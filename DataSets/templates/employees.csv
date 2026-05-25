@@ -1,0 +1,2 @@
+full_name,email,department,role,sentiment_score,is_at_risk,retention_prob
+Jane Doe,jane.doe@company.com,Engineering,Senior Engineer,0.82,false,0.91
