@@ -7,8 +7,10 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
 const API_V1 = `${API_BASE}/api/v1`;
 let preferredApiBase = API_BASE;
 
-// Request timeout (15 seconds) to avoid noisy aborts during cold starts.
+// Request timeout (15 seconds) for normal CRUD calls.
 const REQUEST_TIMEOUT = 15000;
+// Longer timeout for large read operations and dashboard snapshots.
+const LONG_REQUEST_TIMEOUT = 60000;
 
 // Max retries for failed requests
 const MAX_RETRIES = 3;
@@ -180,6 +182,9 @@ async function streamRequest(url, handlers = {}, signal = null) {
  * Make HTTP request with error handling and retry logic
  */
 async function request(url, options = {}, responseType = "json") {
+  const timeoutMs = options.timeoutMs || REQUEST_TIMEOUT;
+  const fetchOptions = { ...options };
+  delete fetchOptions.timeoutMs;
   const isFormData =
     typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers = {
@@ -210,17 +215,17 @@ async function request(url, options = {}, responseType = "json") {
         let requestIndex = 0;
         requestIndex < requestUrls.length;
         requestIndex++
-      ) {
-        const requestUrl = requestUrls[requestIndex];
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+        ) {
+          const requestUrl = requestUrls[requestIndex];
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-        try {
-          response = await fetch(requestUrl, {
-            ...options,
-            headers,
-            signal: controller.signal,
-          });
+          try {
+            response = await fetch(requestUrl, {
+              ...fetchOptions,
+              headers,
+              signal: controller.signal,
+            });
           requestUrlUsed = requestUrl;
           break;
         } catch (error) {
@@ -318,7 +323,7 @@ async function request(url, options = {}, responseType = "json") {
         error?.name === "AbortError" ||
         /aborted/i.test(error?.message || "")
       ) {
-        lastError = new Error(`Request timed out after ${REQUEST_TIMEOUT}ms`);
+        lastError = new Error(`Request timed out after ${timeoutMs}ms`);
         if (attempt < MAX_RETRIES - 1) {
           await new Promise((resolve) =>
             setTimeout(resolve, RETRY_DELAY * Math.pow(2, attempt)),
@@ -475,7 +480,9 @@ export const employeesAPI = {
     params.append("limit", limit);
     if (department) params.append("department", department);
     if (atRiskOnly) params.append("at_risk_only", true);
-    return request(`${API_V1}/employees?${params}`);
+    return request(`${API_V1}/employees?${params}`, {
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    });
   },
 
   get: (employeeId) => request(`${API_V1}/employees/${employeeId}`),
@@ -507,7 +514,9 @@ export const candidatesAPI = {
     params.append("skip", skip);
     params.append("limit", limit);
     if (department) params.append("department", department);
-    return request(`${API_V1}/candidates?${params}`);
+    return request(`${API_V1}/candidates?${params}`, {
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    });
   },
 };
 
@@ -540,7 +549,10 @@ export const analysisAPI = {
     return request(`${API_V1}/ai/sentiment/report?${params}`);
   },
 
-  getAnalyticsSnapshot: () => request(`${API_V1}/ai/analytics/snapshot`),
+  getAnalyticsSnapshot: () =>
+    request(`${API_V1}/ai/analytics/snapshot`, {
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    }),
 
   streamAnalytics: (handlers = {}, signal = null) =>
     streamRequest(`${API_V1}/ai/analytics/stream`, handlers, signal),
@@ -668,7 +680,9 @@ export const leanAPI = {
   listSyncJobs: (connectionId) =>
     request(`${API_V1}/lean/connections/${connectionId}/sync-jobs`),
   listQuarantine: (limit = 200) =>
-    request(`${API_V1}/lean/quarantine?limit=${limit}`),
+    request(`${API_V1}/lean/quarantine?limit=${limit}`, {
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    }),
   trainModel: () =>
     request(`${API_V1}/lean/ml/train`, {
       method: "POST",
@@ -715,10 +729,12 @@ export const leanAPI = {
     return uploadRequest(`${API_V1}/lean/import/csv/async`, form, onProgress);
   },
   getImportJobStatus: (jobId) => request(`${API_V1}/lean/import/jobs/${jobId}`),
-  getDataSummary: () => request(`${API_V1}/lean/summary`),
+  getDataSummary: () =>
+    request(`${API_V1}/lean/summary`, { timeoutMs: LONG_REQUEST_TIMEOUT }),
   getExecutivePacket: (template = "monthly") =>
     request(
       `${API_V1}/lean/executive/packet?template=${encodeURIComponent(template)}`,
+      { timeoutMs: LONG_REQUEST_TIMEOUT },
     ),
   listPolicyPacks: () => request(`${API_V1}/lean/policy/packs`),
   createPolicyPack: (payload) =>
@@ -731,12 +747,14 @@ export const leanAPI = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  listDrift: () => request(`${API_V1}/lean/ml/drift`),
+  listDrift: () =>
+    request(`${API_V1}/lean/ml/drift`, { timeoutMs: LONG_REQUEST_TIMEOUT }),
   retrainModel: () =>
     request(`${API_V1}/lean/ml/retrain`, {
       method: "POST",
     }),
-  listModelCards: () => request(`${API_V1}/lean/ml/cards`),
+  listModelCards: () =>
+    request(`${API_V1}/lean/ml/cards`, { timeoutMs: LONG_REQUEST_TIMEOUT }),
   approveModelCard: (cardId) =>
     request(`${API_V1}/lean/ml/cards/${cardId}/approve`, {
       method: "POST",
@@ -749,8 +767,14 @@ export const leanAPI = {
     request(`${API_V1}/lean/ml/cards/${cardId}/rollback`, {
       method: "POST",
     }),
-  getFairnessSummary: () => request(`${API_V1}/lean/compliance/fairness`),
-  listReleaseGates: () => request(`${API_V1}/lean/release-gates`),
+  getFairnessSummary: () =>
+    request(`${API_V1}/lean/compliance/fairness`, {
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    }),
+  listReleaseGates: () =>
+    request(`${API_V1}/lean/release-gates`, {
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    }),
   createReleaseGate: (payload) =>
     request(`${API_V1}/lean/release-gates`, {
       method: "POST",
@@ -760,8 +784,14 @@ export const leanAPI = {
     request(`${API_V1}/lean/release-gates/${gateId}/approve`, {
       method: "POST",
     }),
-  listAuditEvents: () => request(`${API_V1}/lean/audit-events`),
-  listDRRunbooks: () => request(`${API_V1}/lean/dr/runbooks`),
+  listAuditEvents: () =>
+    request(`${API_V1}/lean/audit-events`, {
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    }),
+  listDRRunbooks: () =>
+    request(`${API_V1}/lean/dr/runbooks`, {
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    }),
   createDRRunbook: (payload) =>
     request(`${API_V1}/lean/dr/runbooks`, {
       method: "POST",
@@ -772,13 +802,18 @@ export const leanAPI = {
       method: "POST",
     }),
   listProcurementArtifacts: () =>
-    request(`${API_V1}/lean/procurement/artifacts`),
+    request(`${API_V1}/lean/procurement/artifacts`, {
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    }),
   createProcurementArtifact: (payload) =>
     request(`${API_V1}/lean/procurement/artifacts`, {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  listScenarios: () => request(`${API_V1}/lean/scenarios`),
+  listScenarios: () =>
+    request(`${API_V1}/lean/scenarios`, {
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    }),
 };
 
 /**
