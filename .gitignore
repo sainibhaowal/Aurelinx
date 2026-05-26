@@ -85,6 +85,7 @@ DataSets
 !server/datasets/
 !server/datasets/raw/
 !server/datasets/raw/onet_database_text.zip
+Docs/DataSets/
 # IDE and editor files
 .vscode/
 .idea/
