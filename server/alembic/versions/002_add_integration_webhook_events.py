@@ -1,7 +1,7 @@
 """Alembic revision: add integration_webhook_events table and unique constraint.
 
-Revision ID: 002_add_integration_webhook_events
-Revises: 001_initial_schema
+Revision ID: 002
+Revises: 001
 Create Date: 2026-05-24 00:00:00.000000
 """
 
@@ -11,8 +11,8 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
-revision = '002_add_integration_webhook_events'
-down_revision = '001_initial_schema'
+revision = '002'
+down_revision = '001'
 branch_labels = None
 depends_on = None
 

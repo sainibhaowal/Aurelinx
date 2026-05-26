@@ -182,13 +182,13 @@ This file tracks every single technical step taken in the development of Aureliu
 - **Action:** Added tenant-scoped enterprise tables and request context, scheduled sync orchestration, compliance policy packs, drift snapshots, retraining trigger, and persisted scenario runs.
 - **Location:** `server/app/models/database.py`, `server/app/core/security.py`, `server/app/api/v1/lean_enterprise.py`, `server/app/api/v1/enterprise.py`, `client/src/services/apiClient.js`, `client/src/components/EnterpriseOpsView.jsx`, `server/app/main.py`
 - **Why:** User requested the remaining production controls to be implemented end to end in a lean but powerful way.
-- **Verification:** Backend compile passed with `venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
+- **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
 
 ### ? Step 36: Local End-to-End Import Mode Added
 - **Action:** Added CSV upload endpoints, demo bundle import, demo reset, and frontend file-upload controls so Aurelius can run fully without vendor auth.
 - **Location:** `server/app/api/v1/lean_enterprise.py`, `client/src/services/apiClient.js`, `client/src/components/EnterpriseOpsView.jsx`
 - **Why:** User explicitly wanted the app to work end to end even without enterprise vendor credentials.
-- **Verification:** Backend compile passed with `venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
+- **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
 
 ### ? Step 37: Repository Records and Landing Blueprint Added
 - **Action:** Added durable implementation record, status report, and landing-page blueprint MD files for future tracking and launch work.
@@ -200,7 +200,7 @@ This file tracks every single technical step taken in the development of Aureliu
 - **Action:** Added enterprise audit logging, fairness summary reporting, model cards with approve/promote/rollback, and release gate records with frontend visibility.
 - **Location:** `server/app/api/v1/lean_enterprise.py`, `server/app/api/v1/enterprise.py`, `server/app/models/database.py`, `server/app/schemas/schemas.py`, `client/src/services/apiClient.js`, `client/src/components/EnterpriseOpsView.jsx`
 - **Why:** User requested the remaining enterprise-readiness gaps be closed with a live todo list and implementation tracking.
-- **Verification:** Backend compile passed with `venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
+- **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
 
 ### ? Step 39: Launch / Onboarding UI Added
 - **Action:** Added a dedicated launch screen and wired it into the application shell so the product now has a clear first-run entry experience.
@@ -212,19 +212,19 @@ This file tracks every single technical step taken in the development of Aureliu
 - **Action:** Added a dedicated landing page route outside the shell, lazy-loaded heavy views, removed the export stack from the initial bundle, and added DR/SRE and procurement artifact admin screens.
 - **Location:** `client/src/App.jsx`, `client/src/components/LandingPage.jsx`, `client/src/components/EnterpriseOpsView.jsx`, `client/src/services/apiClient.js`, `server/app/models/database.py`, `server/app/schemas/schemas.py`, `server/app/api/v1/lean_enterprise.py`
 - **Why:** The product needed a real public landing entry, lower startup bundle cost, and the remaining enterprise admin surfaces the user requested.
-- **Verification:** Backend compile passed with `venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
+- **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
 
 ### ? Step 41: Landing Blueprint Completed
 - **Action:** Expanded the landing page to include the problem, solution, modules, demo proof, integrations, governance, value, and CTA sections, plus a local demo-request capture form.
 - **Location:** `client/src/components/LandingPage.jsx`, `Docs/Worked/aurelius_landing_page_remaining_todo.md`
 - **Why:** The landing page blueprint needed to be implemented fully so the public entry experience matches the planned product narrative.
-- **Verification:** Backend compile passed with `venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
+- **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
 
 ### ? Step 42: Import Validation and Executive Packet Added
 - **Action:** Added import validation scorecards, an executive packet endpoint, frontend packet display, and the end-to-end checklist.
 - **Location:** `server/app/api/v1/lean_enterprise.py`, `client/src/services/apiClient.js`, `client/src/components/EnterpriseOpsView.jsx`, `Docs/Worked/aurelius_end_to_end_checklist.md`
 - **Why:** The remaining product gaps from the roadmap needed to be made visible and operational in the UI before only optional hardening work remained.
-- **Verification:** Backend compile passed with `venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
+- **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
 
 ### ? Step 43: Demo Skill Import Fixed
 - **Action:** Fixed the demo bundle import and validation paths to recognize `skill_name` in the skills CSV files, so employee and candidate skills now load correctly.
@@ -236,19 +236,19 @@ This file tracks every single technical step taken in the development of Aureliu
 - **Action:** Added a structured copilot endpoint that builds grounded workforce context and generates LLM-backed leadership briefs, plus a reusable copilot panel in launch, dashboard, and enterprise views.
 - **Location:** `server/app/api/v1/analysis.py`, `server/app/schemas/schemas.py`, `client/src/components/AICopilotPanel.jsx`, `client/src/components/LaunchPadView.jsx`, `client/src/App.jsx`, `client/src/components/EnterpriseOpsView.jsx`, `client/src/services/apiClient.js`
 - **Why:** The user wanted the LLM integrated across the product, not only in chat, so the model can explain HR risk, recommend actions, and support operational decisions everywhere.
-- **Verification:** Backend compile passed with `venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`; clean API call to `/api/v1/ai/copilot/brief` returned a grounded executive summary from the live dataset.
+- **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`; clean API call to `/api/v1/ai/copilot/brief` returned a grounded executive summary from the live dataset.
 
 ### ? Step 45: Page-Scoped Agent Drawer Added
 - **Action:** Added a floating right-side page agent drawer with collapsible UI, page-specific quick actions, and a page-context-aware copilot prompt that can trigger real app operations from each surface.
 - **Location:** `client/src/components/PageAgentDrawer.jsx`, `client/src/App.jsx`, `server/app/api/v1/analysis.py`, `server/app/schemas/schemas.py`, `client/src/components/LaunchPadView.jsx`
 - **Why:** The user wanted page-level AI control with real buttons that can act on the current dashboard, directory, launch, analytics, scout, workflow, and enterprise surfaces.
-- **Verification:** Backend compile passed with `venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
+- **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
 
 ### ? Step 46: OpenCode Provider Added
 - **Action:** Added OpenCode Zen as a first-class provider in the settings UI and wired it through the chat, copilot, and talent analysis paths as an OpenAI-compatible gateway provider.
 - **Location:** `client/src/components/ProvidersView.jsx`, `server/app/api/v1/chat.py`, `server/app/api/v1/analysis.py`, `server/app/schemas/schemas.py`, `client/src/components/AICopilotPanel.jsx`, `client/src/components/IntelligenceChatView.jsx`, `client/src/components/TalentScoutView.jsx`
 - **Why:** The user wanted a new LLM provider option called OpenCode added into provider settings so the app can use it for HR intelligence workflows.
-- **Verification:** Backend compile passed with `venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
+- **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
 
 ### ? Step 47: Dev Host Binding Fixed
 - **Action:** Updated the client dev script to bind Vite explicitly to `127.0.0.1`, then restarted the frontend so `npm run dev` serves correctly on the same local address as the backend.

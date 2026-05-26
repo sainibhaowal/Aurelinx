@@ -15,10 +15,13 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from app.api.v1.employees import get_employee_out
+from app.api.v1.candidates import get_candidate_out
 from app.core.logging_config import get_logger
 from app.core.security import TokenData, get_current_user
+from app.core.provider_utils import normalize_local_provider_base
 from app.core.data_policy import filter_real_records
 from app.models.database import (
+    CandidateTable,
     CompliancePolicyTable,
     EmployeeTable,
     ForecastScenarioTable,
@@ -47,7 +50,11 @@ def _analytics_snapshot(session: Session) -> dict:
     total = len(employees)
     at_risk = len([e for e in employees if e.is_at_risk])
     at_risk_pct = round((at_risk / total) * 100, 1) if total > 0 else 0.0
-    avg_sentiment = round(sum(e.sentiment_score for e in employees) / total, 3) if total > 0 else 0.0
+    avg_sentiment = (
+        round(sum(e.sentiment_score for e in employees) / total, 3)
+        if total > 0
+        else 0.0
+    )
 
     dept_map = {}
     dept_risk = {}
@@ -56,7 +63,10 @@ def _analytics_snapshot(session: Session) -> dict:
         if e.is_at_risk:
             dept_risk[e.department] = dept_risk.get(e.department, 0) + 1
 
-    depts = [{"name": name, "count": count} for name, count in sorted(dept_map.items(), key=lambda x: x[0])]
+    depts = [
+        {"name": name, "count": count}
+        for name, count in sorted(dept_map.items(), key=lambda x: x[0])
+    ]
     top_risk_dept = None
     top_risk_ratio = 0.0
     for dept_name, dept_total in dept_map.items():
@@ -73,10 +83,24 @@ def _analytics_snapshot(session: Session) -> dict:
     else:
         risk_level = "LOW"
 
-    low_sentiment_count = len([e for e in employees if (e.sentiment_score or 0.0) < 0.45])
-    low_retention_count = len([e for e in employees if (e.retention_prob if e.retention_prob is not None else 0.5) < 0.55])
+    low_sentiment_count = len(
+        [e for e in employees if (e.sentiment_score or 0.0) < 0.45]
+    )
+    low_retention_count = len(
+        [
+            e
+            for e in employees
+            if (e.retention_prob if e.retention_prob is not None else 0.5) < 0.55
+        ]
+    )
     flagged_count = len([e for e in employees if e.is_at_risk])
-    dept_pressure_count = len([d for d, total_count in dept_map.items() if total_count > 0 and (dept_risk.get(d, 0) / total_count) >= 0.25])
+    dept_pressure_count = len(
+        [
+            d
+            for d, total_count in dept_map.items()
+            if total_count > 0 and (dept_risk.get(d, 0) / total_count) >= 0.25
+        ]
+    )
     top_risk_drivers = sorted(
         [
             {"factor": "Low morale signals", "count": low_sentiment_count},
@@ -106,13 +130,31 @@ def _workspace_context(session: Session) -> Dict:
     employees = filter_real_records(session.exec(select(EmployeeTable)).all())
     top_risky = sorted(
         employees,
-        key=lambda e: (float(e.retention_prob or 0.5) - float(e.sentiment_score or 0.0), e.sentiment_score),
+        key=lambda e: (
+            float(e.retention_prob or 0.5) - float(e.sentiment_score or 0.0),
+            e.sentiment_score,
+        ),
         reverse=False,
     )[:5]
-    interventions = session.exec(select(InterventionTable).order_by(InterventionTable.created_at.desc()).limit(10)).all()
-    policies = session.exec(select(CompliancePolicyTable).where(CompliancePolicyTable.status == "active").order_by(CompliancePolicyTable.created_at.desc()).limit(5)).all()
-    model_cards = session.exec(select(MLModelCardTable).order_by(MLModelCardTable.created_at.desc()).limit(5)).all()
-    scenarios = session.exec(select(ForecastScenarioTable).order_by(ForecastScenarioTable.created_at.desc()).limit(3)).all()
+    interventions = session.exec(
+        select(InterventionTable)
+        .order_by(InterventionTable.created_at.desc())
+        .limit(10)
+    ).all()
+    policies = session.exec(
+        select(CompliancePolicyTable)
+        .where(CompliancePolicyTable.status == "active")
+        .order_by(CompliancePolicyTable.created_at.desc())
+        .limit(5)
+    ).all()
+    model_cards = session.exec(
+        select(MLModelCardTable).order_by(MLModelCardTable.created_at.desc()).limit(5)
+    ).all()
+    scenarios = session.exec(
+        select(ForecastScenarioTable)
+        .order_by(ForecastScenarioTable.created_at.desc())
+        .limit(3)
+    ).all()
     snapshot = _analytics_snapshot(session)
     return {
         "snapshot": snapshot,
@@ -168,7 +210,9 @@ def _workspace_context(session: Session) -> Dict:
     }
 
 
-def _build_sentiment_metrics(employees: List[EmployeeTable], prev_snapshot: dict = None) -> Tuple[List[SentimentMetric], dict]:
+def _build_sentiment_metrics(
+    employees: List[EmployeeTable], prev_snapshot: dict = None
+) -> Tuple[List[SentimentMetric], dict]:
     total = len(employees)
     if total == 0:
         return [], {}
@@ -185,7 +229,9 @@ def _build_sentiment_metrics(employees: List[EmployeeTable], prev_snapshot: dict
     talent_density = 1.0 - largest_dept_ratio
 
     leadership_trust = min(max((avg_retention * 0.6) + (avg_sentiment * 0.4), 0.0), 1.0)
-    burnout_risk = min(max((at_risk_ratio * 0.7) + ((1.0 - avg_sentiment) * 0.3), 0.0), 1.0)
+    burnout_risk = min(
+        max((at_risk_ratio * 0.7) + ((1.0 - avg_sentiment) * 0.3), 0.0), 1.0
+    )
 
     current = {
         "Organizational Morale": round(avg_sentiment, 4),
@@ -216,7 +262,9 @@ def _tokenize(text: str) -> List[str]:
     return re.findall(r"[a-z0-9\+\#\.]{2,}", text.lower())
 
 
-def _score_employee(prompt: str, employee: EmployeeTable, skill_names: List[str]) -> float:
+def _score_employee(
+    prompt: str, employee: EmployeeTable, skill_names: List[str]
+) -> float:
     prompt_tokens = set(_tokenize(prompt))
     role_tokens = set(_tokenize(employee.role))
     dept_tokens = set(_tokenize(employee.department))
@@ -233,6 +281,25 @@ def _score_employee(prompt: str, employee: EmployeeTable, skill_names: List[str]
     return score
 
 
+def _score_candidate(
+    prompt: str, candidate: CandidateTable, skill_names: List[str]
+) -> float:
+    prompt_tokens = set(_tokenize(prompt))
+    role_tokens = set(_tokenize(candidate.role))
+    dept_tokens = set(_tokenize(candidate.department))
+    skill_tokens = set(_tokenize(" ".join(skill_names)))
+
+    role_hits = len(prompt_tokens & role_tokens)
+    dept_hits = len(prompt_tokens & dept_tokens)
+    skill_hits = len(prompt_tokens & skill_tokens)
+
+    score = (skill_hits * 2.6) + (role_hits * 2.1) + (dept_hits * 1.3)
+    score += float(candidate.sentiment_score) * 1.0
+    if candidate.match_score is not None:
+        score += float(candidate.match_score) * 1.8
+    return score
+
+
 async def _call_openai_compatible_model(
     provider: str,
     prompt: str,
@@ -244,11 +311,15 @@ async def _call_openai_compatible_model(
     provider = (provider or "openai").lower()
 
     if provider == "lmstudio":
-        endpoint = f"{(base_url or 'http://127.0.0.1:1234/v1').rstrip('/')}/chat/completions"
+        endpoint = (
+            f"{normalize_local_provider_base(base_url).rstrip('/')}/chat/completions"
+        )
         selected_model = model or "local-model"
         auth_header = {}
     elif provider == "opencode":
-        endpoint = f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/chat/completions"
+        endpoint = (
+            f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/chat/completions"
+        )
         selected_model = model or "gpt-5.5"
         auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     elif provider == "groq":
@@ -308,7 +379,9 @@ async def _call_copilot_model(
 ) -> str:
     provider = (provider or "lmstudio").lower()
     if provider == "lmstudio":
-        endpoint = f"{(base_url or 'http://127.0.0.1:1234/v1').rstrip('/')}/chat/completions"
+        endpoint = (
+            f"{normalize_local_provider_base(base_url).rstrip('/')}/chat/completions"
+        )
         selected_model = model or "local-model"
         auth_header = {}
     elif provider == "groq":
@@ -331,7 +404,9 @@ async def _call_copilot_model(
         selected_model = model or "gemini-1.5-pro"
         auth_header = {}
     elif provider == "opencode":
-        endpoint = f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/chat/completions"
+        endpoint = (
+            f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/chat/completions"
+        )
         selected_model = model or "gpt-5.5"
         auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     else:
@@ -353,7 +428,10 @@ async def _call_copilot_model(
         payload = {
             "model": selected_model,
             "temperature": 0.2,
-            "messages": [{"role": "system", "content": system_msg}, {"role": "user", "content": user_msg}],
+            "messages": [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
         }
     elif provider == "claude":
         payload = {
@@ -376,7 +454,11 @@ async def _call_copilot_model(
         if provider in ["openai", "lmstudio", "groq"]:
             return data["choices"][0]["message"]["content"].strip()
         if provider == "claude":
-            text_blocks = [b.get("text", "") for b in data.get("content", []) if isinstance(b, dict)]
+            text_blocks = [
+                b.get("text", "")
+                for b in data.get("content", [])
+                if isinstance(b, dict)
+            ]
             return "\n".join([t for t in text_blocks if t]).strip()
         return (
             data.get("candidates", [{}])[0]
@@ -400,40 +482,78 @@ async def analyze_talent(
     logger.info(f"User {current_user.user_id} analyzing talent with {request.provider}")
 
     try:
+        candidates = filter_real_records(session.exec(select(CandidateTable)).all())
         employees = filter_real_records(session.exec(select(EmployeeTable)).all())
-        if not employees:
-            return AIAnalysisResponse(
-                analysis="No employee profiles are available in the database for analysis.",
-                candidates=[],
-                confidence_score=0.0,
-                processing_time_ms=0.0,
-            )
 
-        scored: List[Tuple[float, EmployeeTable, List[str]]] = []
-        for emp in employees:
-            skills = session.exec(select(SkillTable).where(SkillTable.employee_id == emp.id)).all()
-            skill_names = [s.name for s in skills]
-            score = _score_employee(request.prompt, emp, skill_names)
-            scored.append((score, emp, skill_names))
+        use_candidates = bool(candidates)
+        scored: List[Tuple[float, object, List[str]]] = []
+        if use_candidates:
+            for cand in candidates:
+                skills = session.exec(
+                    select(SkillTable).where(SkillTable.candidate_id == cand.id)
+                ).all()
+                skill_names = [s.name for s in skills]
+                score = _score_candidate(request.prompt, cand, skill_names)
+                scored.append((score, cand, skill_names))
+        else:
+            if not employees:
+                return AIAnalysisResponse(
+                    analysis="No candidate or employee profiles are available in the database for analysis.",
+                    candidates=[],
+                    confidence_score=0.0,
+                    processing_time_ms=0.0,
+                )
+
+            for emp in employees:
+                skills = session.exec(
+                    select(SkillTable).where(SkillTable.employee_id == emp.id)
+                ).all()
+                skill_names = [s.name for s in skills]
+                score = _score_employee(request.prompt, emp, skill_names)
+                scored.append((score, emp, skill_names))
 
         scored.sort(key=lambda x: x[0], reverse=True)
         top_scored = scored[:5]
 
         top_profiles = []
         top_candidates = []
-        for score, emp, skill_names in top_scored:
-            top_profiles.append(
-                {
-                    "name": emp.full_name,
-                    "role": emp.role,
-                    "department": emp.department,
-                    "skills": skill_names[:8],
-                    "sentiment_score": emp.sentiment_score,
-                    "is_at_risk": emp.is_at_risk,
-                    "ranking_score": round(score, 3),
-                }
-            )
-            top_candidates.append(get_employee_out(emp, session))
+        for score, person, skill_names in top_scored:
+            if use_candidates:
+                cand = person  # type: ignore[assignment]
+                candidate_out = get_candidate_out(cand, session).model_dump(mode="json")
+                candidate_out.update(
+                    {
+                        "is_at_risk": bool((cand.match_score or 0.0) < 0.55),
+                        "retention_prob": float(cand.match_score or 0.0),
+                        "updated_at": cand.created_at,
+                    }
+                )
+                top_profiles.append(
+                    {
+                        "name": cand.full_name,
+                        "role": cand.role,
+                        "department": cand.department,
+                        "skills": skill_names[:8],
+                        "sentiment_score": cand.sentiment_score,
+                        "match_score": cand.match_score,
+                        "ranking_score": round(score, 3),
+                    }
+                )
+                top_candidates.append(candidate_out)
+            else:
+                emp = person  # type: ignore[assignment]
+                top_profiles.append(
+                    {
+                        "name": emp.full_name,
+                        "role": emp.role,
+                        "department": emp.department,
+                        "skills": skill_names[:8],
+                        "sentiment_score": emp.sentiment_score,
+                        "is_at_risk": emp.is_at_risk,
+                        "ranking_score": round(score, 3),
+                    }
+                )
+                top_candidates.append(get_employee_out(emp, session))
 
         analysis_text = await _call_openai_compatible_model(
             provider=request.provider,
@@ -454,7 +574,9 @@ async def analyze_talent(
         )
 
     except httpx.HTTPStatusError as e:
-        logger.error(f"Provider HTTP error: {e.response.status_code} - {e.response.text}")
+        logger.error(
+            f"Provider HTTP error: {e.response.status_code} - {e.response.text}"
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="AI provider request failed. Check provider endpoint/key/model.",
@@ -486,7 +608,7 @@ async def get_sentiment_report(
             query = query.where(EmployeeTable.department == department)
 
         if include_at_risk_only:
-            query = query.where(EmployeeTable.is_at_risk == True)
+            query = query.where(EmployeeTable.is_at_risk)
 
         employees = filter_real_records(session.exec(query).all())
 
@@ -500,7 +622,7 @@ async def get_sentiment_report(
             )
 
         at_risk_count = len([e for e in employees if e.is_at_risk])
-        avg_sentiment = sum([e.sentiment_score for e in employees]) / len(employees)
+        sum([e.sentiment_score for e in employees]) / len(employees)
         metrics, _ = _build_sentiment_metrics(employees)
         risk_pct = (at_risk_count / len(employees) * 100) if employees else 0.0
 
@@ -510,9 +632,11 @@ async def get_sentiment_report(
             at_risk_percentage=risk_pct,
             metrics=metrics,
             recommendations=[
-                f"Monitor {at_risk_count} employees at risk of attrition"
-                if at_risk_count > 0
-                else "All employees seem satisfied",
+                (
+                    f"Monitor {at_risk_count} employees at risk of attrition"
+                    if at_risk_count > 0
+                    else "All employees seem satisfied"
+                ),
                 f"Current at-risk percentage is {risk_pct:.1f}%",
                 "Consider engagement initiatives for teams with lower morale",
                 "Schedule 1:1s with at-risk employees for retention conversations",
@@ -530,7 +654,11 @@ async def get_sentiment_report(
 @router.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "aurelius-ai", "timestamp": datetime.utcnow().isoformat()}
+    return {
+        "status": "healthy",
+        "service": "aurelius-ai",
+        "timestamp": datetime.utcnow().isoformat(),
+    }
 
 
 @router.get("/sentiment/stream")
@@ -555,7 +683,7 @@ async def sentiment_stream(
                     if department:
                         query = query.where(EmployeeTable.department == department)
                     if include_at_risk_only:
-                        query = query.where(EmployeeTable.is_at_risk == True)
+                        query = query.where(EmployeeTable.is_at_risk)
                     employees = filter_real_records(session.exec(query).all())
 
                 prev = _SENTIMENT_PREV_SNAPSHOT.get(stream_key, {})
@@ -565,7 +693,11 @@ async def sentiment_stream(
                 total = len(employees)
                 at_risk_count = len([e for e in employees if e.is_at_risk])
                 risk_pct = round((at_risk_count / total) * 100, 1) if total > 0 else 0.0
-                avg_sentiment = round(sum(e.sentiment_score for e in employees) / total, 3) if total > 0 else 0.0
+                avg_sentiment = (
+                    round(sum(e.sentiment_score for e in employees) / total, 3)
+                    if total > 0
+                    else 0.0
+                )
 
                 if risk_pct >= 20:
                     priority_level = "Level 3"
@@ -668,14 +800,21 @@ async def copilot_brief(
     """
     Generate a grounded, cross-surface HR intelligence brief.
     """
-    logger.info(f"User {current_user.user_id} requested copilot brief on {request.surface}")
+    logger.info(
+        f"User {current_user.user_id} requested copilot brief on {request.surface}"
+    )
     context = _workspace_context(session)
     context["surface"] = request.surface
     context["prompt"] = request.prompt
     context["page_context"] = request.page_context or {}
 
-    if request.provider in {"openai", "groq", "claude", "gemini", "opencode"} and not request.api_key:
-        raise HTTPException(status_code=422, detail="LLM provider key is required for this provider")
+    if (
+        request.provider in {"openai", "groq", "claude", "gemini", "opencode"}
+        and not request.api_key
+    ):
+        raise HTTPException(
+            status_code=422, detail="LLM provider key is required for this provider"
+        )
 
     try:
         answer = await _call_copilot_model(

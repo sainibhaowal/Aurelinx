@@ -1,8 +1,22 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Bot, Plus, Send, Trash2, Pencil, Paperclip, Eraser, X, Square, PanelRightClose, PanelRightOpen, Brain, Sparkles } from 'lucide-react';
-import { chatAPI } from '../services/apiClient';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import {
+  Bot,
+  Plus,
+  Send,
+  Trash2,
+  Pencil,
+  Paperclip,
+  Eraser,
+  X,
+  Square,
+  PanelRightClose,
+  PanelRightOpen,
+  Brain,
+  Info,
+} from "lucide-react";
+import { chatAPI } from "../services/apiClient";
 
 // ── Premium Markdown renderer — full GFM: tables, code, blockquotes, lists, task lists, images ──
 const MarkdownRenderer = ({ children }) => (
@@ -11,27 +25,41 @@ const MarkdownRenderer = ({ children }) => (
     components={{
       // ── Headings (H1–H6) ──
       h1: ({ children }) => (
-        <h1 className="text-xl font-black text-cyan-300 mt-5 mb-2 border-b border-cyan-500/20 pb-1">{children}</h1>
+        <h1 className="text-xl font-black text-cyan-300 mt-5 mb-2 border-b border-cyan-500/20 pb-1">
+          {children}
+        </h1>
       ),
       h2: ({ children }) => (
-        <h2 className="text-lg font-extrabold text-cyan-400 mt-4 mb-2">{children}</h2>
+        <h2 className="text-lg font-extrabold text-cyan-400 mt-4 mb-2">
+          {children}
+        </h2>
       ),
       h3: ({ children }) => (
-        <h3 className="text-base font-bold text-cyan-300/80 mt-3 mb-1.5">{children}</h3>
+        <h3 className="text-base font-bold text-cyan-300/80 mt-3 mb-1.5">
+          {children}
+        </h3>
       ),
       h4: ({ children }) => (
-        <h4 className="text-sm font-bold text-slate-300 mt-2 mb-1">{children}</h4>
+        <h4 className="text-sm font-bold text-slate-300 mt-2 mb-1">
+          {children}
+        </h4>
       ),
       h5: ({ children }) => (
-        <h5 className="text-xs font-bold text-slate-400 mt-2 mb-1 uppercase tracking-wider">{children}</h5>
+        <h5 className="text-xs font-bold text-slate-400 mt-2 mb-1 uppercase tracking-wider">
+          {children}
+        </h5>
       ),
       h6: ({ children }) => (
-        <h6 className="text-xs font-semibold text-slate-500 mt-1 mb-0.5 uppercase tracking-wider">{children}</h6>
+        <h6 className="text-xs font-semibold text-slate-500 mt-1 mb-0.5 uppercase tracking-wider">
+          {children}
+        </h6>
       ),
 
       // ── Paragraph ──
       p: ({ children }) => (
-        <p className="text-sm text-slate-200 leading-relaxed my-1.5">{children}</p>
+        <p className="text-sm text-slate-200 leading-relaxed my-1.5">
+          {children}
+        </p>
       ),
 
       // ── Bold, Italic, Strikethrough ──
@@ -48,19 +76,27 @@ const MarkdownRenderer = ({ children }) => (
       // ── Code (inline and block) — react-markdown v10 uses node.position to differentiate ──
       code: ({ node, className, children, ...props }) => {
         // If the parent is a <pre>, this is a fenced code block — render as block code
-        const isBlock = node?.position?.start?.line !== node?.position?.end?.line ||
-          (className && className.startsWith('language-'));
+        const isBlock =
+          node?.position?.start?.line !== node?.position?.end?.line ||
+          (className && className.startsWith("language-"));
         if (isBlock) {
-          const lang = className ? className.replace('language-', '') : '';
+          const lang = className ? className.replace("language-", "") : "";
           return (
-            <code className="block font-mono text-xs text-cyan-100 leading-relaxed" data-lang={lang} {...props}>
+            <code
+              className="block font-mono text-xs text-cyan-100 leading-relaxed"
+              data-lang={lang}
+              {...props}
+            >
               {children}
             </code>
           );
         }
         // Inline code
         return (
-          <code className="px-1.5 py-0.5 rounded-md bg-slate-950 border border-cyan-900/40 text-cyan-300 font-mono text-xs" {...props}>
+          <code
+            className="px-1.5 py-0.5 rounded-md bg-slate-950 border border-cyan-900/40 text-cyan-300 font-mono text-xs"
+            {...props}
+          >
             {children}
           </code>
         );
@@ -88,31 +124,44 @@ const MarkdownRenderer = ({ children }) => (
       // ── Unordered List ──
       ul: ({ className, children }) => {
         // GFM task lists get a special class from remark-gfm
-        const isTaskList = className?.includes('contains-task-list');
+        const isTaskList = className?.includes("contains-task-list");
         return (
-          <ul className={`my-2 space-y-1 ${isTaskList ? 'pl-0 list-none' : 'pl-1'}`}>{children}</ul>
+          <ul
+            className={`my-2 space-y-1 ${isTaskList ? "pl-0 list-none" : "pl-1"}`}
+          >
+            {children}
+          </ul>
         );
       },
 
       // ── Ordered List ──
       ol: ({ children, start }) => (
-        <ol className="my-2 space-y-1 pl-5 list-decimal marker:text-cyan-600" start={start}>{children}</ol>
+        <ol
+          className="my-2 space-y-1 pl-5 list-decimal marker:text-cyan-600"
+          start={start}
+        >
+          {children}
+        </ol>
       ),
 
       // ── List Item (with task list checkbox support) ──
       li: ({ className, checked, children }) => {
-        const isTask = className?.includes('task-list-item');
+        const isTask = className?.includes("task-list-item");
         if (isTask) {
           return (
             <li className="flex items-start gap-2 text-sm text-slate-200 leading-relaxed list-none">
-              <span className={`mt-0.5 flex-shrink-0 h-4 w-4 rounded border inline-flex items-center justify-center text-[10px] ${
-                checked
-                  ? 'bg-cyan-500/20 border-cyan-400/60 text-cyan-300'
-                  : 'bg-slate-900 border-white/15 text-transparent'
-              }`}>
-                {checked ? '✓' : ''}
+              <span
+                className={`mt-0.5 flex-shrink-0 h-4 w-4 rounded border inline-flex items-center justify-center text-[10px] ${
+                  checked
+                    ? "bg-cyan-500/20 border-cyan-400/60 text-cyan-300"
+                    : "bg-slate-900 border-white/15 text-transparent"
+                }`}
+              >
+                {checked ? "✓" : ""}
               </span>
-              <span className={checked ? 'line-through text-slate-500' : ''}>{children}</span>
+              <span className={checked ? "line-through text-slate-500" : ""}>
+                {children}
+              </span>
             </li>
           );
         }
@@ -126,7 +175,7 @@ const MarkdownRenderer = ({ children }) => (
 
       // ── GFM Task List Checkbox (prevent default input rendering) ──
       input: ({ type, checked }) => {
-        if (type === 'checkbox') return null; // handled by li above
+        if (type === "checkbox") return null; // handled by li above
         return <input type={type} checked={checked} readOnly />;
       },
 
@@ -145,39 +194,67 @@ const MarkdownRenderer = ({ children }) => (
       // ── Images ──
       img: ({ src, alt }) => (
         <div className="my-3 rounded-xl overflow-hidden border border-white/10 shadow-lg">
-          <img src={src} alt={alt || ''} className="w-full h-auto object-cover" loading="lazy" />
-          {alt && <div className="px-3 py-1.5 text-xs text-slate-400 bg-black/30">{alt}</div>}
+          <img
+            src={src}
+            alt={alt || ""}
+            className="w-full h-auto object-cover"
+            loading="lazy"
+          />
+          {alt && (
+            <div className="px-3 py-1.5 text-xs text-slate-400 bg-black/30">
+              {alt}
+            </div>
+          )}
         </div>
       ),
 
       // ── GFM Tables — premium glassmorphic dark styling ──
       table: ({ children }) => (
         <div className="my-4 overflow-x-auto rounded-xl border border-white/10 shadow-lg shadow-black/30 -mx-1">
-          <table className="min-w-full text-sm border-collapse table-auto">{children}</table>
+          <table className="min-w-full text-sm border-collapse table-auto">
+            {children}
+          </table>
         </div>
       ),
       thead: ({ children }) => (
-        <thead className="bg-cyan-950/60 border-b border-cyan-500/20">{children}</thead>
+        <thead className="bg-cyan-950/60 border-b border-cyan-500/20">
+          {children}
+        </thead>
       ),
       tbody: ({ children }) => (
         <tbody className="divide-y divide-white/5">{children}</tbody>
       ),
       tr: ({ children }) => (
-        <tr className="hover:bg-white/[0.03] transition-colors duration-150">{children}</tr>
+        <tr className="hover:bg-white/[0.03] transition-colors duration-150">
+          {children}
+        </tr>
       ),
       th: ({ children, style }) => (
-        <th className="px-3 py-2 text-left text-[11px] font-extrabold uppercase tracking-wider text-cyan-400" style={style}>
+        <th
+          className="px-3 py-2 text-left text-[11px] font-extrabold uppercase tracking-wider text-cyan-400"
+          style={style}
+        >
           {children}
         </th>
       ),
       td: ({ children, style }) => (
-        <td className="px-3 py-2 text-slate-200 text-sm break-words" style={style}>{children}</td>
+        <td
+          className="px-3 py-2 text-slate-200 text-sm break-words"
+          style={style}
+        >
+          {children}
+        </td>
       ),
       sup: ({ children }) => (
         <sup className="text-[10px] text-cyan-400 font-bold">{children}</sup>
       ),
       section: ({ children, ...props }) => (
-        <section className="mt-4 pt-3 border-t border-white/5 text-xs text-slate-400" {...props}>{children}</section>
+        <section
+          className="mt-4 pt-3 border-t border-white/5 text-xs text-slate-400"
+          {...props}
+        >
+          {children}
+        </section>
       ),
     }}
   >
@@ -185,45 +262,122 @@ const MarkdownRenderer = ({ children }) => (
   </ReactMarkdown>
 );
 
-
 // ── Compact Markdown renderer with micro-typography (font-size 10px to 11px) and zero vertical spacing/margins for thinking panels ──
 const CompactMarkdownRenderer = ({ children }) => (
   <ReactMarkdown
     remarkPlugins={[remarkGfm]}
     components={{
-      h1: ({ children }) => <h1 className="text-[11px] font-black text-cyan-300/90 my-0.5 p-0 border-b border-cyan-500/10 pb-0.5">{children}</h1>,
-      h2: ({ children }) => <h2 className="text-[11px] font-extrabold text-cyan-400 my-0.5 p-0">{children}</h2>,
-      h3: ({ children }) => <h3 className="text-[10.5px] font-bold text-cyan-300/80 my-0.5 p-0">{children}</h3>,
-      h4: ({ children }) => <h4 className="text-[10.5px] font-bold text-slate-350 my-0.5 p-0">{children}</h4>,
-      h5: ({ children }) => <h5 className="text-[10px] font-bold text-slate-400 my-0.5 p-0 uppercase tracking-wider">{children}</h5>,
-      h6: ({ children }) => <h6 className="text-[10px] font-semibold text-slate-550 my-0.5 p-0 uppercase tracking-wider">{children}</h6>,
-      p: ({ children }) => <p className="text-[10.5px] text-slate-300 leading-normal my-0.5 p-0">{children}</p>,
-      strong: ({ children }) => <strong className="font-bold text-cyan-200/95">{children}</strong>,
-      em: ({ children }) => <em className="italic text-slate-400">{children}</em>,
-      del: ({ children }) => <del className="line-through text-slate-600">{children}</del>,
+      h1: ({ children }) => (
+        <h1 className="text-[11px] font-black text-cyan-300/90 my-0.5 p-0 border-b border-cyan-500/10 pb-0.5">
+          {children}
+        </h1>
+      ),
+      h2: ({ children }) => (
+        <h2 className="text-[11px] font-extrabold text-cyan-400 my-0.5 p-0">
+          {children}
+        </h2>
+      ),
+      h3: ({ children }) => (
+        <h3 className="text-[10.5px] font-bold text-cyan-300/80 my-0.5 p-0">
+          {children}
+        </h3>
+      ),
+      h4: ({ children }) => (
+        <h4 className="text-[10.5px] font-bold text-slate-350 my-0.5 p-0">
+          {children}
+        </h4>
+      ),
+      h5: ({ children }) => (
+        <h5 className="text-[10px] font-bold text-slate-400 my-0.5 p-0 uppercase tracking-wider">
+          {children}
+        </h5>
+      ),
+      h6: ({ children }) => (
+        <h6 className="text-[10px] font-semibold text-slate-550 my-0.5 p-0 uppercase tracking-wider">
+          {children}
+        </h6>
+      ),
+      p: ({ children }) => (
+        <p className="text-[10.5px] text-slate-300 leading-normal my-0.5 p-0">
+          {children}
+        </p>
+      ),
+      strong: ({ children }) => (
+        <strong className="font-bold text-cyan-200/95">{children}</strong>
+      ),
+      em: ({ children }) => (
+        <em className="italic text-slate-400">{children}</em>
+      ),
+      del: ({ children }) => (
+        <del className="line-through text-slate-600">{children}</del>
+      ),
       code: ({ node, className, children, ...props }) => {
-        const isBlock = node?.position?.start?.line !== node?.position?.end?.line || (className && className.startsWith('language-'));
+        const isBlock =
+          node?.position?.start?.line !== node?.position?.end?.line ||
+          (className && className.startsWith("language-"));
         if (isBlock) {
-          const lang = className ? className.replace('language-', '') : '';
-          return <code className="block font-mono text-[10px] text-cyan-200/80 leading-tight my-0.5 p-0" data-lang={lang} {...props}>{children}</code>;
+          const lang = className ? className.replace("language-", "") : "";
+          return (
+            <code
+              className="block font-mono text-[10px] text-cyan-200/80 leading-tight my-0.5 p-0"
+              data-lang={lang}
+              {...props}
+            >
+              {children}
+            </code>
+          );
         }
-        return <code className="px-1 py-0 rounded bg-slate-950/80 border border-cyan-900/30 text-cyan-400 font-mono text-[10px]" {...props}>{children}</code>;
+        return (
+          <code
+            className="px-1 py-0 rounded bg-slate-950/80 border border-cyan-900/30 text-cyan-400 font-mono text-[10px]"
+            {...props}
+          >
+            {children}
+          </code>
+        );
       },
-      pre: ({ children }) => <pre className="my-1 p-1 rounded bg-black/45 border border-cyan-950/40 overflow-x-auto font-mono text-[10px] whitespace-pre shadow-inner">{children}</pre>,
-      blockquote: ({ children }) => <blockquote className="my-0.5 pl-2 border-l border-cyan-500/30 bg-cyan-500/2 rounded-r py-0.5 pr-2 text-slate-400 text-[10.5px]">{children}</blockquote>,
+      pre: ({ children }) => (
+        <pre className="my-1 p-1 rounded bg-black/45 border border-cyan-950/40 overflow-x-auto font-mono text-[10px] whitespace-pre shadow-inner">
+          {children}
+        </pre>
+      ),
+      blockquote: ({ children }) => (
+        <blockquote className="my-0.5 pl-2 border-l border-cyan-500/30 bg-cyan-500/2 rounded-r py-0.5 pr-2 text-slate-400 text-[10.5px]">
+          {children}
+        </blockquote>
+      ),
       hr: () => <hr className="my-1 border-0 h-px bg-cyan-900/10" />,
       ul: ({ className, children }) => {
-        const isTaskList = className?.includes('contains-task-list');
-        return <ul className={`my-0.5 p-0 list-none space-y-0 ${isTaskList ? '' : 'pl-0.5'}`}>{children}</ul>;
+        const isTaskList = className?.includes("contains-task-list");
+        return (
+          <ul
+            className={`my-0.5 p-0 list-none space-y-0 ${isTaskList ? "" : "pl-0.5"}`}
+          >
+            {children}
+          </ul>
+        );
       },
-      ol: ({ children, start }) => <ol className="my-0.5 p-0 space-y-0 pl-3 list-decimal marker:text-cyan-800" start={start}>{children}</ol>,
+      ol: ({ children, start }) => (
+        <ol
+          className="my-0.5 p-0 space-y-0 pl-3 list-decimal marker:text-cyan-800"
+          start={start}
+        >
+          {children}
+        </ol>
+      ),
       li: ({ className, checked, children }) => {
-        const isTask = className?.includes('task-list-item');
+        const isTask = className?.includes("task-list-item");
         if (isTask) {
           return (
             <li className="flex items-start gap-1 text-[10.5px] text-slate-300 leading-tight list-none my-0.5 p-0">
-              <span className={`mt-0.5 flex-shrink-0 h-2.5 w-2.5 rounded border inline-flex items-center justify-center text-[7px] ${checked ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-400' : 'bg-slate-950 border-white/5 text-transparent'}`}>{checked ? '✓' : ''}</span>
-              <span className={checked ? 'line-through text-slate-550' : ''}>{children}</span>
+              <span
+                className={`mt-0.5 flex-shrink-0 h-2.5 w-2.5 rounded border inline-flex items-center justify-center text-[7px] ${checked ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-400" : "bg-slate-950 border-white/5 text-transparent"}`}
+              >
+                {checked ? "✓" : ""}
+              </span>
+              <span className={checked ? "line-through text-slate-550" : ""}>
+                {children}
+              </span>
             </li>
           );
         }
@@ -235,39 +389,79 @@ const CompactMarkdownRenderer = ({ children }) => (
         );
       },
       input: ({ type, checked }) => {
-        if (type === 'checkbox') return null;
+        if (type === "checkbox") return null;
         return <input type={type} checked={checked} readOnly />;
       },
-      a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-400/90 underline decoration-cyan-800/40 hover:text-cyan-300 text-[10.5px]">{children}</a>,
-      img: ({ src, alt }) => <div className="my-0.5 rounded border border-white/5 overflow-hidden max-w-xs"><img src={src} alt={alt || ''} className="w-full h-auto" loading="lazy" /></div>,
-      table: ({ children }) => <div className="my-1 overflow-x-auto rounded border border-white/5"><table className="min-w-full text-[10px] border-collapse table-auto">{children}</table></div>,
-      thead: ({ children }) => <thead className="bg-cyan-950/40 border-b border-cyan-500/10">{children}</thead>,
-      tbody: ({ children }) => <tbody className="divide-y divide-white/5">{children}</tbody>,
-      tr: ({ children }) => <tr className="hover:bg-white/[0.01] transition-colors">{children}</tr>,
-      th: ({ children, style }) => <th className="px-1 py-0.5 text-left text-[10px] font-extrabold uppercase tracking-wider text-cyan-400/80" style={style}>{children}</th>,
-      td: ({ children, style }) => <td className="px-1 py-0.5 text-slate-350 text-[10px] break-words" style={style}>{children}</td>,
-      sup: ({ children }) => <sup className="text-[8px] text-cyan-500/80 font-bold">{children}</sup>,
-      section: ({ children, ...props }) => <section className="my-0.5 pt-0.5 border-t border-white/5 text-[8.5px] text-slate-500" {...props}>{children}</section>,
+      a: ({ href, children }) => (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-cyan-400/90 underline decoration-cyan-800/40 hover:text-cyan-300 text-[10.5px]"
+        >
+          {children}
+        </a>
+      ),
+      img: ({ src, alt }) => (
+        <div className="my-0.5 rounded border border-white/5 overflow-hidden max-w-xs">
+          <img
+            src={src}
+            alt={alt || ""}
+            className="w-full h-auto"
+            loading="lazy"
+          />
+        </div>
+      ),
+      table: ({ children }) => (
+        <div className="my-1 overflow-x-auto rounded border border-white/5">
+          <table className="min-w-full text-[10px] border-collapse table-auto">
+            {children}
+          </table>
+        </div>
+      ),
+      thead: ({ children }) => (
+        <thead className="bg-cyan-950/40 border-b border-cyan-500/10">
+          {children}
+        </thead>
+      ),
+      tbody: ({ children }) => (
+        <tbody className="divide-y divide-white/5">{children}</tbody>
+      ),
+      tr: ({ children }) => (
+        <tr className="hover:bg-white/[0.01] transition-colors">{children}</tr>
+      ),
+      th: ({ children, style }) => (
+        <th
+          className="px-1 py-0.5 text-left text-[10px] font-extrabold uppercase tracking-wider text-cyan-400/80"
+          style={style}
+        >
+          {children}
+        </th>
+      ),
+      td: ({ children, style }) => (
+        <td
+          className="px-1 py-0.5 text-slate-350 text-[10px] break-words"
+          style={style}
+        >
+          {children}
+        </td>
+      ),
+      sup: ({ children }) => (
+        <sup className="text-[8px] text-cyan-500/80 font-bold">{children}</sup>
+      ),
+      section: ({ children, ...props }) => (
+        <section
+          className="my-0.5 pt-0.5 border-t border-white/5 text-[8.5px] text-slate-500"
+          {...props}
+        >
+          {children}
+        </section>
+      ),
     }}
   >
     {children}
   </ReactMarkdown>
 );
-
-
-const COGNITIVE_STEPS = [
-  "Initializing cognitive vector space...",
-  "Analyzing semantic patterns in user input parameters...",
-  "Querying HR Directory indexes for potential candidate and employee records...",
-  "Verifying secure RBAC data access policies...",
-  "Retrieving active integrations, ATS records, and webhook endpoints...",
-  "Synthesizing corporate compliance regulations...",
-  "Correlating workforce sentiment scores and performance vectors...",
-  "Evaluating mitigation scenarios and governance risks...",
-  "Formulating professional, executive-grade recommendations...",
-  "Structuring tabular employee dashboards and responses...",
-  "Finalizing cognitive inference pathways and formatting output..."
-];
 
 // ── Premium Collapsible inline Thinking / Reasoning Box for DeepSeek-style models ──
 const ThinkingMessageContent = ({ text, children, isBusy }) => {
@@ -279,41 +473,41 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
     if (!isBusy) return;
     setElapsed(0);
     const timer = setInterval(() => {
-      setElapsed(prev => prev + 1);
+      setElapsed((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
   }, [isBusy]);
 
   const rawText = useMemo(() => {
     if (text) return text;
-    if (typeof children === 'string') return children;
-    if (Array.isArray(children)) return children.join('');
-    return '';
+    if (typeof children === "string") return children;
+    if (Array.isArray(children)) return children.join("");
+    return "";
   }, [text, children]);
 
   const parsed = useMemo(() => {
     if (!rawText) {
-      return { thinking: '', content: '' };
+      return { thinking: "", content: "" };
     }
-    const thinkStart = rawText.indexOf('<think>');
+    const thinkStart = rawText.indexOf("<think>");
     if (thinkStart === -1) {
-      return { thinking: '', content: rawText };
+      return { thinking: "", content: rawText };
     }
-    const thinkEnd = rawText.indexOf('</think>');
+    const thinkEnd = rawText.indexOf("</think>");
     if (thinkEnd === -1) {
       return {
         thinking: rawText.slice(thinkStart + 7),
-        content: ''
+        content: "",
       };
     }
     return {
       thinking: rawText.slice(thinkStart + 7, thinkEnd),
-      content: rawText.slice(thinkEnd + 8)
+      content: rawText.slice(thinkEnd + 8),
     };
   }, [rawText]);
 
   // Determine if active thinking is occurring
-  const isThinkingActive = isBusy && parsed.content === '';
+  const isThinkingActive = isBusy && parsed.content === "";
 
   // Only render if we actually have model thoughts (past or current) or are currently thinking
   if (!parsed.thinking && !isThinkingActive) {
@@ -336,15 +530,22 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
           className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors w-fit font-medium cursor-pointer py-1"
         >
           <span className="flex items-center gap-1.5">
-            <Brain size={12} className={isThinkingActive ? "text-cyan-400 animate-pulse" : "text-slate-500"} />
+            <Brain
+              size={12}
+              className={
+                isThinkingActive
+                  ? "text-cyan-400 animate-pulse"
+                  : "text-slate-500"
+              }
+            />
             {isThinkingActive ? (
-              <span>Thinking... {elapsed > 0 ? `(${elapsed}s)` : ''}</span>
+              <span>Thinking... {elapsed > 0 ? `(${elapsed}s)` : ""}</span>
             ) : (
-              <span>Thought for {elapsed > 0 ? `${elapsed}s` : 'trace'}</span>
+              <span>Thought for {elapsed > 0 ? `${elapsed}s` : "trace"}</span>
             )}
           </span>
           <span className="text-[10px] text-slate-500 font-mono transition-transform duration-200">
-            {isOpen ? '▼' : '▶'}
+            {isOpen ? "▼" : "▶"}
           </span>
         </button>
 
@@ -354,7 +555,9 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
             <div className="flex gap-2.5 items-start bg-slate-900/30 p-2.5 rounded-lg border border-white/5 font-sans italic select-text w-full">
               <div className="flex-1 max-h-48 overflow-y-auto custom-scrollbar">
                 {parsed.thinking.trim() ? (
-                  <CompactMarkdownRenderer>{parsed.thinking.trim()}</CompactMarkdownRenderer>
+                  <CompactMarkdownRenderer>
+                    {parsed.thinking.trim()}
+                  </CompactMarkdownRenderer>
                 ) : (
                   <div className="flex items-center gap-1.5 font-mono text-[7px] text-slate-500">
                     <span className="inline-block h-2 w-2 rounded-full border border-cyan-500/30 border-t-cyan-400 animate-spin" />
@@ -376,28 +579,27 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
   );
 };
 
-
 const IntelligenceChatView = () => {
   const [sessions, setSessions] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [selectedSessions, setSelectedSessions] = useState([]);
   const [attachments, setAttachments] = useState([]);
-  const [streamText, setStreamText] = useState('');
+  const [streamText, setStreamText] = useState("");
   const [streamPhase, setStreamPhase] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(true);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [renameValue, setRenameValue] = useState("");
   const abortRef = useRef(null);
   const chatEndRef = useRef(null);
 
   const selectedSession = useMemo(
     () => sessions.find((s) => s.id === selectedSessionId) || null,
-    [sessions, selectedSessionId]
+    [sessions, selectedSessionId],
   );
-
 
   const loadSessions = async () => {
     const data = await chatAPI.listSessions();
@@ -430,7 +632,7 @@ const IntelligenceChatView = () => {
   }, [selectedSessionId]);
 
   const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -438,7 +640,7 @@ const IntelligenceChatView = () => {
   }, [messages, streamText, busy]);
 
   const createSession = async () => {
-    const created = await chatAPI.createSession('New Workflow Session');
+    const created = await chatAPI.createSession("New Workflow Session");
     setSessions((prev) => [created, ...prev]);
     setSelectedSessionId(created.id);
   };
@@ -446,15 +648,20 @@ const IntelligenceChatView = () => {
   const renameSession = async (sessionId) => {
     const session = sessions.find((s) => s.id === sessionId);
     setRenameTarget(session);
-    setRenameValue(session?.title || '');
+    setRenameValue(session?.title || "");
   };
 
   const confirmRenameSession = async () => {
     if (!renameTarget || !renameValue.trim()) return;
-    const updated = await chatAPI.renameSession(renameTarget.id, renameValue.trim());
-    setSessions((prev) => prev.map((s) => (s.id === renameTarget.id ? updated : s)));
+    const updated = await chatAPI.renameSession(
+      renameTarget.id,
+      renameValue.trim(),
+    );
+    setSessions((prev) =>
+      prev.map((s) => (s.id === renameTarget.id ? updated : s)),
+    );
     setRenameTarget(null);
-    setRenameValue('');
+    setRenameValue("");
   };
 
   const deleteSession = async (sessionId) => {
@@ -483,8 +690,8 @@ const IntelligenceChatView = () => {
     // 1. Optimistically clear messages and attachments on the UI instantly
     setMessages([]);
     setAttachments([]);
-    setStreamText('');
-    setStreamPhase('cleared');
+    setStreamText("");
+    setStreamPhase("cleared");
 
     // 2. Perform clear in backend
     try {
@@ -543,31 +750,35 @@ const IntelligenceChatView = () => {
   const sendMessage = async () => {
     if (!input.trim() || busy) return;
     setBusy(true);
-    setStreamText('');
-    setStreamPhase('starting');
+    setStreamText("");
+    setStreamPhase("starting");
     const controller = new AbortController();
     abortRef.current = controller;
     const userText = input.trim();
-    setInput('');
+    setInput("");
     let sessionId = selectedSessionId;
     try {
       if (!sessionId) {
-        const created = await chatAPI.createSession('New Workflow Session');
+        const created = await chatAPI.createSession("New Workflow Session");
         setSessions((prev) => [created, ...prev]);
         setSelectedSessionId(created.id);
         sessionId = created.id;
       }
 
-      const cfgRaw = localStorage.getItem('AURELIUS_PROVIDERS_CONFIG');
+      const cfgRaw = localStorage.getItem("AURELIUS_PROVIDERS_CONFIG");
       const cfg = cfgRaw ? JSON.parse(cfgRaw) : {};
-      const provider = cfg.activeProvider || 'lmstudio';
+      const provider = cfg.activeProvider || "lmstudio";
       const providerCfg = cfg[provider] || {};
-      const model = providerCfg.selectedModel || cfg.lmstudio?.selectedModel || null;
-      const baseUrl = providerCfg.endpoint || providerCfg.base_url || (provider === 'lmstudio'
-        ? providerCfg.key || 'http://127.0.0.1:1234/v1'
-        : provider === 'opencode'
-          ? 'https://opencode.ai/zen/v1'
-        : null);
+      const model =
+        providerCfg.selectedModel || cfg.lmstudio?.selectedModel || null;
+      const baseUrl =
+        providerCfg.endpoint ||
+        providerCfg.base_url ||
+        (provider === "lmstudio"
+          ? "http://127.0.0.1:1234/v1"
+          : provider === "opencode"
+            ? "https://opencode.ai/zen/v1"
+            : null);
       const payload = {
         content: userText,
         provider,
@@ -583,54 +794,63 @@ const IntelligenceChatView = () => {
           onChunk: ({ text }) => setStreamText((prev) => prev + text),
           onDone: ({ assistant_message, user_message, session }) => {
             setMessages((prev) => [...prev, user_message, assistant_message]);
-            setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)));
-            setStreamText('');
-            setStreamPhase('done');
+            setSessions((prev) =>
+              prev.map((s) => (s.id === session.id ? session : s)),
+            );
+            setStreamText("");
+            setStreamPhase("done");
             loadMessages(session.id).catch(console.error);
           },
           onError: (err) => {
-            setStreamPhase('error');
-            setStreamText('');
+            setStreamPhase("error");
+            setStreamText("");
             setMessages((prev) => [
               ...prev,
               {
                 id: `stream-error-${Date.now()}`,
-                role: 'assistant',
-                content: `Streaming failed: ${err?.message || 'unknown error'}`,
+                role: "assistant",
+                content: `Streaming failed: ${err?.message || "unknown error"}`,
                 tool_trace: null,
                 created_at: new Date().toISOString(),
               },
             ]);
           },
         },
-        controller.signal
+        controller.signal,
       );
       if (!streamResult) {
-        throw new Error('No streamed response received');
+        throw new Error("No streamed response received");
       }
     } catch (e) {
-      if (e.name === 'AbortError') {
+      if (e.name === "AbortError") {
         return;
       }
 
       console.error(e);
 
-      if (e?.status === 404 || /404/.test(String(e?.message || ''))) {
-        const created = await chatAPI.createSession('New Workflow Session');
-        setSessions((prev) => [created, ...prev.filter((s) => s.id !== created.id)]);
+      if (e?.status === 404 || /404/.test(String(e?.message || ""))) {
+        const created = await chatAPI.createSession("New Workflow Session");
+        setSessions((prev) => [
+          created,
+          ...prev.filter((s) => s.id !== created.id),
+        ]);
         setSelectedSessionId(created.id);
         sessionId = created.id;
         try {
-          const cfgRaw = localStorage.getItem('AURELIUS_PROVIDERS_CONFIG');
+          const cfgRaw = localStorage.getItem("AURELIUS_PROVIDERS_CONFIG");
           const cfg = cfgRaw ? JSON.parse(cfgRaw) : {};
-          const provider = cfg.activeProvider || 'lmstudio';
+          const provider = cfg.activeProvider || "lmstudio";
           const providerCfg = cfg[provider] || {};
-          const model = providerCfg.selectedModel || cfg.lmstudio?.selectedModel || null;
-          const baseUrl = providerCfg.endpoint || providerCfg.base_url || (provider === 'lmstudio'
-            ? providerCfg.key || 'http://127.0.0.1:1234/v1'
-            : provider === 'opencode'
-              ? 'https://opencode.ai/zen/v1'
-            : null);
+          const model =
+            providerCfg.selectedModel || cfg.lmstudio?.selectedModel || null;
+          const baseUrl =
+            providerCfg.endpoint ||
+            providerCfg.base_url ||
+            (provider === "lmstudio"
+              ? "http://127.0.0.1:1234/v1"
+              : provider === "opencode"
+                ? "https://opencode.ai/zen/v1"
+                : null);
           const fallback = await chatAPI.sendMessage(sessionId, {
             content: userText,
             provider,
@@ -638,11 +858,19 @@ const IntelligenceChatView = () => {
             base_url: baseUrl,
             model,
           });
-          setMessages((prev) => [...prev, fallback.user_message, fallback.assistant_message]);
-          setSessions((prev) => prev.map((s) => (s.id === fallback.session.id ? fallback.session : s)));
-          setStreamPhase('done');
-          setStreamText('');
-          setInput('');
+          setMessages((prev) => [
+            ...prev,
+            fallback.user_message,
+            fallback.assistant_message,
+          ]);
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === fallback.session.id ? fallback.session : s,
+            ),
+          );
+          setStreamPhase("done");
+          setStreamText("");
+          setInput("");
           return;
         } catch (retryError) {
           console.error(retryError);
@@ -650,16 +878,20 @@ const IntelligenceChatView = () => {
       }
 
       try {
-        const cfgRaw = localStorage.getItem('AURELIUS_PROVIDERS_CONFIG');
+        const cfgRaw = localStorage.getItem("AURELIUS_PROVIDERS_CONFIG");
         const cfg = cfgRaw ? JSON.parse(cfgRaw) : {};
-        const provider = cfg.activeProvider || 'lmstudio';
+        const provider = cfg.activeProvider || "lmstudio";
         const providerCfg = cfg[provider] || {};
-        const model = providerCfg.selectedModel || cfg.lmstudio?.selectedModel || null;
-        const baseUrl = providerCfg.endpoint || providerCfg.base_url || (provider === 'lmstudio'
-          ? providerCfg.key || 'http://127.0.0.1:1234/v1'
-          : provider === 'opencode'
-            ? 'https://opencode.ai/zen/v1'
-          : null);
+        const model =
+          providerCfg.selectedModel || cfg.lmstudio?.selectedModel || null;
+        const baseUrl =
+          providerCfg.endpoint ||
+          providerCfg.base_url ||
+          (provider === "lmstudio"
+            ? "http://127.0.0.1:1234/v1"
+            : provider === "opencode"
+              ? "https://opencode.ai/zen/v1"
+              : null);
         const fallback = await chatAPI.sendMessage(sessionId, {
           content: userText,
           provider,
@@ -667,24 +899,33 @@ const IntelligenceChatView = () => {
           base_url: baseUrl,
           model,
         });
-        setMessages((prev) => [...prev, fallback.user_message, fallback.assistant_message]);
-        setSessions((prev) => prev.map((s) => (s.id === fallback.session.id ? fallback.session : s)));
-        setStreamPhase('done');
-        setStreamText('');
-        setInput('');
+        setMessages((prev) => [
+          ...prev,
+          fallback.user_message,
+          fallback.assistant_message,
+        ]);
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === fallback.session.id ? fallback.session : s,
+          ),
+        );
+        setStreamPhase("done");
+        setStreamText("");
+        setInput("");
       } catch (fallbackError) {
         console.error(fallbackError);
         setMessages((prev) => [
           ...prev,
           {
             id: `error-${Date.now()}`,
-            role: 'assistant',
-            content: 'I could not generate a response. Check provider configuration and backend logs.',
+            role: "assistant",
+            content:
+              "I could not generate a response. Check provider configuration and backend logs.",
             tool_trace: null,
             created_at: new Date().toISOString(),
           },
         ]);
-        setStreamPhase('error');
+        setStreamPhase("error");
       }
     } finally {
       setBusy(false);
@@ -696,18 +937,38 @@ const IntelligenceChatView = () => {
     if (abortRef.current) {
       abortRef.current.abort();
       setBusy(false);
-      setStreamPhase('cancelled');
+      setStreamPhase("cancelled");
     }
   };
 
   return (
     <div className="relative w-full h-full min-h-0">
-      <div className={`premium-card p-4 flex flex-col h-full min-h-0 transition-[margin-right] duration-300 ${drawerOpen ? 'mr-[356px]' : 'mr-[76px]'}`}>
+      <div
+        className={`premium-card p-4 flex flex-col h-full min-h-0 transition-[margin-right] duration-300 ${drawerOpen ? "mr-[356px]" : "mr-[76px]"}`}
+      >
         <div className="flex items-center gap-3 mb-3">
-          <div className="p-2 rounded-lg bg-primary/20 text-cyan-200"><Bot size={18} /></div>
+          <div className="p-2 rounded-lg bg-primary/20 text-cyan-200">
+            <Bot size={18} />
+          </div>
           <div>
-            <h2 className="text-lg font-extrabold">Aurelius Intelligence Chat</h2>
-            <p className="text-xs text-slate-400">Agentic control over dashboard, directory, sentiment, analytics, scout and data tools.</p>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-extrabold">
+                Aurelius Intelligence Chat
+              </h2>
+              <button
+                type="button"
+                onClick={() => setHelpOpen((v) => !v)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 hover:text-cyan-200 transition-colors"
+                title="What Aurelius Intelligence Chat can do"
+                aria-label="What Aurelius Intelligence Chat can do"
+              >
+                <Info size={12} />
+              </button>
+            </div>
+            <p className="text-xs text-slate-400">
+              Agentic control over dashboard, directory, sentiment, analytics,
+              scout and data tools.
+            </p>
           </div>
           <button
             onClick={clearMessages}
@@ -718,13 +979,50 @@ const IntelligenceChatView = () => {
           </button>
         </div>
 
+        {helpOpen && (
+          <div className="mb-3 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4 text-xs text-slate-300">
+            <div className="font-bold uppercase tracking-[0.16em] text-cyan-300 mb-2">
+              What this chat can do
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div>
+                • Answer live questions from Postgres-backed workforce and
+                candidate data.
+              </div>
+              <div>
+                • Explain morale, retention probability, at-risk signals, and
+                department risk clusters.
+              </div>
+              <div>
+                • Surface Talent Scout, Intel Center, Data Ops, Enterprise Ops,
+                policies, and interventions.
+              </div>
+              <div>
+                • Stream token-by-token responses and support file attachments
+                in sessions.
+              </div>
+              <div>
+                • Report system status, model drift, quarantine, release gates,
+                and runbooks.
+              </div>
+              <div>
+                • Give direct counts and exact answers when the data exists in
+                the app.
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col flex-1 min-h-0">
           {sessions.length === 0 ? (
             <div className="flex flex-col items-center justify-center flex-1 text-center p-8 bg-white/[0.01] border border-white/5 rounded-2xl backdrop-blur-md my-auto max-w-xl mx-auto py-16">
               <Bot size={40} className="text-cyan-400 mb-4 animate-pulse" />
-              <h3 className="text-base font-extrabold text-slate-200 mb-2">No Active Workflow Sessions</h3>
+              <h3 className="text-base font-extrabold text-slate-200 mb-2">
+                No Active Workflow Sessions
+              </h3>
               <p className="text-xs text-slate-400 max-w-xs mb-6 leading-relaxed">
-                Create a new session to begin interacting with the Aurelius Intelligence agent.
+                Create a new session to begin interacting with the Aurelius
+                Intelligence agent.
               </p>
               <button
                 onClick={createSession}
@@ -737,18 +1035,28 @@ const IntelligenceChatView = () => {
             <>
               <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
                 {messages.map((m) => (
-                  <div key={m.id} className={`rounded-2xl p-4 border min-w-0 ${m.role === 'user' ? 'ml-16 bg-primary/10 border-primary/30' : 'mr-4 bg-white/5 border-white/10'}`}>
-                    <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5">{m.role}</div>
+                  <div
+                    key={m.id}
+                    className={`rounded-2xl p-4 border min-w-0 ${m.role === "user" ? "ml-16 bg-primary/10 border-primary/30" : "mr-4 bg-white/5 border-white/10"}`}
+                  >
+                    <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5">
+                      {m.role}
+                    </div>
                     <div className="text-sm">
-                      {m.role === 'assistant' ? (
-                        <ThinkingMessageContent text={m.content || ''} isBusy={false} />
+                      {m.role === "assistant" ? (
+                        <ThinkingMessageContent
+                          text={m.content || ""}
+                          isBusy={false}
+                        />
                       ) : (
                         <div className="whitespace-pre-wrap">{m.content}</div>
                       )}
                     </div>
-                    {m.role === 'assistant' && m.tool_trace && (
+                    {m.role === "assistant" && m.tool_trace && (
                       <details className="mt-3 text-xs">
-                        <summary className="cursor-pointer text-cyan-300 font-semibold hover:text-cyan-200">View Ingested Context Trace</summary>
+                        <summary className="cursor-pointer text-cyan-300 font-semibold hover:text-cyan-200">
+                          View Ingested Context Trace
+                        </summary>
                         <pre className="mt-2 p-2.5 rounded-lg bg-black/35 border border-white/10 overflow-x-auto whitespace-pre-wrap text-slate-300">
                           {m.tool_trace}
                         </pre>
@@ -758,33 +1066,50 @@ const IntelligenceChatView = () => {
                 ))}
                 {busy && (
                   <div className="rounded-2xl p-4 border mr-4 bg-[#081220]/45 border-cyan-500/15 shadow-[0_0_15px_rgba(6,182,212,0.02)] backdrop-blur-sm">
-                    <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5">assistant</div>
+                    <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5">
+                      assistant
+                    </div>
                     <div className="text-sm">
                       <ThinkingMessageContent text={streamText} isBusy={busy} />
                     </div>
                   </div>
                 )}
-                {!messages.length && <div className="text-sm text-slate-400">Start a chat session and ask Aurelius to search, analyze, and update data.</div>}
+                {!messages.length && (
+                  <div className="text-sm text-slate-400">
+                    Start a chat session and ask Aurelius to search, analyze,
+                    and update data.
+                  </div>
+                )}
                 <div ref={chatEndRef} />
               </div>
 
               <div className="mt-auto pt-3 border-t border-white/5">
-                <div className="text-xs text-slate-400 mb-2">
-                  Attachments:
-                </div>
+                <div className="text-xs text-slate-400 mb-2">Attachments:</div>
                 <div className="mb-2 flex flex-wrap gap-2">
-                  {attachments.length === 0 && <span className="text-xs text-slate-500">none</span>}
+                  {attachments.length === 0 && (
+                    <span className="text-xs text-slate-500">none</span>
+                  )}
                   {attachments.map((a) => (
-                    <span key={a.id} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-white/10 bg-white/5">
+                    <span
+                      key={a.id}
+                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-white/10 bg-white/5"
+                    >
                       {a.original_name}
-                      <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] uppercase ${
-                        a.parsing_status === 'parsed' ? 'bg-emerald-500/20 text-emerald-300' :
-                        a.parsing_status === 'failed' ? 'bg-rose-500/20 text-rose-300' :
-                        'bg-amber-500/20 text-amber-300'
-                      }`}>
+                      <span
+                        className={`ml-1 px-1.5 py-0.5 rounded text-[10px] uppercase ${
+                          a.parsing_status === "parsed"
+                            ? "bg-emerald-500/20 text-emerald-300"
+                            : a.parsing_status === "failed"
+                              ? "bg-rose-500/20 text-rose-300"
+                              : "bg-amber-500/20 text-amber-300"
+                        }`}
+                      >
                         {a.parsing_status}
                       </span>
-                      <button onClick={() => removeAttachment(a.id)} className="text-rose-300 hover:text-rose-200">
+                      <button
+                        onClick={() => removeAttachment(a.id)}
+                        className="text-rose-300 hover:text-rose-200"
+                      >
                         <X size={11} />
                       </button>
                     </span>
@@ -795,18 +1120,22 @@ const IntelligenceChatView = () => {
                   {busy && (
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-teal-400/20 via-cyan-500/25 to-indigo-500/20 blur-md -z-10 animate-pulse pointer-events-none" />
                   )}
-                  
-                  <div 
+
+                  <div
                     className={`flex items-center gap-3 px-3 py-2 rounded-2xl bg-[#081220]/95 border transition-all duration-500 ${
-                      busy 
-                        ? 'border-cyan-400/40 shadow-[0_0_20px_rgba(45,212,191,0.2)]' 
-                        : 'border-white/10 focus-within:border-primary/50 focus-within:shadow-[0_0_15px_rgba(45,212,191,0.12)]'
+                      busy
+                        ? "border-cyan-400/40 shadow-[0_0_20px_rgba(45,212,191,0.2)]"
+                        : "border-white/10 focus-within:border-primary/50 focus-within:shadow-[0_0_15px_rgba(45,212,191,0.12)]"
                     }`}
                   >
                     {/* Vector Attachment Button */}
                     <label className="h-9 w-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 flex items-center justify-center cursor-pointer transition-all duration-200 flex-shrink-0">
                       <Paperclip size={18} />
-                      <input type="file" className="hidden" onChange={uploadFile} />
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={uploadFile}
+                      />
                     </label>
 
                     {/* Seamless Borderless Input */}
@@ -816,7 +1145,7 @@ const IntelligenceChatView = () => {
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
+                        if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
                           sendMessage();
                         }
@@ -826,45 +1155,77 @@ const IntelligenceChatView = () => {
                     {/* Vector Send / Stop Action Button */}
                     <button
                       onClick={busy ? cancelStream : sendMessage}
-                      disabled={(!busy && (!input.trim() || !selectedSession))}
+                      disabled={!busy && (!input.trim() || !selectedSession)}
                       className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-300 flex-shrink-0 cursor-pointer ${
-                        busy 
-                          ? 'bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500/35 hover:scale-105 active:scale-95 shadow-[0_0_12px_rgba(239,68,68,0.2)]' 
-                          : 'bg-gradient-to-r from-teal-400 to-cyan-400 hover:from-teal-300 hover:to-cyan-300 text-slate-950 hover:scale-105 active:scale-95 shadow-[0_0_15px_rgba(45,212,191,0.25)] disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none'
+                        busy
+                          ? "bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500/35 hover:scale-105 active:scale-95 shadow-[0_0_12px_rgba(239,68,68,0.2)]"
+                          : "bg-gradient-to-r from-teal-400 to-cyan-400 hover:from-teal-300 hover:to-cyan-300 text-slate-950 hover:scale-105 active:scale-95 shadow-[0_0_15px_rgba(45,212,191,0.25)] disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none"
                       }`}
-                      title={busy ? 'Stop stream' : 'Send message'}
+                      title={busy ? "Stop stream" : "Send message"}
                     >
                       {busy ? (
-                        <Square size={13} fill="currentColor" className="animate-pulse" />
+                        <Square
+                          size={13}
+                          fill="currentColor"
+                          className="animate-pulse"
+                        />
                       ) : (
-                        <Send size={15} fill="none" strokeWidth={2.5} className="mr-0.5" />
+                        <Send
+                          size={15}
+                          fill="none"
+                          strokeWidth={2.5}
+                          className="mr-0.5"
+                        />
                       )}
                     </button>
                   </div>
                 </div>
-                {streamPhase && <div className="mt-2 text-xs text-slate-400 uppercase tracking-[0.12em]">stream: {streamPhase}</div>}
+                {streamPhase && (
+                  <div className="mt-2 text-xs text-slate-400 uppercase tracking-[0.12em]">
+                    stream: {streamPhase}
+                  </div>
+                )}
               </div>
             </>
           )}
         </div>
       </div>
 
-      <aside className={`absolute top-0 right-0 h-full transition-all duration-300 ease-out ${drawerOpen ? 'w-[340px]' : 'w-[64px]'}`}>
+      <aside
+        className={`absolute top-0 right-0 h-full transition-all duration-300 ease-out ${drawerOpen ? "w-[340px]" : "w-[64px]"}`}
+      >
         <div className="premium-card h-full min-h-0 overflow-hidden flex flex-col">
-          <div className={`flex items-center ${drawerOpen ? 'justify-between px-3 py-3' : 'justify-center px-2 py-3'}`}>
-            {drawerOpen && <div className="font-bold text-sm uppercase tracking-[0.14em] text-slate-300">Workflow Sessions</div>}
+          <div
+            className={`flex items-center ${drawerOpen ? "justify-between px-3 py-3" : "justify-center px-2 py-3"}`}
+          >
+            {drawerOpen && (
+              <div className="font-bold text-sm uppercase tracking-[0.14em] text-slate-300">
+                Workflow Sessions
+              </div>
+            )}
             <div className="flex items-center gap-2">
               {drawerOpen && (
-                <button onClick={createSession} className="p-2 rounded-lg bg-white/10 hover:bg-white/20">
+                <button
+                  onClick={createSession}
+                  className="p-2 rounded-lg bg-white/10 hover:bg-white/20"
+                >
                   <Plus size={14} />
                 </button>
               )}
               <button
                 onClick={() => setDrawerOpen((v) => !v)}
                 className="p-2 rounded-lg bg-white/10 hover:bg-white/20"
-                aria-label={drawerOpen ? 'Collapse sessions drawer' : 'Expand sessions drawer'}
+                aria-label={
+                  drawerOpen
+                    ? "Collapse sessions drawer"
+                    : "Expand sessions drawer"
+                }
               >
-                {drawerOpen ? <PanelRightClose size={14} /> : <PanelRightOpen size={14} />}
+                {drawerOpen ? (
+                  <PanelRightClose size={14} />
+                ) : (
+                  <PanelRightOpen size={14} />
+                )}
               </button>
             </div>
           </div>
@@ -875,7 +1236,7 @@ const IntelligenceChatView = () => {
                 {sessions.map((s) => (
                   <div
                     key={s.id}
-                    className={`rounded-lg border p-2 ${selectedSessionId === s.id ? 'border-primary/50 bg-primary/10' : 'border-white/10 bg-white/5'}`}
+                    className={`rounded-lg border p-2 ${selectedSessionId === s.id ? "border-primary/50 bg-primary/10" : "border-white/10 bg-white/5"}`}
                   >
                     <div className="flex items-center gap-2">
                       <input
@@ -883,15 +1244,30 @@ const IntelligenceChatView = () => {
                         checked={selectedSessions.includes(s.id)}
                         onChange={(e) =>
                           setSelectedSessions((prev) =>
-                            e.target.checked ? [...prev, s.id] : prev.filter((id) => id !== s.id)
+                            e.target.checked
+                              ? [...prev, s.id]
+                              : prev.filter((id) => id !== s.id),
                           )
                         }
                       />
-                      <button className="flex-1 text-left text-sm font-semibold truncate" onClick={() => setSelectedSessionId(s.id)}>
+                      <button
+                        className="flex-1 text-left text-sm font-semibold truncate"
+                        onClick={() => setSelectedSessionId(s.id)}
+                      >
                         {s.title}
                       </button>
-                      <button onClick={() => renameSession(s.id)} className="p-1 text-slate-300 hover:text-white"><Pencil size={12} /></button>
-                      <button onClick={() => deleteSession(s.id)} className="p-1 text-rose-300 hover:text-rose-200"><Trash2 size={12} /></button>
+                      <button
+                        onClick={() => renameSession(s.id)}
+                        className="p-1 text-slate-300 hover:text-white"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        onClick={() => deleteSession(s.id)}
+                        className="p-1 text-rose-300 hover:text-rose-200"
+                      >
+                        <Trash2 size={12} />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -911,7 +1287,11 @@ const IntelligenceChatView = () => {
                 <span className="w-2 h-2 rounded-full bg-primary/80" />
                 {sessions.length}
               </div>
-              <button onClick={createSession} className="p-2 rounded-lg bg-white/10 hover:bg-white/20" title="New session">
+              <button
+                onClick={createSession}
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20"
+                title="New session"
+              >
                 <Plus size={14} />
               </button>
             </div>
@@ -928,7 +1308,9 @@ const IntelligenceChatView = () => {
               </div>
               <div>
                 <h3 className="text-base font-extrabold">Rename session</h3>
-                <p className="text-xs text-slate-400">Use the app modal instead of a browser dialog.</p>
+                <p className="text-xs text-slate-400">
+                  Use the app modal instead of a browser dialog.
+                </p>
               </div>
             </div>
             <input
@@ -938,8 +1320,8 @@ const IntelligenceChatView = () => {
               className="w-full h-11 rounded-lg bg-slate-900/80 border border-white/10 px-3 outline-none"
               placeholder="Session name"
               onKeyDown={(e) => {
-                if (e.key === 'Enter') confirmRenameSession();
-                if (e.key === 'Escape') setRenameTarget(null);
+                if (e.key === "Enter") confirmRenameSession();
+                if (e.key === "Escape") setRenameTarget(null);
               }}
             />
             <div className="flex justify-end gap-2 mt-4">

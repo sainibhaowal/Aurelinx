@@ -3,20 +3,19 @@ Authentication endpoints - Login, Register, Token refresh
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from sqlmodel import Session as SQLSession, SQLModel, select
 from datetime import timedelta
 from uuid import UUID
 
 from app.schemas.schemas import (
-    LoginRequest, 
-    LoginResponse, 
-    RegisterRequest, 
+    LoginRequest,
+    LoginResponse,
+    RegisterRequest,
     UserOut,
     DeleteAccountRequest,
     ResetWorkspaceRequest,
 )
-from app.models.database import UserTable, engine, get_session
+from app.models.database import UserTable, get_session
 from app.core.security import (
     hash_password,
     verify_password,
@@ -24,82 +23,79 @@ from app.core.security import (
     get_current_user,
     get_current_user_strict,
     TokenData,
-    ACCESS_TOKEN_EXPIRE_MINUTES
+    ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 from app.core.logging_config import get_logger
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = get_logger(__name__)
 
+
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(
-    request: RegisterRequest,
-    session: SQLSession = Depends(get_session)
+    request: RegisterRequest, session: SQLSession = Depends(get_session)
 ):
     """
     Register a new user
-    
+
     - **email**: User email (must be unique)
     - **full_name**: User full name
     - **password**: Password (min 8 chars, must contain uppercase and digit)
     """
-    
+
     logger.info(f"New registration attempt for {request.email}")
-    
+
     # Check if user exists
     existing_user = session.exec(
         select(UserTable).where(UserTable.email == request.email)
     ).first()
-    
+
     if existing_user:
         logger.warning(f"Registration failed: Email already exists {request.email}")
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered"
+            status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
         )
-    
+
     # Create new user
     user = UserTable(
         email=request.email,
         full_name=request.full_name,
         hashed_password=hash_password(request.password),
         is_active=True,
-        is_admin=False
+        is_admin=False,
     )
-    
+
     session.add(user)
     session.commit()
     session.refresh(user)
-    
+
     logger.info(f"User registered successfully: {user.id}")
-    
+
     return UserOut(
         id=user.id,
         email=user.email,
         full_name=user.full_name,
         is_active=user.is_active,
         is_admin=user.is_admin,
-        created_at=user.created_at
+        created_at=user.created_at,
     )
 
+
 @router.post("/login", response_model=LoginResponse)
-async def login(
-    request: LoginRequest,
-    session: SQLSession = Depends(get_session)
-):
+async def login(request: LoginRequest, session: SQLSession = Depends(get_session)):
     """
     Login with email and password
-    
+
     Returns access token and token expiry
     """
-    
+
     logger.info(f"Login attempt for {request.email}")
-    
+
     # Find user
     user = session.exec(
         select(UserTable).where(UserTable.email == request.email)
     ).first()
-    
+
     if not user or not verify_password(request.password, user.hashed_password):
         logger.warning(f"Login failed: Invalid credentials for {request.email}")
         raise HTTPException(
@@ -107,65 +103,60 @@ async def login(
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     if not user.is_active:
         logger.warning(f"Login failed: User inactive {request.email}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive"
+            status_code=status.HTTP_403_FORBIDDEN, detail="User account is inactive"
         )
-    
+
     # Create tokens
     access_token = create_access_token(
-        data={
-            "sub": str(user.id),
-            "email": user.email,
-            "is_admin": user.is_admin
-        },
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    
+
     logger.info(f"Login successful for {user.id}")
-    
+
     return LoginResponse(
         access_token=access_token,
-        token_type="bearer",
+        token_type="bearer",  # nosec B106
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user_id=user.id
+        user_id=user.id,
     )
+
 
 @router.get("/me", response_model=UserOut)
 async def get_current_user_profile(
     current_user: TokenData = Depends(get_current_user),
-    session: SQLSession = Depends(get_session)
+    session: SQLSession = Depends(get_session),
 ):
     """
     Get current user profile
     """
     user = session.get(UserTable, UUID(current_user.user_id))
-    
+
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    
+
     return UserOut(
         id=user.id,
         email=user.email,
         full_name=user.full_name,
         is_active=user.is_active,
         is_admin=user.is_admin,
-        created_at=user.created_at
+        created_at=user.created_at,
     )
 
+
 @router.post("/verify-token", response_model=dict)
-async def verify_token(
-    current_user: TokenData = Depends(get_current_user)
-):
+async def verify_token(current_user: TokenData = Depends(get_current_user)):
     """Verify if token is still valid"""
     return {
         "valid": True,
         "user_id": current_user.user_id,
         "email": current_user.email,
-        "is_admin": current_user.is_admin
+        "is_admin": current_user.is_admin,
     }
 
 
@@ -184,7 +175,9 @@ async def delete_current_account(
 
     user = session.get(UserTable, UUID(current_user.user_id))
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     session.delete(user)
     session.commit()

@@ -8,6 +8,7 @@ yarn-error.log*
 # Python environments
 .venv/
 venv/
+server/venv/
 env/
 ENV/
 bin/
@@ -66,5 +67,53 @@ logs/
 
 # Scratch and rendering caches
 scratch/
+$root/
 ppt_render_*/
 
+# Uploads directory
+uploads/
+server/uploads/
+deliverables/
+# Generated datasets and large files
+DataSets/
+DataSets
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.classpath
+.c9/
+*.sublime-workspace
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Client build artifacts
+client/dist/
+client/build/
+client/node_modules/
+client/.next/
+
+# Server build artifacts
+server/__pycache__/
+server/dist/
+server/build/
+server/*.egg-info/
+
+# Test coverage reports
+coverage/
+.nyc_output/
+
+# Misc temporary files
+*.pid
+*.seed
+*.pid.lock
+.cache/
+.parcel-cache/
+.next
+out

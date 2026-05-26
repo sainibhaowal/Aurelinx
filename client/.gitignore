@@ -12,7 +12,25 @@ dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# Next.js
+.next/
+out/
+build/
+.vercel/
+.turbo/
+public/sw.js
+
+# Testing
+.nyc_output
+coverage
+
+# Misc
+.env.local
+.env.*.local
+*.pem
+*.lock
+
+# IDE and Editor
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -22,3 +40,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db

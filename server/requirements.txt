@@ -13,6 +13,7 @@ alembic==1.14.0
 # Security & Authentication
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+argon2-cffi==23.1.0
 email-validator==2.2.0
 
 # Testing
@@ -38,7 +39,7 @@ pytesseract==0.3.13
 
 # Background worker (Redis + RQ)
 rq==1.1.0
-redis==5.0.11
+redis==5.0.8
 
 # AI/LLM - COMMENTED OUT (requires C++ compiler, will install after)
 # Uncomment these after installing Microsoft Visual C++ Build Tools
@@ -46,7 +47,5 @@ redis==5.0.11
 # langgraph==0.1.19
 # openai==1.52.0
 # anthropic==0.31.0
-
-
 
 

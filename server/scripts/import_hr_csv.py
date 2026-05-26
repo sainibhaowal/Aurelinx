@@ -22,14 +22,13 @@ SERVER_ROOT = Path(__file__).resolve().parent.parent
 if str(SERVER_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVER_ROOT))
 
-from app.models.database import (
+from app.models.database import (  # noqa: E402
     CandidateTable,
     EmployeeTable,
     ExperienceTable,
     SkillTable,
     engine,
 )
-
 
 REQUIRED_EMPLOYEE_COLUMNS = {"full_name", "email", "department", "role"}
 REQUIRED_CANDIDATE_COLUMNS = {"full_name", "email", "department", "role"}
@@ -55,14 +54,21 @@ def _read_csv(path: Path) -> Tuple[List[Dict[str, str]], List[str]]:
         raise FileNotFoundError(f"CSV file not found: {path}")
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
-        rows = [{(k or "").strip(): (v or "").strip() for k, v in row.items()} for row in reader]
+        rows = [
+            {(k or "").strip(): (v or "").strip() for k, v in row.items()}
+            for row in reader
+        ]
         return rows, [h.strip() for h in (reader.fieldnames or [])]
 
 
-def _assert_columns(file_label: str, headers: Iterable[str], required: set[str]) -> None:
+def _assert_columns(
+    file_label: str, headers: Iterable[str], required: set[str]
+) -> None:
     missing = sorted(required - set(headers))
     if missing:
-        raise ValueError(f"{file_label} is missing required columns: {', '.join(missing)}")
+        raise ValueError(
+            f"{file_label} is missing required columns: {', '.join(missing)}"
+        )
 
 
 def _to_bool(value: str, default: bool = False) -> bool:
@@ -80,7 +86,9 @@ def _to_float(value: str, default: Optional[float] = None) -> Optional[float]:
         return default
 
 
-def _upsert_employees(session: Session, rows: List[Dict[str, str]]) -> Tuple[ImportStats, Dict[str, EmployeeTable]]:
+def _upsert_employees(
+    session: Session, rows: List[Dict[str, str]]
+) -> Tuple[ImportStats, Dict[str, EmployeeTable]]:
     stats = ImportStats()
     email_index: Dict[str, EmployeeTable] = {}
     for row in rows:
@@ -89,19 +97,27 @@ def _upsert_employees(session: Session, rows: List[Dict[str, str]]) -> Tuple[Imp
             stats.skipped += 1
             continue
 
-        existing = session.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
+        existing = session.exec(
+            select(EmployeeTable).where(EmployeeTable.email == email)
+        ).first()
         if existing:
             existing.full_name = row["full_name"] or existing.full_name
             existing.department = row["department"] or existing.department
             existing.role = row["role"] or existing.role
             if "sentiment_score" in row:
-                sentiment = _to_float(row.get("sentiment_score", ""), existing.sentiment_score)
+                sentiment = _to_float(
+                    row.get("sentiment_score", ""), existing.sentiment_score
+                )
                 if sentiment is not None:
                     existing.sentiment_score = sentiment
             if "retention_prob" in row:
-                existing.retention_prob = _to_float(row.get("retention_prob", ""), existing.retention_prob)
+                existing.retention_prob = _to_float(
+                    row.get("retention_prob", ""), existing.retention_prob
+                )
             if "is_at_risk" in row:
-                existing.is_at_risk = _to_bool(row.get("is_at_risk", ""), existing.is_at_risk)
+                existing.is_at_risk = _to_bool(
+                    row.get("is_at_risk", ""), existing.is_at_risk
+                )
             session.add(existing)
             email_index[email] = existing
             stats.updated += 1
@@ -124,7 +140,9 @@ def _upsert_employees(session: Session, rows: List[Dict[str, str]]) -> Tuple[Imp
     return stats, email_index
 
 
-def _upsert_candidates(session: Session, rows: List[Dict[str, str]]) -> Tuple[ImportStats, Dict[str, CandidateTable]]:
+def _upsert_candidates(
+    session: Session, rows: List[Dict[str, str]]
+) -> Tuple[ImportStats, Dict[str, CandidateTable]]:
     stats = ImportStats()
     email_index: Dict[str, CandidateTable] = {}
     for row in rows:
@@ -133,17 +151,23 @@ def _upsert_candidates(session: Session, rows: List[Dict[str, str]]) -> Tuple[Im
             stats.skipped += 1
             continue
 
-        existing = session.exec(select(CandidateTable).where(CandidateTable.email == email)).first()
+        existing = session.exec(
+            select(CandidateTable).where(CandidateTable.email == email)
+        ).first()
         if existing:
             existing.full_name = row["full_name"] or existing.full_name
             existing.department = row["department"] or existing.department
             existing.role = row["role"] or existing.role
             if "sentiment_score" in row:
-                sentiment = _to_float(row.get("sentiment_score", ""), existing.sentiment_score)
+                sentiment = _to_float(
+                    row.get("sentiment_score", ""), existing.sentiment_score
+                )
                 if sentiment is not None:
                     existing.sentiment_score = sentiment
             if "match_score" in row:
-                existing.match_score = _to_float(row.get("match_score", ""), existing.match_score)
+                existing.match_score = _to_float(
+                    row.get("match_score", ""), existing.match_score
+                )
             session.add(existing)
             email_index[email] = existing
             stats.updated += 1
@@ -181,13 +205,25 @@ def _import_skills(
             stats.skipped += 1
             continue
 
-        employee = employee_index.get(email) or session.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
-        candidate = candidate_index.get(email) or session.exec(select(CandidateTable).where(CandidateTable.email == email)).first()
+        employee = (
+            employee_index.get(email)
+            or session.exec(
+                select(EmployeeTable).where(EmployeeTable.email == email)
+            ).first()
+        )
+        candidate = (
+            candidate_index.get(email)
+            or session.exec(
+                select(CandidateTable).where(CandidateTable.email == email)
+            ).first()
+        )
         if not employee and not candidate:
             stats.skipped += 1
             continue
 
-        query = select(SkillTable).where(SkillTable.name == skill_name, SkillTable.level == level)
+        query = select(SkillTable).where(
+            SkillTable.name == skill_name, SkillTable.level == level
+        )
         if employee:
             query = query.where(SkillTable.employee_id == employee.id)
         if candidate:
@@ -221,8 +257,18 @@ def _import_experience(
             stats.skipped += 1
             continue
 
-        employee = employee_index.get(email) or session.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
-        candidate = candidate_index.get(email) or session.exec(select(CandidateTable).where(CandidateTable.email == email)).first()
+        employee = (
+            employee_index.get(email)
+            or session.exec(
+                select(EmployeeTable).where(EmployeeTable.email == email)
+            ).first()
+        )
+        candidate = (
+            candidate_index.get(email)
+            or session.exec(
+                select(CandidateTable).where(CandidateTable.email == email)
+            ).first()
+        )
         if not employee and not candidate:
             stats.skipped += 1
             continue
@@ -252,8 +298,16 @@ def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Import HR CSV data into Aurelius")
     p.add_argument("--employees", type=Path, help="employees.csv")
     p.add_argument("--candidates", type=Path, help="candidates.csv")
-    p.add_argument("--employee-skills", type=Path, help="employee_skills.csv (email,skill_name,level)")
-    p.add_argument("--candidate-skills", type=Path, help="candidate_skills.csv (email,skill_name,level)")
+    p.add_argument(
+        "--employee-skills",
+        type=Path,
+        help="employee_skills.csv (email,skill_name,level)",
+    )
+    p.add_argument(
+        "--candidate-skills",
+        type=Path,
+        help="candidate_skills.csv (email,skill_name,level)",
+    )
     p.add_argument("--employee-experience", type=Path, help="employee_experience.csv")
     p.add_argument("--candidate-experience", type=Path, help="candidate_experience.csv")
     return p
@@ -271,7 +325,9 @@ def main() -> None:
             args.candidate_experience,
         ]
     ):
-        raise SystemExit("No files provided. Use --employees and/or --candidates (and optional skills/experience files).")
+        raise SystemExit(
+            "No files provided. Use --employees and/or --candidates (and optional skills/experience files)."
+        )
 
     with Session(engine) as session:
         employee_index: Dict[str, EmployeeTable] = {}
@@ -281,13 +337,17 @@ def main() -> None:
             rows, headers = _read_csv(args.employees)
             _assert_columns("employees.csv", headers, REQUIRED_EMPLOYEE_COLUMNS)
             stats, employee_index = _upsert_employees(session, rows)
-            print(f"Employees: created={stats.created}, updated={stats.updated}, skipped={stats.skipped}")
+            print(
+                f"Employees: created={stats.created}, updated={stats.updated}, skipped={stats.skipped}"
+            )
 
         if args.candidates:
             rows, headers = _read_csv(args.candidates)
             _assert_columns("candidates.csv", headers, REQUIRED_CANDIDATE_COLUMNS)
             stats, candidate_index = _upsert_candidates(session, rows)
-            print(f"Candidates: created={stats.created}, updated={stats.updated}, skipped={stats.skipped}")
+            print(
+                f"Candidates: created={stats.created}, updated={stats.updated}, skipped={stats.skipped}"
+            )
 
         if args.employee_skills:
             rows, headers = _read_csv(args.employee_skills)
@@ -303,15 +363,23 @@ def main() -> None:
 
         if args.employee_experience:
             rows, headers = _read_csv(args.employee_experience)
-            _assert_columns("employee_experience.csv", headers, REQUIRED_EXPERIENCE_COLUMNS)
+            _assert_columns(
+                "employee_experience.csv", headers, REQUIRED_EXPERIENCE_COLUMNS
+            )
             stats = _import_experience(session, rows, employee_index, {})
-            print(f"Employee experience: created={stats.created}, skipped={stats.skipped}")
+            print(
+                f"Employee experience: created={stats.created}, skipped={stats.skipped}"
+            )
 
         if args.candidate_experience:
             rows, headers = _read_csv(args.candidate_experience)
-            _assert_columns("candidate_experience.csv", headers, REQUIRED_EXPERIENCE_COLUMNS)
+            _assert_columns(
+                "candidate_experience.csv", headers, REQUIRED_EXPERIENCE_COLUMNS
+            )
             stats = _import_experience(session, rows, {}, candidate_index)
-            print(f"Candidate experience: created={stats.created}, skipped={stats.skipped}")
+            print(
+                f"Candidate experience: created={stats.created}, skipped={stats.skipped}"
+            )
 
         session.commit()
         print("Import completed.")

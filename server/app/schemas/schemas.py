@@ -3,41 +3,53 @@ Pydantic schemas for request/response validation
 Ensures type safety and automatic documentation
 """
 
-from pydantic import BaseModel, Field, EmailStr, validator, field_validator, ConfigDict
+from pydantic import BaseModel, Field, EmailStr, field_validator, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 
 # ============ AUTHENTICATION SCHEMAS ============
 
+
 class LoginRequest(BaseModel):
     """User login request"""
+
     email: EmailStr = Field(..., description="User email address")
-    password: str = Field(..., min_length=8, max_length=100, description="User password")
+    password: str = Field(
+        ..., min_length=8, max_length=100, description="User password"
+    )
+
 
 class LoginResponse(BaseModel):
     """User login response"""
+
     access_token: str
     token_type: str = "bearer"
     expires_in: int
     user_id: UUID
 
+
 class RegisterRequest(BaseModel):
     """User registration request"""
+
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=100)
-    password: str = Field(..., min_length=8, max_length=100, description="Must be at least 8 characters")
-    
-    @field_validator('password')
+    password: str = Field(
+        ..., min_length=8, max_length=100, description="Must be at least 8 characters"
+    )
+
+    @field_validator("password")
     def validate_password(cls, v):
         if not any(char.isdigit() for char in v):
-            raise ValueError('Password must contain at least one digit')
+            raise ValueError("Password must contain at least one digit")
         if not any(char.isupper() for char in v):
-            raise ValueError('Password must contain at least one uppercase letter')
+            raise ValueError("Password must contain at least one uppercase letter")
         return v
+
 
 class UserOut(BaseModel):
     """User response (no password)"""
+
     id: UUID
     email: str
     full_name: str
@@ -48,38 +60,50 @@ class UserOut(BaseModel):
 
 class DeleteAccountRequest(BaseModel):
     """Delete the current account after explicit confirmation."""
+
     confirmation_text: str = Field(..., min_length=1, max_length=32)
 
 
 class ResetWorkspaceRequest(BaseModel):
     """Reset all non-user app data after explicit confirmation."""
+
     confirmation_text: str = Field(..., min_length=1, max_length=32)
+
 
 # ============ SKILL SCHEMAS ============
 
+
 class SkillCreate(BaseModel):
     """Create skill"""
+
     name: str = Field(..., min_length=1, max_length=100)
     level: int = Field(..., ge=1, le=5, description="Proficiency level 1-5")
 
+
 class SkillOut(BaseModel):
     """Skill response"""
+
     id: UUID
     name: str
     level: int
     created_at: datetime
 
+
 # ============ EXPERIENCE SCHEMAS ============
+
 
 class ExperienceCreate(BaseModel):
     """Create experience"""
+
     company: str = Field(..., min_length=1, max_length=200)
     position: str = Field(..., min_length=1, max_length=100)
     duration_years: float = Field(..., ge=0, le=70)
     description: str = Field(..., min_length=0, max_length=1000)
 
+
 class ExperienceOut(BaseModel):
     """Experience response"""
+
     id: UUID
     company: str
     position: str
@@ -87,10 +111,13 @@ class ExperienceOut(BaseModel):
     description: str
     created_at: datetime
 
+
 # ============ EMPLOYEE SCHEMAS ============
+
 
 class EmployeeCreate(BaseModel):
     """Create employee"""
+
     full_name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
     department: str = Field(..., min_length=1, max_length=100)
@@ -99,16 +126,20 @@ class EmployeeCreate(BaseModel):
     skills: Optional[List[SkillCreate]] = []
     experiences: Optional[List[ExperienceCreate]] = []
 
+
 class EmployeeUpdate(BaseModel):
     """Update employee"""
+
     full_name: Optional[str] = None
     department: Optional[str] = None
     role: Optional[str] = None
     sentiment_score: Optional[float] = Field(None, ge=0.0, le=1.0)
     is_at_risk: Optional[bool] = None
 
+
 class EmployeeOut(BaseModel):
     """Employee response"""
+
     id: UUID
     full_name: str
     email: str
@@ -122,10 +153,13 @@ class EmployeeOut(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 # ============ CANDIDATE SCHEMAS ============
+
 
 class CandidateCreate(BaseModel):
     """Create candidate"""
+
     full_name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
     department: str = Field(..., min_length=1, max_length=100)
@@ -133,8 +167,10 @@ class CandidateCreate(BaseModel):
     skills: Optional[List[SkillCreate]] = []
     experiences: Optional[List[ExperienceCreate]] = []
 
+
 class CandidateOut(BaseModel):
     """Candidate response"""
+
     id: UUID
     full_name: str
     email: str
@@ -147,34 +183,47 @@ class CandidateOut(BaseModel):
     application_date: datetime
     created_at: datetime
 
+
 # ============ AI/ANALYSIS SCHEMAS ============
+
 
 class AIAnalysisRequest(BaseModel):
     """Request for AI talent analysis"""
-    prompt: str = Field(..., min_length=5, max_length=1000, description="What are you looking for?")
+
+    prompt: str = Field(
+        ..., min_length=5, max_length=1000, description="What are you looking for?"
+    )
     provider: str = Field(..., description="LLM provider: openai, claude, or groq")
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     model: Optional[str] = None
-    
-    @field_validator('provider')
+
+    @field_validator("provider")
     def validate_provider(cls, v):
         allowed = ["openai", "claude", "groq", "lmstudio", "gemini", "opencode"]
         if v.lower() not in allowed:
             raise ValueError(f"Provider must be one of {allowed}")
         return v.lower()
-    
-    @field_validator('prompt')
+
+    @field_validator("prompt")
     def validate_prompt(cls, v):
         # Prevent SQL injection and prompt injection
-        dangerous_patterns = ["DROP TABLE", "DELETE FROM", "INSERT INTO", "UPDATE ", ";--"]
+        dangerous_patterns = [
+            "DROP TABLE",
+            "DELETE FROM",
+            "INSERT INTO",
+            "UPDATE ",
+            ";--",
+        ]
         for pattern in dangerous_patterns:
             if pattern.upper() in v.upper():
                 raise ValueError("Prompt contains potentially dangerous SQL patterns")
         return v
 
+
 class AIAnalysisResponse(BaseModel):
     """Response from AI analysis"""
+
     analysis: str
     candidates: List[EmployeeOut] = []
     confidence_score: Optional[float]
@@ -183,24 +232,37 @@ class AIAnalysisResponse(BaseModel):
 
 class AICopilotRequest(BaseModel):
     """Request for the workplace copilot."""
+
     prompt: str = Field(..., min_length=1, max_length=1000)
-    surface: str = Field(default="dashboard", pattern="^(dashboard|directory|enterprise|scout|workflow|chat)$")
-    provider: str = Field(default="lmstudio", description="LLM provider: openai, claude, groq, lmstudio, gemini")
+    surface: str = Field(
+        default="dashboard",
+        pattern="^(dashboard|directory|enterprise|scout|workflow|chat)$",
+    )
+    provider: str = Field(
+        default="lmstudio",
+        description="LLM provider: openai, claude, groq, lmstudio, gemini",
+    )
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     model: Optional[str] = None
     page_context: Optional[dict] = None
 
-    @field_validator('provider')
+    @field_validator("provider")
     def validate_provider(cls, v):
         allowed = ["openai", "claude", "groq", "lmstudio", "gemini", "opencode"]
         if v.lower() not in allowed:
             raise ValueError(f"Provider must be one of {allowed}")
         return v.lower()
 
-    @field_validator('prompt')
+    @field_validator("prompt")
     def validate_prompt(cls, v):
-        dangerous_patterns = ["DROP TABLE", "DELETE FROM", "INSERT INTO", "UPDATE ", ";--"]
+        dangerous_patterns = [
+            "DROP TABLE",
+            "DELETE FROM",
+            "INSERT INTO",
+            "UPDATE ",
+            ";--",
+        ]
         for pattern in dangerous_patterns:
             if pattern.upper() in v.upper():
                 raise ValueError("Prompt contains potentially dangerous SQL patterns")
@@ -209,6 +271,7 @@ class AICopilotRequest(BaseModel):
 
 class AICopilotResponse(BaseModel):
     """Structured response from the workplace copilot."""
+
     headline: str
     answer: str
     evidence: List[str] = []
@@ -221,60 +284,78 @@ class AICopilotResponse(BaseModel):
     surface: str
     generated_at: datetime
 
+
 class SentimentReportRequest(BaseModel):
     """Request sentiment analysis report"""
+
     department: Optional[str] = None
     include_at_risk_only: bool = False
 
+
 class SentimentMetric(BaseModel):
     """Single sentiment metric"""
+
     name: str
     score: float
     velocity: float  # rate of change
     confidence: float
 
+
 class SentimentReportResponse(BaseModel):
     """Sentiment analysis report"""
+
     total_employees: int
     at_risk_count: int
     at_risk_percentage: float
     metrics: List[SentimentMetric]
     recommendations: List[str]
 
+
 # ============ ERROR RESPONSE SCHEMAS ============
+
 
 class ErrorResponse(BaseModel):
     """Standard error response"""
+
     error_code: str
     message: str
     details: Optional[dict] = None
     request_id: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
+
 class ValidationErrorResponse(BaseModel):
     """Validation error response"""
+
     error_code: str = "VALIDATION_ERROR"
     message: str = "Request validation failed"
     errors: dict  # Field name -> error message
     request_id: Optional[str] = None
 
+
 # ============ PAGINATION ============
+
 
 class PaginationParams(BaseModel):
     """Pagination parameters"""
+
     skip: int = Field(default=0, ge=0)
     limit: int = Field(default=10, ge=1, le=100)
     sort_by: Optional[str] = None
     sort_order: str = Field(default="asc", pattern="^(asc|desc)$")
 
+
 class PaginatedResponse(BaseModel):
     """Generic paginated response"""
+
     total: int
     skip: int
     limit: int
     items: List[dict]
 
+
 # ============ CHAT SCHEMAS ============
+
 
 class ChatSessionCreate(BaseModel):
     title: Optional[str] = "New Session"
@@ -326,7 +407,6 @@ class ChatAttachmentOut(BaseModel):
     created_at: datetime
 
 
-
 class ChatResponse(BaseModel):
     session: ChatSessionOut
     user_message: ChatMessageOut
@@ -334,6 +414,7 @@ class ChatResponse(BaseModel):
 
 
 # ============ ENTERPRISE INTELLIGENCE SCHEMAS ============
+
 
 class AttritionDriverOut(BaseModel):
     factor: str
@@ -362,11 +443,16 @@ class AttritionExplainResponse(BaseModel):
 class InterventionCreate(BaseModel):
     title: str = Field(..., min_length=3, max_length=200)
     description: Optional[str] = None
-    target_scope: str = Field(default="team", pattern="^(employee|team|department|org)$")
+    target_scope: str = Field(
+        default="team", pattern="^(employee|team|department|org)$"
+    )
     target_employee_id: Optional[UUID] = None
     target_department: Optional[str] = None
     priority: str = Field(default="medium", pattern="^(low|medium|high|critical)$")
-    status: str = Field(default="planned", pattern="^(planned|approved|in_progress|completed|cancelled)$")
+    status: str = Field(
+        default="planned",
+        pattern="^(planned|approved|in_progress|completed|cancelled)$",
+    )
     owner_name: Optional[str] = None
     due_date: Optional[datetime] = None
     expected_impact: Optional[str] = None
@@ -376,11 +462,17 @@ class InterventionCreate(BaseModel):
 class InterventionUpdate(BaseModel):
     title: Optional[str] = Field(default=None, min_length=3, max_length=200)
     description: Optional[str] = None
-    target_scope: Optional[str] = Field(default=None, pattern="^(employee|team|department|org)$")
+    target_scope: Optional[str] = Field(
+        default=None, pattern="^(employee|team|department|org)$"
+    )
     target_employee_id: Optional[UUID] = None
     target_department: Optional[str] = None
-    priority: Optional[str] = Field(default=None, pattern="^(low|medium|high|critical)$")
-    status: Optional[str] = Field(default=None, pattern="^(planned|approved|in_progress|completed|cancelled)$")
+    priority: Optional[str] = Field(
+        default=None, pattern="^(low|medium|high|critical)$"
+    )
+    status: Optional[str] = Field(
+        default=None, pattern="^(planned|approved|in_progress|completed|cancelled)$"
+    )
     owner_name: Optional[str] = None
     due_date: Optional[datetime] = None
     expected_impact: Optional[str] = None
@@ -410,7 +502,9 @@ class InterventionOut(BaseModel):
 
 class IntegrationConnectionCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=120)
-    source_type: str = Field(..., pattern="^(hris|ats|engagement|productivity|finance)$")
+    source_type: str = Field(
+        ..., pattern="^(hris|ats|engagement|productivity|finance)$"
+    )
     provider: str = Field(..., min_length=2, max_length=80)
     status: str = Field(default="draft", pattern="^(draft|active|paused|error)$")
     base_url: Optional[str] = None
@@ -421,7 +515,9 @@ class IntegrationConnectionCreate(BaseModel):
 
 class IntegrationConnectionUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=2, max_length=120)
-    source_type: Optional[str] = Field(default=None, pattern="^(hris|ats|engagement|productivity|finance)$")
+    source_type: Optional[str] = Field(
+        default=None, pattern="^(hris|ats|engagement|productivity|finance)$"
+    )
     provider: Optional[str] = Field(default=None, min_length=2, max_length=80)
     status: Optional[str] = Field(default=None, pattern="^(draft|active|paused|error)$")
     base_url: Optional[str] = None
@@ -454,7 +550,9 @@ class IntegrationConnectionOut(BaseModel):
 
 class InterventionOutcomeCreate(BaseModel):
     checkpoint_day: int = Field(..., ge=30, le=90)
-    status: str = Field(default="tracking", pattern="^(tracking|improved|neutral|worsened)$")
+    status: str = Field(
+        default="tracking", pattern="^(tracking|improved|neutral|worsened)$"
+    )
     risk_delta: Optional[float] = None
     retention_delta: Optional[float] = None
     notes: Optional[str] = None
@@ -534,7 +632,9 @@ class RiskDriverDrilldownResponse(BaseModel):
 class CompliancePolicyCreate(BaseModel):
     region: str = Field(default="global", min_length=2, max_length=40)
     policy_name: str = Field(..., min_length=3, max_length=120)
-    action_type: str = Field(default="intervention", pattern="^(intervention|export|sync|recommendation)$")
+    action_type: str = Field(
+        default="intervention", pattern="^(intervention|export|sync|recommendation)$"
+    )
     min_confidence: float = Field(default=0.75, ge=0.0, le=1.0)
     requires_approval: bool = True
     blocked_if_missing_evidence: bool = True
@@ -655,7 +755,9 @@ class DRRunbookCreate(BaseModel):
     environment: str = Field(default="prod", pattern="^(dev|stage|prod)$")
     rto_minutes: int = Field(default=120, ge=1)
     rpo_minutes: int = Field(default=15, ge=1)
-    status: str = Field(default="draft", pattern="^(draft|ready|validated|needs_review)$")
+    status: str = Field(
+        default="draft", pattern="^(draft|ready|validated|needs_review)$"
+    )
     notes: Optional[str] = None
 
 

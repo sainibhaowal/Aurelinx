@@ -1,37 +1,37 @@
-import React, { useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import React, { useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 
 const Modal = ({
   isOpen,
   onClose,
   title,
   children,
-  maxWidth = 'max-w-2xl', // max-w-md, max-w-lg, max-w-2xl, max-w-3xl
-  className = '',
+  maxWidth = "max-w-2xl", // max-w-md, max-w-lg, max-w-2xl, max-w-3xl
+  className = "",
   ...props
 }) => {
   // Lock body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     }
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     };
   }, [isOpen]);
 
   // Handle escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isOpen && typeof onClose === 'function') {
+      if (e.key === "Escape" && isOpen && typeof onClose === "function") {
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
   return (
@@ -52,7 +52,7 @@ const Modal = ({
             initial={{ opacity: 0, y: 16, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
             className={`w-full ${maxWidth} bg-slate-900/90 border border-white/10 rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] backdrop-blur-2xl overflow-hidden relative z-10 flex flex-col ${className}`}
             {...props}
           >
@@ -63,7 +63,9 @@ const Modal = ({
             {(title || onClose) && (
               <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-slate-950/20">
                 {title ? (
-                  <h3 className="text-lg font-bold tracking-tight text-white">{title}</h3>
+                  <h3 className="text-lg font-bold tracking-tight text-white">
+                    {title}
+                  </h3>
                 ) : (
                   <div />
                 )}

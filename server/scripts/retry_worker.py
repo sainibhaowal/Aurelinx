@@ -5,6 +5,7 @@ This script polls the `integration_webhook_events` table for failed events
 with `next_retry_at <= now` and attempts re-delivery, updating `attempts`,
 `last_error`, `next_retry_at`, and `status` accordingly.
 """
+
 import asyncio
 import json
 from datetime import datetime, timedelta
@@ -34,9 +35,11 @@ async def deliver_event(event, session):
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
-            resp = await client.post(event.endpoint, content=event.payload.encode('utf-8'), headers=headers)
+            resp = await client.post(
+                event.endpoint, content=event.payload.encode("utf-8"), headers=headers
+            )
             if 200 <= resp.status_code < 300:
-                event.status = 'success'
+                event.status = "success"
                 event.attempts = event.attempts + 1
                 event.last_error = None
                 event.next_retry_at = None
@@ -51,9 +54,11 @@ async def deliver_event(event, session):
             event.last_error = str(exc)
             # Exponential-ish backoff
             backoff = BASE_BACKOFF_SECONDS * (2 ** (event.attempts - 1))
-            event.next_retry_at = datetime.utcnow() + timedelta(seconds=min(backoff, 3600))
+            event.next_retry_at = datetime.utcnow() + timedelta(
+                seconds=min(backoff, 3600)
+            )
             if event.attempts >= MAX_ATTEMPTS:
-                event.status = 'failed'
+                event.status = "failed"
             session.add(event)
             session.commit()
             logger.warning(f"Delivery failed for event {event.id}: {exc}")
@@ -66,12 +71,16 @@ async def poll_loop():
         try:
             with next(get_session()) as session:
                 now = datetime.utcnow()
-                q = session.query(IntegrationWebhookEventTable).filter(
-                    IntegrationWebhookEventTable.status != 'success',
-                    IntegrationWebhookEventTable.next_retry_at != None,
-                    IntegrationWebhookEventTable.next_retry_at <= now,
-                    IntegrationWebhookEventTable.attempts < MAX_ATTEMPTS,
-                ).order_by(IntegrationWebhookEventTable.next_retry_at)
+                q = (
+                    session.query(IntegrationWebhookEventTable)
+                    .filter(
+                        IntegrationWebhookEventTable.status != "success",
+                        IntegrationWebhookEventTable.next_retry_at is not None,
+                        IntegrationWebhookEventTable.next_retry_at <= now,
+                        IntegrationWebhookEventTable.attempts < MAX_ATTEMPTS,
+                    )
+                    .order_by(IntegrationWebhookEventTable.next_retry_at)
+                )
 
                 events = q.all()
                 if events:
@@ -85,7 +94,7 @@ async def poll_loop():
         await asyncio.sleep(POLL_INTERVAL)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         asyncio.run(poll_loop())
     except KeyboardInterrupt:

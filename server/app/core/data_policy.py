@@ -5,7 +5,9 @@ from app.core.config import settings
 
 def include_sample_data() -> bool:
     # Always include sample data in development/debug environments to prevent empty screen experiences
-    if getattr(settings, "ENVIRONMENT", "development") == "development" or getattr(settings, "DEBUG", False):
+    if getattr(settings, "ENVIRONMENT", "development") == "development" or getattr(
+        settings, "DEBUG", False
+    ):
         return True
     return os.getenv("INCLUDE_SAMPLE_DATA", "false").lower() == "true"
 

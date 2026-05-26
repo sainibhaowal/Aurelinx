@@ -6,6 +6,7 @@ CONNECTOR_MAP = {
     "greenhouse": GreenhouseConnector,
 }
 
+
 def get_connector(provider: str):
     cls = CONNECTOR_MAP.get((provider or "").lower())
     return cls() if cls else None

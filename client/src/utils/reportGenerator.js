@@ -1,56 +1,179 @@
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
-export const generateAureliusReport = (employees, analysis) => {
-  const doc = jsPDF();
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function safeValue(value) {
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
+function escapeMarkdownCell(value) {
+  return safeValue(value).replace(/\|/g, "\\|").replace(/\n/g, " ").trim();
+}
+
+function buildEmployeesTableRows(employees = []) {
+  return employees.map((employee) => [
+    safeValue(employee.full_name),
+    safeValue(employee.role),
+    safeValue(employee.department),
+    safeValue(employee.sentiment_score),
+    employee.is_at_risk ? "HIGH" : "Stable",
+  ]);
+}
+
+function exportPdf(employees = [], analysis = "") {
+  const doc = new jsPDF();
   const timestamp = new Date().toLocaleString();
 
-  // 1. Header & Branding
-  doc.setFillColor(15, 23, 42); // Deep blue theme
-  doc.rect(0, 0, 210, 40, 'F');
-  
+  doc.setFillColor(15, 23, 42);
+  doc.rect(0, 0, 210, 40, "F");
+
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
-  doc.text('AURELIUS MANAGEMENT INTELLIGENCE', 20, 25);
-  
+  doc.text("AURELIUS MANAGEMENT INTELLIGENCE", 20, 25);
+
   doc.setFontSize(10);
   doc.text(`Generated on: ${timestamp}`, 150, 32);
 
-  // 2. Executive Summary
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(16);
-  doc.text('Executive Summary', 20, 55);
-  
+  doc.text("Executive Summary", 20, 55);
+
   doc.setFontSize(10);
   doc.text(`Total Headcount Analyzed: ${employees.length}`, 20, 65);
-  doc.text(`Identified Risk Clusters: ${employees.filter(e => e.is_at_risk).length} Employees`, 20, 72);
+  doc.text(
+    `Identified Risk Clusters: ${employees.filter((e) => e.is_at_risk).length} Employees`,
+    20,
+    72,
+  );
 
-  // 3. AI Analysis Section
   if (analysis) {
     doc.setFontSize(14);
-    doc.text('Aurelius Strategic Analysis', 20, 85);
+    doc.text("Aurelius Strategic Analysis", 20, 85);
     doc.setFontSize(9);
     const splitText = doc.splitTextToSize(analysis, 170);
     doc.text(splitText, 20, 95);
   }
 
-  // 4. Talent Table
-  const tableData = employees.map(e => [
-    e.full_name,
-    e.role,
-    e.department,
-    e.sentiment_score.toString(),
-    e.is_at_risk ? 'HIGH' : 'Stable'
-  ]);
-
-  doc.autoTable({
-    startY: analysis ? 130 : 85,
-    head: [['Name', 'Role', 'Department', 'Sentiment', 'Risk Status']],
-    body: tableData,
-    theme: 'grid',
-    headStyles: { fillStyle: [15, 23, 42] }
+  const startY = analysis ? 130 : 85;
+  autoTable(doc, {
+    startY,
+    head: [["Name", "Role", "Department", "Sentiment", "Risk Status"]],
+    body: buildEmployeesTableRows(employees),
+    theme: "grid",
+    headStyles: {
+      fillColor: [15, 23, 42],
+      textColor: [255, 255, 255],
+    },
+    styles: {
+      fontSize: 9,
+      cellPadding: 2.2,
+      overflow: "linebreak",
+    },
+    alternateRowStyles: {
+      fillColor: [245, 247, 250],
+    },
   });
 
-  // 5. Save the PDF
   doc.save(`Aurelius_Management_Report_${Date.now()}.pdf`);
+}
+
+function exportMarkdown(employees = [], analysis = "") {
+  const timestamp = new Date().toLocaleString();
+  const atRisk = employees.filter((e) => e.is_at_risk).length;
+
+  const lines = [
+    "# Aurelius Management Intelligence Report",
+    "",
+    `Generated on: ${timestamp}`,
+    "",
+    "## Executive Summary",
+    `- Total Headcount Analyzed: ${employees.length}`,
+    `- Identified Risk Clusters: ${atRisk} Employees`,
+    `- Risk Rate: ${employees.length ? ((atRisk / employees.length) * 100).toFixed(1) : "0.0"}%`,
+  ];
+
+  if (analysis) {
+    lines.push("", "## Aurelius Strategic Analysis", analysis.trim());
+  }
+
+  lines.push(
+    "",
+    "## Talent Table",
+    "",
+    "| Name | Role | Department | Sentiment | Risk Status |",
+    "| --- | --- | --- | --- | --- |",
+  );
+
+  buildEmployeesTableRows(employees).forEach((row) => {
+    lines.push(`| ${row.map(escapeMarkdownCell).join(" | ")} |`);
+  });
+
+  const blob = new Blob([lines.join("\n")], {
+    type: "text/markdown;charset=utf-8",
+  });
+  downloadBlob(blob, `Aurelius_Management_Report_${Date.now()}.md`);
+}
+
+function exportExcel(employees = [], analysis = "") {
+  const workbook = XLSX.utils.book_new();
+  const timestamp = new Date().toLocaleString();
+  const atRisk = employees.filter((e) => e.is_at_risk).length;
+
+  const summarySheet = XLSX.utils.aoa_to_sheet([
+    ["Aurelius Management Intelligence Report"],
+    ["Generated At", timestamp],
+    ["Employees Analyzed", employees.length],
+    ["At-Risk Employees", atRisk],
+    [
+      "Risk Rate",
+      employees.length
+        ? `${((atRisk / employees.length) * 100).toFixed(1)}%`
+        : "0.0%",
+    ],
+    ["Executive Summary", analysis || "No narrative summary provided."],
+  ]);
+
+  const employeesSheet = XLSX.utils.json_to_sheet(
+    employees.map((employee) => ({
+      full_name: employee.full_name || "",
+      role: employee.role || "",
+      department: employee.department || "",
+      sentiment_score: employee.sentiment_score ?? "",
+      retention_prob: employee.retention_prob ?? "",
+      is_at_risk: employee.is_at_risk ? "HIGH" : "Stable",
+      email: employee.email || "",
+    })),
+  );
+
+  XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
+  XLSX.utils.book_append_sheet(workbook, employeesSheet, "Employees");
+  XLSX.writeFile(workbook, `Aurelius_Management_Report_${Date.now()}.xlsx`);
+}
+
+export const generateAureliusReport = (employees, analysis, format = "pdf") => {
+  const normalizedFormat = String(format || "pdf").toLowerCase();
+
+  if (normalizedFormat === "excel" || normalizedFormat === "xlsx") {
+    exportExcel(employees || [], analysis || "");
+    return;
+  }
+
+  if (normalizedFormat === "markdown" || normalizedFormat === "md") {
+    exportMarkdown(employees || [], analysis || "");
+    return;
+  }
+
+  exportPdf(employees || [], analysis || "");
 };

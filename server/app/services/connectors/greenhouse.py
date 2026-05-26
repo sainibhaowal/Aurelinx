@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 from app.services.connectors.base import BaseConnector
 from app.models.database import CandidateTable
 
+
 class GreenhouseConnector(BaseConnector):
     provider = "greenhouse"
     source_type = "ats"
@@ -14,12 +15,14 @@ class GreenhouseConnector(BaseConnector):
         rows = session.exec(select(CandidateTable).limit(5000)).all()
         data = []
         for c in rows:
-            data.append({
-                "external_id": str(c.id),
-                "full_name": c.full_name,
-                "email": c.email,
-                "department": c.department,
-                "role": c.role,
-                "match_score": c.match_score,
-            })
+            data.append(
+                {
+                    "external_id": str(c.id),
+                    "full_name": c.full_name,
+                    "email": c.email,
+                    "department": c.department,
+                    "role": c.role,
+                    "match_score": c.match_score,
+                }
+            )
         return data

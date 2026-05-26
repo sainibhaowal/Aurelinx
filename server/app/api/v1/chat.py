@@ -9,16 +9,22 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import text as sa_text
+from pydantic import BaseModel
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.core.logging_config import get_logger
+from app.core.data_policy import filter_real_records
+from app.core.provider_utils import (
+    build_local_provider_base_candidates,
+    normalize_local_provider_base,
+)
 from app.core.security import TokenData, get_current_user
 from app.models.database import (
     AuditLogTable,
@@ -26,12 +32,23 @@ from app.models.database import (
     ChatAttachmentTable,
     ChatMessageTable,
     ChatSessionTable,
+    CanonicalCandidateTable,
+    CanonicalEmployeeTable,
     EmployeeTable,
     SkillTable,
     IntegrationConnectionTable,
     CompliancePolicyTable,
     InterventionTable,
     ExperienceTable,
+    GoldMetricSnapshotTable,
+    MLModelCardTable,
+    MLDriftSnapshotTable,
+    ReleaseGateTable,
+    DRRunbookTable,
+    ProcurementArtifactTable,
+    RawEventTable,
+    QuarantineEventTable,
+    ConnectorSyncJobTable,
     get_session,
 )
 from app.schemas.schemas import (
@@ -48,13 +65,14 @@ from app.schemas.schemas import (
 router = APIRouter(prefix="/chat", tags=["chat"])
 logger = get_logger(__name__)
 
-UPLOAD_ROOT = Path("uploads/chat").resolve()
+UPLOAD_ROOT = Path(os.getenv("CHAT_UPLOAD_ROOT", "/app/data/chat")).resolve()
 UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 def _json_dumps(payload: Dict) -> str:
     """Serialize SSE payloads safely, including UUID/datetime values."""
     return json.dumps(payload, default=str)
+
 
 try:
     from pypdf import PdfReader  # type: ignore
@@ -86,9 +104,9 @@ def _to_session_out(s: ChatSessionTable) -> ChatSessionOut:
 
 def _get_session_normalized(db: Session, session_id: UUID) -> "ChatSessionTable | None":
     """Lookup a ChatSession by ID, handling both hyphenated and hex (no-hyphen) UUID
-    storage formats in SQLite (String column).
+    storage formats from older string-based records.
     """
-    sid_str = str(session_id)           # '74013167-aac8-...' (hyphenated)
+    sid_str = str(session_id)  # '74013167-aac8-...' (hyphenated)
     sid_hex = sid_str.replace("-", "")  # '74013167aac8...'  (no hyphens)
 
     # Try hyphenated string first (new sessions stored this way)
@@ -136,7 +154,9 @@ def _assert_session_owner(session_row: ChatSessionTable, current_user: TokenData
     if str(session_row.user_id) == "00000000-0000-0000-0000-000000000000":
         return
     if session_row.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden session access")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden session access"
+        )
 
 
 def _write_audit(
@@ -162,13 +182,19 @@ def _tokenize(text: str) -> List[str]:
     return re.findall(r"[a-z0-9\+\#\.]{2,}", text.lower())
 
 
-def _search_employees(db: Session, query_text: str, limit: int = 5) -> List[EmployeeTable]:
+def _search_employees(
+    db: Session, query_text: str, limit: int = 5
+) -> List[EmployeeTable]:
     employees = db.exec(select(EmployeeTable)).all()
     q_tokens = set(_tokenize(query_text))
     scored: List[Tuple[float, EmployeeTable]] = []
     for emp in employees:
-        skills = db.exec(select(SkillTable).where(SkillTable.employee_id == emp.id)).all()
-        text = f"{emp.full_name} {emp.role} {emp.department} " + " ".join([s.name for s in skills])
+        skills = db.exec(
+            select(SkillTable).where(SkillTable.employee_id == emp.id)
+        ).all()
+        text = f"{emp.full_name} {emp.role} {emp.department} " + " ".join(
+            [s.name for s in skills]
+        )
         e_tokens = set(_tokenize(text))
         overlap = len(q_tokens & e_tokens)
         score = overlap + (0.5 * emp.sentiment_score) - (0.2 if emp.is_at_risk else 0.0)
@@ -177,13 +203,19 @@ def _search_employees(db: Session, query_text: str, limit: int = 5) -> List[Empl
     return [row[1] for row in scored[:limit]]
 
 
-def _search_candidates(db: Session, query_text: str, limit: int = 5) -> List[CandidateTable]:
+def _search_candidates(
+    db: Session, query_text: str, limit: int = 5
+) -> List[CandidateTable]:
     candidates = db.exec(select(CandidateTable)).all()
     q_tokens = set(_tokenize(query_text))
     scored: List[Tuple[float, CandidateTable]] = []
     for c in candidates:
-        skills = db.exec(select(SkillTable).where(SkillTable.candidate_id == c.id)).all()
-        text = f"{c.full_name} {c.role} {c.department} " + " ".join([s.name for s in skills])
+        skills = db.exec(
+            select(SkillTable).where(SkillTable.candidate_id == c.id)
+        ).all()
+        text = f"{c.full_name} {c.role} {c.department} " + " ".join(
+            [s.name for s in skills]
+        )
         overlap = len(q_tokens & set(_tokenize(text)))
         score = overlap + (0.5 * c.sentiment_score)
         scored.append((score, c))
@@ -195,7 +227,9 @@ def _compute_dashboard_snapshot(db: Session) -> Dict:
     employees = db.exec(select(EmployeeTable)).all()
     total = len(employees)
     at_risk = len([e for e in employees if e.is_at_risk])
-    avg_morale = round(sum([e.sentiment_score for e in employees]) / total, 3) if total else 0.0
+    avg_morale = (
+        round(sum([e.sentiment_score for e in employees]) / total, 3) if total else 0.0
+    )
     dept_counts = {}
     for e in employees:
         dept_counts[e.department] = dept_counts.get(e.department, 0) + 1
@@ -207,71 +241,658 @@ def _compute_dashboard_snapshot(db: Session) -> Dict:
     }
 
 
+def _department_risk_summary(employees: List[EmployeeTable]) -> List[Dict[str, Any]]:
+    dept_map: Dict[str, int] = {}
+    dept_risk: Dict[str, int] = {}
+    for e in employees:
+        dept = e.department or "Unknown"
+        dept_map[dept] = dept_map.get(dept, 0) + 1
+        if e.is_at_risk:
+            dept_risk[dept] = dept_risk.get(dept, 0) + 1
+
+    summary: List[Dict[str, Any]] = []
+    for dept, total in sorted(dept_map.items(), key=lambda item: (-item[1], item[0])):
+        at_risk = dept_risk.get(dept, 0)
+        summary.append(
+            {
+                "department": dept,
+                "total": total,
+                "at_risk": at_risk,
+                "at_risk_rate": round((at_risk / total), 3) if total else 0.0,
+            }
+        )
+    return summary
+
+
+def _top_risk_score_employee(employee: EmployeeTable) -> float:
+    sentiment = float(employee.sentiment_score or 0.0)
+    retention = float(
+        employee.retention_prob if employee.retention_prob is not None else 0.5
+    )
+    score = (1.0 - sentiment) * 0.6 + (1.0 - retention) * 0.4
+    if employee.is_at_risk:
+        score += 0.2
+    return round(min(1.0, max(0.0, score)), 3)
+
+
+def _top_match_score_candidate(candidate: CandidateTable) -> float:
+    match_score = float(
+        candidate.match_score if candidate.match_score is not None else 0.0
+    )
+    sentiment = float(candidate.sentiment_score or 0.0)
+    score = (match_score * 0.8) + (sentiment * 0.2)
+    return round(min(1.0, max(0.0, score)), 3)
+
+
+def _workspace_snapshot(db: Session) -> Dict[str, Any]:
+    employees = filter_real_records(db.exec(select(EmployeeTable)).all())
+    candidates = filter_real_records(db.exec(select(CandidateTable)).all())
+
+    dept_summary = _department_risk_summary(employees)
+    top_risk_employees = sorted(employees, key=_top_risk_score_employee, reverse=True)[
+        :5
+    ]
+    top_candidate_matches = sorted(
+        candidates, key=_top_match_score_candidate, reverse=True
+    )[:5]
+
+    integrations = db.exec(
+        select(IntegrationConnectionTable).order_by(
+            IntegrationConnectionTable.created_at.desc()
+        )
+    ).all()
+    policies = db.exec(
+        select(CompliancePolicyTable)
+        .where(CompliancePolicyTable.status == "active")
+        .order_by(CompliancePolicyTable.created_at.desc())
+    ).all()
+    interventions = db.exec(
+        select(InterventionTable)
+        .order_by(InterventionTable.created_at.desc())
+        .limit(10)
+    ).all()
+    model_cards = db.exec(
+        select(MLModelCardTable).order_by(MLModelCardTable.created_at.desc()).limit(5)
+    ).all()
+    drifts = db.exec(
+        select(MLDriftSnapshotTable)
+        .order_by(MLDriftSnapshotTable.created_at.desc())
+        .limit(5)
+    ).all()
+    release_gates = db.exec(
+        select(ReleaseGateTable).order_by(ReleaseGateTable.created_at.desc()).limit(5)
+    ).all()
+    dr_runbooks = db.exec(
+        select(DRRunbookTable).order_by(DRRunbookTable.created_at.desc()).limit(5)
+    ).all()
+    procurement_artifacts = db.exec(
+        select(ProcurementArtifactTable)
+        .order_by(ProcurementArtifactTable.created_at.desc())
+        .limit(5)
+    ).all()
+    raw_events_count = len(db.exec(select(RawEventTable)).all())
+    quarantine_count = len(db.exec(select(QuarantineEventTable)).all())
+    connector_jobs = db.exec(
+        select(ConnectorSyncJobTable)
+        .order_by(ConnectorSyncJobTable.started_at.desc())
+        .limit(10)
+    ).all()
+    gold_snapshots = db.exec(
+        select(GoldMetricSnapshotTable)
+        .order_by(GoldMetricSnapshotTable.created_at.desc())
+        .limit(5)
+    ).all()
+    canonical_employee_count = len(db.exec(select(CanonicalEmployeeTable)).all())
+    canonical_candidate_count = len(db.exec(select(CanonicalCandidateTable)).all())
+
+    workforce = _compute_dashboard_snapshot(db)
+    candidate_match_avg = (
+        round(sum(float(c.match_score or 0.0) for c in candidates) / len(candidates), 3)
+        if candidates
+        else 0.0
+    )
+
+    return {
+        "system_status": {
+            "database": "postgresql",
+            "record_scope": "live",
+            "snapshot_at": datetime.utcnow().isoformat(),
+        },
+        "application_surface": {
+            "modules": [
+                "dashboard",
+                "directory",
+                "sentiment",
+                "analytics",
+                "talent scout",
+                "workflow chat",
+                "intel center",
+                "enterprise ops",
+                "settings/providers",
+            ],
+            "data_planes": [
+                "postgresql",
+                "redis",
+                "qdrant",
+            ],
+            "import_paths": [
+                "enterprise ops > pipelines > csv import",
+                "enterprise ops > pipelines > bundle import",
+                "workflow chat > attachments",
+            ],
+        },
+        "workforce": {
+            "total_workforce": workforce["total_workforce"],
+            "at_risk": workforce["at_risk"],
+            "at_risk_pct": (
+                round((workforce["at_risk"] / workforce["total_workforce"]) * 100, 1)
+                if workforce["total_workforce"]
+                else 0.0
+            ),
+            "avg_morale": workforce["avg_morale"],
+            "departments": workforce["departments"],
+            "department_risk_clusters": dept_summary[:6],
+            "top_risk_department": max(
+                dept_summary, key=lambda item: item["at_risk_rate"], default=None
+            ),
+            "top_risk_drivers": [
+                {
+                    "factor": "Low morale signals",
+                    "count": len(
+                        [e for e in employees if float(e.sentiment_score or 0.0) < 0.45]
+                    ),
+                },
+                {
+                    "factor": "Retention probability pressure",
+                    "count": len(
+                        [
+                            e
+                            for e in employees
+                            if float(
+                                e.retention_prob
+                                if e.retention_prob is not None
+                                else 0.5
+                            )
+                            < 0.55
+                        ]
+                    ),
+                },
+                {
+                    "factor": "Policy risk flags",
+                    "count": len([e for e in employees if e.is_at_risk]),
+                },
+                {
+                    "factor": "Department concentration risk",
+                    "count": len(
+                        [
+                            d
+                            for d in dept_summary
+                            if d["total"] > 0 and d["at_risk_rate"] >= 0.25
+                        ]
+                    ),
+                },
+            ],
+        },
+        "directory": {
+            "top_risk_employees": [
+                {
+                    "full_name": e.full_name,
+                    "email": e.email,
+                    "department": e.department,
+                    "role": e.role,
+                    "sentiment_score": e.sentiment_score,
+                    "retention_prob": e.retention_prob,
+                    "is_at_risk": e.is_at_risk,
+                    "risk_score": _top_risk_score_employee(e),
+                }
+                for e in top_risk_employees
+            ],
+        },
+        "talent_scout": {
+            "candidates_total": len(candidates),
+            "candidate_match_avg": candidate_match_avg,
+            "top_candidates": [
+                {
+                    "full_name": c.full_name,
+                    "email": c.email,
+                    "department": c.department,
+                    "role": c.role,
+                    "sentiment_score": c.sentiment_score,
+                    "match_score": c.match_score,
+                    "scout_score": _top_match_score_candidate(c),
+                }
+                for c in top_candidate_matches
+            ],
+        },
+        "data_ops": {
+            "raw_events": raw_events_count,
+            "quarantine_events": quarantine_count,
+            "canonical_employees": canonical_employee_count,
+            "canonical_candidates": canonical_candidate_count,
+            "sync_jobs": [
+                {
+                    "provider": j.provider,
+                    "source_type": j.source_type,
+                    "status": j.status,
+                    "bronze_events": j.bronze_events,
+                    "silver_upserts": j.silver_upserts,
+                    "quarantined": j.quarantined,
+                }
+                for j in connector_jobs[:5]
+            ],
+        },
+        "enterprise_ops": {
+            "integration_connections": [
+                {
+                    "name": c.name,
+                    "provider": c.provider,
+                    "source_type": c.source_type,
+                    "status": c.status,
+                }
+                for c in integrations[:10]
+            ],
+            "active_interventions": [
+                {
+                    "title": i.title,
+                    "priority": i.priority,
+                    "status": i.status,
+                    "owner_name": i.owner_name,
+                    "target_department": i.target_department,
+                    "target_scope": i.target_scope,
+                }
+                for i in interventions[:5]
+            ],
+            "policy_packs": [
+                {
+                    "policy_name": p.policy_name,
+                    "region": p.region,
+                    "action_type": p.action_type,
+                    "status": p.status,
+                    "min_confidence": p.min_confidence,
+                    "requires_approval": p.requires_approval,
+                }
+                for p in policies[:5]
+            ],
+            "model_governance": [
+                {
+                    "model_name": m.model_name,
+                    "version": m.version,
+                    "status": m.status,
+                    "pr_auc": m.pr_auc,
+                    "calibration_error": m.calibration_error,
+                    "fairness_gap": m.fairness_gap,
+                }
+                for m in model_cards
+            ],
+            "drift_snapshots": [
+                {
+                    "model_name": d.model_name,
+                    "model_version": d.model_version,
+                    "drift_score": d.drift_score,
+                    "needs_retraining": d.needs_retraining,
+                }
+                for d in drifts
+            ],
+            "release_gates": [
+                {
+                    "environment": g.environment,
+                    "artifact_name": g.artifact_name,
+                    "version": g.version,
+                    "status": g.status,
+                }
+                for g in release_gates
+            ],
+            "dr_runbooks": [
+                {
+                    "runbook_name": r.runbook_name,
+                    "environment": r.environment,
+                    "status": r.status,
+                    "rto_minutes": r.rto_minutes,
+                    "rpo_minutes": r.rpo_minutes,
+                }
+                for r in dr_runbooks
+            ],
+            "procurement_artifacts": [
+                {
+                    "artifact_type": a.artifact_type,
+                    "title": a.title,
+                    "version": a.version,
+                    "status": a.status,
+                }
+                for a in procurement_artifacts
+            ],
+            "gold_snapshots": [
+                {
+                    "metric_type": s.metric_type,
+                    "created_at": s.created_at,
+                }
+                for s in gold_snapshots
+            ],
+        },
+    }
+
+
+def _is_workspace_query(user_text: str) -> bool:
+    text = user_text.lower()
+    terms = [
+        "directory",
+        "sentiment",
+        "morale",
+        "risk",
+        "retention",
+        "talent scout",
+        "talent scout",
+        "workflow",
+        "workflows",
+        "candidate",
+        "workforce",
+        "analytics",
+        "intervention",
+        "policy",
+        "system status",
+        "enterprise operations",
+        "data ops",
+        "model",
+        "drift",
+        "release gate",
+        "runbook",
+        "procurement",
+        "integration",
+        "quarantine",
+        "department",
+        "cluster",
+        "priority",
+        "predictive",
+    ]
+    return any(term in text for term in terms)
+
+
+def _direct_workspace_answer(db: Session, user_text: str) -> str | None:
+    if not _is_workspace_query(user_text):
+        return None
+
+    snapshot = _workspace_snapshot(db)
+    workforce = snapshot["workforce"]
+    directory = snapshot["directory"]
+    talent = snapshot["talent_scout"]
+    ops = snapshot["enterprise_ops"]
+    data_ops = snapshot["data_ops"]
+
+    lines = [
+        "## Aurelius Workspace Snapshot",
+        f"- Workforce: **{workforce['total_workforce']}**",
+        f"- At risk employees: **{workforce['at_risk']}**",
+        f"- Average morale: **{workforce['avg_morale']}**",
+        f"- Candidates: **{talent['candidates_total']}**",
+        f"- Candidate match average: **{talent['candidate_match_avg']}**",
+        f"- Raw events: **{data_ops['raw_events']}**",
+        f"- Quarantine events: **{data_ops['quarantine_events']}**",
+        f"- Active interventions: **{len(ops['active_interventions'])} shown**",
+        f"- Active policy packs: **{len(ops['policy_packs'])} shown**",
+    ]
+
+    top_cluster = workforce.get("top_risk_department")
+    if top_cluster:
+        lines.append(
+            f"- Top risk department: **{top_cluster['department']}** "
+            f"({top_cluster['at_risk']} / {top_cluster['total']} at risk rate {top_cluster['at_risk_rate']:.3f})"
+        )
+
+    lines.append("")
+    lines.append("### Risk Drivers")
+    for item in workforce["top_risk_drivers"]:
+        lines.append(f"- {item['factor']}: `{item['count']}`")
+
+    if workforce.get("department_risk_clusters"):
+        lines.append("")
+        lines.append("### Department Risk Clusters")
+        for cluster in workforce["department_risk_clusters"][:5]:
+            lines.append(
+                f"- {cluster['department']} | total `{cluster['total']}` | at risk `{cluster['at_risk']}` | "
+                f"rate `{cluster['at_risk_rate']:.3f}`"
+            )
+
+    if directory["top_risk_employees"]:
+        lines.append("")
+        lines.append("### Highest Risk Employees")
+        for e in directory["top_risk_employees"]:
+            lines.append(
+                f"- {e['full_name']} | {e['department']} | {e['role']} | "
+                f"sentiment `{e['sentiment_score']}` | retention `{e['retention_prob']}` | risk `{e['risk_score']}`"
+            )
+
+    if talent["top_candidates"]:
+        lines.append("")
+        lines.append("### Top Candidate Matches")
+        for c in talent["top_candidates"]:
+            lines.append(
+                f"- {c['full_name']} | {c['department']} | {c['role']} | "
+                f"match `{c['match_score']}` | scout `{c['scout_score']}`"
+            )
+
+    lines.append("")
+    lines.append("### Enterprise Operations")
+    lines.append(f"- Integrations: `{len(ops['integration_connections'])}`")
+    lines.append(f"- Model cards: `{len(ops['model_governance'])}`")
+    lines.append(f"- Drift snapshots: `{len(ops['drift_snapshots'])}`")
+    lines.append(f"- Release gates: `{len(ops['release_gates'])}`")
+    lines.append(f"- DR runbooks: `{len(ops['dr_runbooks'])}`")
+    lines.append(f"- Procurement artifacts: `{len(ops['procurement_artifacts'])}`")
+    surface = snapshot.get("application_surface", {})
+    if surface:
+        lines.append("")
+        lines.append("### Application Surfaces")
+        lines.append(f"- Modules: {', '.join(surface.get('modules', []))}")
+        lines.append(f"- Data planes: {', '.join(surface.get('data_planes', []))}")
+        lines.append(f"- Import paths: {', '.join(surface.get('import_paths', []))}")
+
+    return "\n".join(lines)
+
+
+def _workspace_snapshot_summary_lines(snapshot: Dict[str, Any]) -> List[str]:
+    workforce = snapshot.get("workforce", {})
+    talent = snapshot.get("talent_scout", {})
+    data_ops = snapshot.get("data_ops", {})
+    ops = snapshot.get("enterprise_ops", {})
+    top_cluster = workforce.get("top_risk_department")
+
+    lines = [
+        f"- Workforce: {workforce.get('total_workforce', 0)} total, {workforce.get('at_risk', 0)} at risk, avg morale {workforce.get('avg_morale', 0.0)}",
+        f"- Candidate pool: {talent.get('candidates_total', 0)} total, avg match {talent.get('candidate_match_avg', 0.0)}",
+        f"- Data ops: raw events {data_ops.get('raw_events', 0)}, quarantine {data_ops.get('quarantine_events', 0)}",
+        f"- Enterprise ops: integrations {len(ops.get('integration_connections', []))}, interventions {len(ops.get('active_interventions', []))}, policies {len(ops.get('policy_packs', []))}",
+        "- Application surfaces: dashboard, directory, sentiment, analytics, talent scout, workflow chat, intel center, enterprise ops, settings",
+    ]
+    if top_cluster:
+        lines.append(
+            f"- Top risk department: {top_cluster.get('department')} ({top_cluster.get('at_risk', 0)}/{top_cluster.get('total', 0)} at risk rate {top_cluster.get('at_risk_rate', 0.0):.3f})"
+        )
+    return lines
+
+
+def _record_counts(db: Session) -> Dict[str, int]:
+    def _count(model) -> int:
+        value = db.exec(select(func.count()).select_from(model)).one()
+        if isinstance(value, tuple):
+            value = value[0]
+        return int(value or 0)
+
+    return {
+        "employees": _count(EmployeeTable),
+        "candidates": _count(CandidateTable),
+        "skills": _count(SkillTable),
+        "experience": _count(ExperienceTable),
+    }
+
+
+def _is_count_query(user_text: str) -> bool:
+    text = user_text.lower()
+    count_phrases = (
+        "how many",
+        "number of",
+        "count of",
+        "total",
+        "how much",
+    )
+    entity_phrases = (
+        "candidate",
+        "candidates",
+        "employee",
+        "employees",
+        "workforce",
+        "people",
+    )
+    return any(p in text for p in count_phrases) and any(
+        p in text for p in entity_phrases
+    )
+
+
+def _direct_count_answer(db: Session, user_text: str) -> str | None:
+    if not _is_count_query(user_text):
+        return None
+
+    counts = _record_counts(db)
+    text = user_text.lower()
+    if any(
+        term in text
+        for term in [
+            "candidate",
+            "candidates",
+            "recruit",
+            "hiring",
+            "talent",
+            "talents",
+        ]
+    ):
+        return (
+            f"There are **{counts['candidates']} candidates** in Postgres.\n\n"
+            f"- Candidates: `{counts['candidates']}`\n"
+            f"- Skills linked: `{counts['skills']}`\n"
+            f"- Experience rows: `{counts['experience']}`"
+        )
+    if any(term in text for term in ["employee", "employees", "workforce", "people"]):
+        return (
+            f"There are **{counts['employees']} employees** in Postgres.\n\n"
+            f"- Employees: `{counts['employees']}`\n"
+            f"- Candidates: `{counts['candidates']}`"
+        )
+    return None
+
+
 def _parse_csv_and_ingest(db: Session, attachments: List[ChatAttachmentTable]) -> Dict:
     import csv
-    ingest_log = {"ingested": False, "employees": 0, "candidates": 0, "companies": 0, "errors": [], "actions": []}
+
+    ingest_log = {
+        "ingested": False,
+        "employees": 0,
+        "candidates": 0,
+        "companies": 0,
+        "errors": [],
+        "actions": [],
+    }
     for att in attachments:
         path = Path(att.file_path)
         if not path.exists() or path.suffix.lower() != ".csv":
             continue
         try:
-            with open(path, mode='r', encoding='utf-8', errors='ignore') as f:
+            with open(path, mode="r", encoding="utf-8", errors="ignore") as f:
                 content_sample = f.read(2048)
                 f.seek(0)
-                delimiter = ','
-                if ';' in content_sample and ',' not in content_sample:
-                    delimiter = ';'
-                
+                delimiter = ","
+                if ";" in content_sample and "," not in content_sample:
+                    delimiter = ";"
+
                 reader = csv.DictReader(f, delimiter=delimiter)
                 for row in reader:
                     if not row:
                         continue
-                    clean_row = {str(k).strip().lower(): str(v).strip() for k, v in row.items() if k is not None}
-                    
-                    email = clean_row.get("email") or clean_row.get("email_address") or clean_row.get("mail")
-                    name = clean_row.get("full_name") or clean_row.get("name") or clean_row.get("employee_name")
-                    role = clean_row.get("role") or clean_row.get("position") or clean_row.get("title") or "Software Engineer"
-                    dept = clean_row.get("department") or clean_row.get("dept") or "Engineering"
-                    
+                    clean_row = {
+                        str(k).strip().lower(): str(v).strip()
+                        for k, v in row.items()
+                        if k is not None
+                    }
+
+                    email = (
+                        clean_row.get("email")
+                        or clean_row.get("email_address")
+                        or clean_row.get("mail")
+                    )
+                    name = (
+                        clean_row.get("full_name")
+                        or clean_row.get("name")
+                        or clean_row.get("employee_name")
+                    )
+                    role = (
+                        clean_row.get("role")
+                        or clean_row.get("position")
+                        or clean_row.get("title")
+                        or "Software Engineer"
+                    )
+                    dept = (
+                        clean_row.get("department")
+                        or clean_row.get("dept")
+                        or "Engineering"
+                    )
+
                     if not email or not name:
                         continue
-                    
+
                     is_candidate = (
-                        "candidate" in clean_row 
-                        or clean_row.get("status", "").lower() == "candidate" 
+                        "candidate" in clean_row
+                        or clean_row.get("status", "").lower() == "candidate"
                         or clean_row.get("type", "").lower() == "candidate"
                     )
-                    
+
                     if is_candidate:
-                        exists = db.exec(select(CandidateTable).where(CandidateTable.email == email)).first()
+                        exists = db.exec(
+                            select(CandidateTable).where(CandidateTable.email == email)
+                        ).first()
                         if not exists:
                             cand = CandidateTable(
                                 full_name=name,
                                 email=email,
                                 department=dept.title(),
                                 role=role.title(),
-                                sentiment_score=float(clean_row.get("sentiment_score") or clean_row.get("sentiment") or 0.65),
+                                sentiment_score=float(
+                                    clean_row.get("sentiment_score")
+                                    or clean_row.get("sentiment")
+                                    or 0.65
+                                ),
                             )
                             db.add(cand)
                             ingest_log["candidates"] += 1
-                            ingest_log["actions"].append(f"Ingested Candidate: {name} ({email})")
+                            ingest_log["actions"].append(
+                                f"Ingested Candidate: {name} ({email})"
+                            )
                     else:
-                        exists = db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
+                        exists = db.exec(
+                            select(EmployeeTable).where(EmployeeTable.email == email)
+                        ).first()
                         if not exists:
                             sentiment = 0.75
                             try:
-                                sentiment = float(clean_row.get("sentiment_score") or clean_row.get("sentiment") or 0.75)
+                                sentiment = float(
+                                    clean_row.get("sentiment_score")
+                                    or clean_row.get("sentiment")
+                                    or 0.75
+                                )
                             except ValueError:
                                 pass
-                            
-                            is_at_risk = clean_row.get("is_at_risk", "false").lower() in ["true", "1", "yes"]
-                            
+
+                            is_at_risk = clean_row.get(
+                                "is_at_risk", "false"
+                            ).lower() in ["true", "1", "yes"]
+
                             retention = 0.90
                             try:
-                                retention = float(clean_row.get("retention_prob") or clean_row.get("retention") or 0.90)
+                                retention = float(
+                                    clean_row.get("retention_prob")
+                                    or clean_row.get("retention")
+                                    or 0.90
+                                )
                             except ValueError:
                                 pass
-                                
+
                             emp = EmployeeTable(
                                 full_name=name,
                                 email=email,
@@ -283,18 +904,24 @@ def _parse_csv_and_ingest(db: Session, attachments: List[ChatAttachmentTable]) -
                             )
                             db.add(emp)
                             ingest_log["employees"] += 1
-                            ingest_log["actions"].append(f"Ingested Employee: {name} ({email})")
-                            
-                    company = clean_row.get("company") or clean_row.get("previous_company") or clean_row.get("employer")
+                            ingest_log["actions"].append(
+                                f"Ingested Employee: {name} ({email})"
+                            )
+
+                    company = (
+                        clean_row.get("company")
+                        or clean_row.get("previous_company")
+                        or clean_row.get("employer")
+                    )
                     if company:
                         ingest_log["companies"] += 1
-                        
+
             db.commit()
             ingest_log["ingested"] = True
         except Exception as e:
             db.rollback()
             ingest_log["errors"].append(str(e))
-            
+
     return ingest_log
 
 
@@ -312,7 +939,9 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
     lowered = user_text.lower()
     mutation_log = {"updated": False, "actions": []}
 
-    risk_match = re.search(r"set\s+employee\s+([^\s]+@[^\s]+)\s+risk\s+(true|false)", lowered)
+    risk_match = re.search(
+        r"set\s+employee\s+([^\s]+@[^\s]+)\s+risk\s+(true|false)", lowered
+    )
     if risk_match:
         email = risk_match.group(1)
         value = risk_match.group(2) == "true"
@@ -324,7 +953,9 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
             mutation_log["updated"] = True
             mutation_log["actions"].append(f"Set risk={value} for {email}")
 
-    move_match = re.search(r"move\s+employee\s+([^\s]+@[^\s]+)\s+to\s+department\s+(.+)", lowered)
+    move_match = re.search(
+        r"move\s+employee\s+([^\s]+@[^\s]+)\s+to\s+department\s+(.+)", lowered
+    )
     if move_match:
         email = move_match.group(1)
         dept = move_match.group(2).strip().title()
@@ -337,18 +968,30 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
             mutation_log["actions"].append(f"Moved {email} to {dept}")
 
     if "add employee" in lowered or "create employee" in lowered:
-        name_match = re.search(r"(?:name|employee)\s+([a-zA-Z\s]+)(?:,|$|\s+email)", user_text, re.IGNORECASE)
-        email_match = re.search(r"email\s+([a-zA-Z0-9\.\-\_\@\+]+)", user_text, re.IGNORECASE)
+        name_match = re.search(
+            r"(?:name|employee)\s+([a-zA-Z\s]+)(?:,|$|\s+email)",
+            user_text,
+            re.IGNORECASE,
+        )
+        email_match = re.search(
+            r"email\s+([a-zA-Z0-9\.\-\_\@\+]+)", user_text, re.IGNORECASE
+        )
         role_match = re.search(r"role\s+([a-zA-Z0-9\s\-\_]+)", user_text, re.IGNORECASE)
-        dept_match = re.search(r"(?:dept|department)\s+([a-zA-Z0-9\s\-\_]+)", user_text, re.IGNORECASE)
-        
+        dept_match = re.search(
+            r"(?:dept|department)\s+([a-zA-Z0-9\s\-\_]+)", user_text, re.IGNORECASE
+        )
+
         name = name_match.group(1).strip() if name_match else None
         email = email_match.group(1).strip() if email_match else None
-        role = role_match.group(1).strip().title() if role_match else "Software Engineer"
+        role = (
+            role_match.group(1).strip().title() if role_match else "Software Engineer"
+        )
         dept = dept_match.group(1).strip().title() if dept_match else "Engineering"
-        
+
         if name and email:
-            exists = db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
+            exists = db.exec(
+                select(EmployeeTable).where(EmployeeTable.email == email)
+            ).first()
             if not exists:
                 emp = EmployeeTable(
                     full_name=name,
@@ -357,25 +1000,39 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
                     department=dept,
                     sentiment_score=0.75,
                     is_at_risk=False,
-                    retention_prob=0.95
+                    retention_prob=0.95,
                 )
                 db.add(emp)
                 mutation_log["updated"] = True
-                mutation_log["actions"].append(f"Created employee {name} ({email}) in department {dept} as {role}")
+                mutation_log["actions"].append(
+                    f"Created employee {name} ({email}) in department {dept} as {role}"
+                )
 
     if "add candidate" in lowered or "create candidate" in lowered:
-        name_match = re.search(r"(?:name|candidate)\s+([a-zA-Z\s]+)(?:,|$|\s+email)", user_text, re.IGNORECASE)
-        email_match = re.search(r"email\s+([a-zA-Z0-9\.\-\_\@\+]+)", user_text, re.IGNORECASE)
+        name_match = re.search(
+            r"(?:name|candidate)\s+([a-zA-Z\s]+)(?:,|$|\s+email)",
+            user_text,
+            re.IGNORECASE,
+        )
+        email_match = re.search(
+            r"email\s+([a-zA-Z0-9\.\-\_\@\+]+)", user_text, re.IGNORECASE
+        )
         role_match = re.search(r"role\s+([a-zA-Z0-9\s\-\_]+)", user_text, re.IGNORECASE)
-        dept_match = re.search(r"(?:dept|department)\s+([a-zA-Z0-9\s\-\_]+)", user_text, re.IGNORECASE)
-        
+        dept_match = re.search(
+            r"(?:dept|department)\s+([a-zA-Z0-9\s\-\_]+)", user_text, re.IGNORECASE
+        )
+
         name = name_match.group(1).strip() if name_match else None
         email = email_match.group(1).strip() if email_match else None
-        role = role_match.group(1).strip().title() if role_match else "Software Engineer"
+        role = (
+            role_match.group(1).strip().title() if role_match else "Software Engineer"
+        )
         dept = dept_match.group(1).strip().title() if dept_match else "Engineering"
-        
+
         if name and email:
-            exists = db.exec(select(CandidateTable).where(CandidateTable.email == email)).first()
+            exists = db.exec(
+                select(CandidateTable).where(CandidateTable.email == email)
+            ).first()
             if not exists:
                 cand = CandidateTable(
                     full_name=name,
@@ -383,13 +1040,18 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
                     role=role,
                     department=dept,
                     sentiment_score=0.65,
-                    match_score=0.85
+                    match_score=0.85,
                 )
                 db.add(cand)
                 mutation_log["updated"] = True
-                mutation_log["actions"].append(f"Created candidate {name} ({email}) in department {dept} as {role}")
+                mutation_log["actions"].append(
+                    f"Created candidate {name} ({email}) in department {dept} as {role}"
+                )
 
-    update_match = re.search(r"(?:update|correct|change|fix)\s+employee\s+([^\s]+@[^\s]+)\s+(?:role|department|name)\s+(?:to|set)\s+(.+)", lowered)
+    update_match = re.search(
+        r"(?:update|correct|change|fix)\s+employee\s+([^\s]+@[^\s]+)\s+(?:role|department|name)\s+(?:to|set)\s+(.+)",
+        lowered,
+    )
     if update_match:
         email = update_match.group(1)
         val = update_match.group(2).strip().title()
@@ -404,32 +1066,49 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
             else:
                 emp.full_name = val
                 action_desc = f"Updated full name to {val} for {email}"
-                
+
             emp.updated_at = datetime.utcnow()
             db.add(emp)
             mutation_log["updated"] = True
             mutation_log["actions"].append(action_desc)
 
-    if "add connection" in lowered or "create connection" in lowered or "add company" in lowered:
-        name_match = re.search(r"(?:connection|company)\s+([a-zA-Z0-9\s]+)(?:,|$)", user_text, re.IGNORECASE)
-        provider_match = re.search(r"provider\s+([a-zA-Z0-9\s]+)", user_text, re.IGNORECASE)
+    if (
+        "add connection" in lowered
+        or "create connection" in lowered
+        or "add company" in lowered
+    ):
+        name_match = re.search(
+            r"(?:connection|company)\s+([a-zA-Z0-9\s]+)(?:,|$)",
+            user_text,
+            re.IGNORECASE,
+        )
+        provider_match = re.search(
+            r"provider\s+([a-zA-Z0-9\s]+)", user_text, re.IGNORECASE
+        )
         type_match = re.search(r"type\s+([a-zA-Z0-9\s]+)", user_text, re.IGNORECASE)
-        
-        c_name = name_match.group(1).strip() if name_match else "Greenhouse ATS Connection"
-        provider = provider_match.group(1).strip().lower() if provider_match else "greenhouse"
+
+        c_name = (
+            name_match.group(1).strip() if name_match else "Greenhouse ATS Connection"
+        )
+        provider = (
+            provider_match.group(1).strip().lower() if provider_match else "greenhouse"
+        )
         source_type = type_match.group(1).strip().lower() if type_match else "ats"
-        
-        exists = db.exec(select(IntegrationConnectionTable).where(IntegrationConnectionTable.name == c_name)).first()
+
+        exists = db.exec(
+            select(IntegrationConnectionTable).where(
+                IntegrationConnectionTable.name == c_name
+            )
+        ).first()
         if not exists:
             conn = IntegrationConnectionTable(
-                name=c_name,
-                provider=provider,
-                source_type=source_type,
-                status="active"
+                name=c_name, provider=provider, source_type=source_type, status="active"
             )
             db.add(conn)
             mutation_log["updated"] = True
-            mutation_log["actions"].append(f"Configured integration connection {c_name} (provider: {provider})")
+            mutation_log["actions"].append(
+                f"Configured integration connection {c_name} (provider: {provider})"
+            )
 
     if mutation_log["updated"]:
         db.commit()
@@ -437,7 +1116,9 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
     return mutation_log
 
 
-def _attachment_text_context(attachments: List[ChatAttachmentTable], max_chars: int = 12000) -> str:
+def _attachment_text_context(
+    attachments: List[ChatAttachmentTable], max_chars: int = 12000
+) -> str:
     chunks = []
     consumed = 0
     for att in attachments[:8]:
@@ -457,7 +1138,11 @@ def _attachment_text_context(attachments: List[ChatAttachmentTable], max_chars: 
             elif suffix == ".docx" and Document is not None:
                 doc = Document(str(path))
                 text = "\n".join([p.text for p in doc.paragraphs[:500]])
-            elif suffix in [".png", ".jpg", ".jpeg", ".webp"] and pytesseract is not None and Image is not None:
+            elif (
+                suffix in [".png", ".jpg", ".jpeg", ".webp"]
+                and pytesseract is not None
+                and Image is not None
+            ):
                 text = pytesseract.image_to_string(Image.open(str(path)))
             else:
                 text = f"[Unsupported rich parsing for file type {suffix}]"
@@ -508,11 +1193,15 @@ async def _llm_stream_response(
     casual_chat = _is_casual_chat(user_text)
 
     if provider == "lmstudio":
-        endpoint = f"{(base_url or 'http://127.0.0.1:1234/v1').rstrip('/')}/chat/completions"
+        endpoint = (
+            f"{normalize_local_provider_base(base_url).rstrip('/')}/chat/completions"
+        )
         model_name = model or "liquid/lfm2.5-1.2b"
         headers = {"Content-Type": "application/json"}
     elif provider == "opencode":
-        endpoint = f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/chat/completions"
+        endpoint = (
+            f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/chat/completions"
+        )
         model_name = model or "gpt-5.5"
         headers = {"Content-Type": "application/json"}
         if api_key:
@@ -520,11 +1209,17 @@ async def _llm_stream_response(
     elif provider == "openai":
         endpoint = "https://api.openai.com/v1/chat/completions"
         model_name = model or "gpt-4o-mini"
-        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
     elif provider == "groq":
         endpoint = "https://api.groq.com/openai/v1/chat/completions"
         model_name = model or "llama-3.1-70b-versatile"
-        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
     elif provider == "claude":
         endpoint = "https://api.anthropic.com/v1/messages"
         model_name = model or "claude-3-5-sonnet-20241022"
@@ -544,7 +1239,8 @@ async def _llm_stream_response(
         "You are Aurelius, the authoritative AI intelligence of the Aurelius Management OS — "
         "an executive-grade HR platform.\n"
         "You have live access to the HR employee directory, candidates database, analytics, "
-        "compliance policies, integrations, and agentic tools.\n"
+        "compliance policies, integrations, enterprise ops, and agentic tools.\n"
+        "A structured workspace snapshot may be attached; use it as the source of truth.\n"
         "IMPORTANT RULES:\n"
         "- Always respond in clear, beautiful Markdown with tables, bullet points, bold text where appropriate.\n"
         "- Never dump raw JSON or technical payloads to the user.\n"
@@ -562,9 +1258,13 @@ async def _llm_stream_response(
     for run in tool_runs:
         tool_name = run.get("tool", "unknown")
         if run.get("denied"):
-            tool_summary_lines.append(f"- {tool_name}: ACCESS DENIED — {run.get('reason', '')}")
+            tool_summary_lines.append(
+                f"- {tool_name}: ACCESS DENIED — {run.get('reason', '')}"
+            )
         elif run.get("blocked"):
-            tool_summary_lines.append(f"- {tool_name}: BLOCKED — {run.get('reason', '')}")
+            tool_summary_lines.append(
+                f"- {tool_name}: BLOCKED — {run.get('reason', '')}"
+            )
         else:
             output = run.get("output", [])
             tool_summary_lines.append(f"- {tool_name}: {json.dumps(output)}")
@@ -573,11 +1273,18 @@ async def _llm_stream_response(
     compliance = tool_ctx.get("compliance_policies", [])
     mutations = tool_ctx.get("mutations", {})
     rbac = tool_ctx.get("rbac_role", "member")
+    workspace_snapshot = tool_ctx.get("workspace_snapshot", {})
 
     if has_tool_output:
         tool_block = "\n".join(tool_summary_lines)
+        workspace_block = (
+            "\n".join(_workspace_snapshot_summary_lines(workspace_snapshot))
+            if workspace_snapshot
+            else ""
+        )
         user_content = (
             f"User request: {user_text}\n\n"
+            f"--- WORKSPACE SNAPSHOT ---\n{workspace_block}\n"
             f"--- LIVE TOOL DATA ---\n{tool_block}\n"
             f"Active integrations: {json.dumps(integrations)}\n"
             f"Compliance policies: {json.dumps(compliance)}\n"
@@ -588,17 +1295,18 @@ async def _llm_stream_response(
             "Present employee data as a formatted table. Do not include raw JSON in your response."
         )
     else:
-        user_content = (
-            f"{user_text}\n\n"
-            "Answer naturally and conversationally."
-        )
+        user_content = f"{user_text}\n\n" "Answer naturally and conversationally."
 
     session_history = context_payload.get("session_history", [])
     history_messages = []
     for turn in session_history:
         role = turn.get("role", "user")
         content = turn.get("content", "").strip()
-        if not content or content.startswith("LLM failed") or content.startswith('{"tool_context'):
+        if (
+            not content
+            or content.startswith("LLM failed")
+            or content.startswith('{"tool_context')
+        ):
             continue
         history_messages.append({"role": role, "content": content[:300]})
 
@@ -628,12 +1336,17 @@ async def _llm_stream_response(
         full_prompt = f"{system}\n\n{user_content}"
         payload = {
             "contents": [{"parts": [{"text": full_prompt}]}],
-            "generationConfig": {"temperature": 0.7 if casual_chat else 0.3, "maxOutputTokens": 1024},
+            "generationConfig": {
+                "temperature": 0.7 if casual_chat else 0.3,
+                "maxOutputTokens": 1024,
+            },
         }
 
     in_thinking = False
     async with httpx.AsyncClient(timeout=60.0) as client:
-        async with client.stream("POST", endpoint, json=payload, headers=headers) as resp:
+        async with client.stream(
+            "POST", endpoint, json=payload, headers=headers
+        ) as resp:
             resp.raise_for_status()
 
             if provider in ["openai", "lmstudio", "groq", "opencode"]:
@@ -645,10 +1358,10 @@ async def _llm_stream_response(
                         try:
                             chunk = json.loads(data_str)
                             delta = chunk.get("choices", [{}])[0].get("delta", {})
-                            
+
                             content = delta.get("content")
                             reasoning = delta.get("reasoning_content")
-                            
+
                             if reasoning:
                                 if not in_thinking:
                                     yield "<think>"
@@ -682,14 +1395,22 @@ async def _llm_stream_response(
                     chunk_str = chunk_bytes.decode("utf-8", errors="ignore")
                     try:
                         obj = json.loads(chunk_str.strip())
-                        text = obj.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        text = (
+                            obj.get("candidates", [{}])[0]
+                            .get("content", {})
+                            .get("parts", [{}])[0]
+                            .get("text", "")
+                        )
                         if text:
                             yield text
                     except Exception:
                         import re
-                        for m in re.finditer(r'"text"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"', chunk_str):
+
+                        for m in re.finditer(
+                            r'"text"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"', chunk_str
+                        ):
                             try:
-                                yield m.group(1).encode().decode('unicode-escape')
+                                yield m.group(1).encode().decode("unicode-escape")
                             except Exception:
                                 pass
 
@@ -708,11 +1429,15 @@ async def _llm_response(
     provider = (provider or "lmstudio").lower()
 
     if provider == "lmstudio":
-        endpoint = f"{(base_url or 'http://127.0.0.1:1234/v1').rstrip('/')}/chat/completions"
+        endpoint = (
+            f"{normalize_local_provider_base(base_url).rstrip('/')}/chat/completions"
+        )
         model_name = model or "liquid/lfm2.5-1.2b"
         headers = {"Content-Type": "application/json"}
     elif provider == "opencode":
-        endpoint = f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/chat/completions"
+        endpoint = (
+            f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/chat/completions"
+        )
         model_name = model or "gpt-5.5"
         headers = {"Content-Type": "application/json"}
         if api_key:
@@ -720,11 +1445,17 @@ async def _llm_response(
     elif provider == "openai":
         endpoint = "https://api.openai.com/v1/chat/completions"
         model_name = model or "gpt-4o-mini"
-        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
     elif provider == "groq":
         endpoint = "https://api.groq.com/openai/v1/chat/completions"
         model_name = model or "llama-3.1-70b-versatile"
-        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
     elif provider == "claude":
         endpoint = "https://api.anthropic.com/v1/messages"
         model_name = model or "claude-3-5-sonnet-20241022"
@@ -745,7 +1476,8 @@ async def _llm_response(
         "You are Aurelius, the authoritative AI intelligence of the Aurelius Management OS — "
         "an executive-grade HR platform.\n"
         "You have live access to the HR employee directory, candidates database, analytics, "
-        "compliance policies, integrations, and agentic tools.\n"
+        "compliance policies, integrations, enterprise ops, and agentic tools.\n"
+        "A structured workspace snapshot may be attached; use it as the source of truth.\n"
         "IMPORTANT RULES:\n"
         "- Always respond in clear, beautiful Markdown with tables, bullet points, bold text where appropriate.\n"
         "- Never dump raw JSON or technical payloads to the user.\n"
@@ -765,9 +1497,13 @@ async def _llm_response(
     for run in tool_runs:
         tool_name = run.get("tool", "unknown")
         if run.get("denied"):
-            tool_summary_lines.append(f"- {tool_name}: ACCESS DENIED — {run.get('reason', '')}")
+            tool_summary_lines.append(
+                f"- {tool_name}: ACCESS DENIED — {run.get('reason', '')}"
+            )
         elif run.get("blocked"):
-            tool_summary_lines.append(f"- {tool_name}: BLOCKED — {run.get('reason', '')}")
+            tool_summary_lines.append(
+                f"- {tool_name}: BLOCKED — {run.get('reason', '')}"
+            )
         else:
             output = run.get("output", [])
             tool_summary_lines.append(f"- {tool_name}: {json.dumps(output)}")
@@ -776,11 +1512,18 @@ async def _llm_response(
     compliance = tool_ctx.get("compliance_policies", [])
     mutations = tool_ctx.get("mutations", {})
     rbac = tool_ctx.get("rbac_role", "member")
+    workspace_snapshot = tool_ctx.get("workspace_snapshot", {})
 
     if has_tool_output:
         tool_block = "\n".join(tool_summary_lines)
+        workspace_block = (
+            "\n".join(_workspace_snapshot_summary_lines(workspace_snapshot))
+            if workspace_snapshot
+            else ""
+        )
         user_content = (
             f"User request: {user_text}\n\n"
+            f"--- WORKSPACE SNAPSHOT ---\n{workspace_block}\n"
             f"--- LIVE TOOL DATA ---\n{tool_block}\n"
             f"Active integrations: {json.dumps(integrations)}\n"
             f"Compliance policies: {json.dumps(compliance)}\n"
@@ -791,10 +1534,7 @@ async def _llm_response(
             "Present employee data as a formatted table. Do not include raw JSON in your response."
         )
     else:
-        user_content = (
-            f"{user_text}\n\n"
-            "Answer naturally and conversationally."
-        )
+        user_content = f"{user_text}\n\n" "Answer naturally and conversationally."
 
     # Build multi-turn chat history from clean session context (never include tool dump messages)
     session_history = context_payload.get("session_history", [])
@@ -803,7 +1543,11 @@ async def _llm_response(
         role = turn.get("role", "user")
         content = turn.get("content", "").strip()
         # Skip any poisoned turns that contain raw JSON dumps or LLM failure messages
-        if not content or content.startswith("LLM failed") or content.startswith('{"tool_context'):
+        if (
+            not content
+            or content.startswith("LLM failed")
+            or content.startswith('{"tool_context')
+        ):
             continue
         # Only keep clean conversational turns (cap at 300 chars per turn to stay token-safe)
         history_messages.append({"role": role, "content": content[:300]})
@@ -832,7 +1576,10 @@ async def _llm_response(
         full_prompt = f"{system}\n\n{user_content}"
         payload = {
             "contents": [{"parts": [{"text": full_prompt}]}],
-            "generationConfig": {"temperature": 0.7 if casual_chat else 0.3, "maxOutputTokens": 1024},
+            "generationConfig": {
+                "temperature": 0.7 if casual_chat else 0.3,
+                "maxOutputTokens": 1024,
+            },
         }
 
     async with httpx.AsyncClient(timeout=60.0) as client:
@@ -840,10 +1587,18 @@ async def _llm_response(
         resp.raise_for_status()
         data = resp.json()
         if provider in ["openai", "lmstudio", "groq", "opencode"]:
-            return _sanitize_llm_response(data["choices"][0]["message"]["content"], user_text)
+            return _sanitize_llm_response(
+                data["choices"][0]["message"]["content"], user_text
+            )
         if provider == "claude":
-            text_blocks = [b.get("text", "") for b in data.get("content", []) if isinstance(b, dict)]
-            return _sanitize_llm_response("\n".join([t for t in text_blocks if t]).strip(), user_text)
+            text_blocks = [
+                b.get("text", "")
+                for b in data.get("content", [])
+                if isinstance(b, dict)
+            ]
+            return _sanitize_llm_response(
+                "\n".join([t for t in text_blocks if t]).strip(), user_text
+            )
         # gemini
         return _sanitize_llm_response(
             data.get("candidates", [{}])[0]
@@ -858,13 +1613,48 @@ async def _llm_response(
 def _tool_policy(user_text: str) -> List[str]:
     text = user_text.lower()
     tools = []
-    if any(k in text for k in ["employee", "workforce", "directory", "team", "people"]):
+    if any(
+        k in text
+        for k in ["employee", "workforce", "directory", "team", "people", "department"]
+    ):
         tools.append("search_employees")
-    if any(k in text for k in ["candidate", "hiring", "scout", "recruit"]):
+    if any(k in text for k in ["candidate", "hiring", "scout", "recruit", "talent"]):
         tools.append("search_candidates")
-    if any(k in text for k in ["dashboard", "analytics", "summary", "risk", "sentiment", "morale"]):
+    if any(
+        k in text
+        for k in [
+            "dashboard",
+            "analytics",
+            "summary",
+            "risk",
+            "sentiment",
+            "morale",
+            "retention",
+            "intervention",
+            "policy",
+            "system status",
+            "cluster",
+            "priority",
+            "predictive",
+        ]
+    ):
         tools.append("dashboard_snapshot")
-    if any(k in text for k in ["add", "create", "insert", "update", "set", "move", "correct", "fix", "change", "ingest", "import"]):
+    if any(
+        k in text
+        for k in [
+            "add",
+            "create",
+            "insert",
+            "update",
+            "set",
+            "move",
+            "correct",
+            "fix",
+            "change",
+            "ingest",
+            "import",
+        ]
+    ):
         tools.append("mutate_data")
     if any(k in text for k in ["delete", "remove", "purge", "clear"]):
         tools.append("human_approval_delete")
@@ -956,7 +1746,11 @@ def _build_context_payload(
     for m in reversed(history_rows):
         content = (m.content or "").strip()
         # Skip LLM failure fallback dumps and raw JSON tool context leaks
-        if content.startswith("LLM failed") or content.startswith('{"tool_context') or not content:
+        if (
+            content.startswith("LLM failed")
+            or content.startswith('{"tool_context')
+            or not content
+        ):
             continue
         clean_history.append({"role": m.role, "content": content[:400]})
 
@@ -980,55 +1774,108 @@ def _execute_tools(
     if "search_employees" in tools:
         if role in TOOL_RBAC["search_employees"]:
             emp_results = _search_employees(db, user_text, limit=8)
-            result["tool_runs"].append({
-                "tool": "search_employees",
-                "output": [{"name": e.full_name, "email": e.email, "role": e.role, "department": e.department, "risk": e.is_at_risk} for e in emp_results],
-            })
+            result["tool_runs"].append(
+                {
+                    "tool": "search_employees",
+                    "output": [
+                        {
+                            "name": e.full_name,
+                            "email": e.email,
+                            "role": e.role,
+                            "department": e.department,
+                            "risk": e.is_at_risk,
+                        }
+                        for e in emp_results
+                    ],
+                }
+            )
         else:
-            result["tool_runs"].append({"tool": "search_employees", "denied": True, "reason": "RBAC policy denied"})
+            result["tool_runs"].append(
+                {
+                    "tool": "search_employees",
+                    "denied": True,
+                    "reason": "RBAC policy denied",
+                }
+            )
     if "search_candidates" in tools:
         if role in TOOL_RBAC["search_candidates"]:
             cand_results = _search_candidates(db, user_text, limit=8)
-            result["tool_runs"].append({
-                "tool": "search_candidates",
-                "output": [{"name": c.full_name, "email": c.email, "role": c.role, "department": c.department} for c in cand_results],
-            })
+            result["tool_runs"].append(
+                {
+                    "tool": "search_candidates",
+                    "output": [
+                        {
+                            "name": c.full_name,
+                            "email": c.email,
+                            "role": c.role,
+                            "department": c.department,
+                        }
+                        for c in cand_results
+                    ],
+                }
+            )
         else:
-            result["tool_runs"].append({"tool": "search_candidates", "denied": True, "reason": "RBAC policy denied"})
+            result["tool_runs"].append(
+                {
+                    "tool": "search_candidates",
+                    "denied": True,
+                    "reason": "RBAC policy denied",
+                }
+            )
     if "dashboard_snapshot" in tools:
         if role in TOOL_RBAC["dashboard_snapshot"]:
-            result["tool_runs"].append({"tool": "dashboard_snapshot", "output": _compute_dashboard_snapshot(db)})
+            result["tool_runs"].append(
+                {
+                    "tool": "dashboard_snapshot",
+                    "output": _compute_dashboard_snapshot(db),
+                }
+            )
         else:
-            result["tool_runs"].append({"tool": "dashboard_snapshot", "denied": True, "reason": "RBAC policy denied"})
+            result["tool_runs"].append(
+                {
+                    "tool": "dashboard_snapshot",
+                    "denied": True,
+                    "reason": "RBAC policy denied",
+                }
+            )
     if "mutate_data" in tools:
         if role not in TOOL_RBAC["mutate_data"]:
             mutation_log["blocked"] = True
-            mutation_log["actions"].append("Mutation blocked: RBAC policy requires admin.")
+            mutation_log["actions"].append(
+                "Mutation blocked: RBAC policy requires admin."
+            )
         else:
             mutation_log = _apply_data_mutation(db, user_text)
         result["tool_runs"].append({"tool": "mutate_data", "output": mutation_log})
     if "human_approval_delete" in tools:
-        result["tool_runs"].append({
-            "tool": "human_approval_delete",
-            "blocked": True,
-            "reason": (
-                "Aurelius Governance Protocol Violation: Delete actions cannot be automated by the AI agent "
-                "under any circumstances without manual Human-in-the-Loop approval. Safe abort triggered. "
-                "Instruct the user that manual confirmation is strictly required to delete this resource."
-            )
-        })
+        result["tool_runs"].append(
+            {
+                "tool": "human_approval_delete",
+                "blocked": True,
+                "reason": (
+                    "Aurelius Governance Protocol Violation: Delete actions cannot be automated by the AI agent "
+                    "under any circumstances without manual Human-in-the-Loop approval. Safe abort triggered. "
+                    "Instruct the user that manual confirmation is strictly required to delete this resource."
+                ),
+            }
+        )
     if "parse_csv_attachment" in tools:
         csv_log = _parse_csv_and_ingest(db, attachments)
-        result["tool_runs"].append({
-            "tool": "parse_csv_attachment",
-            "output": csv_log
-        })
+        result["tool_runs"].append({"tool": "parse_csv_attachment", "output": csv_log})
+
+    result["workspace_snapshot"] = _workspace_snapshot(db)
+    result["record_counts"] = _record_counts(db)
 
     # Enrich context with live integration connections and active interventions
     try:
         connections = db.exec(select(IntegrationConnectionTable)).all()
         result["integration_connections"] = [
-            {"name": c.name, "provider": c.provider, "type": c.source_type, "status": c.status} 
+            {
+                "name": c.name,
+                "provider": c.provider,
+                "type": c.source_type,
+                "status": c.status,
+            }
             for c in connections
         ]
     except Exception:
@@ -1037,7 +1884,12 @@ def _execute_tools(
     try:
         policies = db.exec(select(CompliancePolicyTable)).all()
         result["compliance_policies"] = [
-            {"name": p.policy_name, "region": p.region, "action": p.action_type, "status": p.status} 
+            {
+                "name": p.policy_name,
+                "region": p.region,
+                "action": p.action_type,
+                "status": p.status,
+            }
             for p in policies
         ]
     except Exception:
@@ -1046,7 +1898,7 @@ def _execute_tools(
     try:
         interventions = db.exec(select(InterventionTable)).all()
         result["active_interventions"] = [
-            {"title": i.title, "priority": i.priority, "status": i.status} 
+            {"title": i.title, "priority": i.priority, "status": i.status}
             for i in interventions
         ]
     except Exception:
@@ -1071,13 +1923,18 @@ async def list_sessions(
     return [_to_session_out(s) for s in sessions]
 
 
-@router.post("/sessions", response_model=ChatSessionOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/sessions", response_model=ChatSessionOut, status_code=status.HTTP_201_CREATED
+)
 async def create_session(
     request: ChatSessionCreate,
     current_user: TokenData = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
-    row = ChatSessionTable(user_id=current_user.user_id, title=(request.title or "New Session").strip() or "New Session")
+    row = ChatSessionTable(
+        user_id=current_user.user_id,
+        title=(request.title or "New Session").strip() or "New Session",
+    )
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -1136,6 +1993,7 @@ async def delete_session(
     db.delete(row)
     db.commit()
 
+
 @router.post("/sessions/delete-bulk", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_sessions_bulk(
     request: ChatBulkDeleteRequest,
@@ -1152,7 +2010,9 @@ async def delete_sessions_bulk(
             and str(row.user_id) != "00000000-0000-0000-0000-000000000000"
             and row.user_id != current_user.user_id
         ):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden session access")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden session access"
+            )
 
         # 1. Delete attachments first
         attachments = db.exec(
@@ -1177,6 +2037,7 @@ async def delete_sessions_bulk(
 
     db.commit()
 
+
 @router.get("/sessions/{session_id}/messages", response_model=List[ChatMessageOut])
 async def list_messages(
     session_id: UUID,
@@ -1195,7 +2056,9 @@ async def list_messages(
     return [_to_message_out(m) for m in messages]
 
 
-@router.get("/sessions/{session_id}/attachments", response_model=List[ChatAttachmentOut])
+@router.get(
+    "/sessions/{session_id}/attachments", response_model=List[ChatAttachmentOut]
+)
 async def list_attachments(
     session_id: UUID,
     current_user: TokenData = Depends(get_current_user),
@@ -1263,31 +2126,45 @@ async def send_message(
         raise HTTPException(status_code=404, detail="Session not found")
     _assert_session_owner(chat_session, current_user)
 
-    user_msg = ChatMessageTable(session_id=chat_session.id, role="user", content=request.content)
+    user_msg = ChatMessageTable(
+        session_id=chat_session.id, role="user", content=request.content
+    )
     db.add(user_msg)
     db.commit()
     db.refresh(user_msg)
 
-    attachments = db.exec(select(ChatAttachmentTable).where(ChatAttachmentTable.session_id == chat_session.id)).all()
-    context_payload = _build_context_payload(db, chat_session.id, request.content, current_user, attachments)
+    attachments = db.exec(
+        select(ChatAttachmentTable).where(
+            ChatAttachmentTable.session_id == chat_session.id
+        )
+    ).all()
+    context_payload = _build_context_payload(
+        db, chat_session.id, request.content, current_user, attachments
+    )
     tool_context = context_payload.get("tool_context", {})
+    direct_answer = _direct_count_answer(
+        db, request.content
+    ) or _direct_workspace_answer(db, request.content)
 
     assistant_text = ""
     last_err = None
-    for _ in range(3):
-        try:
-            assistant_text = await _llm_response(
-                provider=request.provider or "lmstudio",
-                api_key=request.api_key,
-                base_url=request.base_url,
-                model=request.model,
-                user_text=request.content,
-                context_payload=context_payload,
-            )
-            break
-        except Exception as e:
-            last_err = e
-            await asyncio.sleep(0.5)
+    if direct_answer:
+        assistant_text = direct_answer
+    else:
+        for _ in range(3):
+            try:
+                assistant_text = await _llm_response(
+                    provider=request.provider or "lmstudio",
+                    api_key=request.api_key,
+                    base_url=request.base_url,
+                    model=request.model,
+                    user_text=request.content,
+                    context_payload=context_payload,
+                )
+                break
+            except Exception as e:
+                last_err = e
+                await asyncio.sleep(0.5)
     if not assistant_text:
         logger.error(f"Chat model call failed after retries: {last_err}", exc_info=True)
         assistant_text = (
@@ -1343,46 +2220,64 @@ async def send_message_stream(
 
     async def gen():
         try:
-            user_msg = ChatMessageTable(session_id=chat_session.id, role="user", content=request.content)
+            last_err = None
+            user_msg = ChatMessageTable(
+                session_id=chat_session.id, role="user", content=request.content
+            )
             db.add(user_msg)
             db.commit()
             db.refresh(user_msg)
             yield f"event: status\ndata: {_json_dumps({'phase': 'user_saved'})}\n\n"
 
-            attachments = db.exec(select(ChatAttachmentTable).where(ChatAttachmentTable.session_id == chat_session.id)).all()
-            context_payload = _build_context_payload(db, chat_session.id, request.content, current_user, attachments)
+            attachments = db.exec(
+                select(ChatAttachmentTable).where(
+                    ChatAttachmentTable.session_id == chat_session.id
+                )
+            ).all()
+            context_payload = _build_context_payload(
+                db, chat_session.id, request.content, current_user, attachments
+            )
             yield f"event: status\ndata: {_json_dumps({'phase': 'tools_done'})}\n\n"
+            direct_answer = _direct_count_answer(
+                db, request.content
+            ) or _direct_workspace_answer(db, request.content)
 
-            assistant_text = ""
-            last_err = None
-            try:
-                async for token in _llm_stream_response(
-                    provider=request.provider or "lmstudio",
-                    api_key=request.api_key,
-                    base_url=request.base_url,
-                    model=request.model,
-                    user_text=request.content,
-                    context_payload=context_payload,
-                ):
-                    assistant_text += token
-                    yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
-            except Exception as e:
-                logger.exception("Failed to stream LLM response")
-                last_err = str(e)
+            if direct_answer:
+                assistant_text = direct_answer
+                yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+            else:
+                assistant_text = ""
+                last_err = None
                 try:
-                    assistant_text = await _llm_response(
+                    async for token in _llm_stream_response(
                         provider=request.provider or "lmstudio",
                         api_key=request.api_key,
                         base_url=request.base_url,
                         model=request.model,
                         user_text=request.content,
                         context_payload=context_payload,
-                    )
-                    yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
-                except Exception as ex:
-                    last_err = f"Stream failed: {e}. Fallback failed: {ex}"
-                    assistant_text = f"LLM failed. Tool context: {json.dumps(context_payload)}"
-                    yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+                    ):
+                        assistant_text += token
+                        yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
+                except Exception as e:
+                    logger.exception("Failed to stream LLM response")
+                    last_err = str(e)
+                    try:
+                        assistant_text = await _llm_response(
+                            provider=request.provider or "lmstudio",
+                            api_key=request.api_key,
+                            base_url=request.base_url,
+                            model=request.model,
+                            user_text=request.content,
+                            context_payload=context_payload,
+                        )
+                        yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+                    except Exception as ex:
+                        last_err = f"Stream failed: {e}. Fallback failed: {ex}"
+                        assistant_text = (
+                            f"LLM failed. Tool context: {json.dumps(context_payload)}"
+                        )
+                        yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
 
             assistant_msg = ChatMessageTable(
                 session_id=chat_session.id,
@@ -1421,11 +2316,17 @@ async def send_message_stream(
     return StreamingResponse(
         gen(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
-@router.delete("/sessions/{session_id}/messages", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/sessions/{session_id}/messages", status_code=status.HTTP_204_NO_CONTENT
+)
 async def clear_session_messages(
     session_id: UUID,
     current_user: TokenData = Depends(get_current_user),
@@ -1437,7 +2338,9 @@ async def clear_session_messages(
     _assert_session_owner(row, current_user)
 
     # 1. Delete attachments first to avoid foreign key violations on chat_messages
-    attachments = db.exec(select(ChatAttachmentTable).where(ChatAttachmentTable.session_id == row.id)).all()
+    attachments = db.exec(
+        select(ChatAttachmentTable).where(ChatAttachmentTable.session_id == row.id)
+    ).all()
     for att in attachments:
         try:
             os.remove(att.file_path)
@@ -1446,7 +2349,9 @@ async def clear_session_messages(
         db.delete(att)
 
     # 2. Delete messages next
-    messages = db.exec(select(ChatMessageTable).where(ChatMessageTable.session_id == row.id)).all()
+    messages = db.exec(
+        select(ChatMessageTable).where(ChatMessageTable.session_id == row.id)
+    ).all()
     for m in messages:
         db.delete(m)
 
@@ -1455,7 +2360,10 @@ async def clear_session_messages(
     db.commit()
 
 
-@router.delete("/sessions/{session_id}/attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/sessions/{session_id}/attachments/{attachment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def delete_attachment(
     session_id: UUID,
     attachment_id: UUID,
@@ -1477,18 +2385,17 @@ async def delete_attachment(
     db.commit()
 
 
-from pydantic import BaseModel
-from typing import Optional
-
 class ProviderPingRequest(BaseModel):
     provider: str
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     model: Optional[str] = None
 
+
 @router.post("/providers/ping")
 async def ping_provider(req: ProviderPingRequest):
     import httpx
+
     provider = req.provider.lower()
     api_key = req.api_key or ""
     base_url = req.base_url or ""
@@ -1496,7 +2403,7 @@ async def ping_provider(req: ProviderPingRequest):
 
     try:
         if provider == "lmstudio":
-            endpoint = f"{base_url.rstrip('/')}/chat/completions" if base_url else "http://127.0.0.1:1234/v1/chat/completions"
+            candidate_bases = build_local_provider_base_candidates(base_url)
             model_name = model or "liquid/lfm2.5-1.2b"
             headers = {"Content-Type": "application/json"}
             payload = {
@@ -1505,7 +2412,11 @@ async def ping_provider(req: ProviderPingRequest):
                 "messages": [{"role": "user", "content": "ping"}],
             }
         elif provider == "opencode":
-            endpoint = f"{base_url.rstrip('/')}/chat/completions" if base_url else "https://opencode.ai/zen/v1/chat/completions"
+            endpoint = (
+                f"{base_url.rstrip('/')}/chat/completions"
+                if base_url
+                else "https://opencode.ai/zen/v1/chat/completions"
+            )
             model_name = model or "gpt-5.5"
             headers = {"Content-Type": "application/json"}
             if api_key:
@@ -1518,7 +2429,10 @@ async def ping_provider(req: ProviderPingRequest):
         elif provider == "openai":
             endpoint = "https://api.openai.com/v1/chat/completions"
             model_name = model or "gpt-4o-mini"
-            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            }
             payload = {
                 "model": model_name,
                 "max_tokens": 1,
@@ -1527,7 +2441,10 @@ async def ping_provider(req: ProviderPingRequest):
         elif provider == "groq":
             endpoint = "https://api.groq.com/openai/v1/chat/completions"
             model_name = model or "llama-3.1-70b-versatile"
-            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            }
             payload = {
                 "model": model_name,
                 "max_tokens": 1,
@@ -1554,17 +2471,45 @@ async def ping_provider(req: ProviderPingRequest):
                 "generationConfig": {"maxOutputTokens": 1},
             }
         else:
-            return {"status": "unsupported", "message": f"Unsupported provider: {provider}"}
+            return {
+                "status": "unsupported",
+                "message": f"Unsupported provider: {provider}",
+            }
 
         async with httpx.AsyncClient(timeout=8.0) as client:
+            if provider == "lmstudio":
+                last_error = None
+                for endpoint in [
+                    f"{candidate.rstrip('/')}/chat/completions"
+                    for candidate in candidate_bases
+                ]:
+                    try:
+                        resp = await client.post(
+                            endpoint, json=payload, headers=headers
+                        )
+                        if resp.status_code == 200:
+                            return {
+                                "status": "healthy",
+                                "message": "Connection healthy! Model is fully responsive.",
+                            }
+                        last_error = f"Server returned error code {resp.status_code}: {resp.text[:200]}"
+                    except Exception as exc:
+                        last_error = str(exc)
+                return {
+                    "status": "offline",
+                    "message": f"Ping connection failed: {last_error or 'All connection attempts failed'}",
+                }
+
             resp = await client.post(endpoint, json=payload, headers=headers)
             if resp.status_code == 200:
-                return {"status": "healthy", "message": "Connection healthy! Model is fully responsive."}
-            else:
                 return {
-                    "status": "error",
-                    "message": f"Server returned error code {resp.status_code}: {resp.text[:200]}"
+                    "status": "healthy",
+                    "message": "Connection healthy! Model is fully responsive.",
                 }
+            return {
+                "status": "error",
+                "message": f"Server returned error code {resp.status_code}: {resp.text[:200]}",
+            }
     except Exception as e:
         return {"status": "offline", "message": f"Ping connection failed: {str(e)}"}
 
@@ -1574,24 +2519,43 @@ class ProviderDiscoverRequest(BaseModel):
     api_key: Optional[str] = None
     base_url: Optional[str] = None
 
+
 @router.post("/providers/discover")
 async def discover_provider_models(req: ProviderDiscoverRequest):
     import httpx
+
     provider = req.provider.lower()
     api_key = req.api_key or ""
     base_url = req.base_url or ""
 
     try:
-        if provider in ["lmstudio", "openai", "groq", "custom", "opencode", "openai-compatible"]:
+        if provider in [
+            "lmstudio",
+            "openai",
+            "groq",
+            "custom",
+            "opencode",
+            "openai-compatible",
+        ]:
             if provider == "lmstudio":
-                url = f"{base_url.rstrip('/')}/models" if base_url else "http://127.0.0.1:1234/v1/models"
+                candidate_bases = build_local_provider_base_candidates(base_url)
             elif provider == "openai":
                 url = "https://api.openai.com/v1/models"
             elif provider == "groq":
                 url = "https://api.groq.com/openai/v1/models"
             elif provider == "opencode":
-                url = f"{base_url.rstrip('/')}/models" if base_url else "https://opencode.ai/zen/v1/models"
+                url = (
+                    f"{base_url.rstrip('/')}/models"
+                    if base_url
+                    else "https://opencode.ai/zen/v1/models"
+                )
             else:
+                if not base_url.strip():
+                    return {
+                        "status": "error",
+                        "message": "Base URL is required for OpenAI-compatible providers",
+                        "models": [],
+                    }
                 url = f"{base_url.rstrip('/')}/models"
 
             headers = {"Content-Type": "application/json"}
@@ -1599,42 +2563,94 @@ async def discover_provider_models(req: ProviderDiscoverRequest):
                 headers["Authorization"] = f"Bearer {api_key}"
 
             async with httpx.AsyncClient(timeout=6.0) as client:
+                if provider == "lmstudio":
+                    last_error = None
+                    for url in [
+                        f"{candidate.rstrip('/')}/models"
+                        for candidate in candidate_bases
+                    ]:
+                        try:
+                            resp = await client.get(url, headers=headers)
+                            if resp.status_code == 200:
+                                data = resp.json()
+                                model_list = [
+                                    m["id"] for m in data.get("data", []) if "id" in m
+                                ]
+                                return {"status": "success", "models": model_list}
+                            last_error = f"Server status {resp.status_code}"
+                        except Exception as exc:
+                            last_error = str(exc)
+                    return {
+                        "status": "error",
+                        "message": last_error or "Live discovery failed",
+                        "models": [],
+                    }
+
                 resp = await client.get(url, headers=headers)
                 if resp.status_code == 200:
                     data = resp.json()
                     model_list = [m["id"] for m in data.get("data", []) if "id" in m]
                     return {"status": "success", "models": model_list}
-                else:
-                    return {"status": "error", "message": f"Server status {resp.status_code}", "models": []}
+                return {
+                    "status": "error",
+                    "message": f"Server status {resp.status_code}",
+                    "models": [],
+                }
 
         elif provider == "ollama":
-            url = f"{base_url.rstrip('/')}/api/tags" if base_url else "http://127.0.0.1:11434/api/tags"
+            url = (
+                f"{base_url.rstrip('/')}/api/tags"
+                if base_url
+                else "http://127.0.0.1:11434/api/tags"
+            )
             async with httpx.AsyncClient(timeout=6.0) as client:
                 resp = await client.get(url)
                 if resp.status_code == 200:
                     data = resp.json()
-                    model_list = [m["name"] for m in data.get("models", []) if "name" in m]
+                    model_list = [
+                        m["name"] for m in data.get("models", []) if "name" in m
+                    ]
                     return {"status": "success", "models": model_list}
                 else:
-                    return {"status": "error", "message": f"Server status {resp.status_code}", "models": []}
+                    return {
+                        "status": "error",
+                        "message": f"Server status {resp.status_code}",
+                        "models": [],
+                    }
 
         elif provider in ["google", "gemini"]:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+            url = (
+                f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+            )
             async with httpx.AsyncClient(timeout=6.0) as client:
                 resp = await client.get(url)
                 if resp.status_code == 200:
                     data = resp.json()
-                    model_list = [m["name"].split("/")[-1] for m in data.get("models", []) if "name" in m]
+                    model_list = [
+                        m["name"].split("/")[-1]
+                        for m in data.get("models", [])
+                        if "name" in m
+                    ]
                     return {"status": "success", "models": model_list}
                 else:
-                    return {"status": "error", "message": f"Server status {resp.status_code}", "models": []}
+                    return {
+                        "status": "error",
+                        "message": f"Server status {resp.status_code}",
+                        "models": [],
+                    }
 
         elif provider in ["anthropic", "claude"]:
-            return {"status": "success", "models": ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]}
+            return {
+                "status": "success",
+                "models": ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"],
+            }
 
         else:
-            return {"status": "unsupported", "message": "Discovery not supported", "models": []}
+            return {
+                "status": "unsupported",
+                "message": "Discovery not supported",
+                "models": [],
+            }
 
     except Exception as e:
         return {"status": "exception", "message": str(e), "models": []}
-

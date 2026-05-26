@@ -23,7 +23,6 @@ from app.models.database import (
     IntegrationConnectionTable,
     InterventionTable,
     InterventionOutcomeTable,
-    CandidateTable,
     get_session,
 )
 from app.schemas.schemas import (
@@ -47,7 +46,14 @@ router = APIRouter(prefix="/enterprise", tags=["enterprise"])
 _SYNC_STATE: dict[str, dict] = {}
 
 
-def _audit(db: Session, current_user: TokenData, action: str, resource_type: str, resource_id: UUID | None = None, details: dict | None = None):
+def _audit(
+    db: Session,
+    current_user: TokenData,
+    action: str,
+    resource_type: str,
+    resource_id: UUID | None = None,
+    details: dict | None = None,
+):
     user_uuid = None
     if current_user.user_id:
         try:
@@ -69,7 +75,9 @@ def _audit(db: Session, current_user: TokenData, action: str, resource_type: str
 def _risk_components(employee: EmployeeTable) -> List[AttritionDriverOut]:
     drivers: List[AttritionDriverOut] = []
     sentiment = float(employee.sentiment_score or 0.5)
-    retention = float(employee.retention_prob if employee.retention_prob is not None else 0.5)
+    retention = float(
+        employee.retention_prob if employee.retention_prob is not None else 0.5
+    )
 
     if sentiment < 0.45:
         drivers.append(
@@ -107,9 +115,13 @@ def _risk_components(employee: EmployeeTable) -> List[AttritionDriverOut]:
     return drivers
 
 
-def _risk_probability(employee: EmployeeTable, drivers: List[AttritionDriverOut]) -> float:
+def _risk_probability(
+    employee: EmployeeTable, drivers: List[AttritionDriverOut]
+) -> float:
     sentiment = float(employee.sentiment_score or 0.5)
-    retention = float(employee.retention_prob if employee.retention_prob is not None else 0.5)
+    retention = float(
+        employee.retention_prob if employee.retention_prob is not None else 0.5
+    )
     base = 0.12
     base += max(0.0, (0.55 - sentiment) * 0.9)
     base += max(0.0, (0.60 - retention) * 0.8)
@@ -129,7 +141,9 @@ def _recommended_actions(employee: EmployeeTable, risk_probability: float) -> Li
     else:
         actions.append("Maintain standard engagement cadence and monitor monthly.")
     if employee.department:
-        actions.append(f"Compare {employee.department} team baseline against org median sentiment.")
+        actions.append(
+            f"Compare {employee.department} team baseline against org median sentiment."
+        )
     return actions[:3]
 
 
@@ -229,7 +243,9 @@ async def risk_driver_drilldown(
         )
         for risk, e, evidence in selected[:top_n]
     ]
-    return RiskDriverDrilldownResponse(factor=factor, generated_at=datetime.utcnow(), items=items)
+    return RiskDriverDrilldownResponse(
+        factor=factor, generated_at=datetime.utcnow(), items=items
+    )
 
 
 def _to_intervention_out(item: InterventionTable) -> InterventionOut:
@@ -268,7 +284,11 @@ async def list_interventions(
     return [_to_intervention_out(r) for r in rows]
 
 
-@router.post("/interventions", response_model=InterventionOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/interventions",
+    response_model=InterventionOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_intervention(
     payload: InterventionCreate,
     current_user: TokenData = Depends(get_current_user),
@@ -276,7 +296,9 @@ async def create_intervention(
     db: Session = Depends(get_session),
 ):
     if payload.priority in {"high", "critical"} and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="High-impact interventions require admin approval")
+        raise HTTPException(
+            status_code=403, detail="High-impact interventions require admin approval"
+        )
     row = InterventionTable(
         tenant_id=tenant_id,
         title=payload.title,
@@ -295,7 +317,14 @@ async def create_intervention(
     db.add(row)
     db.commit()
     db.refresh(row)
-    _audit(db, current_user, "CREATE_INTERVENTION", "intervention", row.id, {"priority": payload.priority, "target_scope": payload.target_scope})
+    _audit(
+        db,
+        current_user,
+        "CREATE_INTERVENTION",
+        "intervention",
+        row.id,
+        {"priority": payload.priority, "target_scope": payload.target_scope},
+    )
     db.commit()
     return _to_intervention_out(row)
 
@@ -319,12 +348,21 @@ async def update_intervention(
     db.add(row)
     db.commit()
     db.refresh(row)
-    _audit(db, current_user, "UPDATE_INTERVENTION", "intervention", row.id, {"status": row.status, "priority": row.priority})
+    _audit(
+        db,
+        current_user,
+        "UPDATE_INTERVENTION",
+        "intervention",
+        row.id,
+        {"status": row.status, "priority": row.priority},
+    )
     db.commit()
     return _to_intervention_out(row)
 
 
-@router.delete("/interventions/{intervention_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/interventions/{intervention_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def delete_intervention(
     intervention_id: UUID,
     current_user: TokenData = Depends(get_current_user),
@@ -354,7 +392,10 @@ def _to_outcome_out(item: InterventionOutcomeTable) -> InterventionOutcomeOut:
     )
 
 
-@router.get("/interventions/{intervention_id}/outcomes", response_model=List[InterventionOutcomeOut])
+@router.get(
+    "/interventions/{intervention_id}/outcomes",
+    response_model=List[InterventionOutcomeOut],
+)
 async def list_intervention_outcomes(
     intervention_id: UUID,
     current_user: TokenData = Depends(get_current_user),
@@ -373,7 +414,11 @@ async def list_intervention_outcomes(
     return [_to_outcome_out(r) for r in rows]
 
 
-@router.post("/interventions/{intervention_id}/outcomes", response_model=InterventionOutcomeOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/interventions/{intervention_id}/outcomes",
+    response_model=InterventionOutcomeOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def upsert_intervention_outcome(
     intervention_id: UUID,
     payload: InterventionOutcomeCreate,
@@ -382,7 +427,9 @@ async def upsert_intervention_outcome(
     db: Session = Depends(get_session),
 ):
     if payload.checkpoint_day not in {30, 60, 90}:
-        raise HTTPException(status_code=422, detail="checkpoint_day must be one of 30, 60, 90")
+        raise HTTPException(
+            status_code=422, detail="checkpoint_day must be one of 30, 60, 90"
+        )
     intervention = db.get(InterventionTable, intervention_id)
     if not intervention or intervention.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Intervention not found")
@@ -402,11 +449,19 @@ async def upsert_intervention_outcome(
         db.commit()
         db.refresh(existing)
         # lightweight aggregate score on intervention
-        outcomes = db.exec(select(InterventionOutcomeTable).where(InterventionOutcomeTable.intervention_id == intervention_id)).all()
-        scored = [o for o in outcomes if o.status in {"improved", "neutral", "worsened"}]
+        outcomes = db.exec(
+            select(InterventionOutcomeTable).where(
+                InterventionOutcomeTable.intervention_id == intervention_id
+            )
+        ).all()
+        scored = [
+            o for o in outcomes if o.status in {"improved", "neutral", "worsened"}
+        ]
         if scored:
             mapping = {"worsened": 0.0, "neutral": 0.5, "improved": 1.0}
-            intervention.outcome_score = round(sum(mapping[o.status] for o in scored) / len(scored), 3)
+            intervention.outcome_score = round(
+                sum(mapping[o.status] for o in scored) / len(scored), 3
+            )
             intervention.updated_at = datetime.utcnow()
             db.add(intervention)
             db.commit()
@@ -425,7 +480,14 @@ async def upsert_intervention_outcome(
     db.add(row)
     db.commit()
     db.refresh(row)
-    _audit(db, current_user, "UPSERT_INTERVENTION_OUTCOME", "intervention_outcome", row.id, {"checkpoint_day": payload.checkpoint_day, "status": payload.status})
+    _audit(
+        db,
+        current_user,
+        "UPSERT_INTERVENTION_OUTCOME",
+        "intervention_outcome",
+        row.id,
+        {"checkpoint_day": payload.checkpoint_day, "status": payload.status},
+    )
     db.commit()
     return _to_outcome_out(row)
 
@@ -466,7 +528,11 @@ async def list_connections(
     return [_to_connection_out(r) for r in rows]
 
 
-@router.post("/connections", response_model=IntegrationConnectionOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/connections",
+    response_model=IntegrationConnectionOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_connection(
     payload: IntegrationConnectionCreate,
     current_user: TokenData = Depends(get_current_user),
@@ -488,7 +554,14 @@ async def create_connection(
     db.add(row)
     db.commit()
     db.refresh(row)
-    _audit(db, current_user, "CREATE_CONNECTION", "integration_connection", row.id, {"provider": payload.provider, "source_type": payload.source_type})
+    _audit(
+        db,
+        current_user,
+        "CREATE_CONNECTION",
+        "integration_connection",
+        row.id,
+        {"provider": payload.provider, "source_type": payload.source_type},
+    )
     db.commit()
     return _to_connection_out(row)
 
@@ -510,7 +583,14 @@ async def update_connection(
     db.add(row)
     db.commit()
     db.refresh(row)
-    _audit(db, current_user, "UPDATE_CONNECTION", "integration_connection", row.id, {"status": row.status, "provider": row.provider})
+    _audit(
+        db,
+        current_user,
+        "UPDATE_CONNECTION",
+        "integration_connection",
+        row.id,
+        {"status": row.status, "provider": row.provider},
+    )
     db.commit()
     return _to_connection_out(row)
 
@@ -537,7 +617,9 @@ async def _run_sync_job(connection_id: UUID):
         await asyncio.sleep(1.0)
 
 
-@router.post("/connections/{connection_id}/sync", response_model=ConnectionSyncStatusOut)
+@router.post(
+    "/connections/{connection_id}/sync", response_model=ConnectionSyncStatusOut
+)
 async def trigger_connection_sync(
     connection_id: UUID,
     current_user: TokenData = Depends(get_current_user),
@@ -553,7 +635,14 @@ async def trigger_connection_sync(
     row.updated_at = datetime.utcnow()
     db.add(row)
     db.commit()
-    _audit(db, current_user, "TRIGGER_CONNECTION_SYNC", "integration_connection", row.id, {"connection_id": str(connection_id)})
+    _audit(
+        db,
+        current_user,
+        "TRIGGER_CONNECTION_SYNC",
+        "integration_connection",
+        row.id,
+        {"connection_id": str(connection_id)},
+    )
     db.commit()
     key = str(connection_id)
     _SYNC_STATE[key] = {
@@ -575,7 +664,9 @@ async def trigger_connection_sync(
     )
 
 
-@router.get("/connections/{connection_id}/sync-status", response_model=ConnectionSyncStatusOut)
+@router.get(
+    "/connections/{connection_id}/sync-status", response_model=ConnectionSyncStatusOut
+)
 async def get_sync_status(
     connection_id: UUID,
     current_user: TokenData = Depends(get_current_user),
@@ -610,13 +701,16 @@ async def sync_status_stream(
 
     async def event_generator():
         while True:
-            state = _SYNC_STATE.get(key, {
-                "status": "idle",
-                "phase": "idle",
-                "progress": 0,
-                "message": "No sync in progress",
-                "updated_at": datetime.utcnow().isoformat(),
-            })
+            state = _SYNC_STATE.get(
+                key,
+                {
+                    "status": "idle",
+                    "phase": "idle",
+                    "progress": 0,
+                    "message": "No sync in progress",
+                    "updated_at": datetime.utcnow().isoformat(),
+                },
+            )
             yield f"event: sync\ndata: {_json(state)}\n\n"
             if state.get("status") == "completed":
                 break
@@ -625,5 +719,9 @@ async def sync_status_stream(
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )

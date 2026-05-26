@@ -1,13 +1,13 @@
-import React from 'react';
+import React from "react";
 
 const Input = ({
   label,
   icon,
   error,
   id,
-  type = 'text',
-  placeholder = '',
-  className = '',
+  type = "text",
+  placeholder = "",
+  className = "",
   ...props
 }) => {
   return (
@@ -31,11 +31,11 @@ const Input = ({
           type={type}
           placeholder={placeholder}
           className={`w-full rounded-xl bg-slate-950/50 border border-white/10 outline-none transition-all py-3 px-4 ${
-            icon ? 'pl-11' : ''
+            icon ? "pl-11" : ""
           } ${
-            error 
-              ? 'border-rose-500/50 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/20' 
-              : 'focus:border-indigo-500/50 focus:bg-slate-900/40 focus:ring-1 focus:ring-indigo-500/20'
+            error
+              ? "border-rose-500/50 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/20"
+              : "focus:border-indigo-500/50 focus:bg-slate-900/40 focus:ring-1 focus:ring-indigo-500/20"
           }`}
           {...props}
         />

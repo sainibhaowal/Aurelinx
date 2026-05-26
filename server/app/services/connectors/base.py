@@ -1,5 +1,6 @@
 from typing import Dict, List
 
+
 class BaseConnector:
     provider = "base"
     source_type = "unknown"

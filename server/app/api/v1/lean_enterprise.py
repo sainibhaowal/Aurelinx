@@ -13,7 +13,6 @@ import io
 from datetime import datetime, timedelta
 from pathlib import Path
 import json
-import os
 import threading
 import zipfile
 from typing import Any, Dict, List
@@ -23,7 +22,12 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from sqlmodel import Session, select
 
-from app.core.security import TokenData, get_current_user, get_current_user_strict, get_tenant_id
+from app.core.security import (
+    TokenData,
+    get_current_user,
+    get_current_user_strict,
+    get_tenant_id,
+)
 from app.models.database import (
     AuditLogTable,
     CandidateTable,
@@ -62,7 +66,6 @@ from app.schemas.schemas import (
     DRRunbookOut,
     PolicyCheckRequest,
     PolicyCheckResponse,
-    ForecastScenarioCreate,
     ForecastScenarioOut,
     MLDriftSnapshotOut,
     MLModelCardOut,
@@ -74,7 +77,6 @@ from app.schemas.schemas import (
 
 router = APIRouter(prefix="/lean", tags=["lean-enterprise"])
 _SCHEDULER_TASK: asyncio.Task | None = None
-_DEMO_DATA_DIR = Path(__file__).resolve().parents[3] / "datasets" / "processed"
 _BUNDLE_FILE_NAMES = {
     "employees": "employees_public.csv",
     "candidates": "candidates_public.csv",
@@ -171,14 +173,27 @@ def _build_quality_score(
             if value in seen_values:
                 duplicate_rows += 1
                 if len(issue_samples) < 5:
-                    issue_samples.append(f"Row {idx + 1}: duplicate {unique_field} '{value}'")
+                    issue_samples.append(
+                        f"Row {idx + 1}: duplicate {unique_field} '{value}'"
+                    )
             else:
                 seen_values.add(value)
 
     coverage = 1.0 - (missing_required_rows / total_rows)
     uniqueness = len(seen_values) / total_rows if total_rows else 0.0
-    completeness = 1.0 - (missing_required_fields / max(1, total_rows * max(1, len(required_fields))))
-    quality_score = max(0.0, min(1.0, (coverage * 0.45) + (uniqueness * 0.35) + (completeness * 0.20) - (duplicate_rows / total_rows) * 0.1))
+    completeness = 1.0 - (
+        missing_required_fields / max(1, total_rows * max(1, len(required_fields)))
+    )
+    quality_score = max(
+        0.0,
+        min(
+            1.0,
+            (coverage * 0.45)
+            + (uniqueness * 0.35)
+            + (completeness * 0.20)
+            - (duplicate_rows / total_rows) * 0.1,
+        ),
+    )
 
     return {
         "total_rows": total_rows,
@@ -240,13 +255,32 @@ def _policy_check(
             reasons.append(f"Blocked by policy {policy.policy_name}")
         if confidence < float(policy.min_confidence):
             allowed = False
-            reasons.append(f"Confidence {confidence:.2f} below minimum {policy.min_confidence:.2f}")
+            reasons.append(
+                f"Confidence {confidence:.2f} below minimum {policy.min_confidence:.2f}"
+            )
         if policy.blocked_if_missing_evidence and not (evidence or "").strip():
             allowed = False
             reasons.append(f"Evidence required by policy {policy.policy_name}")
         if policy.requires_approval and high_impact:
-            reasons.append(f"High-impact action requires approval under policy {policy.policy_name}")
-    return PolicyCheckResponse(allowed=allowed, reasons=reasons, matched_policies=matched)
+            reasons.append(
+                f"High-impact action requires approval under policy {policy.policy_name}"
+            )
+    return PolicyCheckResponse(
+        allowed=allowed, reasons=reasons, matched_policies=matched
+    )
+
+
+@router.get("/summary")
+async def get_data_summary(
+    current_user: TokenData = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    return {
+        "employees": len(db.exec(select(EmployeeTable)).all()),
+        "candidates": len(db.exec(select(CandidateTable)).all()),
+        "skills": len(db.exec(select(SkillTable)).all()),
+        "experience": len(db.exec(select(ExperienceTable)).all()),
+    }
 
 
 def _audit(
@@ -275,10 +309,18 @@ def _audit(
     )
 
 
-def _fairness_summary(rows: List[CanonicalEmployeeTable], tenant_id: str) -> FairnessSummaryOut:
+def _fairness_summary(
+    rows: List[CanonicalEmployeeTable], tenant_id: str
+) -> FairnessSummaryOut:
     groups: List[dict] = []
     if not rows:
-        return FairnessSummaryOut(tenant_id=tenant_id, reference_group="none", groups=[], max_gap=0.0, compliant=True)
+        return FairnessSummaryOut(
+            tenant_id=tenant_id,
+            reference_group="none",
+            groups=[],
+            max_gap=0.0,
+            compliant=True,
+        )
     buckets: Dict[str, List[CanonicalEmployeeTable]] = {}
     for row in rows:
         buckets.setdefault(row.department or "Unknown", []).append(row)
@@ -287,7 +329,9 @@ def _fairness_summary(rows: List[CanonicalEmployeeTable], tenant_id: str) -> Fai
         reference = max(buckets.items(), key=lambda item: len(item[1]))[0]
     reference_rate = 0.0
     if reference in buckets:
-        reference_rate = len([r for r in buckets[reference] if r.is_at_risk]) / max(1, len(buckets[reference]))
+        reference_rate = len([r for r in buckets[reference] if r.is_at_risk]) / max(
+            1, len(buckets[reference])
+        )
     max_gap = 0.0
     for name, members in buckets.items():
         rate = len([r for r in members if r.is_at_risk]) / max(1, len(members))
@@ -332,7 +376,11 @@ def _analytics_snapshot(db: Session) -> Dict[str, Any]:
     total = len(rows)
     at_risk = len([r for r in rows if r.is_at_risk])
     at_risk_pct = round((at_risk / total) * 100, 1) if total else 0.0
-    avg_sentiment = round(sum(float(r.sentiment_score or 0.0) for r in rows) / total, 3) if total else 0.0
+    avg_sentiment = (
+        round(sum(float(r.sentiment_score or 0.0) for r in rows) / total, 3)
+        if total
+        else 0.0
+    )
     dept_map: Dict[str, int] = {}
     dept_risk: Dict[str, int] = {}
     for row in rows:
@@ -346,10 +394,20 @@ def _analytics_snapshot(db: Session) -> Dict[str, Any]:
         if ratio > top_risk_department_ratio:
             top_risk_department_ratio = ratio
             top_risk_department = dept
-    low_sentiment_count = len([r for r in rows if float(r.sentiment_score or 0.0) < 0.45])
-    low_retention_count = len([r for r in rows if float(r.retention_prob or 0.5) < 0.55])
+    low_sentiment_count = len(
+        [r for r in rows if float(r.sentiment_score or 0.0) < 0.45]
+    )
+    low_retention_count = len(
+        [r for r in rows if float(r.retention_prob or 0.5) < 0.55]
+    )
     flagged_count = len([r for r in rows if r.is_at_risk])
-    dept_pressure_count = len([dept for dept, count in dept_map.items() if count > 0 and (dept_risk.get(dept, 0) / count) >= 0.25])
+    dept_pressure_count = len(
+        [
+            dept
+            for dept, count in dept_map.items()
+            if count > 0 and (dept_risk.get(dept, 0) / count) >= 0.25
+        ]
+    )
     top_risk_drivers = sorted(
         [
             {"factor": "Low morale signals", "count": low_sentiment_count},
@@ -437,7 +495,9 @@ def _procurement_artifact_out(row: ProcurementArtifactTable) -> ProcurementArtif
 def _normalize_header_map(row: Dict[str, Any]) -> Dict[str, Any]:
     normalized = {}
     for key, value in row.items():
-        normalized[(key or "").strip().lower().replace(" ", "_").replace("-", "_")] = value
+        normalized[(key or "").strip().lower().replace(" ", "_").replace("-", "_")] = (
+            value
+        )
     return normalized
 
 
@@ -475,17 +535,45 @@ def _rows_to_csv_bytes(rows: List[Dict[str, Any]], fieldnames: List[str]) -> byt
 
 
 def _parse_employee_row(row: Dict[str, Any]) -> Dict[str, Any]:
-    email = str(_first_value(row, ["email", "work_email", "employee_email"], "")).strip().lower()
-    full_name = str(_first_value(row, ["full_name", "name", "employee_name"], "")).strip()
-    department = str(_first_value(row, ["department", "dept", "department_name"], "General")).strip() or "General"
-    role = str(_first_value(row, ["role", "job_title", "position", "title"], "Employee")).strip() or "Employee"
-    sentiment_score = float(_first_value(row, ["sentiment_score", "morale", "engagement_score"], 0.5) or 0.5)
-    is_at_risk = str(_first_value(row, ["is_at_risk", "risk_flag"], "false")).lower() in {"1", "true", "yes", "y"}
-    retention_prob = _first_value(row, ["retention_prob", "retention_probability", "retention"], None)
+    email = (
+        str(_first_value(row, ["email", "work_email", "employee_email"], ""))
+        .strip()
+        .lower()
+    )
+    full_name = str(
+        _first_value(row, ["full_name", "name", "employee_name"], "")
+    ).strip()
+    department = (
+        str(
+            _first_value(row, ["department", "dept", "department_name"], "General")
+        ).strip()
+        or "General"
+    )
+    role = (
+        str(
+            _first_value(row, ["role", "job_title", "position", "title"], "Employee")
+        ).strip()
+        or "Employee"
+    )
+    sentiment_score = float(
+        _first_value(row, ["sentiment_score", "morale", "engagement_score"], 0.5) or 0.5
+    )
+    is_at_risk = str(
+        _first_value(row, ["is_at_risk", "risk_flag"], "false")
+    ).lower() in {"1", "true", "yes", "y"}
+    retention_prob = _first_value(
+        row, ["retention_prob", "retention_probability", "retention"], None
+    )
     retention_prob = float(retention_prob) if retention_prob not in [None, ""] else None
-    external_id = str(_first_value(row, ["external_id", "id", "employee_id"], email or full_name or "local")).strip()
+    external_id = str(
+        _first_value(
+            row, ["external_id", "id", "employee_id"], email or full_name or "local"
+        )
+    ).strip()
     if not email:
-        email = f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
+        email = (
+            f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
+        )
     display_name = full_name or email.split("@")[0].replace(".", " ").title()
     return {
         "email": email,
@@ -500,16 +588,40 @@ def _parse_employee_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _parse_candidate_row(row: Dict[str, Any]) -> Dict[str, Any]:
-    email = str(_first_value(row, ["email", "candidate_email", "work_email"], "")).strip().lower()
-    full_name = str(_first_value(row, ["full_name", "name", "candidate_name"], "")).strip()
-    department = str(_first_value(row, ["department", "dept", "department_name"], "General")).strip() or "General"
-    role = str(_first_value(row, ["role", "job_title", "position", "title"], "Candidate")).strip() or "Candidate"
-    sentiment_score = float(_first_value(row, ["sentiment_score", "engagement_score"], 0.5) or 0.5)
+    email = (
+        str(_first_value(row, ["email", "candidate_email", "work_email"], ""))
+        .strip()
+        .lower()
+    )
+    full_name = str(
+        _first_value(row, ["full_name", "name", "candidate_name"], "")
+    ).strip()
+    department = (
+        str(
+            _first_value(row, ["department", "dept", "department_name"], "General")
+        ).strip()
+        or "General"
+    )
+    role = (
+        str(
+            _first_value(row, ["role", "job_title", "position", "title"], "Candidate")
+        ).strip()
+        or "Candidate"
+    )
+    sentiment_score = float(
+        _first_value(row, ["sentiment_score", "engagement_score"], 0.5) or 0.5
+    )
     match_score = _first_value(row, ["match_score", "fit_score"], None)
     match_score = float(match_score) if match_score not in [None, ""] else None
-    external_id = str(_first_value(row, ["external_id", "id", "candidate_id"], email or full_name or "local")).strip()
+    external_id = str(
+        _first_value(
+            row, ["external_id", "id", "candidate_id"], email or full_name or "local"
+        )
+    ).strip()
     if not email:
-        email = f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
+        email = (
+            f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
+        )
     display_name = full_name or email.split("@")[0].replace(".", " ").title()
     return {
         "email": email,
@@ -522,10 +634,16 @@ def _parse_candidate_row(row: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _import_rows_for_kind(db: Session, tenant_id: str, kind: str, rows: List[Dict[str, Any]]) -> int:
+def _import_rows_for_kind(
+    db: Session, tenant_id: str, kind: str, rows: List[Dict[str, Any]]
+) -> int:
     imported = 0
     if kind == "employees":
-        existing_employees = {row.email.lower(): row for row in db.exec(select(EmployeeTable)).all() if row.email}
+        existing_employees = {
+            row.email.lower(): row
+            for row in db.exec(select(EmployeeTable)).all()
+            if row.email
+        }
         existing_canonical = {
             row.external_id: row
             for row in db.exec(
@@ -587,7 +705,11 @@ def _import_rows_for_kind(db: Session, tenant_id: str, kind: str, rows: List[Dic
                 existing_canonical[parsed["external_id"]] = canonical
             imported += 1
     elif kind == "candidates":
-        existing_candidates = {row.email.lower(): row for row in db.exec(select(CandidateTable)).all() if row.email}
+        existing_candidates = {
+            row.email.lower(): row
+            for row in db.exec(select(CandidateTable)).all()
+            if row.email
+        }
         existing_canonical = {
             row.external_id: row
             for row in db.exec(
@@ -656,17 +778,33 @@ def _import_rows_for_kind(db: Session, tenant_id: str, kind: str, rows: List[Dic
             level = int(float(_first_value(row, ["level", "proficiency"], 3) or 3))
             if not name:
                 continue
-            owner_email = str(_first_value(row, ["employee_email", "candidate_email", "email"], "")).strip().lower()
+            owner_email = (
+                str(
+                    _first_value(
+                        row, ["employee_email", "candidate_email", "email"], ""
+                    )
+                )
+                .strip()
+                .lower()
+            )
             if kind == "employee_skills":
                 owner_id = owner_lookup.get(owner_email)
                 if not owner_id:
                     continue
-                batch.append(SkillTable(name=name, level=max(1, min(5, level)), employee_id=owner_id))
+                batch.append(
+                    SkillTable(
+                        name=name, level=max(1, min(5, level)), employee_id=owner_id
+                    )
+                )
             else:
                 owner_id = owner_lookup.get(owner_email)
                 if not owner_id:
                     continue
-                batch.append(SkillTable(name=name, level=max(1, min(5, level)), candidate_id=owner_id))
+                batch.append(
+                    SkillTable(
+                        name=name, level=max(1, min(5, level)), candidate_id=owner_id
+                    )
+                )
             imported += 1
         if batch:
             db.add_all(batch)
@@ -683,10 +821,20 @@ def _import_rows_for_kind(db: Session, tenant_id: str, kind: str, rows: List[Dic
             company = str(_first_value(row, ["company", "organization"], "")).strip()
             position = str(_first_value(row, ["position", "role", "title"], "")).strip()
             description = str(_first_value(row, ["description", "summary"], "")).strip()
-            duration_years = float(_first_value(row, ["duration_years", "years"], 0) or 0)
+            duration_years = float(
+                _first_value(row, ["duration_years", "years"], 0) or 0
+            )
             if not company or not position:
                 continue
-            owner_email = str(_first_value(row, ["employee_email", "candidate_email", "email"], "")).strip().lower()
+            owner_email = (
+                str(
+                    _first_value(
+                        row, ["employee_email", "candidate_email", "email"], ""
+                    )
+                )
+                .strip()
+                .lower()
+            )
             if kind == "employee_experience":
                 owner_id = owner_lookup.get(owner_email)
                 if not owner_id:
@@ -722,10 +870,16 @@ def _import_rows_for_kind(db: Session, tenant_id: str, kind: str, rows: List[Dic
 
 
 def _export_dataset_bundle_bytes(db: Session) -> bytes:
-    employees = db.exec(select(EmployeeTable).order_by(EmployeeTable.created_at.asc())).all()
-    candidates = db.exec(select(CandidateTable).order_by(CandidateTable.created_at.asc())).all()
+    employees = db.exec(
+        select(EmployeeTable).order_by(EmployeeTable.created_at.asc())
+    ).all()
+    candidates = db.exec(
+        select(CandidateTable).order_by(CandidateTable.created_at.asc())
+    ).all()
     skills = db.exec(select(SkillTable).order_by(SkillTable.created_at.asc())).all()
-    experiences = db.exec(select(ExperienceTable).order_by(ExperienceTable.created_at.asc())).all()
+    experiences = db.exec(
+        select(ExperienceTable).order_by(ExperienceTable.created_at.asc())
+    ).all()
 
     employee_email_by_id = {row.id: row.email for row in employees}
     candidate_email_by_id = {row.id: row.email for row in candidates}
@@ -808,48 +962,121 @@ def _export_dataset_bundle_bytes(db: Session) -> bytes:
             _BUNDLE_FILE_NAMES["employees"],
             _rows_to_csv_bytes(
                 employee_rows,
-                ["id", "full_name", "email", "department", "role", "sentiment_score", "is_at_risk", "retention_prob", "join_date", "created_at", "updated_at"],
+                [
+                    "id",
+                    "full_name",
+                    "email",
+                    "department",
+                    "role",
+                    "sentiment_score",
+                    "is_at_risk",
+                    "retention_prob",
+                    "join_date",
+                    "created_at",
+                    "updated_at",
+                ],
             ),
         )
         zipf.writestr(
             _BUNDLE_FILE_NAMES["candidates"],
             _rows_to_csv_bytes(
                 candidate_rows,
-                ["id", "full_name", "email", "department", "role", "sentiment_score", "match_score", "application_date", "created_at", "updated_at"],
+                [
+                    "id",
+                    "full_name",
+                    "email",
+                    "department",
+                    "role",
+                    "sentiment_score",
+                    "match_score",
+                    "application_date",
+                    "created_at",
+                    "updated_at",
+                ],
             ),
         )
         zipf.writestr(
             _BUNDLE_FILE_NAMES["employee_skills"],
-            _rows_to_csv_bytes(employee_skill_rows, ["employee_email", "skill_name", "level"]),
+            _rows_to_csv_bytes(
+                employee_skill_rows, ["employee_email", "skill_name", "level"]
+            ),
         )
         zipf.writestr(
             _BUNDLE_FILE_NAMES["candidate_skills"],
-            _rows_to_csv_bytes(candidate_skill_rows, ["candidate_email", "skill_name", "level"]),
+            _rows_to_csv_bytes(
+                candidate_skill_rows, ["candidate_email", "skill_name", "level"]
+            ),
         )
         zipf.writestr(
             _BUNDLE_FILE_NAMES["employee_experience"],
-            _rows_to_csv_bytes(employee_experience_rows, ["employee_email", "company", "position", "duration_years", "description"]),
+            _rows_to_csv_bytes(
+                employee_experience_rows,
+                [
+                    "employee_email",
+                    "company",
+                    "position",
+                    "duration_years",
+                    "description",
+                ],
+            ),
         )
         zipf.writestr(
             _BUNDLE_FILE_NAMES["candidate_experience"],
-            _rows_to_csv_bytes(candidate_experience_rows, ["candidate_email", "company", "position", "duration_years", "description"]),
+            _rows_to_csv_bytes(
+                candidate_experience_rows,
+                [
+                    "candidate_email",
+                    "company",
+                    "position",
+                    "duration_years",
+                    "description",
+                ],
+            ),
         )
     archive.seek(0)
     return archive.getvalue()
 
 
-def _upsert_employee_like(db: Session, tenant_id: str, row: Dict[str, Any]) -> Dict[str, Any]:
-    email = str(_first_value(row, ["email", "work_email", "employee_email"], "")).strip().lower()
-    full_name = str(_first_value(row, ["full_name", "name", "employee_name"], "")).strip()
-    department = str(_first_value(row, ["department", "dept", "department_name"], "General")).strip() or "General"
-    role = str(_first_value(row, ["role", "job_title", "position", "title"], "Employee")).strip() or "Employee"
-    sentiment_score = float(_first_value(row, ["sentiment_score", "morale", "engagement_score"], 0.5) or 0.5)
-    is_at_risk = str(_first_value(row, ["is_at_risk", "risk_flag"], "false")).lower() in {"1", "true", "yes", "y"}
-    retention_prob = _first_value(row, ["retention_prob", "retention_probability", "retention"], None)
+def _upsert_employee_like(
+    db: Session, tenant_id: str, row: Dict[str, Any]
+) -> Dict[str, Any]:
+    email = (
+        str(_first_value(row, ["email", "work_email", "employee_email"], ""))
+        .strip()
+        .lower()
+    )
+    full_name = str(
+        _first_value(row, ["full_name", "name", "employee_name"], "")
+    ).strip()
+    department = (
+        str(
+            _first_value(row, ["department", "dept", "department_name"], "General")
+        ).strip()
+        or "General"
+    )
+    role = (
+        str(
+            _first_value(row, ["role", "job_title", "position", "title"], "Employee")
+        ).strip()
+        or "Employee"
+    )
+    sentiment_score = float(
+        _first_value(row, ["sentiment_score", "morale", "engagement_score"], 0.5) or 0.5
+    )
+    is_at_risk = str(
+        _first_value(row, ["is_at_risk", "risk_flag"], "false")
+    ).lower() in {"1", "true", "yes", "y"}
+    retention_prob = _first_value(
+        row, ["retention_prob", "retention_probability", "retention"], None
+    )
     retention_prob = float(retention_prob) if retention_prob not in [None, ""] else None
-    external_id = str(_first_value(row, ["external_id", "id", "employee_id"], email or full_name))
+    external_id = str(
+        _first_value(row, ["external_id", "id", "employee_id"], email or full_name)
+    )
     if not email:
-        email = f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
+        email = (
+            f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
+        )
 
     existing = db.exec(
         select(EmployeeTable).where(EmployeeTable.email == email)
@@ -883,17 +1110,41 @@ def _upsert_employee_like(db: Session, tenant_id: str, row: Dict[str, Any]) -> D
     return {"id": str(employee_id), "created": created}
 
 
-def _upsert_candidate_like(db: Session, tenant_id: str, row: Dict[str, Any]) -> Dict[str, Any]:
-    email = str(_first_value(row, ["email", "candidate_email", "work_email"], "")).strip().lower()
-    full_name = str(_first_value(row, ["full_name", "name", "candidate_name"], "")).strip()
-    department = str(_first_value(row, ["department", "dept", "department_name"], "General")).strip() or "General"
-    role = str(_first_value(row, ["role", "job_title", "position", "title"], "Candidate")).strip() or "Candidate"
-    sentiment_score = float(_first_value(row, ["sentiment_score", "engagement_score"], 0.5) or 0.5)
+def _upsert_candidate_like(
+    db: Session, tenant_id: str, row: Dict[str, Any]
+) -> Dict[str, Any]:
+    email = (
+        str(_first_value(row, ["email", "candidate_email", "work_email"], ""))
+        .strip()
+        .lower()
+    )
+    full_name = str(
+        _first_value(row, ["full_name", "name", "candidate_name"], "")
+    ).strip()
+    department = (
+        str(
+            _first_value(row, ["department", "dept", "department_name"], "General")
+        ).strip()
+        or "General"
+    )
+    role = (
+        str(
+            _first_value(row, ["role", "job_title", "position", "title"], "Candidate")
+        ).strip()
+        or "Candidate"
+    )
+    sentiment_score = float(
+        _first_value(row, ["sentiment_score", "engagement_score"], 0.5) or 0.5
+    )
     match_score = _first_value(row, ["match_score", "fit_score"], None)
     match_score = float(match_score) if match_score not in [None, ""] else None
-    external_id = str(_first_value(row, ["external_id", "id", "candidate_id"], email or full_name))
+    external_id = str(
+        _first_value(row, ["external_id", "id", "candidate_id"], email or full_name)
+    )
     if not email:
-        email = f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
+        email = (
+            f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
+        )
 
     existing = db.exec(
         select(CandidateTable).where(CandidateTable.email == email)
@@ -925,18 +1176,48 @@ def _upsert_candidate_like(db: Session, tenant_id: str, row: Dict[str, Any]) -> 
     return {"id": str(candidate_id), "created": created}
 
 
-def _upsert_canonical_employee_from_local(db: Session, tenant_id: str, row: Dict[str, Any]) -> None:
-    email = str(_first_value(row, ["email", "work_email", "employee_email"], "")).strip().lower()
-    full_name = str(_first_value(row, ["full_name", "name", "employee_name"], "")).strip()
-    department = str(_first_value(row, ["department", "dept", "department_name"], "General")).strip() or "General"
-    role = str(_first_value(row, ["role", "job_title", "position", "title"], "Employee")).strip() or "Employee"
-    sentiment_score = float(_first_value(row, ["sentiment_score", "morale", "engagement_score"], 0.5) or 0.5)
-    is_at_risk = str(_first_value(row, ["is_at_risk", "risk_flag"], "false")).lower() in {"1", "true", "yes", "y"}
-    retention_prob = _first_value(row, ["retention_prob", "retention_probability", "retention"], None)
+def _upsert_canonical_employee_from_local(
+    db: Session, tenant_id: str, row: Dict[str, Any]
+) -> None:
+    email = (
+        str(_first_value(row, ["email", "work_email", "employee_email"], ""))
+        .strip()
+        .lower()
+    )
+    full_name = str(
+        _first_value(row, ["full_name", "name", "employee_name"], "")
+    ).strip()
+    department = (
+        str(
+            _first_value(row, ["department", "dept", "department_name"], "General")
+        ).strip()
+        or "General"
+    )
+    role = (
+        str(
+            _first_value(row, ["role", "job_title", "position", "title"], "Employee")
+        ).strip()
+        or "Employee"
+    )
+    sentiment_score = float(
+        _first_value(row, ["sentiment_score", "morale", "engagement_score"], 0.5) or 0.5
+    )
+    is_at_risk = str(
+        _first_value(row, ["is_at_risk", "risk_flag"], "false")
+    ).lower() in {"1", "true", "yes", "y"}
+    retention_prob = _first_value(
+        row, ["retention_prob", "retention_probability", "retention"], None
+    )
     retention_prob = float(retention_prob) if retention_prob not in [None, ""] else None
-    external_id = str(_first_value(row, ["external_id", "id", "employee_id"], email or full_name or "local")).strip()
+    external_id = str(
+        _first_value(
+            row, ["external_id", "id", "employee_id"], email or full_name or "local"
+        )
+    ).strip()
     if not email:
-        email = f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
+        email = (
+            f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
+        )
     existing = db.exec(
         select(CanonicalEmployeeTable)
         .where(CanonicalEmployeeTable.tenant_id == tenant_id)
@@ -970,16 +1251,40 @@ def _upsert_canonical_employee_from_local(db: Session, tenant_id: str, row: Dict
         )
 
 
-def _upsert_canonical_candidate_from_local(db: Session, tenant_id: str, row: Dict[str, Any]) -> None:
-    email = str(_first_value(row, ["email", "candidate_email", "work_email"], "")).strip().lower()
-    full_name = str(_first_value(row, ["full_name", "name", "candidate_name"], "")).strip()
-    department = str(_first_value(row, ["department", "dept", "department_name"], "General")).strip() or "General"
-    role = str(_first_value(row, ["role", "job_title", "position", "title"], "Candidate")).strip() or "Candidate"
+def _upsert_canonical_candidate_from_local(
+    db: Session, tenant_id: str, row: Dict[str, Any]
+) -> None:
+    email = (
+        str(_first_value(row, ["email", "candidate_email", "work_email"], ""))
+        .strip()
+        .lower()
+    )
+    full_name = str(
+        _first_value(row, ["full_name", "name", "candidate_name"], "")
+    ).strip()
+    department = (
+        str(
+            _first_value(row, ["department", "dept", "department_name"], "General")
+        ).strip()
+        or "General"
+    )
+    role = (
+        str(
+            _first_value(row, ["role", "job_title", "position", "title"], "Candidate")
+        ).strip()
+        or "Candidate"
+    )
     match_score = _first_value(row, ["match_score", "fit_score"], None)
     match_score = float(match_score) if match_score not in [None, ""] else None
-    external_id = str(_first_value(row, ["external_id", "id", "candidate_id"], email or full_name or "local")).strip()
+    external_id = str(
+        _first_value(
+            row, ["external_id", "id", "candidate_id"], email or full_name or "local"
+        )
+    ).strip()
     if not email:
-        email = f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
+        email = (
+            f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
+        )
     existing = db.exec(
         select(CanonicalCandidateTable)
         .where(CanonicalCandidateTable.tenant_id == tenant_id)
@@ -1015,7 +1320,9 @@ async def list_contracts(
     tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
-    rows = db.exec(select(DataContractTable).order_by(DataContractTable.created_at.desc())).all()
+    rows = db.exec(
+        select(DataContractTable).order_by(DataContractTable.created_at.desc())
+    ).all()
     rows = [r for r in rows if r.tenant_id == tenant_id]
     return [
         {
@@ -1046,7 +1353,9 @@ async def create_contract(
     if not provider:
         raise HTTPException(status_code=422, detail="provider is required")
     if not isinstance(required_fields, list) or not required_fields:
-        raise HTTPException(status_code=422, detail="required_fields must be non-empty list")
+        raise HTTPException(
+            status_code=422, detail="required_fields must be non-empty list"
+        )
     row = DataContractTable(
         tenant_id=tenant_id,
         source_type=source_type,
@@ -1058,19 +1367,31 @@ async def create_contract(
     db.add(row)
     db.commit()
     db.refresh(row)
-    _audit(db, current_user, "CREATE_CONTRACT", "data_contract", row.id, {"source_type": source_type, "provider": provider})
+    _audit(
+        db,
+        current_user,
+        "CREATE_CONTRACT",
+        "data_contract",
+        row.id,
+        {"source_type": source_type, "provider": provider},
+    )
     db.commit()
     return {"id": str(row.id), "status": "created"}
 
 
-def _run_connection_sync(connection_id: UUID, tenant_id: str, db: Session) -> Dict[str, int]:
+def _run_connection_sync(
+    connection_id: UUID, tenant_id: str, db: Session
+) -> Dict[str, int]:
     conn = db.get(IntegrationConnectionTable, connection_id)
     if not conn or conn.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Connection not found")
 
     connector = get_connector(conn.provider)
     if connector is None:
-        raise HTTPException(status_code=422, detail=f"No connector adapter configured for provider {conn.provider}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"No connector adapter configured for provider {conn.provider}",
+        )
 
     contract = db.exec(
         select(DataContractTable)
@@ -1081,7 +1402,10 @@ def _run_connection_sync(connection_id: UUID, tenant_id: str, db: Session) -> Di
         .order_by(DataContractTable.updated_at.desc())
     ).first()
     if not contract:
-        raise HTTPException(status_code=422, detail=f"No active contract for {conn.provider}/{conn.source_type}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"No active contract for {conn.provider}/{conn.source_type}",
+        )
     required_fields = _load_required_fields(contract)
 
     job = ConnectorSyncJobTable(
@@ -1134,16 +1458,22 @@ def _run_connection_sync(connection_id: UUID, tenant_id: str, db: Session) -> Di
                     select(CanonicalEmployeeTable)
                     .where(CanonicalEmployeeTable.tenant_id == tenant_id)
                     .where(CanonicalEmployeeTable.provider == conn.provider)
-                    .where(CanonicalEmployeeTable.external_id == str(rec["external_id"]))
+                    .where(
+                        CanonicalEmployeeTable.external_id == str(rec["external_id"])
+                    )
                 ).first()
                 if existing:
                     existing.full_name = rec["full_name"]
                     existing.email = rec["email"]
                     existing.department = rec["department"]
                     existing.role = rec["role"]
-                    existing.sentiment_score = float(rec.get("sentiment_score", existing.sentiment_score or 0.5))
+                    existing.sentiment_score = float(
+                        rec.get("sentiment_score", existing.sentiment_score or 0.5)
+                    )
                     existing.retention_prob = rec.get("retention_prob")
-                    existing.is_at_risk = bool(rec.get("is_at_risk", existing.is_at_risk))
+                    existing.is_at_risk = bool(
+                        rec.get("is_at_risk", existing.is_at_risk)
+                    )
                     existing.updated_at = datetime.utcnow()
                     db.add(existing)
                 else:
@@ -1168,7 +1498,9 @@ def _run_connection_sync(connection_id: UUID, tenant_id: str, db: Session) -> Di
                     select(CanonicalCandidateTable)
                     .where(CanonicalCandidateTable.tenant_id == tenant_id)
                     .where(CanonicalCandidateTable.provider == conn.provider)
-                    .where(CanonicalCandidateTable.external_id == str(rec["external_id"]))
+                    .where(
+                        CanonicalCandidateTable.external_id == str(rec["external_id"])
+                    )
                 ).first()
                 if existing:
                     existing.full_name = rec["full_name"]
@@ -1193,8 +1525,16 @@ def _run_connection_sync(connection_id: UUID, tenant_id: str, db: Session) -> Di
                     )
                 silver += 1
 
-        emp_rows = db.exec(select(CanonicalEmployeeTable).where(CanonicalEmployeeTable.tenant_id == tenant_id)).all()
-        cand_rows = db.exec(select(CanonicalCandidateTable).where(CanonicalCandidateTable.tenant_id == tenant_id)).all()
+        emp_rows = db.exec(
+            select(CanonicalEmployeeTable).where(
+                CanonicalEmployeeTable.tenant_id == tenant_id
+            )
+        ).all()
+        cand_rows = db.exec(
+            select(CanonicalCandidateTable).where(
+                CanonicalCandidateTable.tenant_id == tenant_id
+            )
+        ).all()
         emp_count = len(emp_rows)
         cand_count = len(cand_rows)
         at_risk = len([e for e in emp_rows if e.is_at_risk])
@@ -1207,7 +1547,9 @@ def _run_connection_sync(connection_id: UUID, tenant_id: str, db: Session) -> Di
                         "employees": emp_count,
                         "candidates": cand_count,
                         "at_risk": at_risk,
-                        "at_risk_pct": round((at_risk / emp_count) * 100, 2) if emp_count else 0.0,
+                        "at_risk_pct": (
+                            round((at_risk / emp_count) * 100, 2) if emp_count else 0.0
+                        ),
                         "updated_at": datetime.utcnow().isoformat(),
                     }
                 ),
@@ -1216,10 +1558,14 @@ def _run_connection_sync(connection_id: UUID, tenant_id: str, db: Session) -> Di
 
         conn.last_sync_at = datetime.utcnow()
         conn.last_sync_status = "success"
-        conn.last_sync_summary = f"bronze={bronze}, silver={silver}, quarantined={quarantined}"
+        conn.last_sync_summary = (
+            f"bronze={bronze}, silver={silver}, quarantined={quarantined}"
+        )
         conn.status = "active"
         conn.sync_retry_count = 0
-        conn.next_sync_at = datetime.utcnow() + timedelta(minutes=max(5, conn.sync_interval_minutes))
+        conn.next_sync_at = datetime.utcnow() + timedelta(
+            minutes=max(5, conn.sync_interval_minutes)
+        )
         conn.updated_at = datetime.utcnow()
         db.add(conn)
         job.status = "success"
@@ -1229,7 +1575,14 @@ def _run_connection_sync(connection_id: UUID, tenant_id: str, db: Session) -> Di
         job.finished_at = datetime.utcnow()
         db.add(job)
         db.commit()
-        _audit(db, TokenData(user_id="system", email="system@aurelius.local", is_admin=True), "SYNC_CONNECTION", "integration_connection", conn.id, {"bronze": bronze, "silver": silver, "quarantined": quarantined})
+        _audit(
+            db,
+            TokenData(user_id="system", email="system@aurelius.local", is_admin=True),
+            "SYNC_CONNECTION",
+            "integration_connection",
+            conn.id,
+            {"bronze": bronze, "silver": silver, "quarantined": quarantined},
+        )
         db.commit()
         return {
             "connection_id": str(connection_id),
@@ -1248,7 +1601,14 @@ def _run_connection_sync(connection_id: UUID, tenant_id: str, db: Session) -> Di
         job.error_message = str(exc)[:240]
         job.finished_at = datetime.utcnow()
         db.add(job)
-        _audit(db, TokenData(user_id="system", email="system@aurelius.local", is_admin=True), "SYNC_CONNECTION_FAILED", "integration_connection", conn.id, {"error": str(exc)[:240]})
+        _audit(
+            db,
+            TokenData(user_id="system", email="system@aurelius.local", is_admin=True),
+            "SYNC_CONNECTION_FAILED",
+            "integration_connection",
+            conn.id,
+            {"error": str(exc)[:240]},
+        )
         db.commit()
         raise
 
@@ -1264,7 +1624,10 @@ async def sync_connection_into_pipeline(
     return result
 
 
-@router.get("/connections/{connection_id}/mappings", response_model=List[ConnectorFieldMappingOut])
+@router.get(
+    "/connections/{connection_id}/mappings",
+    response_model=List[ConnectorFieldMappingOut],
+)
 async def list_field_mappings(
     connection_id: UUID,
     current_user: TokenData = Depends(get_current_user),
@@ -1292,7 +1655,11 @@ async def list_field_mappings(
     ]
 
 
-@router.post("/connections/{connection_id}/mappings", response_model=ConnectorFieldMappingOut, status_code=201)
+@router.post(
+    "/connections/{connection_id}/mappings",
+    response_model=ConnectorFieldMappingOut,
+    status_code=201,
+)
 async def create_field_mapping(
     connection_id: UUID,
     payload: ConnectorFieldMappingCreate,
@@ -1326,7 +1693,9 @@ async def create_field_mapping(
     )
 
 
-@router.get("/connections/{connection_id}/sync-jobs", response_model=List[ConnectorSyncJobOut])
+@router.get(
+    "/connections/{connection_id}/sync-jobs", response_model=List[ConnectorSyncJobOut]
+)
 async def list_sync_jobs(
     connection_id: UUID,
     current_user: TokenData = Depends(get_current_user),
@@ -1389,22 +1758,41 @@ async def train_attrition_model(
     tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
-    rows = db.exec(select(CanonicalEmployeeTable).where(CanonicalEmployeeTable.tenant_id == tenant_id)).all()
+    rows = db.exec(
+        select(CanonicalEmployeeTable).where(
+            CanonicalEmployeeTable.tenant_id == tenant_id
+        )
+    ).all()
     if len(rows) < 20:
-        raise HTTPException(status_code=422, detail="Need at least 20 canonical employees to train model")
+        raise HTTPException(
+            status_code=422,
+            detail="Need at least 20 canonical employees to train model",
+        )
 
     risky = [r for r in rows if r.is_at_risk]
     stable = [r for r in rows if not r.is_at_risk]
     if not risky or not stable:
-        raise HTTPException(status_code=422, detail="Need both risky and stable records for training")
+        raise HTTPException(
+            status_code=422, detail="Need both risky and stable records for training"
+        )
 
     def avg(values: List[float]) -> float:
         return sum(values) / len(values) if values else 0.0
 
     r_sent = avg([float(r.sentiment_score or 0.5) for r in risky])
     s_sent = avg([float(r.sentiment_score or 0.5) for r in stable])
-    r_ret = avg([float(r.retention_prob if r.retention_prob is not None else 0.5) for r in risky])
-    s_ret = avg([float(r.retention_prob if r.retention_prob is not None else 0.5) for r in stable])
+    r_ret = avg(
+        [
+            float(r.retention_prob if r.retention_prob is not None else 0.5)
+            for r in risky
+        ]
+    )
+    s_ret = avg(
+        [
+            float(r.retention_prob if r.retention_prob is not None else 0.5)
+            for r in stable
+        ]
+    )
 
     sentiment_weight = max(0.2, min(2.0, abs(s_sent - r_sent) * 2.5 + 0.4))
     retention_weight = max(0.2, min(2.0, abs(s_ret - r_ret) * 2.5 + 0.4))
@@ -1469,9 +1857,21 @@ async def train_attrition_model(
         notes="Auto-generated model card from lean training run",
     )
     db.add(card)
-    _audit(db, current_user, "TRAIN_MODEL", "ml_model_registry", row.id, {"metrics": metrics, "card_id": str(card.id)})
+    _audit(
+        db,
+        current_user,
+        "TRAIN_MODEL",
+        "ml_model_registry",
+        row.id,
+        {"metrics": metrics, "card_id": str(card.id)},
+    )
     db.commit()
-    return {"model_name": row.model_name, "version": row.version, "status": row.status, "metrics": metrics}
+    return {
+        "model_name": row.model_name,
+        "version": row.version,
+        "status": row.status,
+        "metrics": metrics,
+    }
 
 
 @router.get("/ml/models")
@@ -1513,18 +1913,26 @@ async def score_attrition(
         .order_by(MLModelRegistryTable.trained_at.desc())
     ).first()
     if not model:
-        raise HTTPException(status_code=422, detail="No active attrition_v1 model. Train first.")
+        raise HTTPException(
+            status_code=422, detail="No active attrition_v1 model. Train first."
+        )
     params = json.loads(model.parameters or "{}")
     sw = float(params.get("sentiment_weight", 1.0))
     rw = float(params.get("retention_weight", 1.0))
     bias = float(params.get("bias", 0.2))
 
-    rows = db.exec(select(CanonicalEmployeeTable).where(CanonicalEmployeeTable.tenant_id == tenant_id)).all()
+    rows = db.exec(
+        select(CanonicalEmployeeTable).where(
+            CanonicalEmployeeTable.tenant_id == tenant_id
+        )
+    ).all()
     scored = []
     for e in rows:
         sentiment = float(e.sentiment_score or 0.5)
         retention = float(e.retention_prob if e.retention_prob is not None else 0.5)
-        risk = bias + max(0.0, (0.55 - sentiment) * sw) + max(0.0, (0.6 - retention) * rw)
+        risk = (
+            bias + max(0.0, (0.55 - sentiment) * sw) + max(0.0, (0.6 - retention) * rw)
+        )
         risk = max(0.01, min(0.99, risk))
         scored.append(
             {
@@ -1567,7 +1975,11 @@ async def optimize_workforce_scenario(
     retention_actions = int(budget_retention // max(1.0, retention_unit_cost))
     hires = int(budget_hiring // max(1.0, hire_unit_cost))
 
-    retention_actions = min(retention_actions, target_retentions) if target_retentions > 0 else retention_actions
+    retention_actions = (
+        min(retention_actions, target_retentions)
+        if target_retentions > 0
+        else retention_actions
+    )
     hires = min(hires, target_hires) if target_hires > 0 else hires
 
     used_budget = (retention_actions * retention_unit_cost) + (hires * hire_unit_cost)
@@ -1592,9 +2004,14 @@ async def optimize_workforce_scenario(
     }
     row = ForecastScenarioTable(
         tenant_id=tenant_id,
-        scenario_name=str(payload.get("scenario_name") or f"scenario-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"),
+        scenario_name=str(
+            payload.get("scenario_name")
+            or f"scenario-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        ),
         input_payload=json.dumps(result["input"]),
-        output_payload=json.dumps(result["recommendation"] | {"assumptions": result["assumptions"]}),
+        output_payload=json.dumps(
+            result["recommendation"] | {"assumptions": result["assumptions"]}
+        ),
         created_by=current_user.user_id,
     )
     db.add(row)
@@ -1639,7 +2056,14 @@ async def create_policy_pack(
     db.add(row)
     db.commit()
     db.refresh(row)
-    _audit(db, current_user, "CREATE_POLICY_PACK", "compliance_policy", row.id, {"region": payload.region, "action_type": payload.action_type})
+    _audit(
+        db,
+        current_user,
+        "CREATE_POLICY_PACK",
+        "compliance_policy",
+        row.id,
+        {"region": payload.region, "action_type": payload.action_type},
+    )
     db.commit()
     return _policy_to_out(row)
 
@@ -1694,7 +2118,9 @@ async def retrain_model(
     tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
-    return await train_attrition_model(current_user=current_user, tenant_id=tenant_id, db=db)
+    return await train_attrition_model(
+        current_user=current_user, tenant_id=tenant_id, db=db
+    )
 
 
 @router.get("/scenarios", response_model=List[ForecastScenarioOut])
@@ -1750,7 +2176,14 @@ async def approve_model_card(
     card.approved_by = current_user.user_id
     card.approved_at = datetime.utcnow()
     db.add(card)
-    _audit(db, current_user, "APPROVE_MODEL_CARD", "ml_model_card", card.id, {"model_name": card.model_name, "version": card.version})
+    _audit(
+        db,
+        current_user,
+        "APPROVE_MODEL_CARD",
+        "ml_model_card",
+        card.id,
+        {"model_name": card.model_name, "version": card.version},
+    )
     db.commit()
     return _model_card_out(card)
 
@@ -1778,7 +2211,14 @@ async def promote_model_card(
     card.approved_at = datetime.utcnow()
     db.add(card)
     db.commit()
-    _audit(db, current_user, "PROMOTE_MODEL_CARD", "ml_model_card", card.id, {"model_name": card.model_name, "version": card.version})
+    _audit(
+        db,
+        current_user,
+        "PROMOTE_MODEL_CARD",
+        "ml_model_card",
+        card.id,
+        {"model_name": card.model_name, "version": card.version},
+    )
     db.commit()
     return _model_card_out(card)
 
@@ -1804,7 +2244,14 @@ async def rollback_model_card(
     card.status = "approved"
     db.add(card)
     db.commit()
-    _audit(db, current_user, "ROLLBACK_MODEL_CARD", "ml_model_card", card.id, {"model_name": card.model_name, "version": card.version})
+    _audit(
+        db,
+        current_user,
+        "ROLLBACK_MODEL_CARD",
+        "ml_model_card",
+        card.id,
+        {"model_name": card.model_name, "version": card.version},
+    )
     db.commit()
     return _model_card_out(card)
 
@@ -1815,7 +2262,11 @@ async def get_fairness_summary(
     tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
-    rows = db.exec(select(CanonicalEmployeeTable).where(CanonicalEmployeeTable.tenant_id == tenant_id)).all()
+    rows = db.exec(
+        select(CanonicalEmployeeTable).where(
+            CanonicalEmployeeTable.tenant_id == tenant_id
+        )
+    ).all()
     if not rows:
         rows = [
             CanonicalEmployeeTable(
@@ -1868,7 +2319,14 @@ async def create_release_gate(
     db.add(row)
     db.commit()
     db.refresh(row)
-    _audit(db, current_user, "CREATE_RELEASE_GATE", "release_gate", row.id, {"environment": payload.environment, "artifact_name": payload.artifact_name})
+    _audit(
+        db,
+        current_user,
+        "CREATE_RELEASE_GATE",
+        "release_gate",
+        row.id,
+        {"environment": payload.environment, "artifact_name": payload.artifact_name},
+    )
     db.commit()
     return _release_gate_out(row)
 
@@ -1888,7 +2346,14 @@ async def approve_release_gate(
     gate.approved_at = datetime.utcnow()
     db.add(gate)
     db.commit()
-    _audit(db, current_user, "APPROVE_RELEASE_GATE", "release_gate", gate.id, {"environment": gate.environment, "artifact_name": gate.artifact_name})
+    _audit(
+        db,
+        current_user,
+        "APPROVE_RELEASE_GATE",
+        "release_gate",
+        gate.id,
+        {"environment": gate.environment, "artifact_name": gate.artifact_name},
+    )
     db.commit()
     return _release_gate_out(gate)
 
@@ -1899,7 +2364,9 @@ async def list_audit_events(
     tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
-    rows = db.exec(select(AuditLogTable).order_by(AuditLogTable.created_at.desc()).limit(200)).all()
+    rows = db.exec(
+        select(AuditLogTable).order_by(AuditLogTable.created_at.desc()).limit(200)
+    ).all()
     return [
         {
             "id": str(r.id),
@@ -1946,7 +2413,18 @@ async def create_dr_runbook(
     db.add(row)
     db.commit()
     db.refresh(row)
-    _audit(db, current_user, "CREATE_DR_RUNBOOK", "dr_runbook", row.id, {"environment": payload.environment, "rto_minutes": payload.rto_minutes, "rpo_minutes": payload.rpo_minutes})
+    _audit(
+        db,
+        current_user,
+        "CREATE_DR_RUNBOOK",
+        "dr_runbook",
+        row.id,
+        {
+            "environment": payload.environment,
+            "rto_minutes": payload.rto_minutes,
+            "rpo_minutes": payload.rpo_minutes,
+        },
+    )
     db.commit()
     return _dr_runbook_out(row)
 
@@ -1967,7 +2445,14 @@ async def run_dr_drill(
     row.updated_at = datetime.utcnow()
     db.add(row)
     db.commit()
-    _audit(db, current_user, "RUN_DR_DRILL", "dr_runbook", row.id, {"result": row.last_drill_result})
+    _audit(
+        db,
+        current_user,
+        "RUN_DR_DRILL",
+        "dr_runbook",
+        row.id,
+        {"result": row.last_drill_result},
+    )
     db.commit()
     return _dr_runbook_out(row)
 
@@ -1986,7 +2471,9 @@ async def list_procurement_artifacts(
     return [_procurement_artifact_out(r) for r in rows]
 
 
-@router.post("/procurement/artifacts", response_model=ProcurementArtifactOut, status_code=201)
+@router.post(
+    "/procurement/artifacts", response_model=ProcurementArtifactOut, status_code=201
+)
 async def create_procurement_artifact(
     payload: ProcurementArtifactCreate,
     current_user: TokenData = Depends(get_current_user),
@@ -2004,7 +2491,14 @@ async def create_procurement_artifact(
     db.add(row)
     db.commit()
     db.refresh(row)
-    _audit(db, current_user, "CREATE_PROCUREMENT_ARTIFACT", "procurement_artifact", row.id, {"artifact_type": payload.artifact_type, "title": payload.title})
+    _audit(
+        db,
+        current_user,
+        "CREATE_PROCUREMENT_ARTIFACT",
+        "procurement_artifact",
+        row.id,
+        {"artifact_type": payload.artifact_type, "title": payload.title},
+    )
     db.commit()
     return _procurement_artifact_out(row)
 
@@ -2015,38 +2509,100 @@ async def reset_local_demo_data(
     db: Session = Depends(get_session),
 ):
     from sqlmodel import delete
-    for model in [SkillTable, ExperienceTable, EmployeeTable, CandidateTable, CanonicalEmployeeTable, CanonicalCandidateTable, RawEventTable, QuarantineEventTable, GoldMetricSnapshotTable]:
+
+    for model in [
+        SkillTable,
+        ExperienceTable,
+        EmployeeTable,
+        CandidateTable,
+        CanonicalEmployeeTable,
+        CanonicalCandidateTable,
+        RawEventTable,
+        QuarantineEventTable,
+        GoldMetricSnapshotTable,
+    ]:
         db.execute(delete(model))
     db.commit()
-    _audit(db, current_user, "RESET_DEMO_DATA", "dataset", None, {"scope": "all_local_demo_entities"})
+    _audit(
+        db,
+        current_user,
+        "RESET_DEMO_DATA",
+        "dataset",
+        None,
+        {"scope": "all_local_demo_entities"},
+    )
     db.commit()
     return {"status": "cleared"}
 
 
 def _reset_local_demo_data_sync(db: Session, current_user: TokenData) -> None:
     from sqlmodel import delete
-    for model in [SkillTable, ExperienceTable, EmployeeTable, CandidateTable, CanonicalEmployeeTable, CanonicalCandidateTable, RawEventTable, QuarantineEventTable, GoldMetricSnapshotTable]:
+
+    for model in [
+        SkillTable,
+        ExperienceTable,
+        EmployeeTable,
+        CandidateTable,
+        CanonicalEmployeeTable,
+        CanonicalCandidateTable,
+        RawEventTable,
+        QuarantineEventTable,
+        GoldMetricSnapshotTable,
+    ]:
         db.execute(delete(model))
     db.commit()
-    _audit(db, current_user, "RESET_DEMO_DATA", "dataset", None, {"scope": "all_local_demo_entities"})
+    _audit(
+        db,
+        current_user,
+        "RESET_DEMO_DATA",
+        "dataset",
+        None,
+        {"scope": "all_local_demo_entities"},
+    )
     db.commit()
 
 
 def _run_import_job(job_id: str, runner):
     def _target():
-        _update_import_job(job_id, status="running", phase="starting", progress=1, message="Starting import job...")
+        _update_import_job(
+            job_id,
+            status="running",
+            phase="starting",
+            progress=1,
+            message="Starting import job...",
+        )
         try:
             result = runner(job_id)
-            _update_import_job(job_id, status="completed", phase="completed", progress=100, message="Import completed.", result=result)
+            _update_import_job(
+                job_id,
+                status="completed",
+                phase="completed",
+                progress=100,
+                message="Import completed.",
+                result=result,
+            )
         except Exception as exc:
-            _update_import_job(job_id, status="failed", phase="failed", progress=100, message="Import failed.", error=str(exc))
+            _update_import_job(
+                job_id,
+                status="failed",
+                phase="failed",
+                progress=100,
+                message="Import failed.",
+                error=str(exc),
+            )
+
     threading.Thread(target=_target, daemon=True).start()
 
 
 def _bundle_job_runner(file_name: str, archive_bytes: bytes, current_user: TokenData):
     def _runner(job_id: str):
         with Session(engine) as db:
-            _update_import_job(job_id, phase="reading_bundle", progress=10, message="Opening ZIP bundle...")
+            _update_import_job(
+                job_id,
+                phase="reading_bundle",
+                progress=10,
+                message="Opening ZIP bundle...",
+            )
             try:
                 with zipfile.ZipFile(io.BytesIO(archive_bytes)) as zipf:
                     bundle_members: Dict[str, str] = {}
@@ -2055,11 +2611,23 @@ def _bundle_job_runner(file_name: str, archive_bytes: bytes, current_user: Token
                         for kind, expected_name in _BUNDLE_FILE_NAMES.items():
                             if base_name == expected_name:
                                 bundle_members[kind] = member
-                    missing = [expected for kind, expected in _BUNDLE_FILE_NAMES.items() if kind not in bundle_members]
+                    missing = [
+                        expected
+                        for kind, expected in _BUNDLE_FILE_NAMES.items()
+                        if kind not in bundle_members
+                    ]
                     if missing:
-                        raise HTTPException(status_code=422, detail=f"Bundle missing required files: {', '.join(missing)}")
+                        raise HTTPException(
+                            status_code=422,
+                            detail=f"Bundle missing required files: {', '.join(missing)}",
+                        )
 
-                    _update_import_job(job_id, phase="resetting", progress=20, message="Resetting current local dataset...")
+                    _update_import_job(
+                        job_id,
+                        phase="resetting",
+                        progress=20,
+                        message="Resetting current local dataset...",
+                    )
                     _reset_local_demo_data_sync(db, current_user)
 
                     ordered_kinds = list(_BUNDLE_FILE_NAMES.keys())
@@ -2080,71 +2648,86 @@ def _bundle_job_runner(file_name: str, archive_bytes: bytes, current_user: Token
                         results[kind] = _import_rows_for_kind(db, "default", kind, rows)
                         db.commit()
 
-                    _update_import_job(job_id, phase="auditing", progress=95, message="Finalizing import audit...")
-                    _audit(db, current_user, "IMPORT_DATASET_BUNDLE", "dataset", None, {"bundle": results, "file_name": file_name})
+                    _update_import_job(
+                        job_id,
+                        phase="auditing",
+                        progress=95,
+                        message="Finalizing import audit...",
+                    )
+                    _audit(
+                        db,
+                        current_user,
+                        "IMPORT_DATASET_BUNDLE",
+                        "dataset",
+                        None,
+                        {"bundle": results, "file_name": file_name},
+                    )
                     db.commit()
-                    return {"status": "imported", "bundle": results, "file_name": file_name}
+                    return {
+                        "status": "imported",
+                        "bundle": results,
+                        "file_name": file_name,
+                    }
             except zipfile.BadZipFile as exc:
-                raise HTTPException(status_code=422, detail="Invalid ZIP bundle") from exc
+                raise HTTPException(
+                    status_code=422, detail="Invalid ZIP bundle"
+                ) from exc
+
     return _runner
 
 
 def _demo_job_runner(current_user: TokenData):
     def _runner(job_id: str):
-        with Session(engine) as db:
-            bundle = {
-                "employees": _DEMO_DATA_DIR / "employees_public.csv",
-                "candidates": _DEMO_DATA_DIR / "candidates_public.csv",
-                "employee_skills": _DEMO_DATA_DIR / "employee_skills_public.csv",
-                "candidate_skills": _DEMO_DATA_DIR / "candidate_skills_public.csv",
-                "employee_experience": _DEMO_DATA_DIR / "employee_experience_public.csv",
-                "candidate_experience": _DEMO_DATA_DIR / "candidate_experience_public.csv",
-            }
-            if not bundle["employees"].exists() or not bundle["candidates"].exists():
-                raise HTTPException(status_code=404, detail=f"Demo bundle not found at {_DEMO_DATA_DIR}")
+        raise HTTPException(
+            status_code=410,
+            detail="Demo dataset import has been removed. Upload CSV files manually.",
+        )
 
-            _update_import_job(job_id, phase="resetting", progress=10, message="Resetting current local dataset...")
-            _reset_local_demo_data_sync(db, current_user)
-
-            results = {}
-            total_steps = len(bundle)
-            for index, (kind, path) in enumerate(bundle.items(), start=1):
-                if not path.exists():
-                    continue
-                _update_import_job(
-                    job_id,
-                    phase=f"importing_{kind}",
-                    progress=10 + int(index / total_steps * 80),
-                    message=f"Loading {path.name}...",
-                )
-                rows = _load_csv_rows(path)
-                imported = _import_rows_for_kind(db, "default", kind, rows)
-                db.commit()
-                results[kind] = imported
-
-            _update_import_job(job_id, phase="auditing", progress=95, message="Finalizing demo import...")
-            _audit(db, current_user, "IMPORT_DEMO_BUNDLE", "dataset", None, {"bundle": results})
-            db.commit()
-            return {"status": "imported", "bundle": results}
     return _runner
 
 
-def _csv_job_runner(kind: str, file_name: str, csv_bytes: bytes, current_user: TokenData):
+def _csv_job_runner(
+    kind: str, file_name: str, csv_bytes: bytes, current_user: TokenData
+):
     def _runner(job_id: str):
         with Session(engine) as db:
-            _update_import_job(job_id, phase="reading_csv", progress=15, message=f"Reading {file_name}...")
+            _update_import_job(
+                job_id,
+                phase="reading_csv",
+                progress=15,
+                message=f"Reading {file_name}...",
+            )
             content = csv_bytes.decode("utf-8-sig")
             reader = csv.DictReader(content.splitlines())
             rows = [_normalize_header_map(row) for row in reader]
-            _update_import_job(job_id, phase="importing_csv", progress=45, message=f"Importing {kind.replace('_', ' ')} rows...")
+            _update_import_job(
+                job_id,
+                phase="importing_csv",
+                progress=45,
+                message=f"Importing {kind.replace('_', ' ')} rows...",
+            )
             imported = _import_rows_for_kind(db, "default", kind, rows)
             db.commit()
-            _update_import_job(job_id, phase="auditing", progress=90, message="Writing audit trail...")
-            _audit(db, current_user, "IMPORT_CSV", "dataset", None, {"kind": kind, "rows": imported, "file_name": file_name})
+            _update_import_job(
+                job_id, phase="auditing", progress=90, message="Writing audit trail..."
+            )
+            _audit(
+                db,
+                current_user,
+                "IMPORT_CSV",
+                "dataset",
+                None,
+                {"kind": kind, "rows": imported, "file_name": file_name},
+            )
             db.commit()
-            return {"status": "imported", "kind": kind, "rows": imported, "file_name": file_name}
-    return _runner
+            return {
+                "status": "imported",
+                "kind": kind,
+                "rows": imported,
+                "file_name": file_name,
+            }
 
+    return _runner
 
 
 @router.post("/import/csv")
@@ -2160,7 +2743,14 @@ async def import_csv_bundle(
     imported = _import_rows_for_kind(db, "default", kind, rows)
 
     db.commit()
-    _audit(db, current_user, "IMPORT_CSV", "dataset", None, {"kind": kind, "rows": imported, "file_name": file.filename})
+    _audit(
+        db,
+        current_user,
+        "IMPORT_CSV",
+        "dataset",
+        None,
+        {"kind": kind, "rows": imported, "file_name": file.filename},
+    )
     db.commit()
     return {"status": "imported", "kind": kind, "rows": imported}
 
@@ -2173,7 +2763,10 @@ async def import_csv_bundle_async(
 ):
     csv_bytes = await file.read()
     job_id = _create_import_job("csv", file.filename or f"{kind}.csv")
-    _run_import_job(job_id, _csv_job_runner(kind, file.filename or f"{kind}.csv", csv_bytes, current_user))
+    _run_import_job(
+        job_id,
+        _csv_job_runner(kind, file.filename or f"{kind}.csv", csv_bytes, current_user),
+    )
     return {"job_id": job_id, "status": "queued"}
 
 
@@ -2214,7 +2807,10 @@ async def import_dataset_bundle(
     db: Session = Depends(get_session),
 ):
     if not file.filename or not file.filename.lower().endswith(".zip"):
-        raise HTTPException(status_code=422, detail="Upload a ZIP bundle containing the dataset CSV files")
+        raise HTTPException(
+            status_code=422,
+            detail="Upload a ZIP bundle containing the dataset CSV files",
+        )
 
     archive_bytes = await file.read()
     try:
@@ -2225,9 +2821,16 @@ async def import_dataset_bundle(
                 for kind, expected_name in _BUNDLE_FILE_NAMES.items():
                     if base_name == expected_name:
                         bundle_members[kind] = member
-            missing = [expected for kind, expected in _BUNDLE_FILE_NAMES.items() if kind not in bundle_members]
+            missing = [
+                expected
+                for kind, expected in _BUNDLE_FILE_NAMES.items()
+                if kind not in bundle_members
+            ]
             if missing:
-                raise HTTPException(status_code=422, detail=f"Bundle missing required files: {', '.join(missing)}")
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Bundle missing required files: {', '.join(missing)}",
+                )
 
             await reset_local_demo_data(current_user=current_user, db=db)
 
@@ -2240,7 +2843,14 @@ async def import_dataset_bundle(
                 results[kind] = _import_rows_for_kind(db, "default", kind, rows)
 
             db.commit()
-            _audit(db, current_user, "IMPORT_DATASET_BUNDLE", "dataset", None, {"bundle": results, "file_name": file.filename})
+            _audit(
+                db,
+                current_user,
+                "IMPORT_DATASET_BUNDLE",
+                "dataset",
+                None,
+                {"bundle": results, "file_name": file.filename},
+            )
             db.commit()
             return {"status": "imported", "bundle": results, "file_name": file.filename}
     except zipfile.BadZipFile:
@@ -2253,10 +2863,15 @@ async def import_dataset_bundle_async(
     current_user: TokenData = Depends(get_current_user_strict),
 ):
     if not file.filename or not file.filename.lower().endswith(".zip"):
-        raise HTTPException(status_code=422, detail="Upload a ZIP bundle containing the dataset CSV files")
+        raise HTTPException(
+            status_code=422,
+            detail="Upload a ZIP bundle containing the dataset CSV files",
+        )
     archive_bytes = await file.read()
     job_id = _create_import_job("bundle", file.filename)
-    _run_import_job(job_id, _bundle_job_runner(file.filename, archive_bytes, current_user))
+    _run_import_job(
+        job_id, _bundle_job_runner(file.filename, archive_bytes, current_user)
+    )
     return {"job_id": job_id, "status": "queued"}
 
 
@@ -2265,38 +2880,20 @@ async def import_local_demo_bundle(
     current_user: TokenData = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
-    bundle = {
-        "employees": _DEMO_DATA_DIR / "employees_public.csv",
-        "candidates": _DEMO_DATA_DIR / "candidates_public.csv",
-        "employee_skills": _DEMO_DATA_DIR / "employee_skills_public.csv",
-        "candidate_skills": _DEMO_DATA_DIR / "candidate_skills_public.csv",
-        "employee_experience": _DEMO_DATA_DIR / "employee_experience_public.csv",
-        "candidate_experience": _DEMO_DATA_DIR / "candidate_experience_public.csv",
-    }
-    if not bundle["employees"].exists() or not bundle["candidates"].exists():
-        raise HTTPException(status_code=404, detail=f"Demo bundle not found at {_DEMO_DATA_DIR}")
-
-    await reset_local_demo_data(current_user=current_user, db=db)
-    results = {}
-    for kind, path in bundle.items():
-        if not path.exists():
-            continue
-        rows = _load_csv_rows(path)
-        imported = _import_rows_for_kind(db, "default", kind, rows)
-        results[kind] = imported
-    db.commit()
-    _audit(db, current_user, "IMPORT_DEMO_BUNDLE", "dataset", None, {"bundle": results})
-    db.commit()
-    return {"status": "imported", "bundle": results}
+    raise HTTPException(
+        status_code=410,
+        detail="Demo dataset import has been removed. Upload CSV files manually.",
+    )
 
 
 @router.post("/import/demo/async")
 async def import_local_demo_bundle_async(
     current_user: TokenData = Depends(get_current_user_strict),
 ):
-    job_id = _create_import_job("demo", "demo-bundle")
-    _run_import_job(job_id, _demo_job_runner(current_user))
-    return {"job_id": job_id, "status": "queued"}
+    raise HTTPException(
+        status_code=410,
+        detail="Demo dataset import has been removed. Upload CSV files manually.",
+    )
 
 
 @router.get("/import/jobs/{job_id}")
@@ -2316,26 +2913,32 @@ async def export_dataset_bundle(
     db: Session = Depends(get_session),
 ):
     bundle_bytes = _export_dataset_bundle_bytes(db)
-    _audit(db, current_user, "EXPORT_DATASET_BUNDLE", "dataset", None, {"file_name": "aurelius-dataset-bundle.zip"})
+    _audit(
+        db,
+        current_user,
+        "EXPORT_DATASET_BUNDLE",
+        "dataset",
+        None,
+        {"file_name": "aurelius-dataset-bundle.zip"},
+    )
     db.commit()
     return Response(
         content=bundle_bytes,
         media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename="aurelius-dataset-bundle.zip"'},
+        headers={
+            "Content-Disposition": 'attachment; filename="aurelius-dataset-bundle.zip"'
+        },
     )
 
 
 @router.get("/import/demo/status")
 async def get_demo_import_status(
     current_user: TokenData = Depends(get_current_user),
-    db: Session = Depends(get_session),
 ):
-    return {
-        "employees": len(db.exec(select(EmployeeTable)).all()),
-        "candidates": len(db.exec(select(CandidateTable)).all()),
-        "skills": len(db.exec(select(SkillTable)).all()),
-        "experience": len(db.exec(select(ExperienceTable)).all()),
-    }
+    raise HTTPException(
+        status_code=410,
+        detail="Demo dataset import has been removed. Use /lean/summary instead.",
+    )
 
 
 @router.get("/executive/packet")
@@ -2399,15 +3002,29 @@ async def get_executive_packet(
         ],
         "governance": {
             "policies": [
-                {"name": row.policy_name, "region": row.region, "action_type": row.action_type}
+                {
+                    "name": row.policy_name,
+                    "region": row.region,
+                    "action_type": row.action_type,
+                }
                 for row in policies
             ],
             "dr_runbooks": [
-                {"name": row.runbook_name, "environment": row.environment, "rto": row.rto_minutes, "rpo": row.rpo_minutes}
+                {
+                    "name": row.runbook_name,
+                    "environment": row.environment,
+                    "rto": row.rto_minutes,
+                    "rpo": row.rpo_minutes,
+                }
                 for row in dr_runbooks
             ],
             "procurement_artifacts": [
-                {"type": row.artifact_type, "title": row.title, "version": row.version, "status": row.status}
+                {
+                    "type": row.artifact_type,
+                    "title": row.title,
+                    "version": row.version,
+                    "status": row.status,
+                }
                 for row in procurement
             ],
         },
@@ -2417,7 +3034,14 @@ async def get_executive_packet(
             "hrbp": "Operational packet for HR business partners.",
         }.get(template, "Custom packet template."),
     }
-    _audit(db, current_user, "GENERATE_EXECUTIVE_PACKET", "report", None, {"template": template})
+    _audit(
+        db,
+        current_user,
+        "GENERATE_EXECUTIVE_PACKET",
+        "report",
+        None,
+        {"template": template},
+    )
     db.commit()
     return packet
 
@@ -2439,7 +3063,9 @@ async def scheduler_loop():
                 for conn in due:
                     try:
                         _run_connection_sync(conn.id, conn.tenant_id, db)
-                        conn.next_sync_at = datetime.utcnow() + timedelta(minutes=max(5, conn.sync_interval_minutes))
+                        conn.next_sync_at = datetime.utcnow() + timedelta(
+                            minutes=max(5, conn.sync_interval_minutes)
+                        )
                         conn.last_sync_status = "success"
                         conn.sync_retry_count = 0
                         conn.updated_at = datetime.utcnow()
@@ -2452,7 +3078,7 @@ async def scheduler_loop():
                         conn.updated_at = datetime.utcnow()
                         db.add(conn)
                         db.commit()
-        except Exception:
+        except Exception:  # nosec B110
             pass
         await asyncio.sleep(60)
 

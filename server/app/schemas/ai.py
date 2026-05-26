@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
+
 class AnalysisRequest(BaseModel):
     prompt: str
     api_key: str

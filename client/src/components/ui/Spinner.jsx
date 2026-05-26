@@ -1,11 +1,11 @@
-import React from 'react';
-import { Loader2 } from 'lucide-react';
+import React from "react";
+import { Loader2 } from "lucide-react";
 
 const Spinner = ({
-  size = 'md', // sm, md, lg
-  color = 'primary', // primary, secondary, accent, white
-  label = '',
-  className = '',
+  size = "md", // sm, md, lg
+  color = "primary", // primary, secondary, accent, white
+  label = "",
+  className = "",
   ...props
 }) => {
   const sizes = {
@@ -15,14 +15,17 @@ const Spinner = ({
   };
 
   const colors = {
-    primary: 'text-indigo-500',
-    secondary: 'text-cyan-400',
-    accent: 'text-emerald-400',
-    white: 'text-white',
+    primary: "text-indigo-500",
+    secondary: "text-cyan-400",
+    accent: "text-emerald-400",
+    white: "text-white",
   };
 
   return (
-    <div className={`flex flex-col items-center justify-center gap-3 ${className}`} {...props}>
+    <div
+      className={`flex flex-col items-center justify-center gap-3 ${className}`}
+      {...props}
+    >
       <Loader2
         size={sizes[size]}
         className={`animate-spin ${colors[color]} shrink-0`}
