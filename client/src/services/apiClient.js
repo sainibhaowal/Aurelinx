@@ -699,6 +699,15 @@ export const leanAPI = {
     form.append("file", file);
     return uploadRequest(`${API_V1}/lean/import/validate`, form, onProgress);
   },
+  importDatasetBundleAsync: (file, onProgress = null) => {
+    const form = new FormData();
+    form.append("file", file);
+    return uploadRequest(
+      `${API_V1}/lean/import/bundle/async`,
+      form,
+      onProgress,
+    );
+  },
   importCsvAsync: (kind, file, onProgress = null) => {
     const form = new FormData();
     form.append("kind", kind);

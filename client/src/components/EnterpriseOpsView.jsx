@@ -85,6 +85,7 @@ const EnterpriseOpsView = () => {
     candidate_skills: null,
     employee_experience: null,
     candidate_experience: null,
+    bundle: null,
   });
 
   const [contractForm, setContractForm] = useState({
@@ -482,6 +483,33 @@ const EnterpriseOpsView = () => {
       }));
     });
     await trackImportJob(queued.job_id, "csv", kind);
+  };
+
+  const uploadBundleImport = async () => {
+    const file = importFiles.bundle;
+    if (!file) return;
+    setUploadProgress((prev) => ({
+      ...prev,
+      bundle: {
+        phase: "uploading",
+        percent: 0,
+        message: "Uploading ZIP bundle...",
+      },
+    }));
+    const queued = await leanAPI.importDatasetBundleAsync(file, (percent) => {
+      setUploadProgress((prev) => ({
+        ...prev,
+        bundle: {
+          phase: percent >= 100 ? "queued" : "uploading",
+          percent,
+          message:
+            percent >= 100
+              ? "Upload complete. Waiting for backend bundle import..."
+              : `Uploading ZIP bundle... ${percent}%`,
+        },
+      }));
+    });
+    await trackImportJob(queued.job_id, "bundle");
   };
 
   const validateImport = async (kind) => {
@@ -1190,12 +1218,12 @@ const EnterpriseOpsView = () => {
                   <div className="flex flex-col lg:flex-row lg:items-center gap-3 justify-between relative z-10">
                     <div>
                       <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                        <Upload size={11} className="text-cyan-400" /> Manual
-                        CSV Import Only
+                        <Upload size={11} className="text-cyan-400" /> CSV or
+                        ZIP Import
                       </div>
                       <p className="text-[10px] text-slate-400 leading-normal mt-0.5 max-w-xl">
-                        Upload each CSV directly into Postgres. Demo bundles and
-                        prefilled datasets are disabled.
+                        Upload individual CSVs directly into Postgres, or use a
+                        single ZIP bundle to load the full dataset in one pass.
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-300">
@@ -1231,6 +1259,89 @@ const EnterpriseOpsView = () => {
                 <div className="space-y-4">
                   <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold border-b border-white/5 pb-2">
                     Upload Individual CSV Schemas
+                  </div>
+
+                  <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/5 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                          <Upload size={11} className="text-cyan-400" /> ZIP
+                          Bundle Import
+                        </div>
+                        <p className="text-[10px] text-slate-400 leading-normal mt-0.5 max-w-xl">
+                          Upload a single `aurelius-dataset-bundle.zip` to load
+                          employees, candidates, skills, and experience in one
+                          pass.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          accept=".zip"
+                          id="dataset-bundle-file"
+                          className="hidden"
+                          onChange={(e) =>
+                            setImportFiles((p) => ({
+                              ...p,
+                              bundle: e.target.files?.[0] || null,
+                            }))
+                          }
+                        />
+                        <label
+                          htmlFor="dataset-bundle-file"
+                          className="h-8 px-3 rounded-lg border border-dashed border-cyan-400/30 bg-slate-950/40 text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all hover:border-cyan-400/60"
+                        >
+                          <span className="truncate max-w-[180px]">
+                            {importFiles.bundle
+                              ? importFiles.bundle.name
+                              : "Select ZIP Bundle"}
+                          </span>
+                          <FileSpreadsheet
+                            size={10}
+                            className="text-cyan-400"
+                          />
+                        </label>
+                        <button
+                          onClick={uploadBundleImport}
+                          disabled={!importFiles.bundle}
+                          className="h-8 px-3 rounded-lg border border-cyan-400/20 hover:bg-cyan-500/10 text-[10px] font-bold text-cyan-400 uppercase tracking-wider transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 inline-flex items-center gap-1.5"
+                        >
+                          Upload ZIP
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-[10px] text-slate-500 leading-relaxed">
+                      Required inside the ZIP:
+                      <span className="text-slate-300">
+                        {" "}
+                        `employees_public.csv`, `candidates_public.csv`,
+                        `employee_skills_public.csv`,
+                        `candidate_skills_public.csv`,
+                        `employee_experience_public.csv`,
+                        `candidate_experience_public.csv`
+                      </span>
+                    </div>
+                    {uploadProgress.bundle?.message && (
+                      <div className="mt-3 rounded-lg bg-cyan-950/20 border border-cyan-400/20 p-2 font-mono text-[9px]">
+                        <div className="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                          <span>
+                            {uploadProgress.bundle.phase.toUpperCase()}
+                          </span>
+                          <span>{uploadProgress.bundle.percent}%</span>
+                        </div>
+                        <div className="h-1 rounded-full bg-cyan-950 overflow-hidden">
+                          <div
+                            className="h-full bg-cyan-400 transition-all duration-300"
+                            style={{
+                              width: `${uploadProgress.bundle.percent}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="text-[9px] text-cyan-400/70 mt-1">
+                          {uploadProgress.bundle.message}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
