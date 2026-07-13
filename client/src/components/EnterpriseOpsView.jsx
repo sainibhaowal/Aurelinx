@@ -24,6 +24,7 @@ import {
   Zap,
   HelpCircle,
 } from "lucide-react";
+import { UserManualButton } from "./UserManual";
 import { enterpriseAPI, leanAPI } from "../services/apiClient";
 
 const EnterpriseOpsView = () => {
@@ -669,18 +670,21 @@ const EnterpriseOpsView = () => {
     <div className="w-full pb-20 text-slate-100 antialiased selection:bg-cyan-500/30">
       {/* Header Panel */}
       <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 border-b border-white/5 pb-6 text-left">
-        <div>
-          <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold uppercase tracking-[0.2em] mb-1">
-            <Database size={12} className="animate-pulse" /> Core Infrastructure
-            & ML Ops
+        <div className="flex-1 flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold uppercase tracking-[0.2em] mb-1">
+              <Database size={12} className="animate-pulse" /> Core Infrastructure
+              & ML Ops
+            </div>
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white font-display">
+              Enterprise Operations
+            </h1>
+            <p className="text-slate-400 text-sm mt-1 leading-relaxed max-w-3xl">
+              Pipeline connectors, automated data validation, explainable
+              attrition risks, and real-time model compliance.
+            </p>
           </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white font-display">
-            Enterprise Operations
-          </h1>
-          <p className="text-slate-400 text-sm mt-1 leading-relaxed max-w-3xl">
-            Pipeline connectors, automated data validation, explainable
-            attrition risks, and real-time model compliance.
-          </p>
+          <UserManualButton defaultTab="dataops" className="ml-4 mt-6" />
         </div>
         <button
           onClick={() => loadAll()}
@@ -2307,15 +2311,15 @@ const EnterpriseOpsView = () => {
                           <div className="mt-0.5">
                             Budget:{" "}
                             <span className="text-cyan-400 font-bold">
-                              ${s.budget_cap?.toLocaleString()}
+                              ${s.input_payload?.budget_cap?.toLocaleString() || s.budget_cap?.toLocaleString()}
                             </span>{" "}
                             | Hires:{" "}
                             <span className="text-slate-300 font-bold">
-                              {s.target_hires}
+                              {s.input_payload?.target_hires ?? s.target_hires}
                             </span>{" "}
                             | Retain:{" "}
                             <span className="text-slate-300 font-bold">
-                              {s.target_retentions}
+                              {s.input_payload?.target_retentions ?? s.target_retentions}
                             </span>
                           </div>
                         </div>

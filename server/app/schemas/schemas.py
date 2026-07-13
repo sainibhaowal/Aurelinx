@@ -154,6 +154,21 @@ class EmployeeOut(BaseModel):
     updated_at: datetime
 
 
+class EmployeeListOut(BaseModel):
+    """Lightweight employee response for list endpoints (no skills/experiences)"""
+
+    id: UUID
+    full_name: str
+    email: str
+    department: str
+    role: str
+    sentiment_score: float
+    is_at_risk: bool
+    retention_prob: Optional[float]
+    created_at: datetime
+    updated_at: datetime
+
+
 # ============ CANDIDATE SCHEMAS ============
 
 
@@ -180,6 +195,20 @@ class CandidateOut(BaseModel):
     match_score: Optional[float]
     skills: List[SkillOut] = []
     experiences: List[ExperienceOut] = []
+    application_date: datetime
+    created_at: datetime
+
+
+class CandidateListOut(BaseModel):
+    """Lightweight candidate response for list endpoints (no skills/experiences)"""
+
+    id: UUID
+    full_name: str
+    email: str
+    department: str
+    role: str
+    sentiment_score: float
+    match_score: Optional[float]
     application_date: datetime
     created_at: datetime
 

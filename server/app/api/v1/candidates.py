@@ -2,11 +2,12 @@
 Candidate management endpoints
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 from typing import List
+from uuid import UUID
 
-from app.schemas.schemas import CandidateOut, SkillOut, ExperienceOut
+from app.schemas.schemas import CandidateOut, CandidateListOut, SkillOut, ExperienceOut
 from app.models.database import CandidateTable, SkillTable, ExperienceTable, get_session
 from app.core.security import get_current_user, TokenData
 from app.core.logging_config import get_logger
@@ -51,7 +52,7 @@ def get_candidate_out(cand: CandidateTable, session: Session) -> CandidateOut:
     )
 
 
-@router.get("", response_model=List[CandidateOut])
+@router.get("", response_model=List[CandidateListOut])
 async def list_candidates(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=10000),
@@ -71,4 +72,26 @@ async def list_candidates(
     query = query.offset(skip).limit(limit)
     candidates = filter_real_records(session.exec(query).all())
 
-    return [get_candidate_out(cand, session) for cand in candidates]
+    # Return lightweight response (no N+1 queries for skills/experiences)
+    return candidates
+
+
+@router.get("/{candidate_id}", response_model=CandidateOut)
+async def get_candidate(
+    candidate_id: UUID,
+    current_user: TokenData = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Get a candidate by ID with skills and experiences."""
+
+    candidate = session.get(CandidateTable, candidate_id)
+
+    if not candidate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Candidate {candidate_id} not found",
+        )
+
+    logger.info(f"User {current_user.user_id} accessed candidate {candidate_id}")
+
+    return get_candidate_out(candidate, session)

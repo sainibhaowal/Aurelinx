@@ -626,6 +626,7 @@ def calculate_hazard_rate(
 
 @router.get("/ona")
 def compute_ona(
+    limit: int = 45,
     session: Session = Depends(get_session),
     current_user: TokenData = Depends(get_current_user),
 ):
@@ -635,7 +636,7 @@ def compute_ona(
     """
     employees = [
         emp
-        for emp in filter_real_records(session.exec(select(EmployeeTable)).all())
+        for emp in filter_real_records(session.exec(select(EmployeeTable).limit(limit)).all())
         if emp is not None and getattr(emp, "id", None) is not None
     ]
     if not employees:

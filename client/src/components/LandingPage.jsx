@@ -15,6 +15,10 @@ import {
   Lock,
   Terminal,
   Settings,
+  BrainCircuit,
+  Search,
+  BarChart3,
+  Network,
 } from "lucide-react";
 import {
   analysisAPI,
@@ -156,31 +160,59 @@ const PLATFORM_MODULES = [
   {
     icon: Database,
     accent: "#67e8f9",
-    title: "Bronze → Silver → Gold Pipelines",
-    body: "Raw integrations extract payloads asynchronously, validating against real-time database schemas. Anomalies are dumped to the Quarantine Event Table, ensuring complete dataset integrity.",
-    tags: ["RawEventTable", "Data Contracts", "Quarantine Event"],
+    title: "Bronze → Silver → Gold Ingest Pipelines",
+    body: "Secure webhook syncs capture events from Slack, Jira, and Workday. System logs validate data schemas in real-time, quarantine structural anomalies to the integrity queue, and sync records transactionally.",
+    tags: ["X-API-Key Ingestion", "HMAC-SHA256 Signatures", "Quarantine Logs"],
   },
   {
     icon: Cpu,
     accent: "#a78bfa",
     title: "Explainable ML Registry & Model Cards",
-    body: "Trains lightweight models on tenant-isolated records. The registry maintains PR-AUC, calibration error logs, and department fairness metrics to expose calibration drifts.",
-    tags: ["PR-AUC Calibration", "Model Drift Log", "Ruleboost Inference"],
+    body: "Calculates predictive retention probabilities on tenant-isolated records. Features validation diagnostics including PR-AUC scores, calibration error metrics, and model training snapshots.",
+    tags: ["PR-AUC Calibration", "Model Drift log", "Drift retrain snapshots"],
   },
   {
     icon: Lock,
     accent: "#6ee7b7",
     title: "Regional Compliance Policy Gates",
-    body: "Policy packs enforce regional compliance regulations. High-impact modifications require mandatory administrative authorization keys, preventing unauthorized leaks.",
-    tags: ["Min Confidence Gates", "Admin Keys", "Blocked Actions"],
+    body: "Enforces regional compliance protocols. Administrative operations trigger approval requirement gates, audit log entries, and require manual override verification.",
+    tags: ["Compliance Policy Packs", "Approval Gates", "Audit Event Logs"],
   },
   {
     icon: Workflow,
     accent: "#fbbf24",
     title: "Active Retention Interventions Hub",
-    body: "HR leaders manage 30/60/90-day retention loop tasks, tracking ownership assignments, calculated recovery costs, and outcome effectiveness to yield true workforce ROI scores.",
-    tags: ["Outcome Tracking", "Estimated Cost", "Retention ROI"],
+    body: "Enables organizational leaders to configure and track 30/60/90-day retention loop tasks, measuring recovery cost estimates and turnover mitigation ROI.",
+    tags: ["Outcome Tracker", "Recovery Costs", "Turnover ROI Metrics"],
   },
+  {
+    icon: BrainCircuit,
+    accent: "#f43f5e",
+    title: "Multi-Step Agentic Workflow Chat",
+    body: "Features a live ReAct orchestration loop with interactive status transitions (Think ➔ Plan ➔ Explore ➔ Modify ➔ Verify ➔ Complete). Directly translates natural language queries into secure database read/write actions.",
+    tags: ["Interactive State Tracker", "Dynamic SQL Mutations", "Context Trace Inspector"],
+  },
+  {
+    icon: Search,
+    accent: "#06b6d4",
+    title: "Semantic Talent Scout Matchmaker",
+    body: "Enables conceptual candidate matchmaking using description prompts. Employs a hybrid scoring algorithm indexing roles, departments, skill hierarchies, and matched coordinates.",
+    tags: ["Conceptual Skill Search", "Typewriter Token Streaming", "Talent Profile Modal"],
+  },
+  {
+    icon: BarChart3,
+    accent: "#10b981",
+    title: "Sentiment Intelligence & Morale Analytics",
+    body: "Monitors organizational health and burnout risk indices in real-time. Computes leadership trust, morale velocities, and burnout levels using streaming Server-Sent Events (SSE).",
+    tags: ["burnout risk vector", "morale velocity trends", "live SSE analytics"],
+  },
+  {
+    icon: Network,
+    accent: "#ec4899",
+    title: "Organizational Network Analysis (ONA)",
+    body: "Maps employee pull request reviews and collaborations onto an interactive ONA graph. Computes influence scores using PageRank, Brandes Betweenness centrality, and Dijkstra skill pathways.",
+    tags: ["PageRank Centrality", "Spring-Physics Physics", "Dijkstra skill distances"],
+  }
 ];
 
 /* ─────────────────────────────────────────
@@ -371,6 +403,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
   const [isSimulating, setIsSimulating] = useState(false);
   const [simLogs, setSimLogs] = useState([]);
   const [systemEpoch, setSystemEpoch] = useState(new Date().toISOString());
+  const [calcWorkforce, setCalcWorkforce] = useState(1500);
+  const [calcSalary, setCalcSalary] = useState(120000);
+  const [calcTurnover, setCalcTurnover] = useState(15);
+  const [calcReduction, setCalcReduction] = useState(25);
 
   useEffect(() => {
     const timer = setInterval(
@@ -1531,6 +1567,161 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 </div>
               );
             })}
+          </div>
+        </section>
+
+        {/* ══════════ ROI CALCULATOR ══════════ */}
+        <section
+          className="py-20"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+        >
+          <div className="mx-auto max-w-[700px] text-center mb-12">
+            <SectionLabel>Value Realization</SectionLabel>
+            <SectionHeading>Interactive Turnover ROI Calculator</SectionHeading>
+            <p
+              className="mt-5 text-sm leading-relaxed"
+              style={{ color: "rgba(148,163,184,0.6)" }}
+            >
+              Industry metrics show employee replacement costs (recruiting, onboarding, productivity lag) average 1.5x base salary. Adjust variables to see your organization's potential savings.
+            </p>
+          </div>
+
+          <div className="mx-auto max-w-[1093px]">
+            <GlassCard className="p-8 grid gap-8 lg:grid-cols-2">
+              {/* Sliders Side */}
+              <div className="space-y-6">
+                <div>
+                  <div className="flex justify-between text-sm font-semibold mb-2">
+                    <span className="text-slate-300">Total Workforce Size</span>
+                    <span className="text-cyan-400 font-mono font-bold">{calcWorkforce.toLocaleString()} employees</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="100"
+                    max="10000"
+                    step="100"
+                    value={calcWorkforce}
+                    onChange={(e) => setCalcWorkforce(Number(e.target.value))}
+                    className="w-full h-1.5 bg-slate-950/70 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                    <span>100</span>
+                    <span>10,000</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-sm font-semibold mb-2">
+                    <span className="text-slate-300">Average Employee Salary</span>
+                    <span className="text-cyan-400 font-mono font-bold">${calcSalary.toLocaleString()} / year</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="40000"
+                    max="300000"
+                    step="5000"
+                    value={calcSalary}
+                    onChange={(e) => setCalcSalary(Number(e.target.value))}
+                    className="w-full h-1.5 bg-slate-950/70 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                    <span>$40,000</span>
+                    <span>$300,000</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-sm font-semibold mb-2">
+                    <span className="text-slate-300">Annual Employee Turnover Rate</span>
+                    <span className="text-cyan-400 font-mono font-bold">{calcTurnover}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="45"
+                    step="1"
+                    value={calcTurnover}
+                    onChange={(e) => setCalcTurnover(Number(e.target.value))}
+                    className="w-full h-1.5 bg-slate-950/70 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                    <span>5% (Healthy)</span>
+                    <span>45% (High Attrition)</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-sm font-semibold mb-2">
+                    <span className="text-slate-300">Target Retention Improvement</span>
+                    <span className="text-emerald-400 font-mono font-bold">{calcReduction}% reduction</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="50"
+                    step="5"
+                    value={calcReduction}
+                    onChange={(e) => setCalcReduction(Number(e.target.value))}
+                    className="w-full h-1.5 bg-slate-950/70 rounded-lg appearance-none cursor-pointer accent-emerald-400 focus:outline-none"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                    <span>10% (Conservative)</span>
+                    <span>50% (Ambitious)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Computations Side */}
+              <div className="flex flex-col justify-between rounded-2xl bg-slate-950/40 border border-white/5 p-6">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500 mb-6">
+                    AURELIUS IMPACT FORECAST
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <div className="text-xs text-slate-400 mb-1">Annual Departures</div>
+                      <div className="text-xl font-bold text-white font-mono">
+                        {Math.round(calcWorkforce * (calcTurnover / 100))} <span className="text-xs font-normal text-slate-400">exits/yr</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-400 mb-1">Total Attrition Cost</div>
+                      <div className="text-xl font-bold text-rose-400 font-mono">
+                        ${(Math.round(calcWorkforce * (calcTurnover / 100)) * calcSalary * 1.5).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/5 pt-6 space-y-4">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-400">Retained Employees via Aurelius</span>
+                      <span className="font-bold text-emerald-400 font-mono">
+                        +{Math.round(calcWorkforce * (calcTurnover / 100) * (calcReduction / 100))} / year
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-400">Cost Per Exit (1.5x Multiplier)</span>
+                      <span className="font-bold text-slate-300 font-mono">
+                        ${(calcSalary * 1.5).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 border-t border-white/10 pt-6">
+                  <div className="text-xs text-emerald-400 font-bold uppercase tracking-widest mb-1">
+                    ESTIMATED NET ANNUAL SAVINGS
+                  </div>
+                  <div className="text-4xl sm:text-5xl font-black text-white font-mono tracking-tight glow-text">
+                    ${(Math.round(calcWorkforce * (calcTurnover / 100) * (calcReduction / 100)) * calcSalary * 1.5).toLocaleString()}
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
+                    *Savings projection based on standard organizational replacement cost indexes (SHRM, Gallup). Net returns vary by department role specificity.
+                  </p>
+                </div>
+              </div>
+            </GlassCard>
           </div>
         </section>
 

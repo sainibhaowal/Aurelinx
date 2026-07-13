@@ -16,6 +16,7 @@ import {
   Brain,
   Info,
 } from "lucide-react";
+import { UserManualButton } from "./UserManual";
 import { chatAPI } from "../services/apiClient";
 
 // ── Premium Markdown renderer — full GFM: tables, code, blockquotes, lists, task lists, images ──
@@ -579,6 +580,90 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
   );
 };
 
+const AgenticStepTracker = ({ phase, streamText }) => {
+  const steps = [
+    { id: "thinking", label: "Think", desc: "Analyzing request intent and query scope" },
+    { id: "planning", label: "Plan", desc: "Context payload generation and RBAC check" },
+    { id: "exploring", label: "Explore", desc: "Retrieving records from PostgreSQL database" },
+    { id: "modifying", label: "Modify", desc: "Applying database write mutations", optional: true },
+    { id: "verifying", label: "Verify", desc: "Running compliance audit and safeguards" },
+    { id: "completing", label: "Complete", desc: "Streaming response token chunks" }
+  ];
+
+  // Helper to determine status icon
+  const getStepStatus = (stepId, index) => {
+    const activeIndex = steps.findIndex(s => s.id === phase);
+    const stepIndex = steps.findIndex(s => s.id === stepId);
+    
+    if (phase === "done") return "completed";
+    if (phase === "error") return "error";
+    if (activeIndex === -1) return "pending";
+    if (stepIndex < activeIndex) return "completed";
+    if (stepIndex === activeIndex) return "active";
+    return "pending";
+  };
+
+  return (
+    <div className="flex flex-col gap-2 bg-slate-950/40 p-4 border border-cyan-500/10 rounded-xl my-2">
+      <div className="flex items-center justify-between pb-2 border-b border-white/5 mb-1.5">
+        <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+          </span>
+          Agentic Orchestration State
+        </span>
+        <span className="text-[10px] font-mono text-slate-500 uppercase">Multi-Step Loop</span>
+      </div>
+      
+      <div className="space-y-3">
+        {steps.map((step, idx) => {
+          const status = getStepStatus(step.id, idx);
+          
+          return (
+            <div key={step.id} className="flex items-start gap-3 text-left">
+              <div className="mt-0.5 flex-shrink-0">
+                {status === "completed" && (
+                  <span className="h-4 w-4 rounded-full bg-emerald-500/20 border border-emerald-400/50 inline-flex items-center justify-center text-emerald-400 text-[10px] font-bold">
+                    ✓
+                  </span>
+                )}
+                {status === "active" && (
+                  <span className="h-4 w-4 rounded-full bg-cyan-500/20 border border-cyan-400 inline-flex items-center justify-center text-cyan-400 text-[10px] font-bold animate-pulse">
+                    ●
+                  </span>
+                )}
+                {status === "pending" && (
+                  <span className="h-4 w-4 rounded-full bg-slate-900 border border-white/10 inline-flex items-center justify-center text-slate-600 text-[9px]">
+                    ○
+                  </span>
+                )}
+                {status === "error" && (
+                  <span className="h-4 w-4 rounded-full bg-rose-500/20 border border-rose-400 inline-flex items-center justify-center text-rose-400 text-[10px] font-bold">
+                    ✗
+                  </span>
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold ${status === "active" ? "text-cyan-300" : status === "completed" ? "text-slate-300" : "text-slate-500"}`}>
+                    {step.label}
+                  </span>
+                </div>
+                <p className={`text-[11px] leading-tight ${status === "active" ? "text-slate-300" : "text-slate-500"}`}>
+                  {step.desc}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+
 const IntelligenceChatView = () => {
   const [sessions, setSessions] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
@@ -756,6 +841,16 @@ const IntelligenceChatView = () => {
     abortRef.current = controller;
     const userText = input.trim();
     setInput("");
+
+    // Add optimistic user message to display input immediately
+    const optimisticUserMsg = {
+      id: "optimistic-user-msg-" + Date.now(),
+      role: "user",
+      content: userText,
+      created_at: new Date().toISOString()
+    };
+    setMessages((prev) => [...prev, optimisticUserMsg]);
+
     let sessionId = selectedSessionId;
     try {
       if (!sessionId) {
@@ -793,7 +888,11 @@ const IntelligenceChatView = () => {
           onStatus: ({ phase }) => setStreamPhase(phase),
           onChunk: ({ text }) => setStreamText((prev) => prev + text),
           onDone: ({ assistant_message, user_message, session }) => {
-            setMessages((prev) => [...prev, user_message, assistant_message]);
+            setMessages((prev) => [
+              ...prev.filter(m => !m.id.toString().startsWith("optimistic-user-msg-")),
+              user_message,
+              assistant_message
+            ]);
             setSessions((prev) =>
               prev.map((s) => (s.id === session.id ? session : s)),
             );
@@ -805,7 +904,7 @@ const IntelligenceChatView = () => {
             setStreamPhase("error");
             setStreamText("");
             setMessages((prev) => [
-              ...prev,
+              ...prev.filter(m => !m.id.toString().startsWith("optimistic-user-msg-")),
               {
                 id: `stream-error-${Date.now()}`,
                 role: "assistant",
@@ -970,13 +1069,16 @@ const IntelligenceChatView = () => {
               scout and data tools.
             </p>
           </div>
-          <button
-            onClick={clearMessages}
-            disabled={!selectedSession}
-            className="ml-auto h-9 px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs inline-flex items-center gap-2"
-          >
-            <Eraser size={13} /> Clear Chat
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <UserManualButton defaultTab="workflows" />
+            <button
+              onClick={clearMessages}
+              disabled={!selectedSession}
+              className="h-9 px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs inline-flex items-center gap-2"
+            >
+              <Eraser size={13} /> Clear Chat
+            </button>
+          </div>
         </div>
 
         {helpOpen && (
@@ -1066,10 +1168,11 @@ const IntelligenceChatView = () => {
                 ))}
                 {busy && (
                   <div className="rounded-2xl p-4 border mr-4 bg-[#081220]/45 border-cyan-500/15 shadow-[0_0_15px_rgba(6,182,212,0.02)] backdrop-blur-sm">
-                    <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5">
-                      assistant
+                    <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5 flex items-center justify-between">
+                      <span>assistant</span>
                     </div>
-                    <div className="text-sm">
+                    <AgenticStepTracker phase={streamPhase} streamText={streamText} />
+                    <div className="text-sm border-t border-white/5 pt-3">
                       <ThinkingMessageContent text={streamText} isBusy={busy} />
                     </div>
                   </div>
@@ -1180,11 +1283,7 @@ const IntelligenceChatView = () => {
                     </button>
                   </div>
                 </div>
-                {streamPhase && (
-                  <div className="mt-2 text-xs text-slate-400 uppercase tracking-[0.12em]">
-                    stream: {streamPhase}
-                  </div>
-                )}
+
               </div>
             </>
           )}

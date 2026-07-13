@@ -10,6 +10,7 @@ from typing import List
 from app.schemas.schemas import (
     EmployeeCreate,
     EmployeeOut,
+    EmployeeListOut,
     EmployeeUpdate,
     SkillOut,
     ExperienceOut,
@@ -59,7 +60,7 @@ def get_employee_out(emp: EmployeeTable, session: Session) -> EmployeeOut:
     )
 
 
-@router.get("", response_model=List[EmployeeOut])
+@router.get("", response_model=List[EmployeeListOut])
 async def list_employees(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=10000),
@@ -90,7 +91,8 @@ async def list_employees(
     query = query.offset(skip).limit(limit)
     employees = filter_real_records(session.exec(query).all())
 
-    return [get_employee_out(emp, session) for emp in employees]
+    # Return lightweight response (no N+1 queries for skills/experiences)
+    return employees
 
 
 @router.post("", response_model=EmployeeOut, status_code=status.HTTP_201_CREATED)

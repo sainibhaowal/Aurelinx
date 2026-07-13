@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { PieChart, TrendingUp, Target, Loader2, Radio } from "lucide-react";
+import { UserManualButton } from "./UserManual";
 import { analysisAPI } from "../services/apiClient";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -109,27 +110,30 @@ const AnalyticsView = () => {
 
   return (
     <div className="w-full pb-20">
-      <header className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-white">
-          Organizational Analytics
-        </h1>
-        <p className="text-slate-400 text-sm md:text-base leading-relaxed max-w-3xl">
-          Deep-dive telemetry into workforce distribution and health clusters.
-        </p>
-        <div className="mt-3 flex items-center gap-2 text-xs uppercase tracking-[0.14em]">
-          <Radio
-            size={14}
-            className={streamConnected ? "text-emerald-300" : "text-rose-300"}
-          />
-          <span
-            className={streamConnected ? "text-emerald-300" : "text-rose-300"}
-          >
-            {streamConnected
-              ? "Live stream connected"
-              : "Live stream disconnected"}
-          </span>
-          <span className="text-slate-400">- {updatedLabel}</span>
+      <header className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-white">
+            Organizational Analytics
+          </h1>
+          <p className="text-slate-400 text-sm md:text-base leading-relaxed max-w-3xl">
+            Deep-dive telemetry into workforce distribution and health clusters.
+          </p>
+          <div className="mt-3 flex items-center gap-2 text-xs uppercase tracking-[0.14em]">
+            <Radio
+              size={14}
+              className={streamConnected ? "text-emerald-300" : "text-rose-300"}
+            />
+            <span
+              className={streamConnected ? "text-emerald-300" : "text-rose-300"}
+            >
+              {streamConnected
+                ? "Live stream connected"
+                : "Live stream disconnected"}
+            </span>
+            <span className="text-slate-400">- {updatedLabel}</span>
+          </div>
         </div>
+        <UserManualButton defaultTab="analytics" className="flex-none mt-2" />
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">

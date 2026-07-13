@@ -86,6 +86,7 @@ const App = () => {
     type: "info",
   });
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [selectedProfileLoading, setSelectedProfileLoading] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const [analyticsSnapshot, setAnalyticsSnapshot] = useState({
@@ -112,6 +113,26 @@ const App = () => {
   const showToast = (message, type = "info") => {
     setToast({ visible: true, message, type });
     setTimeout(() => setToast((prev) => ({ ...prev, visible: false })), 4000);
+  };
+
+  const isCandidateRecord = (person) =>
+    Boolean(person?.match_score !== undefined || person?.application_date);
+
+  const openProfileDetails = async (person) => {
+    if (!person?.id) return;
+
+    setSelectedProfileLoading(true);
+    try {
+      const record = isCandidateRecord(person)
+        ? await candidatesAPI.get(person.id)
+        : await employeesAPI.get(person.id);
+      setSelectedProfile(record);
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to load full profile details", "error");
+    } finally {
+      setSelectedProfileLoading(false);
+    }
   };
 
   const loadEmployees = () => {
@@ -659,7 +680,7 @@ const App = () => {
                                   <TalentCard
                                     talent={emp}
                                     onOpenProfile={() =>
-                                      setSelectedProfile(emp)
+                                      openProfileDetails(emp)
                                     }
                                   />
                                 </motion.div>
@@ -704,7 +725,7 @@ const App = () => {
                                   <TalentCard
                                     talent={cand}
                                     onOpenProfile={() =>
-                                      setSelectedProfile(cand)
+                                      openProfileDetails(cand)
                                     }
                                   />
                                 </motion.div>
@@ -893,6 +914,23 @@ const App = () => {
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+        {selectedProfileLoading && !selectedProfile && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <div className="w-full max-w-md premium-card p-6 md:p-8 border border-white/15 flex items-center gap-3">
+              <Loader2 className="animate-spin text-cyan-300" size={20} />
+              <div>
+                <div className="font-bold text-white">Loading profile</div>
+                <div className="text-sm text-slate-400">
+                  Fetching skills and experience from Postgres...
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

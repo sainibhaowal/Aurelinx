@@ -42,7 +42,7 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:6333/healthz || exit 1"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333 && echo -e 'GET /healthz HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q 'healthz check passed'"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -129,6 +129,8 @@ services:
     restart: unless-stopped
     env_file:
       - ./.env.production
+    environment:
+      HOSTNAME: "0.0.0.0"
     depends_on:
       api:
         condition: service_healthy

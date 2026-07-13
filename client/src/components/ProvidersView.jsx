@@ -22,6 +22,7 @@ import {
   Copy,
 } from "lucide-react";
 import Toast from "./Toast";
+import { UserManualButton } from "./UserManual";
 
 const LLM_FAMILIES = [
   {
@@ -885,27 +886,30 @@ const ProvidersView = () => {
           >
             {/* Header controls */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-white/5 pb-4">
-              <div>
-                <button
-                  onClick={() => {
-                    setViewMode("list");
-                    setSelectedConnection(null);
-                  }}
-                  className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-slate-400 hover:text-cyan-300 transition-colors mb-2"
-                >
-                  <ArrowLeft size={10} /> Back to Settings
-                </button>
-                <div className="flex items-center gap-3">
-                  <div className="h-6 w-1 bg-cyan-400 rounded-sm" />
-                  <div>
-                    <h1 className="text-2xl font-black text-white tracking-tight leading-none uppercase">
-                      Providers
-                    </h1>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mt-1">
-                      Manage foundation models and runtime connectivity
-                    </p>
+              <div className="flex-1 flex items-start justify-between">
+                <div>
+                  <button
+                    onClick={() => {
+                      setViewMode("list");
+                      setSelectedConnection(null);
+                    }}
+                    className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-slate-400 hover:text-cyan-300 transition-colors mb-2"
+                  >
+                    <ArrowLeft size={10} /> Back to Settings
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <div className="h-6 w-1 bg-cyan-400 rounded-sm" />
+                    <div>
+                      <h1 className="text-2xl font-black text-white tracking-tight leading-none uppercase">
+                        Providers
+                      </h1>
+                      <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mt-1">
+                        Manage foundation models and runtime connectivity
+                      </p>
+                    </div>
                   </div>
                 </div>
+                <UserManualButton defaultTab={activeCategory === "INTEGRATIONS" ? "integrations" : "overview"} className="ml-4 mt-8" />
               </div>
 
               {/* Category tabs */}

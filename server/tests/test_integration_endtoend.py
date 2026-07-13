@@ -11,6 +11,7 @@ TEST_DATABASE_URL = os.getenv(
     "postgresql+psycopg://aurelius:AureliusPg_2026!ChangeMe@localhost:5432/aurelius_db?options=-csearch_path%3Dtest,public",
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["ALLOWED_HOSTS"] = "*"
 os.environ.setdefault("ENVIRONMENT", "development")
 
 from fastapi.testclient import TestClient  # noqa: E402
@@ -79,6 +80,7 @@ def test_signature_and_header_auth_and_expiry(client_db):
 
     # first call should 404 because employee not found (but signature/auth should pass)
     resp = client.post("/api/v1/integrations/slack", headers=headers, json=payload)
+    print("RESP BODY:", resp.text)
     assert resp.status_code in (400, 404)
 
     # Now expire the key
@@ -95,4 +97,5 @@ def test_signature_and_header_auth_and_expiry(client_db):
         s.commit()
 
     resp2 = client.post("/api/v1/integrations/slack", headers=headers, json=payload)
+    print("RESP2 BODY:", resp2.text)
     assert resp2.status_code == 401

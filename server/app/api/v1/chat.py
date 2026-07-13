@@ -186,19 +186,49 @@ def _search_employees(
     db: Session, query_text: str, limit: int = 5
 ) -> List[EmployeeTable]:
     employees = db.exec(select(EmployeeTable)).all()
-    q_tokens = set(_tokenize(query_text))
-    scored: List[Tuple[float, EmployeeTable]] = []
+    query_lower = query_text.lower()
+    scored = []
+    
+    # Identify query intent flags
+    wants_at_risk = any(k in query_lower for k in ["risk", "flight", "hazard", "leaving", "attrition"])
+    wants_high_morale = any(k in query_lower for k in ["high morale", "happy", "satisfied", "good sentiment"])
+    wants_low_morale = any(k in query_lower for k in ["low morale", "unhappy", "dissatisfied", "bad sentiment"])
+    
     for emp in employees:
-        skills = db.exec(
-            select(SkillTable).where(SkillTable.employee_id == emp.id)
-        ).all()
-        text = f"{emp.full_name} {emp.role} {emp.department} " + " ".join(
-            [s.name for s in skills]
-        )
-        e_tokens = set(_tokenize(text))
-        overlap = len(q_tokens & e_tokens)
-        score = overlap + (0.5 * emp.sentiment_score) - (0.2 if emp.is_at_risk else 0.0)
+        score = 0.0
+        
+        # 1. Direct substring checks (name, role, department)
+        if emp.full_name and emp.full_name.lower() in query_lower:
+            score += 10.0
+        for token in query_lower.split():
+            if len(token) > 2:
+                if emp.full_name and token in emp.full_name.lower():
+                    score += 5.0
+                if emp.role and token in emp.role.lower():
+                    score += 3.0
+                if emp.department and token in emp.department.lower():
+                    score += 4.0
+                    
+        # 2. Intent matching
+        if wants_at_risk:
+            if emp.is_at_risk:
+                score += 15.0
+            score += (1.0 - (emp.sentiment_score or 0.5)) * 10.0
+            if emp.retention_prob is not None:
+                score += (1.0 - emp.retention_prob) * 10.0
+        elif wants_low_morale:
+            score += (1.0 - (emp.sentiment_score or 0.5)) * 15.0
+        elif wants_high_morale:
+            score += (emp.sentiment_score or 0.5) * 15.0
+            
+        # 3. Skills overlap
+        skills = db.exec(select(SkillTable).where(SkillTable.employee_id == emp.id)).all()
+        for s in skills:
+            if s.name and s.name.lower() in query_lower:
+                score += 5.0
+                
         scored.append((score, emp))
+        
     scored.sort(key=lambda x: x[0], reverse=True)
     return [row[1] for row in scored[:limit]]
 
@@ -207,18 +237,45 @@ def _search_candidates(
     db: Session, query_text: str, limit: int = 5
 ) -> List[CandidateTable]:
     candidates = db.exec(select(CandidateTable)).all()
-    q_tokens = set(_tokenize(query_text))
-    scored: List[Tuple[float, CandidateTable]] = []
+    query_lower = query_text.lower()
+    scored = []
+    
+    # Identify query intent flags
+    wants_high_match = any(k in query_lower for k in ["best", "top", "highly matched", "match", "scout"])
+    wants_high_morale = any(k in query_lower for k in ["high morale", "happy", "good sentiment"])
+    wants_low_morale = any(k in query_lower for k in ["low morale", "unhappy", "bad sentiment"])
+    
     for c in candidates:
-        skills = db.exec(
-            select(SkillTable).where(SkillTable.candidate_id == c.id)
-        ).all()
-        text = f"{c.full_name} {c.role} {c.department} " + " ".join(
-            [s.name for s in skills]
-        )
-        overlap = len(q_tokens & set(_tokenize(text)))
-        score = overlap + (0.5 * c.sentiment_score)
+        score = 0.0
+        
+        # 1. Direct substring checks
+        if c.full_name and c.full_name.lower() in query_lower:
+            score += 10.0
+        for token in query_lower.split():
+            if len(token) > 2:
+                if c.full_name and token in c.full_name.lower():
+                    score += 5.0
+                if c.role and token in c.role.lower():
+                    score += 3.0
+                if c.department and token in c.department.lower():
+                    score += 4.0
+                    
+        # 2. Intent matching
+        if wants_high_match:
+            score += (c.match_score or 0.0) * 15.0
+        if wants_low_morale:
+            score += (1.0 - (c.sentiment_score or 0.5)) * 10.0
+        elif wants_high_morale:
+            score += (c.sentiment_score or 0.5) * 10.0
+            
+        # 3. Skills overlap
+        skills = db.exec(select(SkillTable).where(SkillTable.candidate_id == c.id)).all()
+        for s in skills:
+            if s.name and s.name.lower() in query_lower:
+                score += 5.0
+                
         scored.append((score, c))
+        
     scored.sort(key=lambda x: x[0], reverse=True)
     return [row[1] for row in scored[:limit]]
 
@@ -284,104 +341,30 @@ def _top_match_score_candidate(candidate: CandidateTable) -> float:
     return round(min(1.0, max(0.0, score)), 3)
 
 
-def _workspace_snapshot(db: Session) -> Dict[str, Any]:
-    employees = filter_real_records(db.exec(select(EmployeeTable)).all())
-    candidates = filter_real_records(db.exec(select(CandidateTable)).all())
+def _workspace_snapshot(db: Session, user_text: str = "") -> Dict[str, Any]:
+    query_lower = user_text.lower() if user_text else ""
+    snapshot = {}
 
-    dept_summary = _department_risk_summary(employees)
-    top_risk_employees = sorted(employees, key=_top_risk_score_employee, reverse=True)[
-        :5
-    ]
-    top_candidate_matches = sorted(
-        candidates, key=_top_match_score_candidate, reverse=True
-    )[:5]
+    # Check query intent keywords
+    wants_risk = any(k in query_lower for k in ["risk", "morale", "sentiment", "unhappy", "leaving", "hazard", "at-risk", "employee"])
+    wants_candidates = any(k in query_lower for k in ["candidate", "scout", "match", "hiring", "talent"])
+    wants_integrations = any(k in query_lower for k in ["integration", "connection", "connect", "greenhouse", "slack", "jira", "workday"])
+    wants_compliance = any(k in query_lower for k in ["compliance", "policy", "policies", "gate", "release"])
+    wants_interventions = any(k in query_lower for k in ["intervention", "mitigate", "action"])
+    wants_events = any(k in query_lower for k in ["event", "quarantine", "ops", "bronze", "silver", "sync"])
 
-    integrations = db.exec(
-        select(IntegrationConnectionTable).order_by(
-            IntegrationConnectionTable.created_at.desc()
-        )
-    ).all()
-    policies = db.exec(
-        select(CompliancePolicyTable)
-        .where(CompliancePolicyTable.status == "active")
-        .order_by(CompliancePolicyTable.created_at.desc())
-    ).all()
-    interventions = db.exec(
-        select(InterventionTable)
-        .order_by(InterventionTable.created_at.desc())
-        .limit(10)
-    ).all()
-    model_cards = db.exec(
-        select(MLModelCardTable).order_by(MLModelCardTable.created_at.desc()).limit(5)
-    ).all()
-    drifts = db.exec(
-        select(MLDriftSnapshotTable)
-        .order_by(MLDriftSnapshotTable.created_at.desc())
-        .limit(5)
-    ).all()
-    release_gates = db.exec(
-        select(ReleaseGateTable).order_by(ReleaseGateTable.created_at.desc()).limit(5)
-    ).all()
-    dr_runbooks = db.exec(
-        select(DRRunbookTable).order_by(DRRunbookTable.created_at.desc()).limit(5)
-    ).all()
-    procurement_artifacts = db.exec(
-        select(ProcurementArtifactTable)
-        .order_by(ProcurementArtifactTable.created_at.desc())
-        .limit(5)
-    ).all()
-    raw_events_count = len(db.exec(select(RawEventTable)).all())
-    quarantine_count = len(db.exec(select(QuarantineEventTable)).all())
-    connector_jobs = db.exec(
-        select(ConnectorSyncJobTable)
-        .order_by(ConnectorSyncJobTable.started_at.desc())
-        .limit(10)
-    ).all()
-    gold_snapshots = db.exec(
-        select(GoldMetricSnapshotTable)
-        .order_by(GoldMetricSnapshotTable.created_at.desc())
-        .limit(5)
-    ).all()
-    canonical_employee_count = len(db.exec(select(CanonicalEmployeeTable)).all())
-    canonical_candidate_count = len(db.exec(select(CanonicalCandidateTable)).all())
+    # If it is a generic query and none of the above are matched, we don't fetch any snapshot details!
+    if not (wants_risk or wants_candidates or wants_integrations or wants_compliance or wants_interventions or wants_events):
+        return {}
 
-    workforce = _compute_dashboard_snapshot(db)
-    candidate_match_avg = (
-        round(sum(float(c.match_score or 0.0) for c in candidates) / len(candidates), 3)
-        if candidates
-        else 0.0
-    )
-
-    return {
-        "system_status": {
-            "database": "postgresql",
-            "record_scope": "live",
-            "snapshot_at": datetime.utcnow().isoformat(),
-        },
-        "application_surface": {
-            "modules": [
-                "dashboard",
-                "directory",
-                "sentiment",
-                "analytics",
-                "talent scout",
-                "workflow chat",
-                "intel center",
-                "enterprise ops",
-                "settings/providers",
-            ],
-            "data_planes": [
-                "postgresql",
-                "redis",
-                "qdrant",
-            ],
-            "import_paths": [
-                "enterprise ops > pipelines > csv import",
-                "enterprise ops > pipelines > bundle import",
-                "workflow chat > attachments",
-            ],
-        },
-        "workforce": {
+    # Query only what is requested!
+    if wants_risk:
+        employees = filter_real_records(db.exec(select(EmployeeTable)).all())
+        dept_summary = _department_risk_summary(employees)
+        top_risk_employees = sorted(employees, key=_top_risk_score_employee, reverse=True)[:5]
+        workforce = _compute_dashboard_snapshot(db)
+        
+        snapshot["workforce"] = {
             "total_workforce": workforce["total_workforce"],
             "at_risk": workforce["at_risk"],
             "at_risk_pct": (
@@ -395,45 +378,8 @@ def _workspace_snapshot(db: Session) -> Dict[str, Any]:
             "top_risk_department": max(
                 dept_summary, key=lambda item: item["at_risk_rate"], default=None
             ),
-            "top_risk_drivers": [
-                {
-                    "factor": "Low morale signals",
-                    "count": len(
-                        [e for e in employees if float(e.sentiment_score or 0.0) < 0.45]
-                    ),
-                },
-                {
-                    "factor": "Retention probability pressure",
-                    "count": len(
-                        [
-                            e
-                            for e in employees
-                            if float(
-                                e.retention_prob
-                                if e.retention_prob is not None
-                                else 0.5
-                            )
-                            < 0.55
-                        ]
-                    ),
-                },
-                {
-                    "factor": "Policy risk flags",
-                    "count": len([e for e in employees if e.is_at_risk]),
-                },
-                {
-                    "factor": "Department concentration risk",
-                    "count": len(
-                        [
-                            d
-                            for d in dept_summary
-                            if d["total"] > 0 and d["at_risk_rate"] >= 0.25
-                        ]
-                    ),
-                },
-            ],
-        },
-        "directory": {
+        }
+        snapshot["directory"] = {
             "top_risk_employees": [
                 {
                     "full_name": e.full_name,
@@ -443,12 +389,23 @@ def _workspace_snapshot(db: Session) -> Dict[str, Any]:
                     "sentiment_score": e.sentiment_score,
                     "retention_prob": e.retention_prob,
                     "is_at_risk": e.is_at_risk,
-                    "risk_score": _top_risk_score_employee(e),
                 }
                 for e in top_risk_employees
-            ],
-        },
-        "talent_scout": {
+            ]
+        }
+
+    if wants_candidates:
+        candidates = filter_real_records(db.exec(select(CandidateTable)).all())
+        candidate_match_avg = (
+            round(sum(float(c.match_score or 0.0) for c in candidates) / len(candidates), 3)
+            if candidates
+            else 0.0
+        )
+        top_candidate_matches = sorted(
+            candidates, key=_top_match_score_candidate, reverse=True
+        )[:5]
+        
+        snapshot["talent_scout"] = {
             "candidates_total": len(candidates),
             "candidate_match_avg": candidate_match_avg,
             "top_candidates": [
@@ -459,29 +416,18 @@ def _workspace_snapshot(db: Session) -> Dict[str, Any]:
                     "role": c.role,
                     "sentiment_score": c.sentiment_score,
                     "match_score": c.match_score,
-                    "scout_score": _top_match_score_candidate(c),
                 }
                 for c in top_candidate_matches
-            ],
-        },
-        "data_ops": {
-            "raw_events": raw_events_count,
-            "quarantine_events": quarantine_count,
-            "canonical_employees": canonical_employee_count,
-            "canonical_candidates": canonical_candidate_count,
-            "sync_jobs": [
-                {
-                    "provider": j.provider,
-                    "source_type": j.source_type,
-                    "status": j.status,
-                    "bronze_events": j.bronze_events,
-                    "silver_upserts": j.silver_upserts,
-                    "quarantined": j.quarantined,
-                }
-                for j in connector_jobs[:5]
-            ],
-        },
-        "enterprise_ops": {
+            ]
+        }
+
+    if wants_integrations:
+        integrations = db.exec(
+            select(IntegrationConnectionTable).order_by(
+                IntegrationConnectionTable.created_at.desc()
+            )
+        ).all()
+        snapshot["enterprise_ops"] = {
             "integration_connections": [
                 {
                     "name": c.name,
@@ -490,86 +436,76 @@ def _workspace_snapshot(db: Session) -> Dict[str, Any]:
                     "status": c.status,
                 }
                 for c in integrations[:10]
-            ],
-            "active_interventions": [
+            ]
+        }
+
+    if wants_compliance:
+        policies = db.exec(
+            select(CompliancePolicyTable)
+            .where(CompliancePolicyTable.status == "active")
+            .order_by(CompliancePolicyTable.created_at.desc())
+        ).all()
+        release_gates = db.exec(
+            select(ReleaseGateTable).order_by(ReleaseGateTable.created_at.desc()).limit(5)
+        ).all()
+        snapshot["enterprise_ops"] = snapshot.get("enterprise_ops", {})
+        snapshot["enterprise_ops"]["policy_packs"] = [
+            {
+                "policy_name": p.policy_name,
+                "region": p.region,
+                "action_type": p.action_type,
+                "status": p.status,
+            }
+            for p in policies[:5]
+        ]
+        snapshot["enterprise_ops"]["release_gates"] = [
+            {
+                "artifact_name": g.artifact_name,
+                "version": g.version,
+                "status": g.status,
+            }
+            for g in release_gates
+        ]
+
+    if wants_interventions:
+        interventions = db.exec(
+            select(InterventionTable)
+            .order_by(InterventionTable.created_at.desc())
+            .limit(5)
+        ).all()
+        snapshot["enterprise_ops"] = snapshot.get("enterprise_ops", {})
+        snapshot["enterprise_ops"]["active_interventions"] = [
+            {
+                "title": i.title,
+                "priority": i.priority,
+                "status": i.status,
+                "target_department": i.target_department,
+            }
+            for i in interventions
+        ]
+
+    if wants_events:
+        raw_events_count = len(db.exec(select(RawEventTable)).all())
+        quarantine_count = len(db.exec(select(QuarantineEventTable)).all())
+        connector_jobs = db.exec(
+            select(ConnectorSyncJobTable)
+            .order_by(ConnectorSyncJobTable.started_at.desc())
+            .limit(5)
+        ).all()
+        snapshot["data_ops"] = {
+            "raw_events": raw_events_count,
+            "quarantine_events": quarantine_count,
+            "sync_jobs": [
                 {
-                    "title": i.title,
-                    "priority": i.priority,
-                    "status": i.status,
-                    "owner_name": i.owner_name,
-                    "target_department": i.target_department,
-                    "target_scope": i.target_scope,
+                    "provider": j.provider,
+                    "source_type": j.source_type,
+                    "status": j.status,
                 }
-                for i in interventions[:5]
-            ],
-            "policy_packs": [
-                {
-                    "policy_name": p.policy_name,
-                    "region": p.region,
-                    "action_type": p.action_type,
-                    "status": p.status,
-                    "min_confidence": p.min_confidence,
-                    "requires_approval": p.requires_approval,
-                }
-                for p in policies[:5]
-            ],
-            "model_governance": [
-                {
-                    "model_name": m.model_name,
-                    "version": m.version,
-                    "status": m.status,
-                    "pr_auc": m.pr_auc,
-                    "calibration_error": m.calibration_error,
-                    "fairness_gap": m.fairness_gap,
-                }
-                for m in model_cards
-            ],
-            "drift_snapshots": [
-                {
-                    "model_name": d.model_name,
-                    "model_version": d.model_version,
-                    "drift_score": d.drift_score,
-                    "needs_retraining": d.needs_retraining,
-                }
-                for d in drifts
-            ],
-            "release_gates": [
-                {
-                    "environment": g.environment,
-                    "artifact_name": g.artifact_name,
-                    "version": g.version,
-                    "status": g.status,
-                }
-                for g in release_gates
-            ],
-            "dr_runbooks": [
-                {
-                    "runbook_name": r.runbook_name,
-                    "environment": r.environment,
-                    "status": r.status,
-                    "rto_minutes": r.rto_minutes,
-                    "rpo_minutes": r.rpo_minutes,
-                }
-                for r in dr_runbooks
-            ],
-            "procurement_artifacts": [
-                {
-                    "artifact_type": a.artifact_type,
-                    "title": a.title,
-                    "version": a.version,
-                    "status": a.status,
-                }
-                for a in procurement_artifacts
-            ],
-            "gold_snapshots": [
-                {
-                    "metric_type": s.metric_type,
-                    "created_at": s.created_at,
-                }
-                for s in gold_snapshots
-            ],
-        },
-    }
+                for j in connector_jobs
+            ]
+        }
+
+    return snapshot
 
 
 def _is_workspace_query(user_text: str) -> bool:
@@ -699,7 +635,7 @@ def _workspace_snapshot_summary_lines(snapshot: Dict[str, Any]) -> List[str]:
     lines = [
         f"- Workforce: {workforce.get('total_workforce', 0)} total, {workforce.get('at_risk', 0)} at risk, avg morale {workforce.get('avg_morale', 0.0)}",
         f"- Candidate pool: {talent.get('candidates_total', 0)} total, avg match {talent.get('candidate_match_avg', 0.0)}",
-        f"- Data ops: raw events {data_ops.get('raw_events', 0)}, quarantine {data_ops.get('quarantine_events', 0)}",
+        f"- Data ops: raw events {data_ops.get('raw_events', 0)}, quarantine {data_ops.get('quarantine_events', 0)}, canonical employees {data_ops.get('canonical_employees', 0)}, canonical candidates {data_ops.get('canonical_candidates', 0)}",
         f"- Enterprise ops: integrations {len(ops.get('integration_connections', []))}, interventions {len(ops.get('active_interventions', []))}, policies {len(ops.get('policy_packs', []))}",
         "- Application surfaces: dashboard, directory, sentiment, analytics, talent scout, workflow chat, intel center, enterprise ops, settings",
     ]
@@ -707,6 +643,46 @@ def _workspace_snapshot_summary_lines(snapshot: Dict[str, Any]) -> List[str]:
         lines.append(
             f"- Top risk department: {top_cluster.get('department')} ({top_cluster.get('at_risk', 0)}/{top_cluster.get('total', 0)} at risk rate {top_cluster.get('at_risk_rate', 0.0):.3f})"
         )
+
+    # 1. Top At-Risk Employees details
+    top_risk_employees = snapshot.get("directory", {}).get("top_risk_employees", [])
+    if top_risk_employees:
+        lines.append("\nTop 5 At-Risk Employees:")
+        for emp in top_risk_employees:
+            lines.append(
+                f"  * {emp.get('full_name')} ({emp.get('role')} - {emp.get('department')}): Sentiment {emp.get('sentiment_score')}, Retention Prob {emp.get('retention_prob')}, At Risk Flag: {emp.get('is_at_risk')}"
+            )
+
+    # 2. Top Candidate Matches details
+    top_candidate_matches = talent.get("top_candidates", [])
+    if top_candidate_matches:
+        lines.append("\nTop 5 Candidate Matches:")
+        for cand in top_candidate_matches:
+            lines.append(
+                f"  * {cand.get('full_name')} ({cand.get('role')} - {cand.get('department')}): Match Score {cand.get('match_score')}, Sentiment {cand.get('sentiment_score')}"
+            )
+
+    # 3. Active Connections details
+    connections = ops.get("integration_connections", [])
+    if connections:
+        lines.append("\nIntegration Connections:")
+        for conn in connections:
+            lines.append(f"  * {conn.get('name')} ({conn.get('provider')} - {conn.get('source_type')}): Status {conn.get('status')}")
+
+    # 4. Compliance Policies details
+    policies = ops.get("policy_packs", [])
+    if policies:
+        lines.append("\nActive Compliance Policies:")
+        for p in policies:
+            lines.append(f"  * {p.get('policy_name')} (Region: {p.get('region')}, Action: {p.get('action_type')}): Status {p.get('status')}")
+
+    # 5. Active Interventions details
+    interventions = ops.get("active_interventions", [])
+    if interventions:
+        lines.append("\nActive Interventions:")
+        for i in interventions:
+            lines.append(f"  * {i.get('title')} (Priority: {i.get('priority')}): Status {i.get('status')}")
+
     return lines
 
 
@@ -1275,8 +1251,8 @@ async def _llm_stream_response(
     rbac = tool_ctx.get("rbac_role", "member")
     workspace_snapshot = tool_ctx.get("workspace_snapshot", {})
 
-    if has_tool_output:
-        tool_block = "\n".join(tool_summary_lines)
+    if not casual_chat:
+        tool_block = "\n".join(tool_summary_lines) if tool_summary_lines else "- No specific tool queries executed."
         workspace_block = (
             "\n".join(_workspace_snapshot_summary_lines(workspace_snapshot))
             if workspace_snapshot
@@ -1291,7 +1267,7 @@ async def _llm_stream_response(
             f"Mutation log: {json.dumps(mutations)}\n"
             f"User RBAC role: {rbac}\n"
             "--- END TOOL DATA ---\n\n"
-            "Using only the data above, answer the user's request clearly in Markdown. "
+            "Using the data above, answer the user's request clearly in Markdown. "
             "Present employee data as a formatted table. Do not include raw JSON in your response."
         )
     else:
@@ -1514,8 +1490,8 @@ async def _llm_response(
     rbac = tool_ctx.get("rbac_role", "member")
     workspace_snapshot = tool_ctx.get("workspace_snapshot", {})
 
-    if has_tool_output:
-        tool_block = "\n".join(tool_summary_lines)
+    if not casual_chat:
+        tool_block = "\n".join(tool_summary_lines) if tool_summary_lines else "- No specific tool queries executed."
         workspace_block = (
             "\n".join(_workspace_snapshot_summary_lines(workspace_snapshot))
             if workspace_snapshot
@@ -1530,7 +1506,7 @@ async def _llm_response(
             f"Mutation log: {json.dumps(mutations)}\n"
             f"User RBAC role: {rbac}\n"
             "--- END TOOL DATA ---\n\n"
-            "Using only the data above, answer the user's request clearly in Markdown. "
+            "Using the data above, answer the user's request clearly in Markdown. "
             "Present employee data as a formatted table. Do not include raw JSON in your response."
         )
     else:
@@ -1863,7 +1839,7 @@ def _execute_tools(
         csv_log = _parse_csv_and_ingest(db, attachments)
         result["tool_runs"].append({"tool": "parse_csv_attachment", "output": csv_log})
 
-    result["workspace_snapshot"] = _workspace_snapshot(db)
+    result["workspace_snapshot"] = _workspace_snapshot(db, user_text)
     result["record_counts"] = _record_counts(db)
 
     # Enrich context with live integration connections and active interventions
@@ -2142,29 +2118,22 @@ async def send_message(
         db, chat_session.id, request.content, current_user, attachments
     )
     tool_context = context_payload.get("tool_context", {})
-    direct_answer = _direct_count_answer(
-        db, request.content
-    ) or _direct_workspace_answer(db, request.content)
-
     assistant_text = ""
     last_err = None
-    if direct_answer:
-        assistant_text = direct_answer
-    else:
-        for _ in range(3):
-            try:
-                assistant_text = await _llm_response(
-                    provider=request.provider or "lmstudio",
-                    api_key=request.api_key,
-                    base_url=request.base_url,
-                    model=request.model,
-                    user_text=request.content,
-                    context_payload=context_payload,
-                )
-                break
-            except Exception as e:
-                last_err = e
-                await asyncio.sleep(0.5)
+    for _ in range(3):
+        try:
+            assistant_text = await _llm_response(
+                provider=request.provider or "lmstudio",
+                api_key=request.api_key,
+                base_url=request.base_url,
+                model=request.model,
+                user_text=request.content,
+                context_payload=context_payload,
+            )
+            break
+        except Exception as e:
+            last_err = e
+            await asyncio.sleep(0.5)
     if not assistant_text:
         logger.error(f"Chat model call failed after retries: {last_err}", exc_info=True)
         assistant_text = (
@@ -2227,57 +2196,73 @@ async def send_message_stream(
             db.add(user_msg)
             db.commit()
             db.refresh(user_msg)
-            yield f"event: status\ndata: {_json_dumps({'phase': 'user_saved'})}\n\n"
+            
+            # Step 1: Thinking
+            yield f"event: status\ndata: {_json_dumps({'phase': 'thinking'})}\n\n"
+            await asyncio.sleep(0.35)
+            
+            # Step 2: Planning
+            yield f"event: status\ndata: {_json_dumps({'phase': 'planning'})}\n\n"
+            await asyncio.sleep(0.35)
 
             attachments = db.exec(
                 select(ChatAttachmentTable).where(
                     ChatAttachmentTable.session_id == chat_session.id
                 )
             ).all()
+            
+            # Step 3: Exploring
+            yield f"event: status\ndata: {_json_dumps({'phase': 'exploring'})}\n\n"
             context_payload = _build_context_payload(
                 db, chat_session.id, request.content, current_user, attachments
             )
-            yield f"event: status\ndata: {_json_dumps({'phase': 'tools_done'})}\n\n"
-            direct_answer = _direct_count_answer(
-                db, request.content
-            ) or _direct_workspace_answer(db, request.content)
+            await asyncio.sleep(0.35)
+            
+            # Check if there is mutation tool policy to show modifying step
+            tool_policy = context_payload.get("tool_context", {}).get("tool_policy", [])
+            if "mutate_data" in tool_policy:
+                # Step 4: Modifying
+                yield f"event: status\ndata: {_json_dumps({'phase': 'modifying'})}\n\n"
+                await asyncio.sleep(0.35)
+                
+            # Step 5: Verifying
+            yield f"event: status\ndata: {_json_dumps({'phase': 'verifying'})}\n\n"
+            await asyncio.sleep(0.35)
 
-            if direct_answer:
-                assistant_text = direct_answer
-                yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
-            else:
-                assistant_text = ""
-                last_err = None
+            # Step 6: Completing
+            yield f"event: status\ndata: {_json_dumps({'phase': 'completing'})}\n\n"
+            assistant_text = ""
+            last_err = None
+            try:
+                async for token in _llm_stream_response(
+                    provider=request.provider or "lmstudio",
+                    api_key=request.api_key,
+                    base_url=request.base_url,
+                    model=request.model,
+                    user_text=request.content,
+                    context_payload=context_payload,
+                ):
+                    assistant_text += token
+                    yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
+            except Exception as e:
+                logger.exception("Failed to stream LLM response")
+                last_err = str(e)
                 try:
-                    async for token in _llm_stream_response(
+                    assistant_text = await _llm_response(
                         provider=request.provider or "lmstudio",
                         api_key=request.api_key,
                         base_url=request.base_url,
                         model=request.model,
                         user_text=request.content,
                         context_payload=context_payload,
-                    ):
-                        assistant_text += token
-                        yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
-                except Exception as e:
-                    logger.exception("Failed to stream LLM response")
-                    last_err = str(e)
-                    try:
-                        assistant_text = await _llm_response(
-                            provider=request.provider or "lmstudio",
-                            api_key=request.api_key,
-                            base_url=request.base_url,
-                            model=request.model,
-                            user_text=request.content,
-                            context_payload=context_payload,
-                        )
-                        yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
-                    except Exception as ex:
-                        last_err = f"Stream failed: {e}. Fallback failed: {ex}"
-                        assistant_text = (
-                            f"LLM failed. Tool context: {json.dumps(context_payload)}"
-                        )
-                        yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+                    )
+                    yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+                except Exception as ex:
+                    last_err = f"Stream failed: {e}. Fallback failed: {ex}"
+                    assistant_text = (
+                        f"LLM failed. Tool context: {json.dumps(context_payload)}"
+                    )
+                    yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
 
             assistant_msg = ChatMessageTable(
                 session_id=chat_session.id,

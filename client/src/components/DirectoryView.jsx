@@ -10,6 +10,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import TalentCard from "./TalentCard";
+import { UserManualButton } from "./UserManual";
 import {
   analysisAPI,
   candidatesAPI,
@@ -23,6 +24,7 @@ const DirectoryView = ({ onExport }) => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [selectedProfileLoading, setSelectedProfileLoading] = useState(false);
   const [workforceTotal, setWorkforceTotal] = useState(null);
   const [candidateTotal, setCandidateTotal] = useState(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -71,6 +73,25 @@ const DirectoryView = ({ onExport }) => {
     };
   }, []);
 
+  const isCandidateRecord = (person) =>
+    Boolean(person?.match_score !== undefined || person?.application_date);
+
+  const openProfileDetails = async (person) => {
+    if (!person?.id) return;
+
+    setSelectedProfileLoading(true);
+    try {
+      const record = isCandidateRecord(person)
+        ? await candidatesAPI.get(person.id)
+        : await employeesAPI.get(person.id);
+      setSelectedProfile(record);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSelectedProfileLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (
       !loading &&
@@ -100,13 +121,16 @@ const DirectoryView = ({ onExport }) => {
   return (
     <div className="w-full pb-20">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-white">
-            Talent Directory
-          </h1>
-          <p className="text-slate-400 text-sm md:text-base leading-relaxed max-w-3xl">
-            Centralized governance for your entire organizational workforce.
-          </p>
+        <div className="flex-1 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-white">
+              Talent Directory
+            </h1>
+            <p className="text-slate-400 text-sm md:text-base leading-relaxed max-w-3xl">
+              Centralized governance for your entire organizational workforce.
+            </p>
+          </div>
+          <UserManualButton defaultTab="directory" className="ml-4 mt-2" />
         </div>
         <div className="flex gap-3">
           <div className="inline-flex rounded-xl border border-white/10 overflow-hidden">
@@ -284,7 +308,7 @@ const DirectoryView = ({ onExport }) => {
                   >
                     <TalentCard
                       talent={emp}
-                      onOpenProfile={() => setSelectedProfile(emp)}
+                      onOpenProfile={() => openProfileDetails(emp)}
                     />
                   </motion.div>
                 ))}
@@ -324,7 +348,7 @@ const DirectoryView = ({ onExport }) => {
                   >
                     <TalentCard
                       talent={cand}
-                      onOpenProfile={() => setSelectedProfile(cand)}
+                      onOpenProfile={() => openProfileDetails(cand)}
                     />
                   </motion.div>
                 ))}
@@ -429,6 +453,13 @@ const DirectoryView = ({ onExport }) => {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {selectedProfileLoading && !selectedProfile && (
+        <div className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md premium-card p-6 md:p-8 border border-white/15">
+            <div className="text-sm text-slate-300">Loading profile...</div>
           </div>
         </div>
       )}

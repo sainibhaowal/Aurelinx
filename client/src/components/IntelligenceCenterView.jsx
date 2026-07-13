@@ -16,6 +16,7 @@ import {
   Trash2,
   RefreshCw,
 } from "lucide-react";
+import { UserManualButton } from "./UserManual";
 
 // Curated 2D positions for skill nodes in Dijkstra SVG graph
 const SKILL_GRAPH_COORDS = {
@@ -641,19 +642,22 @@ const IntelligenceCenterView = () => {
     <div className="min-h-full pb-10">
       {/* Top Header */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-white/5 pb-6">
-        <div className="text-left">
-          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/5 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-indigo-400 mb-2">
-            <Cpu size={10} className="animate-spin-slow" /> Math-Engine &
-            Optimization
+        <div className="flex-1 flex items-start justify-between">
+          <div className="text-left">
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/5 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-indigo-400 mb-2">
+              <Cpu size={10} className="animate-spin-slow" /> Math-Engine &
+              Optimization
+            </div>
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-white">
+              Intelligence Center
+            </h1>
+            <p className="text-slate-400 text-sm leading-relaxed max-w-3xl">
+              Aurelius state-of-the-art decision workbench. Powered by graph
+              theory, combinatorial solvers, survival models, and Markov
+              transition matrices.
+            </p>
           </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-white">
-            Intelligence Center
-          </h1>
-          <p className="text-slate-400 text-sm leading-relaxed max-w-3xl">
-            Aurelius state-of-the-art decision workbench. Powered by graph
-            theory, combinatorial solvers, survival models, and Markov
-            transition matrices.
-          </p>
+          <UserManualButton defaultTab="intelligence" className="ml-4 mt-8" />
         </div>
       </header>
 

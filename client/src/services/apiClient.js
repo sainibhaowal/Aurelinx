@@ -518,6 +518,8 @@ export const candidatesAPI = {
       timeoutMs: LONG_REQUEST_TIMEOUT,
     });
   },
+
+  get: (candidateId) => request(`${API_V1}/candidates/${candidateId}`),
 };
 
 /**

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -8,8 +8,98 @@ import {
   Target,
   Filter,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import TalentCard from "./TalentCard";
-import { analysisAPI } from "../services/apiClient";
+import { UserManualButton } from "./UserManual";
+import { analysisAPI, candidatesAPI } from "../services/apiClient";
+
+const MarkdownRenderer = ({ children }) => (
+  <ReactMarkdown
+    remarkPlugins={[remarkGfm]}
+    components={{
+      h1: ({ children }) => (
+        <h1 className="text-lg font-black text-cyan-300 mt-4 mb-2 border-b border-cyan-500/20 pb-1 uppercase tracking-wider">
+          {children}
+        </h1>
+      ),
+      h2: ({ children }) => (
+        <h2 className="text-base font-extrabold text-cyan-400 mt-3 mb-1.5 border-l-2 border-cyan-400/50 pl-2">
+          {children}
+        </h2>
+      ),
+      h3: ({ children }) => (
+        <h3 className="text-sm font-bold text-cyan-300/80 mt-2.5 mb-1">
+          {children}
+        </h3>
+      ),
+      p: ({ children }) => (
+        <p className="text-sm text-slate-200 leading-relaxed my-1.5">
+          {children}
+        </p>
+      ),
+      strong: ({ children }) => (
+        <strong className="font-bold text-cyan-200">{children}</strong>
+      ),
+      em: ({ children }) => (
+        <em className="italic text-slate-300">{children}</em>
+      ),
+      ul: ({ children }) => (
+        <ul className="my-2 space-y-1 pl-4 list-disc marker:text-cyan-500">
+          {children}
+        </ul>
+      ),
+      ol: ({ children }) => (
+        <ol className="my-2 space-y-1 pl-4 list-decimal marker:text-cyan-500">
+          {children}
+        </ol>
+      ),
+      li: ({ children }) => (
+        <li className="text-sm text-slate-200 leading-relaxed">
+          {children}
+        </li>
+      ),
+      table: ({ children }) => (
+        <div className="my-4 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/20 shadow-lg shadow-black/30">
+          <table className="min-w-full text-xs border-collapse table-auto">
+            {children}
+          </table>
+        </div>
+      ),
+      thead: ({ children }) => (
+        <thead className="bg-cyan-950/60 border-b border-cyan-500/20">
+          {children}
+        </thead>
+      ),
+      tbody: ({ children }) => (
+        <tbody className="divide-y divide-white/5">{children}</tbody>
+      ),
+      tr: ({ children }) => (
+        <tr className="hover:bg-white/[0.02] transition-colors duration-150">
+          {children}
+        </tr>
+      ),
+      th: ({ children, style }) => (
+        <th
+          className="px-3 py-2 text-left font-bold uppercase tracking-wider text-cyan-400 text-[10px]"
+          style={style}
+        >
+          {children}
+        </th>
+      ),
+      td: ({ children, style }) => (
+        <td
+          className="px-3 py-2 text-slate-200 text-xs break-words"
+          style={style}
+        >
+          {children}
+        </td>
+      ),
+    }}
+  >
+    {children}
+  </ReactMarkdown>
+);
 
 const TalentScoutView = () => {
   const [query, setQuery] = useState("");
@@ -17,6 +107,7 @@ const TalentScoutView = () => {
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState("");
   const [selectedTalent, setSelectedTalent] = useState(null);
+  const [selectedTalentLoading, setSelectedTalentLoading] = useState(false);
 
   const handleSearch = async () => {
     let config = {};
@@ -43,6 +134,8 @@ const TalentScoutView = () => {
 
     setLoading(true);
     try {
+      setAnalysis("");
+      setResults([]);
       const data = await analysisAPI.analyzeTalent(
         `Analyze this hiring need: ${query}. Use the database to find the best conceptual matches. Provide a summary of WHY they fit.`,
         activeProvider,
@@ -50,8 +143,20 @@ const TalentScoutView = () => {
         baseUrl,
         selectedModel,
       );
-      setAnalysis(data.analysis);
       setResults(data.candidates || []);
+      
+      const fullText = data.analysis || "";
+      let index = 0;
+      const step = 8;
+      const interval = setInterval(() => {
+        index += step;
+        if (index >= fullText.length) {
+          setAnalysis(fullText);
+          clearInterval(interval);
+        } else {
+          setAnalysis(fullText.slice(0, index));
+        }
+      }, 15);
     } catch (err) {
       console.error(err);
       alert(
@@ -62,16 +167,33 @@ const TalentScoutView = () => {
     }
   };
 
+  const openTalentDetails = async (cand) => {
+    if (!cand?.id) return;
+
+    setSelectedTalentLoading(true);
+    try {
+      const record = await candidatesAPI.get(cand.id);
+      setSelectedTalent(record);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSelectedTalentLoading(false);
+    }
+  };
+
   return (
     <div className="w-full">
-      <header className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-white">
-          Talent Scout
-        </h1>
-        <p className="text-slate-400 text-sm md:text-base leading-relaxed max-w-3xl">
-          Semantic candidate discovery for high-confidence hiring decisions and
-          role-fit analysis.
-        </p>
+      <header className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-white">
+            Talent Scout
+          </h1>
+          <p className="text-slate-400 text-sm md:text-base leading-relaxed max-w-3xl">
+            Semantic candidate discovery for high-confidence hiring decisions and
+            role-fit analysis.
+          </p>
+        </div>
+        <UserManualButton defaultTab="scout" className="flex-none mt-2" />
       </header>
 
       <div className="mb-10 md:mb-12">
@@ -129,7 +251,7 @@ const TalentScoutView = () => {
               </h3>
             </div>
             <div className="text-slate-100/90 leading-relaxed text-base md:text-lg max-w-none">
-              {analysis}
+              <MarkdownRenderer>{analysis}</MarkdownRenderer>
             </div>
           </motion.div>
         )}
@@ -151,7 +273,7 @@ const TalentScoutView = () => {
               <TalentCard
                 talent={cand}
                 type="candidate"
-                onOpenProfile={() => setSelectedTalent(cand)}
+                onOpenProfile={() => openTalentDetails(cand)}
               />
             </motion.div>
           ))}
@@ -250,6 +372,17 @@ const TalentScoutView = () => {
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+        {selectedTalentLoading && !selectedTalent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <div className="w-full max-w-md premium-card p-6 md:p-8 border border-white/15">
+              <div className="text-sm text-slate-300">Loading profile...</div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
