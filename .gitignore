@@ -76,12 +76,6 @@ server/uploads/
 deliverables/
 # Generated datasets and large files
 DataSets/
-DataSets
-!DataSets/
-!DataSets/processed/
-!DataSets/processed/employee_experience_public.zip
-!DataSets/raw/
-!DataSets/raw/onet_database_text.zip
 !server/datasets/
 !server/datasets/raw/
 !server/datasets/raw/onet_database_text.zip
