@@ -2,84 +2,112 @@
 
 ![Aurelius Logo](client/public/logo.png)
 
-> Enterprise HR intelligence platform with a Next.js workspace and a production-oriented FastAPI backend.
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=nextdotjs)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python)](https://www.python.org/)
+[![Production Ready](https://img.shields.io/badge/Architecture-Production_Grade-111827?style=for-the-badge)]
 
-## What Aurelius Is
+> A commercial-grade enterprise HR intelligence platform for talent operations, workforce analysis, and decision support.
 
-Aurelius is a full-stack HR intelligence system for modern talent, employee, and enterprise operations. It combines an interactive frontend with a secure Python backend to help teams explore workforce data, assess risk, analyze sentiment, and support operational decision-making.
+## Executive Summary
 
-This repository is organized as a monorepo with:
+Aurelius is a full-stack HR intelligence platform designed for organizations that need more than a dashboard. It brings together employee intelligence, candidate analysis, sentiment visibility, enterprise workflows, and secure API services in one product-ready system.
 
-- `client/` for the frontend experience
-- `server/` for the API, database, and worker logic
-- `infra/` for deployment and Docker configuration
-- `Docs/` for planning, architecture, and delivery records
+The repository is structured as a production-oriented monorepo:
 
-## My Opinion
+- `client/` delivers the modern workspace UI
+- `server/` powers the FastAPI backend, database, migrations, and workers
+- `infra/` contains the Docker and deployment stack
+- `Docs/` stores planning, architecture, and implementation records
 
-This is a strong project foundation. The codebase already looks beyond a demo and into real product territory because it has a clear separation between the UI, backend API, migrations, workers, and deployment assets. The biggest strength is the direction: this is not just an HR dashboard, it is an intelligence platform with automation, analytics, and operational workflows.
+## Contents
 
-If you want this to feel truly production-grade, the main priorities are consistency, documentation, and deployment clarity. The core architecture is already there; the README should now match that level of seriousness.
+- [Product Positioning](#product-positioning)
+- [Product Capabilities](#product-capabilities)
+- [Architecture Overview](#architecture-overview)
+- [Technology Stack](#technology-stack)
+- [Repository Layout](#repository-layout)
+- [Getting Started](#getting-started)
+- [Production Deployment](#production-deployment)
+- [API Surface](#api-surface)
+- [Why Aurelius Feels Commercial](#why-aurelius-feels-commercial)
+- [Key Files to Review](#key-files-to-review)
+- [Brand Asset](#brand-asset)
 
-## Key Capabilities
+## Product Positioning
 
-- Talent and employee intelligence workspace
-- AI-assisted analysis and conversation flows
-- Candidate and employee directory views
-- Analytics snapshots and risk visibility
-- Sentiment and retention signal monitoring
-- Enterprise operations and intervention workflows
-- Authentication and protected workspace access
-- Export-ready reporting for business use
+Aurelius is built for teams that want a single operating layer for HR intelligence. The application is designed to support:
 
-## Architecture
+- executive visibility into workforce health and retention risk
+- candidate screening and talent scouting workflows
+- employee directory exploration and profile review
+- AI-assisted intelligence and conversational analysis
+- enterprise intervention and operational follow-through
+- exportable reporting for internal stakeholders
 
-### Frontend
+This is not a demo shell. The codebase already reflects a real product structure with clear separation between UI, API, data, and infrastructure concerns.
 
-The frontend is built with Next.js and React, with a modern workspace UI under `client/`. The app includes routed views for the landing page, analytics, talent scouting, intelligence center, sentiment monitoring, settings, and enterprise operations.
+## Product Capabilities
 
-### Backend
+- Authenticated workspace experience
+- Talent Scout and candidate discovery views
+- Employee directory and profile exploration
+- Analytics snapshot generation and trend visibility
+- Sentiment pulse and risk signal monitoring
+- Intelligence center and chat-driven workflows
+- Enterprise operations and intervention management
+- Reporting export support for business use
 
-The backend is a FastAPI service under `server/` with versioned API routes, database setup, middleware, exception handling, and scheduled enterprise workflows. It includes:
+## Architecture Overview
 
-- API route groups for auth, employees, candidates, analysis, chat, intelligence, enterprise, and integrations
-- Database initialization and Alembic migrations
-- Request ID tracking and structured error handling
-- CORS and host safety controls for production deployments
-- Scheduler hooks for enterprise automation
+### Frontend Experience
 
-### Infrastructure
+The frontend is implemented with Next.js and React and includes a polished app shell with routed experiences for landing, dashboard, analytics, intelligence, settings, and enterprise operations. Visual interaction is enhanced with Framer Motion, Lucide icons, and modular UI components.
 
-Deployment and runtime support live in `infra/`, including Dockerfiles, compose configuration, and PostgreSQL initialization scripts.
+### Backend Services
 
-## Tech Stack
+The backend is a FastAPI service with production-oriented middleware, request tracing, structured error handling, versioned API routing, and scheduled enterprise automation. Core backend areas include:
 
-- Frontend: Next.js, React, Framer Motion, Lucide React
-- Backend: FastAPI, Python, SQLAlchemy-style database layer, Alembic
-- Operations: Docker, PostgreSQL, scheduled workers
-- Tooling: ESLint, PostCSS, Tailwind CSS, Vite assets in the legacy client layer
+- authentication and protected access
+- employees, candidates, analysis, chat, enterprise, and intelligence APIs
+- database initialization and Alembic migrations
+- security controls for hosts, CORS, and HTTPS enforcement
+- worker and scheduler support for background processing
 
-## Project Structure
+### Deployment Layer
+
+The deployment stack in `infra/` is built for repeatable production-style execution with Docker Compose, PostgreSQL, Redis, and Qdrant support. The infra layer also includes the container definitions and database bootstrap scripts needed for a stable runtime.
+
+## Technology Stack
+
+- Frontend: Next.js 15, React 19, Framer Motion, Lucide React
+- Styling and UI: Tailwind CSS, PostCSS, custom component system
+- Backend: FastAPI, Python 3.11+, SQLAlchemy, SQLModel, Alembic
+- Security and auth: `python-jose`, `passlib`, `argon2-cffi`
+- Data and services: PostgreSQL, Redis, Qdrant, background workers
+- Reporting: `jsPDF`, `xlsx`, markdown rendering utilities
+
+## Repository Layout
 
 ```text
 Aurelius/
-├── client/      # Next.js frontend and UI components
-├── server/      # FastAPI backend, migrations, workers, tests
-├── infra/       # Docker and deployment assets
-├── Docs/        # Architecture notes and delivery documentation
-└── package.json # Repository-level orchestration entry point
+├── client/      # Next.js workspace and public-facing UI
+├── server/      # FastAPI application, models, services, tests, migrations
+├── infra/       # Docker, compose, and environment files
+├── Docs/        # Architecture, planning, and delivery documentation
+└── package.json # Root orchestration scripts
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ for the frontend and workspace scripts
-- Python 3.11+ for the backend
-- PostgreSQL for persistent data storage
-- Docker and Docker Compose for local production-style runs
+- Node.js 18 or later
+- Python 3.11 or later
+- PostgreSQL
+- Docker and Docker Compose for full-stack local deployment
 
-### Frontend
+### Frontend Development
 
 ```bash
 cd client
@@ -87,7 +115,9 @@ npm install
 npm run dev
 ```
 
-### Backend
+The client runs on port `3001` in development and starts on port `3000` in production mode.
+
+### Backend Development
 
 ```bash
 cd server
@@ -104,36 +134,53 @@ cd server
 alembic upgrade head
 ```
 
-## Environment Notes
+## Production Deployment
 
-The backend is configured through environment variables in the `server/` area. Review `server/.env.example` before running locally and set values for your database, frontend origin, and any provider or integration settings.
+For a full-stack deployment, use the Docker configuration in `infra/`:
 
-## API
+```bash
+cd infra
+cp .env.production.example .env.production
+docker compose -f docker-compose.prod.yml up --build -d
+```
 
-The FastAPI application exposes documentation endpoints at:
+This stack is designed around a production runtime with web, API, worker, scheduler, PostgreSQL, Redis, and Qdrant services.
 
+## Configuration Notes
+
+Review `server/.env.example` and `infra/.env.production.example` before running locally or deploying. The application is built to read environment-driven configuration for database connectivity, origins, security, and external integrations.
+
+## API Surface
+
+The backend exposes standard API documentation and health endpoints:
+
+- `/health`
 - `/api/v1/docs`
 - `/api/v1/redoc`
 - `/api/v1/openapi.json`
 
-The service also exposes health and root endpoints for deployment checks.
+The versioned API includes route groups for authentication, employees, candidates, analysis, chat, enterprise operations, integrations, and intelligence workflows.
 
-## Deployment
+## Why Aurelius Feels Commercial
 
-Use the Docker assets in `infra/` when you want a repeatable production-style build. That folder contains the frontend and backend Dockerfiles, compose configuration, and PostgreSQL bootstrap SQL.
+The project is structured like a real product, not a prototype:
 
-## Files Worth Reading First
+- distinct frontend, backend, and infrastructure boundaries
+- documented deployment path with containerized services
+- dedicated migration and worker layers
+- secure backend bootstrap and request tracing
+- reporting and workflow features that support operational use
 
-- `server/app/main.py` for the API bootstrap and middleware
-- `client/src/App.jsx` for the main application shell and routes
-- `client/src/components/` for the UI views
-- `server/app/api/v1/` for the backend route surface
-- `infra/docker-compose.prod.yml` for deployment wiring
+That combination gives Aurelius a credible enterprise footprint and a strong foundation for a customer-facing product.
 
-## Why This Project Stands Out
+## Key Files to Review
 
-Aurelius is not a single-purpose dashboard. It is shaped like an enterprise platform: frontend workspace, backend intelligence layer, migrations, workers, deployment assets, and documentation. That makes it a solid base for a serious product if you keep tightening the data model, deployment story, and API contracts.
+- `server/app/main.py` for the application bootstrap and middleware
+- `client/src/App.jsx` for the workspace shell and routed experience
+- `client/src/components/` for the UI modules
+- `server/app/api/v1/` for the backend surface area
+- `infra/docker-compose.prod.yml` for the deployment topology
 
-## Logo
+## Brand Asset
 
-The brand mark used in this README comes from `client/public/logo.png`.
+The logo used in this README is sourced from [client/public/logo.png](client/public/logo.png).
