@@ -1,0 +1,17 @@
+[package]
+name = "aurelius-desktop"
+version = "1.0.0"
+description = "Aurelius desktop shell"
+authors = ["Aurelius"]
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "1.5.5" }
+
+[dependencies]
+tauri = { version = "1.6.8", features = ["shell-open"] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
