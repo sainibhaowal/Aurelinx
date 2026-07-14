@@ -146,6 +146,19 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 This stack is designed around a production runtime with web, API, worker, scheduler, PostgreSQL, Redis, and Qdrant services.
 
+## Desktop Builds
+
+Aurelius now includes a Tauri-based desktop shell under `desktop/`. It is built for GitHub Actions release packaging and can produce Windows and Linux installers.
+
+To make release builds work, set the repository variable `AURELIUS_APP_URL` to the deployed Aurelius web app URL. The desktop shell will redirect users to that URL when it launches.
+
+The GitHub workflow in `.github/workflows/desktop-release.yml` builds:
+
+- an `.exe` installer on Windows via `nsis`
+- a `.deb` package on Ubuntu
+
+Trigger it by pushing a tag that matches `desktop-v*` or by running the workflow manually.
+
 ## Configuration Notes
 
 Review `server/.env.example` and `infra/.env.production.example` before running locally or deploying. The application is built to read environment-driven configuration for database connectivity, origins, security, and external integrations.

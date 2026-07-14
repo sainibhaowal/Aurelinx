@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.tauri.app/config/1",
+  "build": {
+    "beforeBuildCommand": "npm run prepare:config",
+    "beforeDevCommand": "npm run prepare:config",
+    "devPath": "../dist",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "Aurelius",
+    "version": "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "shell": {
+        "open": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "identifier": "com.aurelius.desktop",
+      "targets": ["deb", "nsis"]
+    },
+    "windows": [
+      {
+        "title": "Aurelius",
+        "width": 1440,
+        "height": 960,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  }
+}
