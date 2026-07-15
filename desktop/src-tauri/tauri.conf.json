@@ -1,8 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/1",
   "build": {
-    "beforeBuildCommand": "npm run prepare:config",
-    "beforeDevCommand": "npm run prepare:config",
     "devPath": "../dist",
     "distDir": "../dist"
   },
