@@ -9,10 +9,12 @@ if (!appUrl) {
   );
 }
 
-const configPath = path.join(__dirname, "..", "dist", "app-config.js");
-const contents = fs
-  .readFileSync(configPath, "utf8")
-  .replace("__AURELIUS_APP_URL__", appUrl);
+const distDir = path.join(__dirname, "..", "dist");
+const configPath = path.join(distDir, "app-config.js");
 
-fs.writeFileSync(configPath, contents);
+fs.mkdirSync(distDir, { recursive: true });
+fs.writeFileSync(
+  configPath,
+  `window.__AURELIUS_APP_URL__ = ${JSON.stringify(appUrl)};\n`,
+);
 console.log(`Prepared Aurelius desktop config for ${appUrl}`);
