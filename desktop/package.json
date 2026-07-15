@@ -10,6 +10,6 @@
     "prepare:config": "node scripts/prepare-config.js"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "1.6.3"
+    "@tauri-apps/cli": "^2.0.0"
   }
 }

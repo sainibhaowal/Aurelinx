@@ -1,41 +1,37 @@
 {
-  "$schema": "https://schema.tauri.app/config/1",
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Aurelius",
+  "version": "1.0.0",
+  "identifier": "com.aurelius.desktop",
   "build": {
-    "devPath": "../dist",
-    "distDir": "../dist"
+    "frontendDist": "../dist",
+    "devUrl": "https://placeholder.aurelius.io"
   },
-  "package": {
-    "productName": "Aurelius",
-    "version": "1.0.0"
-  },
-  "tauri": {
-    "allowlist": {
-      "shell": {
-        "open": true
-      }
-    },
-    "bundle": {
-      "active": true,
-      "identifier": "com.aurelius.desktop",
-      "targets": ["deb", "nsis"],
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.png",
-        "icons/icon.ico",
-        "icons/icon.icns",
-        "icons/app-icon.svg"
-      ]
-    },
+  "app": {
     "windows": [
       {
         "title": "Aurelius",
+        "url": "https://placeholder.aurelius.io",
         "width": 1440,
         "height": 960,
         "resizable": true,
         "fullscreen": false
       }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
     ]
   }
 }
