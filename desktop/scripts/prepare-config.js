@@ -14,7 +14,7 @@ const configPath = path.join(__dirname, "..", "src-tauri", "tauri.conf.json");
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 
 config.build.frontendDist = "../dist";
-config.build.devUrl = "http://localhost:3001";
+config.build.devUrl = "http://localhost:3100";
 config.app.windows[0].url = "index.html";
 
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
@@ -23,7 +23,7 @@ fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
 const distDir = path.join(__dirname, "..", "dist");
 fs.mkdirSync(distDir, { recursive: true });
 
-// Create the gateway HTML page
+// Create the gateway HTML page with image-based favicon health checks
 const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -254,18 +254,22 @@ const htmlContent = `<!DOCTYPE html>
           <span>Retry Primary Server</span>
           <span class="badge" id="primaryBadge">Offline</span>
         </button>
+        <button class="btn" onclick="redirectTo('http://localhost:3100')">
+          <span>Localhost (Next.js - Port 3100)</span>
+          <span class="badge" id="port3100Badge">Checking...</span>
+        </button>
         <button class="btn" onclick="redirectTo('http://localhost:3001')">
-          <span>Localhost (Next.js Dev - Port 3001)</span>
-          <span class="badge" id="devBadge">Checking...</span>
+          <span>Localhost (Next.js - Port 3001)</span>
+          <span class="badge" id="port3001Badge">Checking...</span>
         </button>
         <button class="btn" onclick="redirectTo('http://localhost:3000')">
-          <span>Localhost (Next.js Prod - Port 3000)</span>
-          <span class="badge" id="prodBadge">Checking...</span>
+          <span>Localhost (Next.js - Port 3000)</span>
+          <span class="badge" id="port3000Badge">Checking...</span>
         </button>
       </div>
 
       <div class="custom-url-input">
-        <input type="text" id="customUrl" class="input" placeholder="Enter custom URL (e.g. http://192.168.1.5:3000)" value="http://localhost:3001">
+        <input type="text" id="customUrl" class="input" placeholder="Enter custom URL (e.g. http://192.168.1.5:3100)" value="http://localhost:3100">
         <button class="btn btn-primary" onclick="connectCustom()">Connect</button>
       </div>
     </div>
@@ -284,48 +288,56 @@ const htmlContent = `<!DOCTYPE html>
       window.location.replace(url);
     }
 
-    async function checkServer(url, timeoutMs = 1500) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      
-      try {
-        await fetch(url, { method: 'HEAD', mode: 'no-cors', signal: controller.signal });
-        clearTimeout(timeoutId);
-        return true;
-      } catch (e) {
-        clearTimeout(timeoutId);
-        return false;
-      }
+    // Elegant Image-based check to bypass CORS and accurately detect real images vs Cloudflare HTML error pages
+    function checkServerActive(url, timeoutMs = 2000) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        const timer = setTimeout(() => {
+          img.src = "";
+          resolve(false);
+        }, timeoutMs);
+        
+        img.onload = () => {
+          clearTimeout(timer);
+          resolve(true);
+        };
+        
+        img.onerror = () => {
+          clearTimeout(timer);
+          resolve(false);
+        };
+        
+        img.src = url.replace(/\\/+$/, "") + "/favicon.ico?_cb=" + Date.now();
+      });
     }
 
     async function checkLocalhosts() {
-      const devUp = await checkServer('http://localhost:3001', 800);
-      const devBadge = document.getElementById('devBadge');
-      if (devUp) {
-        devBadge.innerText = 'Online';
-        devBadge.className = 'badge online';
-      } else {
-        devBadge.innerText = 'Offline';
-        devBadge.className = 'badge';
-      }
+      const up3100 = await checkServerActive('http://localhost:3100', 800);
+      updateBadge('port3100Badge', up3100);
 
-      const prodUp = await checkServer('http://localhost:3000', 800);
-      const prodBadge = document.getElementById('prodBadge');
-      if (prodUp) {
-        prodBadge.innerText = 'Online';
-        prodBadge.className = 'badge online';
-      } else {
-        prodBadge.innerText = 'Offline';
-        prodBadge.className = 'badge';
-      }
+      const up3001 = await checkServerActive('http://localhost:3001', 800);
+      updateBadge('port3001Badge', up3001);
 
-      if (devUp) {
+      const up3000 = await checkServerActive('http://localhost:3000', 800);
+      updateBadge('port3000Badge', up3000);
+
+      if (up3100) {
+        redirectTo('http://localhost:3100');
+      } else if (up3001) {
         redirectTo('http://localhost:3001');
-      } else if (prodUp) {
+      } else if (up3000) {
         redirectTo('http://localhost:3000');
       } else {
         document.getElementById('loader').style.display = 'none';
         document.getElementById('fallback').style.display = 'block';
+      }
+    }
+
+    function updateBadge(id, isOnline) {
+      const badge = document.getElementById(id);
+      if (badge) {
+        badge.innerText = isOnline ? 'Online' : 'Offline';
+        badge.className = isOnline ? 'badge online' : 'badge';
       }
     }
 
@@ -343,7 +355,7 @@ const htmlContent = `<!DOCTYPE html>
     async function initConnection() {
       updateText("Connecting to server...", "Checking primary domain " + PRIMARY_URL);
       
-      const primaryOnline = await checkServer(PRIMARY_URL, 2000);
+      const primaryOnline = await checkServerActive(PRIMARY_URL, 2500);
       if (primaryOnline) {
         redirectTo(PRIMARY_URL);
       } else {
