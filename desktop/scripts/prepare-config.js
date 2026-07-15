@@ -359,4 +359,3 @@ const htmlContent = `<!DOCTYPE html>
 
 fs.writeFileSync(path.join(distDir, "index.html"), htmlContent);
 console.log(`Prepared Aurelius desktop config. Primary URL set to ${appUrl}`);
-`;
