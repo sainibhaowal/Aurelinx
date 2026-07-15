@@ -48,7 +48,7 @@ jobs:
 
       - name: Install desktop dependencies
         working-directory: desktop
-        run: npm install
+        run: npm ci
 
       - name: Verify app URL
         shell: bash
