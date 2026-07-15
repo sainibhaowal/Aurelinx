@@ -1,0 +1,122 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Python environments
+.venv/
+venv/
+server/venv/
+env/
+ENV/
+bin/
+lib/
+share/
+include/
+pyvenv.cfg
+pip-selfcheck.json
+
+# Python caches and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Databases (local SQLite)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.serverless/
+deliverables/AURELIUS_University_Submission_Deck_FINAL*.pptx
+!deliverables/artifact-build-manifest.json
+
+# Temporary / Lock files
+~$*
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+*.temp
+
+# Logs and error logs
+logs/
+*.log
+
+# Scratch and rendering caches
+scratch/
+$root/
+ppt_render_*/
+
+# Uploads directory
+uploads/
+server/uploads/
+deliverables/
+# Generated datasets and large files
+DataSets/
+!server/datasets/
+!server/datasets/raw/
+!server/datasets/raw/onet_database_text.zip
+Docs/DataSets/
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.classpath
+.c9/
+*.sublime-workspace
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Client build artifacts
+client/dist/
+client/build/
+client/node_modules/
+client/.next/
+
+# Server build artifacts
+server/__pycache__/
+server/dist/
+server/build/
+server/*.egg-info/
+
+# Test coverage reports
+coverage/
+.nyc_output/
+
+# Misc temporary files
+*.pid
+*.seed
+*.pid.lock
+.cache/
+.parcel-cache/
+.next
+out
