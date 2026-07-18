@@ -344,7 +344,7 @@ async def google_callback(
         # Log them in! Create JWT access token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         jwt_token = create_access_token(
-            data={"sub": user.email}, expires_delta=access_token_expires
+            data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin}, expires_delta=access_token_expires
         )
         
         import urllib.parse
@@ -471,7 +471,7 @@ async def github_callback(
         # Log them in! Create JWT access token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         jwt_token = create_access_token(
-            data={"sub": user.email}, expires_delta=access_token_expires
+            data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin}, expires_delta=access_token_expires
         )
         
         import urllib.parse
