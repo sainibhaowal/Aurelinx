@@ -137,32 +137,125 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
 
       case "scout":
         return (
-          <div className="space-y-6">
+          <div className="space-y-8">
+            {/* Header */}
             <div>
               <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
                 <Search className="text-cyan-400 h-5 w-5" /> Talent Scout Matchmaker
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                The Talent Scout employs a hybrid skill ontology solver. It matches candidate CVs against target positions by conceptual alignment, resolving skill gaps and evaluating organizational fit.
+                Talent Scout is the intelligent search and matchmaking component of Aurelius, designed to connect high-level conceptual roles with matching personnel profiles.
               </p>
             </div>
 
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">How to Run a Search</h3>
-              <ol className="text-xs space-y-2 text-slate-200 list-decimal pl-4">
-                <li>Enter a conceptual description of your hiring need (e.g., <em className="text-cyan-300">"Looking for a Senior Python backend engineer with database experience"</em>).</li>
-                <li>Click the <strong className="text-white">Scout Talent</strong> button.</li>
-                <li>The system retrieves match configurations, ranks candidate profiles, and starts **typewriter token streaming** to output the intelligence brief.</li>
-                <li>Inspect candidate profiles by clicking on cards to view their full credentials, email, morale scores, and career history.</li>
-              </ol>
+            {/* Why Talent Scout? */}
+            <div className="p-4 rounded-xl border border-cyan-500/20 bg-cyan-950/10 space-y-3">
+              <h4 className="text-xs font-black uppercase tracking-wider text-cyan-300">
+                Why Talent Scout? The Failure of Keyword Searches
+              </h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Standard hiring software uses rigid **keyword matching**. If you search for <em>"Python developer"</em>, a resume containing <em>"FastAPI expert"</em> or <em>"Django engineer"</em> might be completely ignored simply because the exact word "Python" wasn't found.
+              </p>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                <strong>Talent Scout solves this</strong> by using semantic token overlap and AI reasoning. It matches candidates based on the <em>concepts</em> and <em>context</em> of their skills, identifying suitable hires who would otherwise be filtered out.
+              </p>
             </div>
 
+            {/* Flow Diagram */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <Activity className="h-4 w-4 text-cyan-400" /> Talent Scout Matchmaking Pipeline
+              </h3>
+              <div className="p-4 rounded-xl bg-slate-950/40 border border-white/5 text-xs text-slate-300 space-y-3">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-center">
+                  
+                  {/* Step 1 */}
+                  <div className="flex-1 p-2 bg-cyan-500/5 rounded border border-cyan-500/20 w-full">
+                    <span className="text-[10px] font-bold text-cyan-400 block">1. CONCEPTUAL INPUT</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Natural language prompt & AI provider key</span>
+                  </div>
+
+                  <div className="text-slate-600 font-bold hidden md:block">➔</div>
+
+                  {/* Step 2 */}
+                  <div className="flex-1 p-2 bg-cyan-500/5 rounded border border-cyan-500/20 w-full">
+                    <span className="text-[10px] font-bold text-cyan-400 block">2. TOKEN OVERLAP SCORE</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Cross-calculates skill, role, & dept hits</span>
+                  </div>
+
+                  <div className="text-slate-600 font-bold hidden md:block">➔</div>
+
+                  {/* Step 3 */}
+                  <div className="flex-1 p-2 bg-cyan-500/5 rounded border border-cyan-500/20 w-full">
+                    <span className="text-[10px] font-bold text-cyan-400 block">3. RETENTION SCREENING</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Checks target dept sentiment and burnout risk</span>
+                  </div>
+
+                  <div className="text-slate-600 font-bold hidden md:block">➔</div>
+
+                  {/* Step 4 */}
+                  <div className="flex-1 p-2 bg-cyan-500/5 rounded border border-cyan-500/20 w-full">
+                    <span className="text-[10px] font-bold text-cyan-400 block">4. STREAMED BRIEF</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">LLM streams recommendations & gap warnings</span>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+            {/* Core Calculations & Math */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Under the Hood: Score Calculations</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                When a search is submitted, the matching engine extracts tokens from your query and calculates match weights differently for candidates and employees:
+              </p>
+              
+              <div className="space-y-3.5 text-xs">
+                {/* Employee Score */}
+                <div className="p-3.5 bg-white/5 rounded-lg border border-white/5 space-y-1.5">
+                  <strong className="text-white block">👥 Internal Employees Scoring Formula</strong>
+                  <p className="text-slate-300 leading-relaxed text-[11px]">
+                    Internal profiles are matched to identify transfer opportunities. Sentiment is heavily weighted to help prevent burnout, and active risks are penalized:
+                  </p>
+                  <div className="font-mono text-[10px] text-cyan-300 bg-black/20 p-2 rounded leading-normal">
+                    Score = (Skill_Hits * 2.5) + (Role_Hits * 2.0) + (Dept_Hits * 1.2) + (Sentiment_Score * 1.1) - (0.6 if At_Risk)
+                  </div>
+                </div>
+
+                {/* Candidate Score */}
+                <div className="p-3.5 bg-white/5 rounded-lg border border-white/5 space-y-1.5">
+                  <strong className="text-white block">👤 External Candidates Scoring Formula</strong>
+                  <p className="text-slate-300 leading-relaxed text-[11px]">
+                    External resumes are ranked primarily based on technical fit, combining search overlap with their pre-calculated CV parse score:
+                  </p>
+                  <div className="font-mono text-[10px] text-cyan-300 bg-black/20 p-2 rounded leading-normal">
+                    Score = (Skill_Hits * 2.6) + (Role_Hits * 2.1) + (Dept_Hits * 1.3) + (Sentiment_Score * 1.0) + (Match_Score * 1.8)
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* The Intelligence Brief */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">What You Get: The AI Scout Brief</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Rather than displaying raw data grids, the matched candidate payloads are sent to an LLM provider of choice. The system streams a typewriter brief containing:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-slate-300 text-xs">
+                <li><strong className="text-white">Best Overall Match:</strong> Identifies the single best candidate and provides a detailed rationale.</li>
+                <li><strong className="text-white">Strengths of Top 3:</strong> Breaks down specific skill advantages and match factors.</li>
+                <li><strong className="text-white">Risks & Gaps:</strong> Warns you of potential skill gaps (e.g. candidate lacks cloud experience) or onboarding issues.</li>
+                <li><strong className="text-white">Final Recommendation:</strong> Clear, actionable advice on next interview steps or job offers.</li>
+              </ul>
+            </div>
+
+            {/* Retention-Aware Warning */}
             <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/20 p-4">
               <h4 className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                <Heart className="h-3.5 w-3.5" /> Retention Aware Recruiting
+                <Heart className="h-3.5 w-3.5" /> Retention-Aware Onboarding
               </h4>
               <p className="text-[11px] text-slate-300 mt-1.5 leading-relaxed">
-                Aurelius Talent Scout integrates directory metrics. If a candidate matches, the system evaluates their target department's morale, attrition rate, and workload density to warning leaders of potential early burnout risks before hire.
+                **Aurelius is built on safety.** When a candidate matches a role, the system analyzes the target department's morale, workload, and attrition trends. If a candidate is placed into a team with high burnout, the engine flags a warning, advising leadership to stabilize the team prior to onboarding.
               </p>
             </div>
           </div>
