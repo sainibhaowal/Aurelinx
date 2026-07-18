@@ -5,13 +5,13 @@
   "identifier": "com.aurelius.desktop",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "https://placeholder.aurelius.io"
+    "devUrl": "http://localhost:3100"
   },
   "app": {
     "windows": [
       {
         "title": "Aurelius",
-        "url": "https://placeholder.aurelius.io",
+        "url": "index.html",
         "width": 1440,
         "height": 960,
         "resizable": true,

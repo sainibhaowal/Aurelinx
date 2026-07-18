@@ -1,0 +1,11 @@
+http://localhost:80 {
+    # Route API calls to the FastAPI backend
+    handle /api/* {
+        reverse_proxy 127.0.0.1:5100
+    }
+
+    # Route everything else to the Next.js frontend
+    handle {
+        reverse_proxy 127.0.0.1:3100
+    }
+}
