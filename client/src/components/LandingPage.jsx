@@ -512,54 +512,54 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
   const displayStats = snapshot
     ? [
-        { label: "Workforce Size", value: snapshot.total },
-        { label: "Risk Cluster", value: snapshot.atRisk },
-        {
-          label: "Avg Morale",
-          value: Number(snapshot.avgSentiment).toFixed(2),
-        },
-      ]
+      { label: "Workforce Size", value: snapshot.total },
+      { label: "Risk Cluster", value: snapshot.atRisk },
+      {
+        label: "Avg Morale",
+        value: Number(snapshot.avgSentiment).toFixed(2),
+      },
+    ]
     : [
-        { label: "Workforce Size", value: "22" },
-        { label: "Risk Cluster", value: "7" },
-        { label: "Avg Morale", value: "0.64" },
-      ];
+      { label: "Workforce Size", value: "22" },
+      { label: "Risk Cluster", value: "7" },
+      { label: "Avg Morale", value: "0.64" },
+    ];
 
   const displayConnectors =
     connections.length > 0
       ? connections.map((c) => ({
-          name: c.name,
-          type: String(c.source_type).toUpperCase(),
-          status: String(c.status).toUpperCase(),
-        }))
+        name: c.name,
+        type: String(c.source_type).toUpperCase(),
+        status: String(c.status).toUpperCase(),
+      }))
       : [
-          {
-            name: "Workday HRIS API",
-            type: "Core Employee DB",
-            status: "ACTIVE",
-          },
-          {
-            name: "Greenhouse ATS",
-            type: "Candidate Pipeline",
-            status: "SUPPORTED",
-          },
-          {
-            name: "SAP SuccessFactors",
-            type: "Performance Analytics",
-            status: "SUPPORTED",
-          },
-          {
-            name: "Oracle HCM Cloud",
-            type: "Workforce Planning",
-            status: "SUPPORTED",
-          },
-          { name: "BambooHR", type: "Directory Sync", status: "SUPPORTED" },
-          {
-            name: "ADP Workforce",
-            type: "Compensation Mapping",
-            status: "SUPPORTED",
-          },
-        ];
+        {
+          name: "Workday HRIS API",
+          type: "Core Employee DB",
+          status: "ACTIVE",
+        },
+        {
+          name: "Greenhouse ATS",
+          type: "Candidate Pipeline",
+          status: "SUPPORTED",
+        },
+        {
+          name: "SAP SuccessFactors",
+          type: "Performance Analytics",
+          status: "SUPPORTED",
+        },
+        {
+          name: "Oracle HCM Cloud",
+          type: "Workforce Planning",
+          status: "SUPPORTED",
+        },
+        { name: "BambooHR", type: "Directory Sync", status: "SUPPORTED" },
+        {
+          name: "ADP Workforce",
+          type: "Compensation Mapping",
+          status: "SUPPORTED",
+        },
+      ];
 
   /* ── Fallback compliance data ── */
   const fallbackRunbooks = [
@@ -671,7 +671,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <img
                   src="/icon.png"
                   alt="Aurelius Logo"
-                  style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                  style={{ width: "120%", height: "120%", objectFit: "contain" }}
                 />
               </div>
               <div>
@@ -1818,13 +1818,13 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     <div className="grid gap-4 sm:grid-cols-2">
                       {(drRunbooks.length > 0
                         ? drRunbooks.map((r) => ({
-                            name: r.runbook_name,
-                            env: r.environment,
-                            rto: r.rto_minutes,
-                            rpo: r.rpo_minutes,
-                            note: r.notes,
-                            status: r.status,
-                          }))
+                          name: r.runbook_name,
+                          env: r.environment,
+                          rto: r.rto_minutes,
+                          rpo: r.rpo_minutes,
+                          note: r.notes,
+                          status: r.status,
+                        }))
                         : fallbackRunbooks
                       ).map((rb, i) => (
                         <div
@@ -1891,12 +1891,12 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     <div className="grid gap-4 sm:grid-cols-2">
                       {(procurement.length > 0
                         ? procurement.map((p) => ({
-                            title: p.title,
-                            type: p.artifact_type,
-                            ver: p.version,
-                            status: p.status,
-                            notes: p.notes,
-                          }))
+                          title: p.title,
+                          type: p.artifact_type,
+                          ver: p.version,
+                          status: p.status,
+                          notes: p.notes,
+                        }))
                         : fallbackProcurement
                       ).map((pa, i) => (
                         <div
