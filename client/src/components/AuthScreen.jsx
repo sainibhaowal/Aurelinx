@@ -38,7 +38,7 @@ const FEATURES = [
 
 const AuthScreen = () => {
   const { login, register, loading } = useAuth();
-  const [mode, setMode] = useState("register");
+  const [mode, setMode] = useState("login");
   const [registerForm, setRegisterForm] = useState(initialRegisterState);
   const [loginForm, setLoginForm] = useState(initialLoginState);
   const [registerError, setRegisterError] = useState("");
@@ -224,12 +224,6 @@ const AuthScreen = () => {
             className="flex gap-8 mb-9"
             style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
           >
-            <TabBtn
-              active={mode === "register"}
-              onClick={() => setMode("register")}
-            >
-              Register
-            </TabBtn>
             <TabBtn active={mode === "login"} onClick={() => setMode("login")}>
               Sign In
             </TabBtn>
@@ -398,17 +392,7 @@ const AuthScreen = () => {
                     {loading ? "Signing in…" : "Sign in"}
                   </SubmitBtn>
 
-                  <p className="text-sm text-slate-500 text-center">
-                    Need an account?{" "}
-                    <button
-                      type="button"
-                      className="font-semibold transition-colors"
-                      style={{ color: "#67e8f9" }}
-                      onClick={() => setMode("register")}
-                    >
-                      Register
-                    </button>
-                  </p>
+                  {/* Public registration is disabled. Admin accounts are managed securely. */}
                 </motion.form>
               )}
             </AnimatePresence>
