@@ -16,7 +16,7 @@ const AureliusLogo = ({ size = 24, collapsed = false }) => {
         <img
           src="/icon.png"
           alt="Aurelius Logo"
-          style={{ width: size, height: size, objectFit: "contain" }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scale(1.45)" }}
         />
       </motion.div>
 

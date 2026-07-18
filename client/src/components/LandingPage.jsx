@@ -671,7 +671,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <img
                   src="/icon.png"
                   alt="Aurelius Logo"
-                  style={{ width: 18, height: 18, objectFit: "contain" }}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scale(1.45)" }}
                 />
               </div>
               <div>
