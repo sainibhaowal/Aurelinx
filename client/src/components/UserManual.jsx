@@ -168,24 +168,171 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
 
       case "analytics":
         return (
-          <div className="space-y-6">
+          <div className="space-y-8">
+            {/* Header */}
             <div>
               <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-                <BarChart3 className="text-emerald-400 h-5 w-5" /> Analytics & Sentiment Pulse
+                <BarChart3 className="text-emerald-400 h-5 w-5" /> Sentiment Intelligence & Org Pulse
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                Aurelius performs continuous statistical modeling on your organization. The metrics stream live over Server-Sent Events (SSE) directly from active database logs.
+                Sentiment Intelligence is the core forecasting engine of Aurelius. It maps the continuous emotional health of your workforce by analyzing active communication streams.
               </p>
             </div>
 
+            {/* Why Sentiment / Why Aurelius Section */}
+            <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-950/10 space-y-3">
+              <h4 className="text-xs font-black uppercase tracking-wider text-emerald-300">
+                Why Sentiment? The Philosophy of Aurelius
+              </h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Traditional organizations rely on **annual surveys** to measure company culture. Surveys fail because they suffer from <em>recency bias</em>, <em>low participation rates</em>, and are <em>too late</em>—by the time the survey is analyzed, key talent has already resigned.
+              </p>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                <strong>Aurelius was built to solve this.</strong> It replaces static surveys with passive, privacy-preserving **live sentiment telemetry**. By scanning the emotional tone of collaboration logs, Aurelius detects early warning signs of burnout, team conflict, and career dissatisfaction in real-time.
+              </p>
+            </div>
+
+            {/* Visual Sentiment Pipeline Diagram */}
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Core Sentiment Calculations</h3>
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <Activity className="h-4 w-4 text-emerald-400" /> Sentiment Intelligence Flow
+              </h3>
+              <div className="p-4 rounded-xl bg-slate-950/40 border border-white/5 text-xs text-slate-300 space-y-3">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-center">
+                  
+                  {/* Step A */}
+                  <div className="flex-1 p-2 bg-emerald-500/5 rounded border border-emerald-500/20 w-full">
+                    <span className="text-[10px] font-bold text-emerald-400 block">A. RAW INGESTION</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Slack, Jira, Git messages</span>
+                  </div>
+
+                  <div className="text-slate-600 font-bold hidden md:block">➔</div>
+
+                  {/* Step B */}
+                  <div className="flex-1 p-2 bg-emerald-500/5 rounded border border-emerald-500/20 w-full">
+                    <span className="text-[10px] font-bold text-emerald-400 block">B. NLP VECTORIZER</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Valence-shifting text analysis</span>
+                  </div>
+
+                  <div className="text-slate-600 font-bold hidden md:block">➔</div>
+
+                  {/* Step C */}
+                  <div className="flex-1 p-2 bg-emerald-500/5 rounded border border-emerald-500/20 w-full">
+                    <span className="text-[10px] font-bold text-emerald-400 block">C. INDICATORS SOLVER</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Score + Velocity + Confidence</span>
+                  </div>
+
+                  <div className="text-slate-600 font-bold hidden md:block">➔</div>
+
+                  {/* Step D */}
+                  <div className="flex-1 p-2 bg-emerald-500/5 rounded border border-emerald-500/20 w-full">
+                    <span className="text-[10px] font-bold text-emerald-400 block">D. THREAT GATEWAY</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">System Status & Action triggers</span>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+            {/* Core Metrics: Score, Velocity, Confidence */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">The Three Pillars of Live Indicators</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Aurelius measures three independent values to generate high-fidelity, actionable employee profiles:
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Pillar 1 */}
+                <div className="p-3.5 bg-white/5 rounded-xl border border-white/5 space-y-2">
+                  <span className="text-xs font-black text-cyan-300 block">📊 Current Score (1.0 - 5.0)</span>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    The moving average of emotional valence from recent workspace posts. A score of <strong>5.0</strong> indicates high motivation, while <strong>1.0</strong> indicates severe disengagement.
+                  </p>
+                  <div className="text-[10px] font-mono text-cyan-300 bg-black/30 p-1.5 rounded">
+                    Score = (Σ Positive) / (Σ Total Messages)
+                  </div>
+                </div>
+
+                {/* Pillar 2 */}
+                <div className="p-3.5 bg-white/5 rounded-xl border border-white/5 space-y-2">
+                  <span className="text-xs font-black text-purple-300 block">⚡ Velocity (dM/dt)</span>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    The rate of change of morale over a rolling 7-day window. A negative velocity means morale is plummeting, while positive velocity indicates improvement.
+                  </p>
+                  <div className="text-[10px] font-mono text-purple-300 bg-black/30 p-1.5 rounded">
+                    Velocity = ΔScore / ΔTime
+                  </div>
+                </div>
+
+                {/* Pillar 3 */}
+                <div className="p-3.5 bg-white/5 rounded-xl border border-white/5 space-y-2">
+                  <span className="text-xs font-black text-emerald-300 block">🎯 Confidence Level (0% - 100%)</span>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    Represents the reliability of the score. If an employee messages frequently, confidence is 90%+. If they write very little, the score defaults to neutral with low confidence.
+                  </p>
+                  <div className="text-[10px] font-mono text-emerald-300 bg-black/30 p-1.5 rounded">
+                    Confidence = min(1.0, msg_count / 15)
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* System Status and Intervention Priorities */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Dashboard Telemetry & Priority Rules</h3>
+              <div className="space-y-3.5 text-xs">
+                
+                {/* System Status */}
+                <div className="p-3.5 bg-white/5 rounded-lg border border-white/5 space-y-1.5">
+                  <strong className="text-white block">🏢 System Status Index</strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    Calculates the organization's macro-health threat level by aggregating the total portion of at-risk employees.
+                  </p>
+                  <ul className="list-disc pl-4 space-y-1 text-slate-400">
+                    <li><strong className="text-slate-300">Level 1 (Healthy):</strong> &lt; 10% of employees are flagged as at-risk.</li>
+                    <li><strong className="text-slate-300">Level 2 (Caution):</strong> 10% - 20% at-risk ratio. Triggers early warning review.</li>
+                    <li><strong className="text-slate-300">Level 3 (Critical):</strong> &gt; 20% at-risk ratio. Auto-warns managers of systemic attrition bottlenecks.</li>
+                  </ul>
+                </div>
+
+                {/* Intervention Priorities */}
+                <div className="p-3.5 bg-white/5 rounded-lg border border-white/5 space-y-1.5">
+                  <strong className="text-white block">🚨 Intervention Priority Levels</strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    Intervention priority ranks employees to determine how urgently HR managers must step in. Priority is calculated by combining Attrition Risk and ONA influence PageRank.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-300 mt-2">
+                    <div className="p-2 bg-red-500/10 border border-red-500/25 rounded">
+                      <span className="text-red-400 font-bold block">CRITICAL Priority</span>
+                      ML Risk &gt; 80%, low morale, and high PageRank influence bottleneck.
+                    </div>
+                    <div className="p-2 bg-orange-500/10 border border-orange-500/25 rounded">
+                      <span className="text-orange-400 font-bold block">HIGH Priority</span>
+                      ML Risk &gt; 50% with declining velocity.
+                    </div>
+                    <div className="p-2 bg-yellow-500/10 border border-yellow-500/25 rounded">
+                      <span className="text-yellow-400 font-bold block">MEDIUM Priority</span>
+                      Moderately high risk with stable velocity.
+                    </div>
+                    <div className="p-2 bg-blue-500/10 border border-blue-500/25 rounded">
+                      <span className="text-blue-400 font-bold block">LOW Priority</span>
+                      Low attrition likelihood; normal telemetry logs.
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Core Calculations */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Mathematical Model Formulations</h3>
               <div className="space-y-3 text-xs">
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5">
                   <strong className="text-white block mb-0.5">Burnout Risk Vector</strong>
                   Calculates potential burnout using employee risk indicators and sentiment:
                   <div className="mt-1 font-mono text-[10px] text-emerald-300 bg-black/20 p-1.5 rounded">
-                    Burnout = (at_risk_ratio * 0.7) + ((1.0 - avg_sentiment) * 0.3)
+                    Burnout = (at_risk_ratio * 0.7) + ((1.0 - (avg_sentiment / 5.0)) * 0.3)
                   </div>
                 </div>
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5">
@@ -199,16 +346,17 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                   <strong className="text-white block mb-0.5">Leadership Trust</strong>
                   Estimates alignment with management based on morale and retention averages:
                   <div className="mt-1 font-mono text-[10px] text-emerald-300 bg-black/20 p-1.5 rounded">
-                    Trust = (avg_retention_prob * 0.6) + (avg_sentiment * 0.4)
+                    Trust = (avg_retention_prob * 0.6) + ((avg_sentiment / 5.0) * 0.4)
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* Warning block */}
             <div className="rounded-lg border border-red-500/20 bg-red-950/10 p-3 flex items-start gap-2.5">
               <ShieldAlert className="h-4 w-4 text-red-400 flex-none mt-0.5" />
               <div>
-                <h4 className="text-xs font-bold text-red-300">Predictive Risk warning</h4>
+                <h4 className="text-xs font-bold text-red-300">Predictive Risk Warning</h4>
                 <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
                   If the overall risk percentage of your workforce exceeds 20%, the system status auto-escalates to **Level 3 (High)** and warns administrators to review ONA bottlenecks.
                 </p>
