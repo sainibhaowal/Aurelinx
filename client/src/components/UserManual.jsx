@@ -219,23 +219,176 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
 
       case "directory":
         return (
-          <div className="space-y-6">
+          <div className="space-y-8">
+            {/* Header */}
             <div>
               <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
                 <Users className="text-purple-400 h-5 w-5" /> Talent Directory
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                The Directory is the central point-of-truth for your workforce. It aggregates both full-time employees and candidate records into a unified filtering layout.
+                The Talent Directory is Aurelius's primary analytical gateway. It acts as a unified interface that aggregates live organizational telemetry, predictive machine learning models, and skills inventory.
               </p>
             </div>
 
+            {/* Architecture flow diagram */}
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">How to Use the Directory</h3>
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <Activity className="h-4 w-4 text-purple-400" /> Data Processing & Attrition Pipeline
+              </h3>
+              <div className="p-4 rounded-xl bg-slate-950/40 border border-white/5 space-y-4">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-center">
+                  
+                  {/* Step 1 */}
+                  <div className="flex-1 p-2.5 bg-purple-500/10 rounded-lg border border-purple-500/20 w-full">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-purple-400 block">1. Telemetry Ingest</span>
+                    <span className="text-[11px] text-slate-300 mt-1 block">Slack, Jira, Git logs, & HRIS</span>
+                  </div>
+
+                  <div className="text-slate-500 font-bold hidden md:block">➔</div>
+                  <div className="text-slate-500 font-bold md:hidden">↓</div>
+
+                  {/* Step 2 */}
+                  <div className="flex-1 p-2.5 bg-cyan-500/10 rounded-lg border border-cyan-500/20 w-full">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 block">2. Scoring Models</span>
+                    <span className="text-[11px] text-slate-300 mt-1 block">NLP Sentiment & ML Risk Calc</span>
+                  </div>
+
+                  <div className="text-slate-500 font-bold hidden md:block">➔</div>
+                  <div className="text-slate-500 font-bold md:hidden">↓</div>
+
+                  {/* Step 3 */}
+                  <div className="flex-1 p-2.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20 w-full">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 block">3. Aggregation</span>
+                    <span className="text-[11px] text-slate-300 mt-1 block">Optimal vs At-Risk classification</span>
+                  </div>
+
+                  <div className="text-slate-500 font-bold hidden md:block">➔</div>
+                  <div className="text-slate-500 font-bold md:hidden">↓</div>
+
+                  {/* Step 4 */}
+                  <div className="flex-1 p-2.5 bg-rose-500/10 rounded-lg border border-rose-500/20 w-full">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-rose-400 block">4. Direct Action</span>
+                    <span className="text-[11px] text-slate-300 mt-1 block">Interventions & PDF Briefings</span>
+                  </div>
+
+                </div>
+                <p className="text-[11px] text-slate-400 text-center leading-relaxed">
+                  Real-time events sync dynamically to update employee statuses, allowing leaders to monitor attrition threats as they develop.
+                </p>
+              </div>
+            </div>
+
+            {/* Core Classification: Employees vs Candidates */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-xl border border-white/5 bg-white/5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Users className="text-cyan-400 h-4 w-4" />
+                  <h4 className="text-xs font-black uppercase tracking-wider text-cyan-300">Employees</h4>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Internal workforce resources. Evaluated using ONA connection graphs, live sentiment analysis, and continuous performance and attrition modeling.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl border border-white/5 bg-white/5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Search className="text-pink-400 h-4 w-4" />
+                  <h4 className="text-xs font-black uppercase tracking-wider text-pink-300">Candidates</h4>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  External database of applicants. Indexed conceptual profiles matched against jobs using semantic distance algorithms in the Talent Scout.
+                </p>
+              </div>
+            </div>
+
+            {/* Metrics Breakdown: Sentiment & Risk Probability */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Understanding Directory Metrics</h3>
+              <div className="space-y-3 text-xs">
+                <div className="p-3.5 bg-white/5 rounded-lg border border-white/5">
+                  <strong className="text-white block text-xs mb-1">💬 Morale Sentiment (Scale: 1-5)</strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    This represents the qualitative emotional state of the individual.
+                  </p>
+                  <ul className="list-disc pl-4 mt-2 space-y-1 text-slate-400">
+                    <li><strong className="text-slate-300">How it works:</strong> Natural Language Processing (NLP) runs continuously on collaboration logs (Slack messages, commit descriptions, ticket updates).</li>
+                    <li><strong className="text-slate-300">Interpretation:</strong> <code className="text-red-300">1-2</code> indicates poor morale, potential dissatisfaction, or conflict. <code className="text-emerald-300">4-5</code> indicates strong engagement and satisfaction.</li>
+                  </ul>
+                </div>
+
+                <div className="p-3.5 bg-white/5 rounded-lg border border-white/5">
+                  <strong className="text-white block text-xs mb-1">⚠️ Attrition Risk Probability (Percentage: 0% - 100%)</strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    This represents the likelihood of an employee leaving the company within the next 90 days.
+                  </p>
+                  <ul className="list-disc pl-4 mt-2 space-y-1 text-slate-400">
+                    <li><strong className="text-slate-300">How it works:</strong> The machine learning model processes active indicators: sentiment trends, PageRank (influence bottleneck), work overload (commit rates), and interaction volume.</li>
+                    <li><strong className="text-slate-300">Why the name:</strong> It directly maps the calculated threat percentage to help HR prioritize retention budgets before attrition happens.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Optimal vs At Risk Comparison */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Retention Status Definitions</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-2">
+                  <span className="inline-block px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase">OPTIMAL</span>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    The employee is highly retained and emotionally stable. 
+                  </p>
+                  <ul className="text-[11px] text-slate-400 list-disc pl-4 space-y-1">
+                    <li>Risk Probability is low (typically &lt; 30%)</li>
+                    <li>Morale sentiment is stable (&gt; 3.0)</li>
+                    <li>Balanced workload and network connections</li>
+                  </ul>
+                </div>
+
+                <div className="p-4 bg-rose-500/5 border border-rose-500/20 rounded-xl space-y-2">
+                  <span className="inline-block px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 text-[10px] font-black uppercase">AT RISK</span>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    The employee is a high flight risk requiring active attention.
+                  </p>
+                  <ul className="text-[11px] text-slate-400 list-disc pl-4 space-y-1">
+                    <li>Risk Probability is high (&gt; 50%)</li>
+                    <li>Morale sentiment shows downward trend</li>
+                    <li>High betweenness centrality indicating bottleneck stress</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Skills & Levels ontology */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">The Skills Ontology & Level Scale</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Aurelius classifies capability metrics based on three tiers of execution:
+              </p>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <span className="text-xs font-black text-cyan-300 block">L1: Foundational</span>
+                  <span className="text-[10px] text-slate-400 mt-1 block">Capable of performing supervised core tasks.</span>
+                </div>
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <span className="text-xs font-black text-purple-300 block">L2: Operational</span>
+                  <span className="text-[10px] text-slate-400 mt-1 block">Performs autonomously in production setups.</span>
+                </div>
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <span className="text-xs font-black text-emerald-300 block">L3: Expert / Strategic</span>
+                  <span className="text-[10px] text-slate-400 mt-1 block">Drives complex systems design & mentors teams.</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actionable Operations */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Operational Checklist</h3>
               <ul className="text-xs space-y-2 text-slate-200 list-disc pl-4">
-                <li>Use tabs at the top (<strong className="text-white">All / Employees / Candidates</strong>) to slice the lists.</li>
+                <li>Use tabs at the top (<strong className="text-white">All / Employees / Candidates</strong>) to toggle records.</li>
                 <li>Filter records in real-time using search queries for name, role, or department.</li>
-                <li>Quickly review risk levels (<span className="text-red-400 font-bold">AT-RISK</span> vs <span className="text-emerald-400 font-bold">OPTIMAL</span>) for every individual at a glance.</li>
-                <li>Click the <strong className="text-white">Quick PDF</strong> button to generate printable executive personnel matrices.</li>
+                <li>Click the <strong className="text-white">Quick PDF</strong> button to generate printable executive personnel reports.</li>
+                <li>Click on any individual card to open their profile modal and review details, historical risk trends, and specific skill tiers.</li>
               </ul>
             </div>
 
