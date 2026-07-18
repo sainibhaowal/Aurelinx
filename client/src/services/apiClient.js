@@ -437,20 +437,13 @@ function uploadRequest(url, formData, onProgress = null) {
  * Authentication API
  */
 export const authAPI = {
-  verifyAdminId: (code) =>
-    request(`${API_V1}/auth/verify-admin-id`, {
-      method: "POST",
-      body: JSON.stringify({ code }),
-    }),
-
-  register: (email, fullName, password, adminId) =>
+  register: (email, fullName, password) =>
     request(`${API_V1}/auth/register`, {
       method: "POST",
       body: JSON.stringify({
         email,
         full_name: fullName,
         password,
-        admin_id: adminId,
       }),
     }),
 

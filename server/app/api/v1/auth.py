@@ -18,9 +18,8 @@ from app.schemas.schemas import (
     UserOut,
     DeleteAccountRequest,
     ResetWorkspaceRequest,
-    VerifyCodeRequest,
 )
-from app.models.database import UserTable, get_session, RegistrationCodeTable
+from app.models.database import UserTable, get_session
 from app.core.security import (
     hash_password,
     verify_password,
@@ -36,26 +35,6 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = get_logger(__name__)
 
 
-@router.post("/verify-admin-id", status_code=status.HTTP_200_OK)
-async def verify_admin_id(
-    request: VerifyCodeRequest, session: SQLSession = Depends(get_session)
-):
-    """
-    Verify if a given Admin ID (access code) exists in the database.
-    """
-    logger.info("Admin ID verification attempt")
-    code_records = session.exec(
-        select(RegistrationCodeTable)
-    ).all()
-
-    for record in code_records:
-        if verify_password(request.code, record.code_hash):
-            return {"success": True, "message": "Valid Admin ID", "is_used": record.is_used}
-
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Invalid Admin ID"
-    )
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -72,24 +51,6 @@ async def register(
     """
 
     logger.info(f"New registration attempt for {request.email}")
-
-    # Verify the admin_id (access code)
-    code_records = session.exec(
-        select(RegistrationCodeTable).where(RegistrationCodeTable.is_used == False)
-    ).all()
-
-    matching_code = None
-    for record in code_records:
-        if verify_password(request.admin_id, record.code_hash):
-            matching_code = record
-            break
-
-    if not matching_code:
-        logger.warning(f"Registration failed: Invalid or used Admin ID for {request.email}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or already used Admin ID"
-        )
 
     # Check if user exists
     existing_user = session.exec(
@@ -115,14 +76,7 @@ async def register(
     session.commit()
     session.refresh(user)
 
-    # Mark the registration code as used
-    matching_code.is_used = True
-    matching_code.used_at = datetime.utcnow()
-    matching_code.used_by = user.email
-    session.add(matching_code)
-    session.commit()
-
-    logger.info(f"User registered successfully with Admin ID: {user.id}")
+    logger.info(f"User registered successfully: {user.id}")
 
     return UserOut(
         id=user.id,
@@ -286,10 +240,11 @@ async def reset_workspace_data(
 
 # ============ OAUTH ENDPOINTS ============
 
+# ============ OAUTH ENDPOINTS ============
+
 @router.get("/google/login")
 async def google_login(
     request: Request,
-    admin_id: str,
 ):
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise HTTPException(
@@ -304,7 +259,7 @@ async def google_login(
     else:
         redirect_uri = f"{base}/api/v1/auth/google/callback"
         
-    state = f"admin_id:{admin_id}"
+    state = "google"
     
     google_auth_url = (
         "https://accounts.google.com/o/oauth2/v2/auth"
@@ -321,16 +276,11 @@ async def google_login(
 async def google_callback(
     request: Request,
     code: str,
-    state: str,
+    state: str = None,
     session: SQLSession = Depends(get_session)
 ):
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise HTTPException(status_code=400, detail="Google OAuth not configured")
-        
-    # Extract admin_id from state
-    admin_id = ""
-    if state and state.startswith("admin_id:"):
-        admin_id = state.replace("admin_id:", "")
         
     # Construct redirect URI
     base = str(request.base_url).rstrip("/")
@@ -353,7 +303,7 @@ async def google_callback(
         )
         if token_res.status_code != 200:
             logger.error(f"Google token exchange failed: {token_res.text}")
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=google_auth_failed")
+            return RedirectResponse(url=f"{settings.FRONTEND_URL}/app?error=google_auth_failed")
             
         token_data = token_res.json()
         access_token = token_data.get("access_token")
@@ -365,33 +315,19 @@ async def google_callback(
         )
         if user_info_res.status_code != 200:
             logger.error(f"Google userinfo failed: {user_info_res.text}")
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=google_userinfo_failed")
+            return RedirectResponse(url=f"{settings.FRONTEND_URL}/app?error=google_userinfo_failed")
             
         user_info = user_info_res.json()
         email = user_info.get("email")
         name = user_info.get("name") or email.split("@")[0]
         
         if not email:
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=no_email_returned")
+            return RedirectResponse(url=f"{settings.FRONTEND_URL}/app?error=no_email_returned")
             
         # Check if user exists
         user = session.exec(select(UserTable).where(UserTable.email == email)).first()
         
         if not user:
-            # Register them! But first verify admin_id
-            code_records = session.exec(
-                select(RegistrationCodeTable).where(RegistrationCodeTable.is_used == False)
-            ).all()
-            
-            matching_code = None
-            for record in code_records:
-                if verify_password(admin_id, record.code_hash):
-                    matching_code = record
-                    break
-                    
-            if not matching_code:
-                return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=invalid_admin_id")
-                
             # Create user
             random_pw = secrets.token_urlsafe(16)
             user = UserTable(
@@ -405,13 +341,6 @@ async def google_callback(
             session.commit()
             session.refresh(user)
             
-            # Consume Admin ID code
-            matching_code.is_used = True
-            matching_code.used_at = datetime.utcnow()
-            matching_code.used_by = email
-            session.add(matching_code)
-            session.commit()
-            
         # Log them in! Create JWT access token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         jwt_token = create_access_token(
@@ -422,14 +351,13 @@ async def google_callback(
         encoded_user = urllib.parse.quote(user.email)
         encoded_name = urllib.parse.quote(user.full_name)
         return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/?oauth_token={jwt_token}&oauth_email={encoded_user}&oauth_name={encoded_name}"
+            url=f"{settings.FRONTEND_URL}/app?oauth_token={jwt_token}&oauth_email={encoded_user}&oauth_name={encoded_name}"
         )
 
 
 @router.get("/github/login")
 async def github_login(
     request: Request,
-    admin_id: str,
 ):
     if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
         raise HTTPException(
@@ -444,7 +372,7 @@ async def github_login(
     else:
         redirect_uri = f"{base}/api/v1/auth/github/callback"
         
-    state = f"admin_id:{admin_id}"
+    state = "github"
     
     github_auth_url = (
         "https://github.com/login/oauth/authorize"
@@ -460,16 +388,11 @@ async def github_login(
 async def github_callback(
     request: Request,
     code: str,
-    state: str,
+    state: str = None,
     session: SQLSession = Depends(get_session)
 ):
     if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
         raise HTTPException(status_code=400, detail="GitHub OAuth not configured")
-        
-    # Extract admin_id from state
-    admin_id = ""
-    if state and state.startswith("admin_id:"):
-        admin_id = state.replace("admin_id:", "")
         
     # Construct redirect URI
     base = str(request.base_url).rstrip("/")
@@ -492,7 +415,7 @@ async def github_callback(
         )
         if token_res.status_code != 200:
             logger.error(f"GitHub token exchange failed: {token_res.text}")
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=github_auth_failed")
+            return RedirectResponse(url=f"{settings.FRONTEND_URL}/app?error=github_auth_failed")
             
         token_data = token_res.json()
         access_token = token_data.get("access_token")
@@ -504,7 +427,7 @@ async def github_callback(
         )
         if user_info_res.status_code != 200:
             logger.error(f"GitHub userinfo failed: {user_info_res.text}")
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=github_userinfo_failed")
+            return RedirectResponse(url=f"{settings.FRONTEND_URL}/app?error=github_userinfo_failed")
             
         user_info = user_info_res.json()
         email = user_info.get("email")
@@ -526,26 +449,12 @@ async def github_callback(
                     email = emails_list[0].get("email")
                     
         if not email:
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=no_email_returned")
+            return RedirectResponse(url=f"{settings.FRONTEND_URL}/app?error=no_email_returned")
             
         # Check if user exists
         user = session.exec(select(UserTable).where(UserTable.email == email)).first()
         
         if not user:
-            # Register them! But first verify admin_id
-            code_records = session.exec(
-                select(RegistrationCodeTable).where(RegistrationCodeTable.is_used == False)
-            ).all()
-            
-            matching_code = None
-            for record in code_records:
-                if verify_password(admin_id, record.code_hash):
-                    matching_code = record
-                    break
-                    
-            if not matching_code:
-                return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=invalid_admin_id")
-                
             # Create user
             random_pw = secrets.token_urlsafe(16)
             user = UserTable(
@@ -559,13 +468,6 @@ async def github_callback(
             session.commit()
             session.refresh(user)
             
-            # Consume Admin ID code
-            matching_code.is_used = True
-            matching_code.used_at = datetime.utcnow()
-            matching_code.used_by = email
-            session.add(matching_code)
-            session.commit()
-            
         # Log them in! Create JWT access token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         jwt_token = create_access_token(
@@ -576,5 +478,5 @@ async def github_callback(
         encoded_user = urllib.parse.quote(user.email)
         encoded_name = urllib.parse.quote(user.full_name)
         return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/?oauth_token={jwt_token}&oauth_email={encoded_user}&oauth_name={encoded_name}"
+            url=f"{settings.FRONTEND_URL}/app?oauth_token={jwt_token}&oauth_email={encoded_user}&oauth_name={encoded_name}"
         )

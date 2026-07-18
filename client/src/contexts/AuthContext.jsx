@@ -128,12 +128,12 @@ export const AuthProvider = ({ children }) => {
     [resolveWithTimeout],
   );
 
-  const register = useCallback(async (email, fullName, password, adminId) => {
+  const register = useCallback(async (email, fullName, password) => {
     setLoading(true);
     setError(null);
 
     try {
-      const userData = await authAPI.register(email, fullName, password, adminId);
+      const userData = await authAPI.register(email, fullName, password);
       if (userData) {
         localStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(userData));
       }

@@ -1,9 +1,8 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertCircle, ArrowRight, CheckCircle2, Lock } from "lucide-react";
+import { AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
 import AureliusLogo from "./AureliusLogo";
 import { useAuth } from "../contexts/AuthContext";
-import { authAPI } from "../services/apiClient";
 
 const initialRegisterState = {
   firstName: "",
@@ -34,7 +33,7 @@ const getPasswordStrength = (password) => {
 const FEATURES = [
   "Email-based account identity",
   "Password strength enforcement",
-  "Gated workspace access",
+  "Instant workspace access",
 ];
 
 const AuthScreen = () => {
@@ -46,70 +45,6 @@ const AuthScreen = () => {
   const [loginError, setLoginError] = useState("");
   const [registerSuccess, setRegisterSuccess] = useState("");
 
-  // Gate System States
-  const [adminId, setAdminId] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("aurelius_admin_id") || "";
-    }
-    return "";
-  });
-  const [isGateUnlocked, setIsGateUnlocked] = useState(() => {
-    if (typeof window !== "undefined") {
-      return !!localStorage.getItem("aurelius_admin_id");
-    }
-    return false;
-  });
-  const [isRegisterDisabled, setIsRegisterDisabled] = useState(false);
-  const [gateInput, setGateInput] = useState("");
-  const [gateError, setGateError] = useState("");
-  const [verifyingGate, setVerifyingGate] = useState(false);
-
-  // Quiet verification of cached gate ID
-  useEffect(() => {
-    const storedCode = localStorage.getItem("aurelius_admin_id");
-    if (storedCode) {
-      authAPI.verifyAdminId(storedCode)
-        .then((res) => {
-          setIsRegisterDisabled(res.is_used);
-          if (res.is_used) {
-            setMode("login");
-          }
-        })
-        .catch(() => {
-          localStorage.removeItem("aurelius_admin_id");
-          setIsGateUnlocked(false);
-        });
-    }
-  }, []);
-
-  const handleVerifyGate = async (e) => {
-    e.preventDefault();
-    if (!gateInput.trim()) {
-      setGateError("Please enter your Admin ID.");
-      return;
-    }
-    setVerifyingGate(true);
-    setGateError("");
-    try {
-      const result = await authAPI.verifyAdminId(gateInput.trim());
-      if (result) {
-        localStorage.setItem("aurelius_admin_id", gateInput.trim());
-        setAdminId(gateInput.trim());
-        setIsRegisterDisabled(result.is_used);
-        if (result.is_used) {
-          setMode("login");
-        } else {
-          setMode("register");
-        }
-        setIsGateUnlocked(true);
-      }
-    } catch (err) {
-      setGateError(err.message || "Invalid Admin ID. Please try again.");
-    } finally {
-      setVerifyingGate(false);
-    }
-  };
-
   // Handle OAuth callback parameters on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -120,11 +55,7 @@ const AuthScreen = () => {
       const error = params.get("error");
 
       if (error) {
-        if (error === "invalid_admin_id") {
-          setGateError("The Admin ID associated with this social login is invalid or already used.");
-        } else {
-          setGateError(`Authentication failed: ${error.replace(/_/g, " ")}`);
-        }
+        setLoginError(`Authentication failed: ${error.replace(/_/g, " ")}`);
       }
 
       if (oauthToken) {
@@ -144,14 +75,8 @@ const AuthScreen = () => {
   }, []);
 
   const handleOAuth = (provider) => {
-    if (!isGateUnlocked) return;
-    const savedAdminId = localStorage.getItem("aurelius_admin_id") || gateInput;
-    if (!savedAdminId) {
-      setGateError("Please enter and verify a valid Admin ID first.");
-      return;
-    }
     const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
-    window.location.href = `${apiBase}/api/v1/auth/${provider}/login?admin_id=${encodeURIComponent(savedAdminId)}`;
+    window.location.href = `${apiBase}/api/v1/auth/${provider}/login`;
   };
 
   const passwordStrength = useMemo(
@@ -196,14 +121,12 @@ const AuthScreen = () => {
       return;
     }
 
-    const result = await register(email, `${firstName} ${lastName}`, password, adminId);
+    const result = await register(email, `${firstName} ${lastName}`, password);
     if (!result.success) {
       setRegisterError(result.error?.message || "Registration failed.");
       return;
     }
 
-    // Success! Since the user is registered, this one-time adminId is now used
-    setIsRegisterDisabled(true);
     setRegisterSuccess("Account created. Sign in with your new credentials.");
     setRegisterForm(initialRegisterState);
     switchToLogin(email);
@@ -262,7 +185,7 @@ const AuthScreen = () => {
         {/* Main copy */}
         <div className="flex-1 flex flex-col justify-center">
           <motion.div
-            key={isGateUnlocked ? mode : "gate"}
+            key={mode}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
@@ -271,29 +194,17 @@ const AuthScreen = () => {
               className="text-[11px] uppercase tracking-[0.3em] font-semibold mb-7"
               style={{ color: "rgba(103,232,249,0.55)" }}
             >
-              {!isGateUnlocked ? "Security Gateway" : mode === "register" ? "01 — Create Account" : "02 — Sign In"}
+              {mode === "register" ? "01 — Create Account" : "02 — Sign In"}
             </p>
 
             <h1 className="text-[3.2rem] font-bold leading-[1.08] tracking-tight text-white mb-7">
-              {!isGateUnlocked ? (
-                <>
-                  Secure
-                  <br />
-                  Aurelius <span style={{ color: "#67e8f9" }}>Portal.</span>
-                </>
-              ) : (
-                <>
-                  Intelligence begins
-                  <br />
-                  with <span style={{ color: "#67e8f9" }}>access.</span>
-                </>
-              )}
+              Intelligence begins
+              <br />
+              with <span style={{ color: "#67e8f9" }}>access.</span>
             </h1>
 
             <p className="text-slate-400 text-[15px] leading-7 max-w-sm">
-              {!isGateUnlocked
-                ? "This workspace is restricted. Please enter a valid Admin ID generated from the server terminal to unlock access."
-                : "Register once, then sign in to your workforce analytics platform — talent data, AI insights, and enterprise connectors unified."}
+              Register once, then sign in to your workforce analytics platform — talent data, AI insights, and enterprise connectors unified.
             </p>
           </motion.div>
 
@@ -323,7 +234,7 @@ const AuthScreen = () => {
           style={{ fontSize: "11rem", color: "rgba(255,255,255,0.025)" }}
           aria-hidden="true"
         >
-          {!isGateUnlocked ? "🔐" : mode === "register" ? "01" : "02"}
+          {mode === "register" ? "01" : "02"}
         </div>
       </aside>
 
@@ -350,95 +261,23 @@ const AuthScreen = () => {
               backdropFilter: "blur(12px)",
             }}
           >
-            {/* 🔑 ADMIN ID GATEWAY (Top Integrated Panel) */}
-            <div className="mb-8 pb-6" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold tracking-wider text-slate-300 uppercase">
-                  Aurelius Access Gate
-                </h3>
-                {isGateUnlocked ? (
-                  <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    UNLOCKED
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 text-xs font-semibold text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/20">
-                    🔒 LOCKED
-                  </span>
-                )}
-              </div>
-
-              {isGateUnlocked ? (
-                <div className="flex items-center justify-between bg-slate-800/25 px-4 py-3 rounded-xl border border-slate-700/35">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Verified Admin ID</span>
-                    <span className="text-sm text-slate-300 font-mono">••••••••••••</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      localStorage.removeItem("aurelius_admin_id");
-                      setIsGateUnlocked(false);
-                      setGateInput("");
-                    }}
-                    className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold transition-colors cursor-pointer"
-                  >
-                    Change ID
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleVerifyGate} className="space-y-4">
-                  <div className="flex gap-3 items-end">
-                    <div className="flex-1">
-                      <LineField
-                        label="Admin ID"
-                        type="password"
-                        value={gateInput}
-                        onChange={setGateInput}
-                        placeholder="••••••••••••"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={verifyingGate}
-                      className="h-[42px] px-5 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center whitespace-nowrap bg-cyan-600 hover:bg-cyan-500 text-white disabled:opacity-50"
-                    >
-                      {verifyingGate ? "Verifying..." : "Verify ID"}
-                    </button>
-                  </div>
-                  {gateError && <StatusMsg tone="error" text={gateError} />}
-                </form>
-              )}
+            {/* Underline tabs */}
+            <div
+              className="flex gap-8 mb-9"
+              style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
+            >
+              <TabBtn
+                active={mode === "register"}
+                onClick={() => setMode("register")}
+              >
+                Register
+              </TabBtn>
+              <TabBtn active={mode === "login"} onClick={() => setMode("login")}>
+                Sign In
+              </TabBtn>
             </div>
 
-            {/* ── FORMS AND TABS SECTION ── */}
-            <div
-              className="transition-all duration-300"
-              style={{
-                opacity: isGateUnlocked ? 1 : 0.4,
-                pointerEvents: isGateUnlocked ? "auto" : "none",
-                userSelect: isGateUnlocked ? "auto" : "none",
-              }}
-            >
-              {/* Underline tabs */}
-              <div
-                className="flex gap-8 mb-9"
-                style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
-              >
-                {!isRegisterDisabled && (
-                  <TabBtn
-                    active={mode === "register"}
-                    onClick={() => isGateUnlocked && setMode("register")}
-                  >
-                    Register
-                  </TabBtn>
-                )}
-                <TabBtn active={mode === "login"} onClick={() => isGateUnlocked && setMode("login")}>
-                  Sign In
-                </TabBtn>
-              </div>
-
-              <AnimatePresence mode="wait">
+            <AnimatePresence mode="wait">
               {mode === "register" ? (
                 <motion.form
                   key="register"
@@ -496,29 +335,36 @@ const AuthScreen = () => {
                       animate={{ opacity: 1, height: "auto" }}
                       className="overflow-hidden"
                     >
-                      <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] mb-2">
-                        <span className="text-slate-500">Strength</span>
-                        <span style={{ color: passwordStrength.color }}>
-                          {passwordStrength.label}
-                        </span>
-                      </div>
-                      <div
-                        className="h-[2px] w-full rounded-full overflow-hidden"
-                        style={{ background: "rgba(255,255,255,0.08)" }}
-                      >
-                        <motion.div
-                          className="h-full rounded-full"
-                          style={{ background: passwordStrength.color }}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${passwordStrength.pct}%` }}
-                          transition={{ duration: 0.35 }}
-                        />
+                      <div className="pt-1 pb-2">
+                        <div className="flex justify-between text-xs mb-1.5">
+                          <span style={{ color: "rgba(148,163,184,0.5)" }}>
+                            Password Strength
+                          </span>
+                          <span
+                            className="font-bold"
+                            style={{ color: passwordStrength.color }}
+                          >
+                            {passwordStrength.label}
+                          </span>
+                        </div>
+                        <div
+                          className="h-1 w-full rounded-full overflow-hidden"
+                          style={{ background: "rgba(255,255,255,0.06)" }}
+                        >
+                          <div
+                            className="h-full transition-all duration-300"
+                            style={{
+                              width: `${passwordStrength.pct}%`,
+                              background: passwordStrength.color,
+                            }}
+                          />
+                        </div>
                       </div>
                     </motion.div>
                   )}
 
                   <LineField
-                    label="Repeat Password"
+                    label="Confirm Password"
                     type="password"
                     value={registerForm.confirmPassword}
                     onChange={(v) => updateRegisterField("confirmPassword", v)}
@@ -528,12 +374,9 @@ const AuthScreen = () => {
                   {registerError && (
                     <StatusMsg tone="error" text={registerError} />
                   )}
-                  {registerSuccess && (
-                    <StatusMsg tone="success" text={registerSuccess} />
-                  )}
 
                   <SubmitBtn loading={loading} accent="cyan">
-                    {loading ? "Creating account…" : "Create account"}
+                    {loading ? "Registering..." : "Create account"}
                   </SubmitBtn>
 
                   <p className="text-sm text-slate-500 text-center">
@@ -599,12 +442,12 @@ const AuthScreen = () => {
                       Welcome back
                     </h2>
                     <p className="text-slate-500 text-sm mt-1">
-                      Sign in to your Aurelius workspace.
+                      Sign in to manage your workspace.
                     </p>
                   </div>
 
                   <LineField
-                    label="Email"
+                    label="Email Address"
                     type="email"
                     value={loginForm.email}
                     onChange={(v) => updateLoginField("email", v)}
@@ -616,31 +459,26 @@ const AuthScreen = () => {
                     type="password"
                     value={loginForm.password}
                     onChange={(v) => updateLoginField("password", v)}
-                    placeholder="Enter your password"
+                    placeholder="••••••••"
                   />
 
-                  {registerSuccess && (
-                    <StatusMsg tone="success" text={registerSuccess} />
-                  )}
                   {loginError && <StatusMsg tone="error" text={loginError} />}
 
-                  <SubmitBtn loading={loading} accent="emerald">
-                    {loading ? "Signing in…" : "Sign in"}
+                  <SubmitBtn loading={loading} accent="cyan">
+                    {loading ? "Signing in..." : "Sign in to Workspace"}
                   </SubmitBtn>
 
-                  {!isRegisterDisabled && (
-                    <p className="text-sm text-slate-500 text-center">
-                      Need an account?{" "}
-                      <button
-                        type="button"
-                        className="font-semibold transition-colors"
-                        style={{ color: "#67e8f9" }}
-                        onClick={() => setMode("register")}
-                      >
-                        Register
-                      </button>
-                    </p>
-                  )}
+                  <p className="text-sm text-slate-500 text-center">
+                    New to Aurelius?{" "}
+                    <button
+                      type="button"
+                      className="font-semibold transition-colors"
+                      style={{ color: "#67e8f9" }}
+                      onClick={() => setMode("register")}
+                    >
+                      Create an account
+                    </button>
+                  </p>
 
                   {/* ── Social Login Row ── */}
                   <div className="relative my-6 flex items-center justify-center">
@@ -680,7 +518,6 @@ const AuthScreen = () => {
                 </motion.form>
               )}
             </AnimatePresence>
-            </div>
           </div>
         </motion.div>
       </div>

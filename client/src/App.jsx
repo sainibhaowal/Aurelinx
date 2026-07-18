@@ -60,6 +60,7 @@ const isAppPath = (pathname = "") =>
 
 const App = () => {
   const { isAuthenticated, loading: authLoading, logout, user } = useAuth();
+
   const EMPLOYEE_CACHE_KEY = "aurelius_dashboard_employees_cache";
   const CANDIDATE_CACHE_KEY = "aurelius_dashboard_candidates_cache";
   const SNAPSHOT_CACHE_KEY = "aurelius_dashboard_snapshot_cache";
@@ -328,6 +329,7 @@ const App = () => {
   if (!isAuthenticated) {
     return <AuthScreen />;
   }
+
 
   return (
     <div className="flex h-screen bg-[#07111f] text-slate-100 relative overflow-hidden selection:bg-primary/30 antialiased">

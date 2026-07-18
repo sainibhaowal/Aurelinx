@@ -42,7 +42,6 @@ class RegisterRequest(BaseModel):
     password: str = Field(
         ..., min_length=8, max_length=100, description="Must be at least 8 characters"
     )
-    admin_id: str = Field(..., min_length=8, max_length=32, description="Required secure code")
 
     @field_validator("password")
     def validate_password(cls, v):
