@@ -43,6 +43,24 @@ docker compose version
 docker buildx version
 ```
 
+### Troubleshooting: Missing `buildx` Plugin Warning
+If you see the warning:
+`WARN[0000] Docker Compose requires buildx plugin to be installed`
+or if `docker buildx version` fails, manually install the binary plugin using these commands:
+```bash
+# Create CLI plugins directory
+mkdir -p ~/.docker/cli-plugins
+
+# Download the latest buildx binary (e.g., v0.15.1)
+curl -SL https://github.com/docker/buildx/releases/download/v0.15.1/buildx-v0.15.1.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx
+
+# Make the plugin executable
+chmod +x ~/.docker/cli-plugins/docker-buildx
+
+# Verify
+docker buildx version
+```
+
 ---
 
 ## Step 2: Clone the Repository
