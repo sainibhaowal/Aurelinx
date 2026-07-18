@@ -230,6 +230,19 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               </p>
             </div>
 
+            {/* ONA Deep Dive Feature Card */}
+            <div className="p-4 rounded-xl border border-purple-500/20 bg-purple-950/10 space-y-2.5">
+              <h4 className="text-xs font-black uppercase tracking-wider text-purple-300 flex items-center gap-2">
+                <Network className="h-4 w-4 text-purple-400" /> Focus: Organizational Network Analysis (ONA)
+              </h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                <strong>What is ONA?</strong> ONA stands for <strong>Organizational Network Analysis</strong>. Rather than viewing a company as a flat list or static hierarchy, ONA models the organization as a living network of nodes (employees) and edges (interactions like Slack messages, Jira ticket collaborations, and Git code reviews).
+              </p>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                By tracking these connections, Aurelius detects who is doing the heavy lifting, who acts as an key information broker, and who is structurally isolated. When an employee with high network value (many incoming collaboration links) displays low morale, the system flags them as high-risk, as their departure would cause a major communication gap.
+              </p>
+            </div>
+
             {/* Architecture flow diagram */}
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
@@ -278,6 +291,29 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               </div>
             </div>
 
+            {/* Terms Glossary / Acronym Guide */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Acronyms & Technical Glossary</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <strong className="text-purple-300 block mb-1">ONA (Organizational Network Analysis)</strong>
+                  Study of communication and collaboration networks to map communication patterns, influence nodes, and systemic bottlenecks.
+                </div>
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <strong className="text-cyan-300 block mb-1">NLP (Natural Language Processing)</strong>
+                  AI algorithms that analyze human language text to classify communication tone as positive, negative, or neutral.
+                </div>
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <strong className="text-emerald-300 block mb-1">ML (Machine Learning)</strong>
+                  Algorithms that study historical features to predict future probabilities, such as attrition risks.
+                </div>
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <strong className="text-pink-300 block mb-1">HRIS (Human Resources Info System)</strong>
+                  Core systems of record (like Workday) tracking employment, compensation, job hierarchies, and roles.
+                </div>
+              </div>
+            </div>
+
             {/* Core Classification: Employees vs Candidates */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 rounded-xl border border-white/5 bg-white/5 space-y-2">
@@ -286,7 +322,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                   <h4 className="text-xs font-black uppercase tracking-wider text-cyan-300">Employees</h4>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Internal workforce resources. Evaluated using ONA connection graphs, live sentiment analysis, and continuous performance and attrition modeling.
+                  Internal workforce resources. Evaluated using ONA (Organizational Network Analysis) connection graphs, live sentiment analysis, and continuous performance and attrition modeling.
                 </p>
               </div>
 
