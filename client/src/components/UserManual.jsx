@@ -280,26 +280,52 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
             {/* System Status and Intervention Priorities */}
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-white">Dashboard Telemetry & Priority Rules</h3>
-              <div className="space-y-3.5 text-xs">
+              <p className="text-xs text-slate-300 leading-relaxed">
+                The Sentiment Intelligence view displays two primary cards at the top representing macro-level metrics, and a table below for granular indicators:
+              </p>
+              <div className="space-y-4 text-xs">
                 
-                {/* System Status */}
+                {/* System Status (Left Card) */}
                 <div className="p-3.5 bg-white/5 rounded-lg border border-white/5 space-y-1.5">
-                  <strong className="text-white block">🏢 System Status Index</strong>
+                  <strong className="text-white block flex items-center gap-1">
+                    <Activity className="h-3.5 w-3.5 text-primary" /> System Status (Live Telemetry)
+                  </strong>
                   <p className="text-slate-300 leading-relaxed">
-                    Calculates the organization's macro-health threat level by aggregating the total portion of at-risk employees.
+                    This left card displays the raw live telemetry counts ingested by the Aurelius pipeline:
                   </p>
                   <ul className="list-disc pl-4 space-y-1 text-slate-400">
-                    <li><strong className="text-slate-300">Level 1 (Healthy):</strong> &lt; 10% of employees are flagged as at-risk.</li>
-                    <li><strong className="text-slate-300">Level 2 (Caution):</strong> 10% - 20% at-risk ratio. Triggers early warning review.</li>
-                    <li><strong className="text-slate-300">Level 3 (Critical):</strong> &gt; 20% at-risk ratio. Auto-warns managers of systemic attrition bottlenecks.</li>
+                    <li><strong className="text-slate-300">Total Analyzed:</strong> Count of employees currently tracked by sentiment telemetry.</li>
+                    <li><strong className="text-slate-300">Current Average Sentiment:</strong> The rolling organizational morale average (scaled 1.0 to 5.0).</li>
+                    <li><strong className="text-slate-300">Flagged Profiles:</strong> Total count of employees actively marked as "At Risk" based on low morale or high attrition probability.</li>
                   </ul>
                 </div>
 
-                {/* Intervention Priorities */}
+                {/* Intervention Priority (Right Card) */}
                 <div className="p-3.5 bg-white/5 rounded-lg border border-white/5 space-y-1.5">
-                  <strong className="text-white block">🚨 Intervention Priority Levels</strong>
+                  <strong className="text-white block flex items-center gap-1">
+                    <ShieldAlert className="h-3.5 w-3.5 text-rose-400" /> Intervention Priority (Dynamic Ranking)
+                  </strong>
                   <p className="text-slate-300 leading-relaxed">
-                    Intervention priority ranks employees to determine how urgently HR managers must step in. Priority is calculated by combining Attrition Risk and ONA influence PageRank.
+                    This right card represents the <strong>macro organizational threat level</strong>. It calculates the company-wide At-Risk Ratio (ratio of flagged employees to the total workforce) and maps it into three priority tiers:
+                  </p>
+                  <ul className="list-disc pl-4 space-y-1 text-slate-400">
+                    <li>
+                      <strong className="text-emerald-300">Level 1 (Healthy/Safe):</strong> At-risk ratio is <strong className="text-emerald-300">&lt; 10%</strong>. Morale is balanced across departments.
+                    </li>
+                    <li>
+                      <strong className="text-amber-300">Level 2 (Caution/Warning):</strong> At-risk ratio is <strong className="text-amber-300">10% - 20%</strong>. Triggers early warning review for department workloads.
+                    </li>
+                    <li>
+                      <strong className="text-rose-400">Level 3 (Critical/Risk):</strong> At-risk ratio is <strong className="text-rose-400">&ge; 20%</strong>. Auto-escalates systemic risk, warning administrators of attrition bottlenecks.
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Individual Profile Priorities */}
+                <div className="p-3.5 bg-white/5 rounded-lg border border-white/5 space-y-1.5">
+                  <strong className="text-white block">🚨 Individual Employee Intervention Priority</strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    Within the talent directory and profiles, individual employees are ranked to determine how urgently HR must step in. This is calculated using a combination of Attrition Risk (ML) and ONA Betweenness Centrality:
                   </p>
                   <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-300 mt-2">
                     <div className="p-2 bg-red-500/10 border border-red-500/25 rounded">
