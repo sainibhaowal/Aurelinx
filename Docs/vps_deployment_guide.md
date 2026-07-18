@@ -130,14 +130,14 @@ Press `Ctrl + O` then `Enter` to save, and `Ctrl + X` to exit `nano`.
 Build and run your full-stack application stack in the background:
 
 ```bash
-docker compose -f docker-compose.prod.yml up --build -d
+docker compose -f infra/docker-compose.prod.yml up -d --build --no-deps web api worker scheduler
 ```
 
 ### Checking Services Status
 
 Verify that all containers are healthy:
 ```bash
-docker compose -f docker-compose.prod.yml ps
+docker compose -f infra/docker-compose.prod.yml ps
 ```
 
 You should see 7 running services:
@@ -156,7 +156,7 @@ You should see 7 running services:
 Once the services are active, initialize and populate the database with default admin credentials and dummy data:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec api python -m app.core.seed_data
+docker compose -f infra/docker-compose.prod.yml exec api python -m app.core.seed_data
 ```
 
 > [!TIP]
@@ -220,7 +220,7 @@ To expose the application over secure HTTPS (`https://yourdomain.com`) instead o
    apt-get install -y certbot python3-certbot-nginx
    certbot --nginx -d yourdomain.com
    ```
-5. **Update `.env.production` URLs**: Update your URLs in `.env.production` to `https://yourdomain.com` and run `docker compose -f docker-compose.prod.yml up -d` to apply changes.
+5. **Update `.env.production` URLs**: Update your URLs in `.env.production` to `https://yourdomain.com` and run `docker compose -f infra/docker-compose.prod.yml up -d` to apply changes.
 
 ---
 
@@ -228,13 +228,13 @@ To expose the application over secure HTTPS (`https://yourdomain.com`) instead o
 
 - **View Logs**:
   ```bash
-  docker compose -f docker-compose.prod.yml logs -f
+  docker compose -f infra/docker-compose.prod.yml logs -f
   ```
 - **Stop Applications**:
   ```bash
-  docker compose -f docker-compose.prod.yml down
+  docker compose -f infra/docker-compose.prod.yml down
   ```
 - **Restart Application**:
   ```bash
-  docker compose -f docker-compose.prod.yml restart
+  docker compose -f infra/docker-compose.prod.yml restart
   ```
