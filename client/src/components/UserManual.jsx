@@ -15,7 +15,9 @@ import {
   Activity,
   Heart,
   ChevronRight,
-  Code
+  Code,
+  PieChart,
+  TrendingUp
 } from "lucide-react";
 
 export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) => {
@@ -347,6 +349,94 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                   </div>
                 </div>
 
+              </div>
+            </div>
+
+            {/* Organizational Analytics & Workforce Distribution */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <PieChart className="text-cyan-400 h-4 w-4" /> Organizational Analytics & Workforce Distribution
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                The **Organizational Analytics** view aggregates individual employee risk telemetry to map macro department-level health and workforce layout.
+              </p>
+
+              {/* High-Level Diagram */}
+              <div className="p-4 rounded-xl bg-slate-950/40 border border-white/5 space-y-3 text-xs text-slate-300">
+                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">
+                  Organizational Analytics Processing Flow
+                </span>
+                <div className="flex flex-col gap-2.5">
+                  <div className="p-2 bg-white/5 rounded border border-white/5">
+                    <span className="text-[10px] font-bold text-cyan-300 block">1. WORKFORCE REGISTRATION (N)</span>
+                    <span className="text-[10px] text-slate-400 block">Total database profiles registered across Active Departments.</span>
+                  </div>
+                  <div className="p-2 bg-white/5 rounded border border-white/5">
+                    <span className="text-[10px] font-bold text-purple-300 block">2. RISK DISTRIBUTION CALCULATOR</span>
+                    <span className="text-[10px] text-slate-400 block">Flags employees as at-risk and calculates department concentrations.</span>
+                  </div>
+                  <div className="p-2 bg-white/5 rounded border border-white/5">
+                    <span className="text-[10px] font-bold text-emerald-300 block">3. PREDICTIVE RISK VECTOR</span>
+                    <span className="text-[10px] text-slate-400 block">Calculates the total organization Risk Coefficient (LOW, MEDIUM, HIGH).</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detailed Variable Breakdown */}
+              <div className="space-y-3 text-xs">
+                {/* Total Workforce */}
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
+                  <strong className="text-white block">👥 Total Workforce (N)</strong>
+                  <p className="text-slate-300 leading-relaxed text-[11px]">
+                    The absolute number of active internal staff profiles. This acts as the denominator ($N$) for all organizational ratios.
+                  </p>
+                </div>
+
+                {/* At-Risk Employees */}
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
+                  <strong className="text-white block">⚠️ At-Risk Employees</strong>
+                  <p className="text-slate-300 leading-relaxed text-[11px]">
+                    Employees actively flagged as flight risks. An individual is marked as "At Risk" when their calculated retention probability falls below target thresholds, indicating burnout, declining morale, or low engagement signals.
+                  </p>
+                </div>
+
+                {/* Active Departments */}
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
+                  <strong className="text-white block">🏢 Active Departments & Workforce Distribution</strong>
+                  <p className="text-slate-300 leading-relaxed text-[11px]">
+                    Measures the count of administrative divisions. Department distribution is computed by dividing the number of members in a specific department by the total workforce ($N$):
+                  </p>
+                  <div className="mt-1 font-mono text-[10px] text-emerald-300 bg-black/20 p-1.5 rounded">
+                    Distribution % = (Department Member Count / Total Workforce) * 100
+                  </div>
+                </div>
+
+                {/* Predictive Risk Vector */}
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
+                  <strong className="text-white block">🔮 Predictive Risk Vector & Risk Coefficient</strong>
+                  <p className="text-slate-300 leading-relaxed text-[11px]">
+                    Unlike historical metrics that analyze why people *left*, the **Predictive Risk Vector** uses active telemetry (Jira workload density, Slack mood shifts) to forecast who is *likely* to leave in the next 90 days. The **Risk Coefficient** categorizes this threat level:
+                  </p>
+                  <ul className="list-disc pl-4 space-y-0.5 text-slate-400 text-[10px] mt-1">
+                    <li><strong className="text-slate-300">LOW Risk Coefficient:</strong> Overall organization at-risk ratio &lt; 10%.</li>
+                    <li><strong className="text-slate-300">MEDIUM Risk Coefficient:</strong> Overall organization at-risk ratio between 10% and 20%.</li>
+                    <li><strong className="text-slate-300">HIGH Risk Coefficient:</strong> Overall organization at-risk ratio &ge; 20%.</li>
+                  </ul>
+                </div>
+
+                {/* Risk Concentration */}
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
+                  <strong className="text-white block">📍 Highest Department Risk Concentration</strong>
+                  <p className="text-slate-300 leading-relaxed text-[11px]">
+                    Isolates which department holds the densest cluster of at-risk employees (e.g. <em>"Sales currently has the highest risk concentration at 40.0%"</em>). It is calculated as:
+                  </p>
+                  <div className="mt-1 font-mono text-[10px] text-emerald-300 bg-black/20 p-1.5 rounded">
+                    Dept Risk Concentration % = (At-Risk Employees in Department / Total Employees in Department) * 100
+                  </div>
+                  <p className="text-slate-400 leading-relaxed text-[10px] mt-1.5">
+                    <strong>Why it matters:</strong> If risk is clustered in a single team (e.g. Sales), the root cause is likely localized (e.g., poor local management, unreasonable quota pressures) rather than systemic company-wide culture issues. This helps target remedial training precisely.
+                  </p>
+                </div>
               </div>
             </div>
 
