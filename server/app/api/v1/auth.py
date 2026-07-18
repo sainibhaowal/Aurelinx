@@ -2,9 +2,13 @@
 Authentication endpoints - Login, Register, Token refresh
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import RedirectResponse
+import httpx
+import secrets
+from app.core.config import settings
 from sqlmodel import Session as SQLSession, SQLModel, select
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from app.schemas.schemas import (
@@ -14,8 +18,9 @@ from app.schemas.schemas import (
     UserOut,
     DeleteAccountRequest,
     ResetWorkspaceRequest,
+    VerifyCodeRequest,
 )
-from app.models.database import UserTable, get_session
+from app.models.database import UserTable, get_session, RegistrationCodeTable
 from app.core.security import (
     hash_password,
     verify_password,
@@ -31,6 +36,28 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = get_logger(__name__)
 
 
+@router.post("/verify-admin-id", status_code=status.HTTP_200_OK)
+async def verify_admin_id(
+    request: VerifyCodeRequest, session: SQLSession = Depends(get_session)
+):
+    """
+    Verify if a given Admin ID (access code) exists in the database.
+    """
+    logger.info("Admin ID verification attempt")
+    code_records = session.exec(
+        select(RegistrationCodeTable)
+    ).all()
+
+    for record in code_records:
+        if verify_password(request.code, record.code_hash):
+            return {"success": True, "message": "Valid Admin ID", "is_used": record.is_used}
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Invalid Admin ID"
+    )
+
+
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(
     request: RegisterRequest, session: SQLSession = Depends(get_session)
@@ -41,9 +68,28 @@ async def register(
     - **email**: User email (must be unique)
     - **full_name**: User full name
     - **password**: Password (min 8 chars, must contain uppercase and digit)
+    - **admin_id**: Secure code generated from the VPS
     """
 
     logger.info(f"New registration attempt for {request.email}")
+
+    # Verify the admin_id (access code)
+    code_records = session.exec(
+        select(RegistrationCodeTable).where(RegistrationCodeTable.is_used == False)
+    ).all()
+
+    matching_code = None
+    for record in code_records:
+        if verify_password(request.admin_id, record.code_hash):
+            matching_code = record
+            break
+
+    if not matching_code:
+        logger.warning(f"Registration failed: Invalid or used Admin ID for {request.email}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or already used Admin ID"
+        )
 
     # Check if user exists
     existing_user = session.exec(
@@ -69,7 +115,14 @@ async def register(
     session.commit()
     session.refresh(user)
 
-    logger.info(f"User registered successfully: {user.id}")
+    # Mark the registration code as used
+    matching_code.is_used = True
+    matching_code.used_at = datetime.utcnow()
+    matching_code.used_by = user.email
+    session.add(matching_code)
+    session.commit()
+
+    logger.info(f"User registered successfully with Admin ID: {user.id}")
 
     return UserOut(
         id=user.id,
@@ -229,3 +282,299 @@ async def reset_workspace_data(
         "deleted_tables": deleted_tables,
         "preserved_tables": sorted(preserved_tables),
     }
+
+
+# ============ OAUTH ENDPOINTS ============
+
+@router.get("/google/login")
+async def google_login(
+    request: Request,
+    admin_id: str,
+):
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=400,
+            detail="Google OAuth is not configured on this server."
+        )
+    
+    # Construct redirect URI
+    base = str(request.base_url).rstrip("/")
+    if "averqel.com" in base or settings.ENVIRONMENT == "production":
+        redirect_uri = "https://aurelius.averqel.com/api/v1/auth/google/callback"
+    else:
+        redirect_uri = f"{base}/api/v1/auth/google/callback"
+        
+    state = f"admin_id:{admin_id}"
+    
+    google_auth_url = (
+        "https://accounts.google.com/o/oauth2/v2/auth"
+        f"?response_type=code"
+        f"&client_id={settings.GOOGLE_CLIENT_ID}"
+        f"&redirect_uri={redirect_uri}"
+        f"&scope=openid%20email%20profile"
+        f"&state={state}"
+    )
+    return RedirectResponse(url=google_auth_url)
+
+
+@router.get("/google/callback")
+async def google_callback(
+    request: Request,
+    code: str,
+    state: str,
+    session: SQLSession = Depends(get_session)
+):
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=400, detail="Google OAuth not configured")
+        
+    # Extract admin_id from state
+    admin_id = ""
+    if state and state.startswith("admin_id:"):
+        admin_id = state.replace("admin_id:", "")
+        
+    # Construct redirect URI
+    base = str(request.base_url).rstrip("/")
+    if "averqel.com" in base or settings.ENVIRONMENT == "production":
+        redirect_uri = "https://aurelius.averqel.com/api/v1/auth/google/callback"
+    else:
+        redirect_uri = f"{base}/api/v1/auth/google/callback"
+        
+    # Exchange code for token
+    async with httpx.AsyncClient() as client:
+        token_res = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            }
+        )
+        if token_res.status_code != 200:
+            logger.error(f"Google token exchange failed: {token_res.text}")
+            return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=google_auth_failed")
+            
+        token_data = token_res.json()
+        access_token = token_data.get("access_token")
+        
+        # Get user info
+        user_info_res = await client.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        if user_info_res.status_code != 200:
+            logger.error(f"Google userinfo failed: {user_info_res.text}")
+            return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=google_userinfo_failed")
+            
+        user_info = user_info_res.json()
+        email = user_info.get("email")
+        name = user_info.get("name") or email.split("@")[0]
+        
+        if not email:
+            return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=no_email_returned")
+            
+        # Check if user exists
+        user = session.exec(select(UserTable).where(UserTable.email == email)).first()
+        
+        if not user:
+            # Register them! But first verify admin_id
+            code_records = session.exec(
+                select(RegistrationCodeTable).where(RegistrationCodeTable.is_used == False)
+            ).all()
+            
+            matching_code = None
+            for record in code_records:
+                if verify_password(admin_id, record.code_hash):
+                    matching_code = record
+                    break
+                    
+            if not matching_code:
+                return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=invalid_admin_id")
+                
+            # Create user
+            random_pw = secrets.token_urlsafe(16)
+            user = UserTable(
+                email=email,
+                full_name=name,
+                hashed_password=hash_password(random_pw),
+                is_active=True,
+                is_admin=False,
+            )
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            
+            # Consume Admin ID code
+            matching_code.is_used = True
+            matching_code.used_at = datetime.utcnow()
+            matching_code.used_by = email
+            session.add(matching_code)
+            session.commit()
+            
+        # Log them in! Create JWT access token
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        jwt_token = create_access_token(
+            data={"sub": user.email}, expires_delta=access_token_expires
+        )
+        
+        import urllib.parse
+        encoded_user = urllib.parse.quote(user.email)
+        encoded_name = urllib.parse.quote(user.full_name)
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/?oauth_token={jwt_token}&oauth_email={encoded_user}&oauth_name={encoded_name}"
+        )
+
+
+@router.get("/github/login")
+async def github_login(
+    request: Request,
+    admin_id: str,
+):
+    if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=400,
+            detail="GitHub OAuth is not configured on this server."
+        )
+    
+    # Construct redirect URI
+    base = str(request.base_url).rstrip("/")
+    if "averqel.com" in base or settings.ENVIRONMENT == "production":
+        redirect_uri = "https://aurelius.averqel.com/api/v1/auth/github/callback"
+    else:
+        redirect_uri = f"{base}/api/v1/auth/github/callback"
+        
+    state = f"admin_id:{admin_id}"
+    
+    github_auth_url = (
+        "https://github.com/login/oauth/authorize"
+        f"?client_id={settings.GITHUB_CLIENT_ID}"
+        f"&redirect_uri={redirect_uri}"
+        f"&scope=user:email"
+        f"&state={state}"
+    )
+    return RedirectResponse(url=github_auth_url)
+
+
+@router.get("/github/callback")
+async def github_callback(
+    request: Request,
+    code: str,
+    state: str,
+    session: SQLSession = Depends(get_session)
+):
+    if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
+        raise HTTPException(status_code=400, detail="GitHub OAuth not configured")
+        
+    # Extract admin_id from state
+    admin_id = ""
+    if state and state.startswith("admin_id:"):
+        admin_id = state.replace("admin_id:", "")
+        
+    # Construct redirect URI
+    base = str(request.base_url).rstrip("/")
+    if "averqel.com" in base or settings.ENVIRONMENT == "production":
+        redirect_uri = "https://aurelius.averqel.com/api/v1/auth/github/callback"
+    else:
+        redirect_uri = f"{base}/api/v1/auth/github/callback"
+        
+    # Exchange code for token
+    async with httpx.AsyncClient() as client:
+        token_res = await client.post(
+            "https://github.com/login/oauth/access_token",
+            data={
+                "code": code,
+                "client_id": settings.GITHUB_CLIENT_ID,
+                "client_secret": settings.GITHUB_CLIENT_SECRET,
+                "redirect_uri": redirect_uri,
+            },
+            headers={"Accept": "application/json"}
+        )
+        if token_res.status_code != 200:
+            logger.error(f"GitHub token exchange failed: {token_res.text}")
+            return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=github_auth_failed")
+            
+        token_data = token_res.json()
+        access_token = token_data.get("access_token")
+        
+        # Get user info
+        user_info_res = await client.get(
+            "https://api.github.com/user",
+            headers={"Authorization": f"Bearer {access_token}", "User-Agent": "Aurelius"}
+        )
+        if user_info_res.status_code != 200:
+            logger.error(f"GitHub userinfo failed: {user_info_res.text}")
+            return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=github_userinfo_failed")
+            
+        user_info = user_info_res.json()
+        email = user_info.get("email")
+        name = user_info.get("name") or user_info.get("login") or "GitHub User"
+        
+        # If email is null, fetch email list
+        if not email:
+            emails_res = await client.get(
+                "https://api.github.com/user/emails",
+                headers={"Authorization": f"Bearer {access_token}", "User-Agent": "Aurelius"}
+            )
+            if emails_res.status_code == 200:
+                emails_list = emails_res.json()
+                for em in emails_list:
+                    if em.get("primary") and em.get("verified"):
+                        email = em.get("email")
+                        break
+                if not email and emails_list:
+                    email = emails_list[0].get("email")
+                    
+        if not email:
+            return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=no_email_returned")
+            
+        # Check if user exists
+        user = session.exec(select(UserTable).where(UserTable.email == email)).first()
+        
+        if not user:
+            # Register them! But first verify admin_id
+            code_records = session.exec(
+                select(RegistrationCodeTable).where(RegistrationCodeTable.is_used == False)
+            ).all()
+            
+            matching_code = None
+            for record in code_records:
+                if verify_password(admin_id, record.code_hash):
+                    matching_code = record
+                    break
+                    
+            if not matching_code:
+                return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=invalid_admin_id")
+                
+            # Create user
+            random_pw = secrets.token_urlsafe(16)
+            user = UserTable(
+                email=email,
+                full_name=name,
+                hashed_password=hash_password(random_pw),
+                is_active=True,
+                is_admin=False,
+            )
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            
+            # Consume Admin ID code
+            matching_code.is_used = True
+            matching_code.used_at = datetime.utcnow()
+            matching_code.used_by = email
+            session.add(matching_code)
+            session.commit()
+            
+        # Log them in! Create JWT access token
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        jwt_token = create_access_token(
+            data={"sub": user.email}, expires_delta=access_token_expires
+        )
+        
+        import urllib.parse
+        encoded_user = urllib.parse.quote(user.email)
+        encoded_name = urllib.parse.quote(user.full_name)
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/?oauth_token={jwt_token}&oauth_email={encoded_user}&oauth_name={encoded_name}"
+        )

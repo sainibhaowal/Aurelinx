@@ -61,6 +61,22 @@ class UserTable(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+# ============ REGISTRATION CODES (ADMIN IDs) ============
+class RegistrationCodeTable(SQLModel, table=True):
+    """Secure invitation/admin codes to access login/register screen"""
+
+    __tablename__ = "registration_codes"
+
+    id: UUID = Field(
+        default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
+    )
+    code_hash: str = Field(index=True)
+    is_used: bool = Field(default=False, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    used_at: Optional[datetime] = Field(default=None)
+    used_by: Optional[str] = Field(default=None)  # Email of the registered user
+
+
 # ============ SKILLS ============
 class SkillTable(SQLModel, table=True):
     """Proper skill tracking (not JSON strings)"""

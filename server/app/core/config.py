@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     # Vector Search
     EMBEDDING_MODEL: str = "text-embedding-3-small"
 
+    # OAuth Settings
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GITHUB_CLIENT_ID: Optional[str] = None
+    GITHUB_CLIENT_SECRET: Optional[str] = None
+
     # Configuration
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=True, extra="allow"
@@ -58,6 +64,11 @@ class Settings(BaseSettings):
 
     def __init__(self, **data):
         super().__init__(**data)
+        # Load OAuth variables
+        self.GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+        self.GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+        self.GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
+        self.GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
         # Override with environment variables if they exist
         self.DATABASE_URL = os.getenv("DATABASE_URL", self.DATABASE_URL)
         self.SECRET_KEY = os.getenv("SECRET_KEY", self.SECRET_KEY)
