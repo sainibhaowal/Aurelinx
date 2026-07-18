@@ -1,6 +1,10 @@
 {$SITE_ADDRESS:http://localhost} {
-    # Route API calls to the FastAPI backend
+    # Route API calls and health checks to the FastAPI backend
     handle /api/* {
+        reverse_proxy api:5000
+    }
+
+    handle /health {
         reverse_proxy api:5000
     }
 
@@ -9,3 +13,4 @@
         reverse_proxy web:3000
     }
 }
+
