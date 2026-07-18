@@ -666,7 +666,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             {/* Logo */}
             <div className="flex items-center gap-3 select-none">
               <div
-                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl border border-cyan-300/40 bg-[#071726] shadow-[0_0_0_1px_rgba(34,211,238,0.2)]"
+                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl"
               >
                 <img
                   src="/icon.png"

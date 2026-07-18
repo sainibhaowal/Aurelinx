@@ -10,7 +10,7 @@ const AureliusLogo = ({ size = 24, collapsed = false }) => {
         initial={{ opacity: 0, scale: 0.92 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.25, ease: "easeOut" }}
-        className="inline-flex items-center justify-center overflow-hidden rounded-xl border border-cyan-300/40 bg-[#071726] shadow-[0_0_0_1.5px_rgba(34,211,238,0.2)]"
+        className="inline-flex items-center justify-center overflow-hidden rounded-xl"
         style={{ width: size + 10, height: size + 10 }}
       >
         <img
