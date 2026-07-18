@@ -80,57 +80,139 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
 
       case "workflows":
         return (
-          <div className="space-y-6">
+          <div className="space-y-8">
+            {/* Header */}
             <div>
               <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
                 <MessageSquare className="text-rose-400 h-5 w-5" /> Agentic Workflow Chat
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                The Workflow Chat is a cognitive agent console. Instead of just answering questions, the agent actively inspects your intent, gathers database parameters, makes decisions, and performs database actions.
+                The Workflow Chat is Aurelius's cognitive agent console. Rather than a static conversational bot, this agent dynamically inspects your intent, executes database commands, checks compliance rules, and mutates tables in real-time.
               </p>
             </div>
 
+            {/* Core Capabilities */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="p-3.5 bg-white/5 rounded-xl border border-white/5 space-y-2">
+                <span className="text-xs font-black text-pink-300 block flex items-center gap-1">
+                  <Database className="h-3.5 w-3.5" /> Database Mutations (Write Ops)
+                </span>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Administrators can write, modify, or relocate resources using natural language. The agent translates prompt instructions into SQL transactions.
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-white/5 rounded-xl border border-white/5 space-y-2">
+                <span className="text-xs font-black text-rose-300 block flex items-center gap-1">
+                  <Key className="h-3.5 w-3.5" /> RBAC Security & Safety
+                </span>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Every mutation check is gated by Role-Based Access Control (RBAC). General members are blocked from executing mutations. Critical actions (like deletion) trigger mandatory safety blocks.
+                </p>
+              </div>
+            </div>
+
+            {/* Architecture Flowchart */}
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Interactive Progress Timeline</h3>
-              <p className="text-xs text-slate-300">
-                Each chat response triggers a real-time ReAct loop which you can monitor through the following status indicators:
-              </p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <span className="text-cyan-300 font-bold block mb-1">🧠 1. Thinking</span>
-                  Analyzing the intent of your query and mapping scopes.
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <span className="text-purple-300 font-bold block mb-1">📋 2. Planning</span>
-                  Verifying credential privileges and building prompt payloads.
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <span className="text-emerald-300 font-bold block mb-1">🔍 3. Exploring</span>
-                  Retrieving relevant workforce, ONA, and candidate records.
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <span className="text-amber-300 font-bold block mb-1">🛠️ 4. Modifying</span>
-                  Applying SQL database mutations (inserts, updates, moves) if requested.
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <span className="text-red-300 font-bold block mb-1">🔒 5. Verifying</span>
-                  Checking target alterations against regional compliance filters.
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <span className="text-green-300 font-bold block mb-1">✓ 6. Completing</span>
-                  Streaming final markdown answers and custom data tables.
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <Activity className="h-4 w-4 text-rose-400" /> Workflows Agent Ingestion & Retrieval Pipeline
+              </h3>
+              <div className="p-4 rounded-xl bg-slate-950/40 border border-white/5 text-xs text-slate-300 space-y-3">
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-cyan-300 font-bold w-24 flex-none">[1. Ingestion]</span>
+                    <span className="text-slate-400">User prompts + File uploads (PDF, DOCX, CSV, Images OCR)</span>
+                  </div>
+                  <div className="h-px bg-white/5" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-purple-300 font-bold w-24 flex-none">[2. Intent Solver]</span>
+                    <span className="text-slate-400">Parser detects if query requires search, snapshot analysis, or data mutations</span>
+                  </div>
+                  <div className="h-px bg-white/5" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-300 font-bold w-24 flex-none">[3. RBAC Gate]</span>
+                    <span className="text-slate-400">Validates user token privileges against target actions (Admins vs Members)</span>
+                  </div>
+                  <div className="h-px bg-white/5" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-300 font-bold w-24 flex-none">[4. Execution]</span>
+                    <span className="text-slate-400">Queries database tables, processes CSV imports, or issues warnings</span>
+                  </div>
+                  <div className="h-px bg-white/5" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-rose-400 font-bold w-24 flex-none">[5. LLM Stream]</span>
+                    <span className="text-slate-400">Combines live data context with prompt and streams Server-Sent Events (SSE)</span>
+                  </div>
                 </div>
               </div>
             </div>
 
+            {/* Parsing & Uploads */}
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Example Commands to Use</h3>
-              <ul className="text-xs space-y-2 pl-4 list-disc text-slate-200">
-                <li><strong className="text-white">Read actions:</strong> <code className="text-cyan-300 bg-black/30 px-1 py-0.5 rounded">"Show me highest risk employees in Sales and explain why"</code></li>
-                <li><strong className="text-white">Update risk flags:</strong> <code className="text-cyan-300 bg-black/30 px-1 py-0.5 rounded">"Set employee olivia@public.local risk to true"</code></li>
-                <li><strong className="text-white">Modify department:</strong> <code className="text-cyan-300 bg-black/30 px-1 py-0.5 rounded">"Move Liam Parker to Human Resources department"</code></li>
-                <li><strong className="text-white">Insert records:</strong> <code className="text-cyan-300 bg-black/30 px-1 py-0.5 rounded">"Add employee Silas Vance, email silas@aurelius.com, role Lead developer, department Technical"</code></li>
+              <h3 className="text-sm font-bold text-white">Attachment Parsing Engines</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                When you drag and drop attachments into the chat input, the backend parses them using specific libraries depending on file suffix:
+              </p>
+              <ul className="text-xs space-y-1.5 text-slate-300 list-disc pl-4">
+                <li><strong className="text-white">TXT / MD / LOG / JSON:</strong> Ingested directly as UTF-8 text strings.</li>
+                <li><strong className="text-white">PDF Documents:</strong> Parsed using <code className="text-rose-300 bg-black/25 px-1 py-0.5 rounded font-mono">pypdf</code> page-by-page.</li>
+                <li><strong className="text-white">Word Documents (DOCX):</strong> Read paragraph-by-paragraph using <code className="text-rose-300 bg-black/25 px-1 py-0.5 rounded font-mono">python-docx</code>.</li>
+                <li><strong className="text-white">Images (PNG / JPG / JPEG):</strong> Extracted using Tesseract OCR (<code className="text-rose-300 bg-black/25 px-1 py-0.5 rounded font-mono">pytesseract</code>).</li>
+                <li><strong className="text-white">CSV files:</strong> Parsed and automatically imported into PostgreSQL as either candidate or employee profiles based on status headers.</li>
               </ul>
+            </div>
+
+            {/* Supported Commands */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Data Mutations Command Reference</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Admins can input the following commands directly into the workflow chat to alter PostgreSQL database values:
+              </p>
+              
+              <div className="space-y-3.5 text-xs">
+                {/* Command 1 */}
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <span className="text-cyan-300 font-bold block mb-1">Set Employee Risk Flags</span>
+                  <code className="text-emerald-300 bg-black/30 px-1.5 py-0.5 rounded block w-full mt-1.5 font-mono text-[10px]">
+                    "Set employee liam@aurelius.com risk to true"
+                  </code>
+                </div>
+
+                {/* Command 2 */}
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <span className="text-cyan-300 font-bold block mb-1">Reorganize Personnel Departments</span>
+                  <code className="text-emerald-300 bg-black/30 px-1.5 py-0.5 rounded block w-full mt-1.5 font-mono text-[10px]">
+                    "Move employee olivia@public.local to department Engineering"
+                  </code>
+                </div>
+
+                {/* Command 3 */}
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <span className="text-cyan-300 font-bold block mb-1">Add New Workforce Entries</span>
+                  <code className="text-emerald-300 bg-black/30 px-1.5 py-0.5 rounded block w-full mt-1.5 font-mono text-[10px]">
+                    "Add employee Silas Vance, email silas@aurelius.com, role Lead Developer, dept Technical"
+                  </code>
+                </div>
+
+                {/* Command 4 */}
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <span className="text-cyan-300 font-bold block mb-1">Configure Integration Connections</span>
+                  <code className="text-emerald-300 bg-black/30 px-1.5 py-0.5 rounded block w-full mt-1.5 font-mono text-[10px]">
+                    "Add connection Slack Sync, provider slack, type messaging"
+                  </code>
+                </div>
+              </div>
+            </div>
+
+            {/* Deletion Warning */}
+            <div className="rounded-lg border border-red-500/20 bg-red-950/20 p-4 flex items-start gap-2.5">
+              <ShieldAlert className="h-4 w-4 text-red-400 flex-none mt-0.5" />
+              <div className="text-xs">
+                <h4 className="font-bold text-red-300">Human-in-the-Loop Safe Aborts</h4>
+                <p className="text-slate-300 mt-1 leading-relaxed">
+                  **Aurelius Governance Protocol:** The agent is strictly prohibited from executing deletion operations (<code className="font-mono text-[10px] text-red-300 bg-black/30 px-1 py-0.5 rounded">delete</code>, <code className="font-mono text-[10px] text-red-300 bg-black/30 px-1 py-0.5 rounded">remove</code>, or <code className="font-mono text-[10px] text-red-300 bg-black/30 px-1 py-0.5 rounded">purge</code>) under any circumstances. If requested, the pipeline safely aborts the operation, prompting the administrator to verify the deletion manually.
+                </p>
+              </div>
             </div>
           </div>
         );
