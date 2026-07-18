@@ -99,6 +99,13 @@ def verify_access_token(token: str) -> TokenData:
         if user_id is None:
             raise credentials_exception
 
+        # Validate that user_id is a valid UUID string to prevent downstream crashes (e.g. from legacy email-sub tokens)
+        try:
+            from uuid import UUID
+            UUID(user_id)
+        except ValueError:
+            raise credentials_exception
+
         token_data = TokenData(user_id=user_id, email=email, is_admin=is_admin)
         return token_data
 
