@@ -929,9 +929,49 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
                 <Network className="text-pink-400 h-5 w-5" /> Intelligence Center & ONA
               </h2>
-              
-              {/* Visual ONA Graph Structure Explanation */}
-              <div className="space-y-4 mt-6">
+              <p className="text-slate-300 text-sm mt-2 leading-relaxed">
+                Welcome to the Aurelius Decision Workbench (Math-Engine). This interface runs live mathematical optimization models, graph algorithms, and statistical simulators to solve key talent planning challenges.
+              </p>
+            </div>
+
+            {/* Executive Decision Workbench Section */}
+            <div className="p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5 space-y-3">
+              <h4 className="text-xs font-black uppercase tracking-wider text-indigo-300">
+                Executive Decision Workbench (Math-Engine)
+              </h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                This page acts as your strategic talent playground. Unlike simple static tables, it runs live mathematical algorithms on your workforce data to solve operational problems:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs mt-2">
+                <div className="bg-slate-950/40 p-3 rounded-lg border border-white/5">
+                  <span className="font-extrabold text-[10px] text-indigo-300 uppercase tracking-wider block mb-1">
+                    1. Semantic Skills Graph
+                  </span>
+                  <p className="text-[10px] text-slate-400 leading-normal">
+                    Finds hidden talent matching your target requirements. By building a skills adjacency graph and executing a shortest-path algorithm (Dijkstra), it proves that employees with "Vue.js" are highly transferable to "React" positions, saving external hiring costs.
+                  </p>
+                </div>
+                <div className="bg-slate-950/40 p-3 rounded-lg border border-white/5">
+                  <span className="font-extrabold text-[10px] text-indigo-300 uppercase tracking-wider block mb-1">
+                    2. Optimal Team Assembly
+                  </span>
+                  <p className="text-[10px] text-slate-400 leading-normal">
+                    Solves headcount constraints automatically. Uses a physics-inspired solver (Simulated Annealing) to compile high-performing team combinations that perfectly fit your budget caps while maximizing necessary project skills.
+                  </p>
+                </div>
+                <div className="bg-slate-950/40 p-3 rounded-lg border border-white/5">
+                  <span className="font-extrabold text-[10px] text-indigo-300 uppercase tracking-wider block mb-1">
+                    3. Attrition Sandbox Simulator
+                  </span>
+                  <p className="text-[10px] text-slate-400 leading-normal">
+                    Test your talent policies risk-free. Adjust the interactive salary boosts, workload scales, or morale shifts to see predicted retention forecasts modeled dynamically, letting you justify compensation changes with math before spending budget.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Visual ONA Graph Structure Explanation */}
+            <div className="space-y-4">
                 <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                   <Network className="text-pink-400 h-4 w-4" /> ONA Network Centrality Blueprint
                 </h3>
@@ -1026,7 +1066,6 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <p className="text-xs text-slate-300 leading-relaxed">
                   High-impact interventions or structural updates (such as releasing department reorganizations) trigger **Mandatory Policy Pack Gates**. These gates require administrative override keys to authorize releases.
                 </p>
-              </div>
             </div>
           </div>
         );

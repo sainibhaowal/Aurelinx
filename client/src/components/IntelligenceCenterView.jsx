@@ -661,61 +661,7 @@ const IntelligenceCenterView = () => {
         </div>
       </header>
 
-      {/* Dynamic Business Outcome Guide Banner */}
-      <div className="premium-card p-5 border border-indigo-500/20 bg-indigo-500/5 mb-6 relative overflow-hidden text-left">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-xl rounded-full translate-x-10 -translate-y-10" />
-        <div className="flex items-start gap-4">
-          <div className="h-10 w-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 border border-indigo-500/20 flex-shrink-0">
-            <Cpu size={20} className="animate-pulse" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-wider">
-              Executive Decision Workbench (Math-Engine)
-            </h3>
-            <p className="text-xs text-slate-300 leading-relaxed mb-4 max-w-4xl">
-              This page acts as your strategic talent playground. Unlike simple
-              static tables, it runs live mathematical algorithms on your
-              workforce data to solve operational problems:
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="bg-slate-950/40 p-3 rounded-lg border border-white/5">
-                <div className="font-extrabold text-[10px] text-indigo-400 uppercase tracking-wider mb-1">
-                  1. Semantic Skills Graph
-                </div>
-                <p className="text-[10px] text-slate-400 leading-normal">
-                  Finds hidden talent matching your target requirements. By
-                  building a skills adjacency graph and executing a
-                  shortest-path algorithm (Dijkstra), it proves that employees
-                  with "Vue.js" are highly transferable to "React" positions,
-                  saving external hiring costs.
-                </p>
-              </div>
-              <div className="bg-slate-950/40 p-3 rounded-lg border border-white/5">
-                <div className="font-extrabold text-[10px] text-indigo-400 uppercase tracking-wider mb-1">
-                  2. Optimal Team Assembly
-                </div>
-                <p className="text-[10px] text-slate-400 leading-normal">
-                  Solves headcount constraints automatically. Uses a
-                  physics-inspired solver (Simulated Annealing) to compile
-                  high-performing team combinations that perfectly fit your
-                  budget caps while maximizing necessary project skills.
-                </p>
-              </div>
-              <div className="bg-slate-950/40 p-3 rounded-lg border border-white/5">
-                <div className="font-extrabold text-[10px] text-indigo-400 uppercase tracking-wider mb-1">
-                  3. Attrition Sandbox Simulator
-                </div>
-                <p className="text-[10px] text-slate-400 leading-normal">
-                  Test your talent policies risk-free. Adjust the interactive
-                  salary boosts, workload scales, or morale shifts to see
-                  predicted retention forecasts modeled dynamically, letting you
-                  justify compensation changes with math before spending budget.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+
 
       {/* Main Tabs Navigation */}
       <div className="flex flex-wrap gap-2 border-b border-white/5 pb-4 mb-6">
