@@ -113,36 +113,54 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
             </div>
 
             {/* Architecture Flowchart */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                 <Activity className="h-4 w-4 text-rose-400" /> Workflows Agent Ingestion & Retrieval Pipeline
               </h3>
-              <div className="p-4 rounded-xl bg-slate-950/40 border border-white/5 text-xs text-slate-300 space-y-3">
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-cyan-300 font-bold w-24 flex-none">[1. Ingestion]</span>
-                    <span className="text-slate-400">User prompts + File uploads (PDF, DOCX, CSV, Images OCR)</span>
+              
+              <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4">
+                <div className="relative pl-6 border-l border-white/10 space-y-6">
+                  
+                  {/* Step 1 */}
+                  <div className="relative">
+                    <div className="absolute -left-[31px] top-0 h-4 w-4 rounded-full bg-cyan-500 border-4 border-slate-950 shadow-[0_0_8px_rgba(6,182,212,0.6)]" />
+                    <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-widest block">1. INGESTION ENGINE</span>
+                    <h5 className="text-xs text-white font-bold mt-0.5">Context Gathering & Parser</h5>
+                    <p className="text-[11px] text-slate-400 mt-1">Accepts user natural language prompts + rich file attachments (PDFs, DOCX, CSV, Image OCR).</p>
                   </div>
-                  <div className="h-px bg-white/5" />
-                  <div className="flex items-center gap-2">
-                    <span className="text-purple-300 font-bold w-24 flex-none">[2. Intent Solver]</span>
-                    <span className="text-slate-400">Parser detects if query requires search, snapshot analysis, or data mutations</span>
+
+                  {/* Step 2 */}
+                  <div className="relative">
+                    <div className="absolute -left-[31px] top-0 h-4 w-4 rounded-full bg-purple-500 border-4 border-slate-950 shadow-[0_0_8px_rgba(168,85,247,0.6)]" />
+                    <span className="text-[10px] font-bold text-purple-300 uppercase tracking-widest block">2. INTENT CLASSIFIER</span>
+                    <h5 className="text-xs text-white font-bold mt-0.5">Dynamic Tool Policy</h5>
+                    <p className="text-[11px] text-slate-400 mt-1">Decides whether the query requests a readonly database search, summary metrics snapshot, or administrative write transactions.</p>
                   </div>
-                  <div className="h-px bg-white/5" />
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-300 font-bold w-24 flex-none">[3. RBAC Gate]</span>
-                    <span className="text-slate-400">Validates user token privileges against target actions (Admins vs Members)</span>
+
+                  {/* Step 3 */}
+                  <div className="relative">
+                    <div className="absolute -left-[31px] top-0 h-4 w-4 rounded-full bg-amber-500 border-4 border-slate-950 shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+                    <span className="text-[10px] font-bold text-amber-300 uppercase tracking-widest block">3. RBAC & SECURITY CHECK</span>
+                    <h5 className="text-xs text-white font-bold mt-0.5">Compliance Gatekeeper</h5>
+                    <p className="text-[11px] text-slate-400 mt-1">Authenticates user privileges. Blocks write operations for regular members and redirects deletion operations to human-in-the-loop gates.</p>
                   </div>
-                  <div className="h-px bg-white/5" />
-                  <div className="flex items-center gap-2">
-                    <span className="text-emerald-300 font-bold w-24 flex-none">[4. Execution]</span>
-                    <span className="text-slate-400">Queries database tables, processes CSV imports, or issues warnings</span>
+
+                  {/* Step 4 */}
+                  <div className="relative">
+                    <div className="absolute -left-[31px] top-0 h-4 w-4 rounded-full bg-emerald-500 border-4 border-slate-950 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                    <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest block">4. TRANSACTION LAYER</span>
+                    <h5 className="text-xs text-white font-bold mt-0.5">PostgreSQL Execution</h5>
+                    <p className="text-[11px] text-slate-400 mt-1">Commits data mutations, runs skills similarity searches, or imports batch CSV rosters directly into Postgres.</p>
                   </div>
-                  <div className="h-px bg-white/5" />
-                  <div className="flex items-center gap-2">
-                    <span className="text-rose-400 font-bold w-24 flex-none">[5. LLM Stream]</span>
-                    <span className="text-slate-400">Combines live data context with prompt and streams Server-Sent Events (SSE)</span>
+
+                  {/* Step 5 */}
+                  <div className="relative">
+                    <div className="absolute -left-[31px] top-0 h-4 w-4 rounded-full bg-rose-500 border-4 border-slate-950 shadow-[0_0_8px_rgba(244,63,94,0.6)]" />
+                    <span className="text-[10px] font-bold text-rose-300 uppercase tracking-widest block">5. GENERATIVE STREAM</span>
+                    <h5 className="text-xs text-white font-bold mt-0.5">SSE Token Typewriter</h5>
+                    <p className="text-[11px] text-slate-400 mt-1">Integrates tool query outcomes with conversation logs and streams real-time Markdown via Server-Sent Events.</p>
                   </div>
+
                 </div>
               </div>
             </div>
@@ -244,41 +262,52 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
             </div>
 
             {/* Flow Diagram */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                 <Activity className="h-4 w-4 text-cyan-400" /> Talent Scout Matchmaking Pipeline
               </h3>
-              <div className="p-4 rounded-xl bg-slate-950/40 border border-white/5 text-xs text-slate-300 space-y-3">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-center">
+              
+              <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                   
                   {/* Step 1 */}
-                  <div className="flex-1 p-2 bg-cyan-500/5 rounded border border-cyan-500/20 w-full">
-                    <span className="text-[10px] font-bold text-cyan-400 block">1. CONCEPTUAL INPUT</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">Natural language prompt & AI provider key</span>
+                  <div className="p-3.5 bg-slate-900/60 border border-cyan-500/20 rounded-xl relative hover:border-cyan-500/40 transition-colors">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(6,182,212,0.5)]">
+                      1
+                    </span>
+                    <span className="text-[9px] font-black text-cyan-300 uppercase tracking-wider block mt-1">INPUT STAGE</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Natural Query</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Accepts natural prompts, extracts skill/role/dept tokens.</p>
                   </div>
-
-                  <div className="text-slate-600 font-bold hidden md:block">➔</div>
 
                   {/* Step 2 */}
-                  <div className="flex-1 p-2 bg-cyan-500/5 rounded border border-cyan-500/20 w-full">
-                    <span className="text-[10px] font-bold text-cyan-400 block">2. TOKEN OVERLAP SCORE</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">Cross-calculates skill, role, & dept hits</span>
+                  <div className="p-3.5 bg-slate-900/60 border border-cyan-500/20 rounded-xl relative hover:border-cyan-500/40 transition-colors">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(6,182,212,0.5)]">
+                      2
+                    </span>
+                    <span className="text-[9px] font-black text-cyan-300 uppercase tracking-wider block mt-1">MATCHING</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Token Scoring</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Intersects search tokens with Postgres skill sets, roles, & CV match scores.</p>
                   </div>
-
-                  <div className="text-slate-600 font-bold hidden md:block">➔</div>
 
                   {/* Step 3 */}
-                  <div className="flex-1 p-2 bg-cyan-500/5 rounded border border-cyan-500/20 w-full">
-                    <span className="text-[10px] font-bold text-cyan-400 block">3. RETENTION SCREENING</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">Checks target dept sentiment and burnout risk</span>
+                  <div className="p-3.5 bg-slate-900/60 border border-cyan-500/20 rounded-xl relative hover:border-cyan-500/40 transition-colors">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(6,182,212,0.5)]">
+                      3
+                    </span>
+                    <span className="text-[9px] font-black text-cyan-300 uppercase tracking-wider block mt-1">SAFETY</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Retention Filter</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Evaluates target department workload & morale levels to prevent placement shocks.</p>
                   </div>
 
-                  <div className="text-slate-600 font-bold hidden md:block">➔</div>
-
                   {/* Step 4 */}
-                  <div className="flex-1 p-2 bg-cyan-500/5 rounded border border-cyan-500/20 w-full">
-                    <span className="text-[10px] font-bold text-cyan-400 block">4. STREAMED BRIEF</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">LLM streams recommendations & gap warnings</span>
+                  <div className="p-3.5 bg-slate-900/60 border border-cyan-500/20 rounded-xl relative hover:border-cyan-500/40 transition-colors">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(6,182,212,0.5)]">
+                      4
+                    </span>
+                    <span className="text-[9px] font-black text-cyan-300 uppercase tracking-wider block mt-1">OUTPUT STAGE</span>
+                    <h6 className="text-xs text-white font-bold mt-1">LLM Summary Brief</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Typewriter streams recommendation rationales, strengths, and candidate gap warning matrices.</p>
                   </div>
 
                 </div>
@@ -370,41 +399,52 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
             </div>
 
             {/* Visual Sentiment Pipeline Diagram */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                 <Activity className="h-4 w-4 text-emerald-400" /> Sentiment Intelligence Flow
               </h3>
-              <div className="p-4 rounded-xl bg-slate-950/40 border border-white/5 text-xs text-slate-300 space-y-3">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-center">
+              
+              <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                   
                   {/* Step A */}
-                  <div className="flex-1 p-2 bg-emerald-500/5 rounded border border-emerald-500/20 w-full">
-                    <span className="text-[10px] font-bold text-emerald-400 block">A. RAW INGESTION</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">Slack, Jira, Git messages</span>
+                  <div className="p-3.5 bg-slate-900/60 border border-emerald-500/20 rounded-xl relative hover:border-emerald-500/40 transition-colors">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-emerald-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(16,185,129,0.5)]">
+                      A
+                    </span>
+                    <span className="text-[9px] font-black text-emerald-300 uppercase tracking-wider block mt-1">TELEMETRY INGEST</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Raw Ingestion</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Pipes active communications from Slack, Jira commits, and Git messages.</p>
                   </div>
-
-                  <div className="text-slate-600 font-bold hidden md:block">➔</div>
 
                   {/* Step B */}
-                  <div className="flex-1 p-2 bg-emerald-500/5 rounded border border-emerald-500/20 w-full">
-                    <span className="text-[10px] font-bold text-emerald-400 block">B. NLP VECTORIZER</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">Valence-shifting text analysis</span>
+                  <div className="p-3.5 bg-slate-900/60 border border-emerald-500/20 rounded-xl relative hover:border-emerald-500/40 transition-colors">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-emerald-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(16,185,129,0.5)]">
+                      B
+                    </span>
+                    <span className="text-[9px] font-black text-emerald-300 uppercase tracking-wider block mt-1">NLP PARSER</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Valence Mapping</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Applies rolling sentiment vectors to identify communication moods.</p>
                   </div>
-
-                  <div className="text-slate-600 font-bold hidden md:block">➔</div>
 
                   {/* Step C */}
-                  <div className="flex-1 p-2 bg-emerald-500/5 rounded border border-emerald-500/20 w-full">
-                    <span className="text-[10px] font-bold text-emerald-400 block">C. INDICATORS SOLVER</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">Score + Velocity + Confidence</span>
+                  <div className="p-3.5 bg-slate-900/60 border border-emerald-500/20 rounded-xl relative hover:border-emerald-500/40 transition-colors">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-emerald-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(16,185,129,0.5)]">
+                      C
+                    </span>
+                    <span className="text-[9px] font-black text-emerald-300 uppercase tracking-wider block mt-1">TELEMETRY SOLVER</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Three Pillars</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Calculates current morale, velocity trends, and communication confidence.</p>
                   </div>
 
-                  <div className="text-slate-600 font-bold hidden md:block">➔</div>
-
                   {/* Step D */}
-                  <div className="flex-1 p-2 bg-emerald-500/5 rounded border border-emerald-500/20 w-full">
-                    <span className="text-[10px] font-bold text-emerald-400 block">D. THREAT GATEWAY</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">System Status & Action triggers</span>
+                  <div className="p-3.5 bg-slate-900/60 border border-emerald-500/20 rounded-xl relative hover:border-emerald-500/40 transition-colors">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-emerald-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(16,185,129,0.5)]">
+                      D
+                    </span>
+                    <span className="text-[9px] font-black text-emerald-300 uppercase tracking-wider block mt-1">THREAT CLASSIFIER</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Macro Status Index</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Aggregates flagged ratios to assign overall Level 1, 2, or 3 priority alerts.</p>
                   </div>
 
                 </div>
@@ -683,50 +723,55 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
             </div>
 
             {/* Architecture flow diagram */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                 <Activity className="h-4 w-4 text-purple-400" /> Data Processing & Attrition Pipeline
               </h3>
-              <div className="p-4 rounded-xl bg-slate-950/40 border border-white/5 space-y-4">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-center">
+              
+              <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                   
                   {/* Step 1 */}
-                  <div className="flex-1 p-2.5 bg-purple-500/10 rounded-lg border border-purple-500/20 w-full">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-purple-400 block">1. Telemetry Ingest</span>
-                    <span className="text-[11px] text-slate-300 mt-1 block">Slack, Jira, Git logs, & HRIS</span>
+                  <div className="p-3.5 bg-slate-900/60 border border-purple-500/20 rounded-xl relative hover:border-purple-500/40 transition-colors">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-purple-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(168,85,247,0.5)]">
+                      1
+                    </span>
+                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider block mt-1">TELEMETRY</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Telemetry Ingest</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Aggregates Slack logs, Jira assignments, Git commits, & Workday profiles.</p>
                   </div>
-
-                  <div className="text-slate-500 font-bold hidden md:block">➔</div>
-                  <div className="text-slate-500 font-bold md:hidden">↓</div>
 
                   {/* Step 2 */}
-                  <div className="flex-1 p-2.5 bg-cyan-500/10 rounded-lg border border-cyan-500/20 w-full">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 block">2. Scoring Models</span>
-                    <span className="text-[11px] text-slate-300 mt-1 block">NLP Sentiment & ML Risk Calc</span>
+                  <div className="p-3.5 bg-slate-900/60 border border-purple-500/20 rounded-xl relative hover:border-purple-500/40 transition-colors">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-purple-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(168,85,247,0.5)]">
+                      2
+                    </span>
+                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider block mt-1">INTELLIGENCE</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Scoring Models</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Calculates NLP communication sentiment & ML Attrition Risk probability.</p>
                   </div>
-
-                  <div className="text-slate-500 font-bold hidden md:block">➔</div>
-                  <div className="text-slate-500 font-bold md:hidden">↓</div>
 
                   {/* Step 3 */}
-                  <div className="flex-1 p-2.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20 w-full">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 block">3. Aggregation</span>
-                    <span className="text-[11px] text-slate-300 mt-1 block">Optimal vs At-Risk classification</span>
+                  <div className="p-3.5 bg-slate-900/60 border border-purple-500/20 rounded-xl relative hover:border-purple-500/40 transition-colors">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-purple-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(168,85,247,0.5)]">
+                      3
+                    </span>
+                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider block mt-1">STATE CONTROL</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Aggregation</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Categorizes employee profiles into OPTIMAL or AT-RISK classification pools.</p>
                   </div>
 
-                  <div className="text-slate-500 font-bold hidden md:block">➔</div>
-                  <div className="text-slate-500 font-bold md:hidden">↓</div>
-
                   {/* Step 4 */}
-                  <div className="flex-1 p-2.5 bg-rose-500/10 rounded-lg border border-rose-500/20 w-full">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-rose-400 block">4. Direct Action</span>
-                    <span className="text-[11px] text-slate-300 mt-1 block">Interventions & PDF Briefings</span>
+                  <div className="p-3.5 bg-slate-900/60 border border-purple-500/20 rounded-xl relative hover:border-purple-500/40 transition-colors">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-purple-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(168,85,247,0.5)]">
+                      4
+                    </span>
+                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider block mt-1">HR INITIATIVE</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Direct Action</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Enables structured 30/60/90-day intervention setups and exportable PDF Briefings.</p>
                   </div>
 
                 </div>
-                <p className="text-[11px] text-slate-400 text-center leading-relaxed">
-                  Real-time events sync dynamically to update employee statuses, allowing leaders to monitor attrition threats as they develop.
-                </p>
               </div>
             </div>
 
@@ -884,27 +929,104 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
                 <Network className="text-pink-400 h-5 w-5" /> Intelligence Center & ONA
               </h2>
-              <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                The Intelligence Center computes Organizational Network Analysis (ONA) using Dijkstra paths, PageRank influence indexes, and Brandes Betweenness centrality solvers.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Interactive Centrality Graph</h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                The network graph is fully interactive. Node size corresponds to the employee's PageRank influence index, and edge connections map actual PR code reviews and Jira collaborations:
-              </p>
-              <ul className="text-xs space-y-1.5 text-slate-200 list-disc pl-4">
-                <li><strong className="text-white">Betweenness Centrality:</strong> Exposes employees who act as information brokers. High brokerage combined with low morale indicates critical attrition bottlenecks.</li>
-                <li><strong className="text-white">PageRank Centrality:</strong> Highlights key decision-makers who hold high structural value inside the organization.</li>
-              </ul>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Compliance Approval Gates</h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                High-impact interventions or structural updates (such as releasing department reorganizations) trigger **Mandatory Policy Pack Gates**. These gates require administrative override keys to authorize releases.
-              </p>
+              
+              {/* Visual ONA Graph Structure Explanation */}
+              <div className="space-y-4 mt-6">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Network className="text-pink-400 h-4 w-4" /> ONA Network Centrality Blueprint
+                </h3>
+                
+                <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4">
+                  <div className="relative h-44 bg-slate-900/80 rounded-lg border border-white/5 overflow-hidden flex items-center justify-center">
+                    {/* Grid background */}
+                    <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:14px_24px]" />
+                    
+                    {/* Visual SVG Connections */}
+                    <svg className="absolute inset-0 h-full w-full pointer-events-none">
+                      <line x1="20%" y1="50%" x2="40%" y2="25%" stroke="rgba(244,63,94,0.3)" strokeWidth="2" strokeDasharray="3 3" />
+                      <line x1="20%" y1="50%" x2="40%" y2="75%" stroke="rgba(244,63,94,0.3)" strokeWidth="2" strokeDasharray="3 3" />
+                      <line x1="40%" y1="25%" x2="60%" y2="50%" stroke="rgba(236,72,153,0.8)" strokeWidth="3" />
+                      <line x1="40%" y1="75%" x2="60%" y2="50%" stroke="rgba(236,72,153,0.8)" strokeWidth="3" />
+                      <line x1="60%" y1="50%" x2="80%" y2="30%" stroke="rgba(6,182,212,0.4)" strokeWidth="2" />
+                      <line x1="60%" y1="50%" x2="80%" y2="70%" stroke="rgba(6,182,212,0.4)" strokeWidth="2" />
+                    </svg>
+  
+                    {/* Node 1: Ingestion / Peripheral */}
+                    <div className="absolute left-[15%] top-[40%] flex flex-col items-center">
+                      <div className="h-6 w-6 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center text-[8px] text-slate-400 font-bold">
+                        A
+                      </div>
+                      <span className="text-[9px] text-slate-400 mt-1">Isolated</span>
+                    </div>
+  
+                    {/* Node 2: Hub */}
+                    <div className="absolute left-[36%] top-[15%] flex flex-col items-center">
+                      <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(6,182,212,0.4)]">
+                        B
+                      </div>
+                      <span className="text-[9px] text-cyan-300 mt-1">High PageRank</span>
+                    </div>
+  
+                    {/* Node 3: Hub */}
+                    <div className="absolute left-[36%] top-[65%] flex flex-col items-center">
+                      <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(6,182,212,0.4)]">
+                        C
+                      </div>
+                      <span className="text-[9px] text-cyan-300 mt-1">Team Hub</span>
+                    </div>
+  
+                    {/* Node 4: Broker (High Betweenness) */}
+                    <div className="absolute left-[56%] top-[40%] flex flex-col items-center">
+                      <div className="h-10 w-10 rounded-full bg-pink-500 border-2 border-pink-400 flex items-center justify-center text-[11px] text-slate-950 font-black shadow-[0_0_12px_rgba(236,72,153,0.6)]">
+                        D
+                      </div>
+                      <span className="text-[9px] text-pink-400 font-extrabold mt-1">Key Broker</span>
+                    </div>
+  
+                    {/* Node 5: Target Dept Output */}
+                    <div className="absolute left-[76%] top-[20%] flex flex-col items-center">
+                      <div className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-500 flex items-center justify-center text-[9px] text-slate-300 font-bold">
+                        E
+                      </div>
+                      <span className="text-[9px] text-slate-400 mt-1">Operational</span>
+                    </div>
+  
+                    <div className="absolute left-[76%] top-[60%] flex flex-col items-center">
+                      <div className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-500 flex items-center justify-center text-[9px] text-slate-300 font-bold">
+                        F
+                      </div>
+                      <span className="text-[9px] text-slate-400 mt-1">Operational</span>
+                    </div>
+                  </div>
+  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300">
+                    <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
+                      <strong className="text-pink-300 block flex items-center gap-1">
+                        <Network className="h-3.5 w-3.5" /> Betweenness Centrality (Brokerage)
+                      </strong>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Measures how often a node sits on the shortest communication path between other nodes (like Node <strong>D</strong>). High betweenness combined with low morale signals an imminent organizational bottleneck.
+                      </p>
+                    </div>
+  
+                    <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
+                      <strong className="text-cyan-300 block flex items-center gap-1">
+                        <Activity className="h-3.5 w-3.5" /> PageRank Centrality (Influence)
+                      </strong>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Measures structural prestige and network reach. A node connected to other high-influence nodes receives a higher ranking, identifying key decision-makers.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+  
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-white">Compliance Approval Gates</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  High-impact interventions or structural updates (such as releasing department reorganizations) trigger **Mandatory Policy Pack Gates**. These gates require administrative override keys to authorize releases.
+                </p>
+              </div>
             </div>
           </div>
         );
