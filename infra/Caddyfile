@@ -1,0 +1,11 @@
+{$SITE_ADDRESS:http://localhost} {
+    # Route API calls to the FastAPI backend
+    handle /api/* {
+        reverse_proxy api:5000
+    }
+
+    # Route everything else to the Next.js frontend
+    handle {
+        reverse_proxy web:3000
+    }
+}

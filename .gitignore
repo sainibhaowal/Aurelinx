@@ -43,6 +43,8 @@ htmlcov/
 .env.test.local
 .env.production.local
 *.env
+.env.production
+infra/.env.production
 
 # Build outputs
 dist/
