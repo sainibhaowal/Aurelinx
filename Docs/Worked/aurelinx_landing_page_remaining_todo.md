@@ -1,4 +1,4 @@
-# Aurelius Landing Page Remaining Todo
+# Aurelinx Landing Page Remaining Todo
 
 ## Goal
 Keep the landing page aligned with the blueprint while tracking the last future-only assets.

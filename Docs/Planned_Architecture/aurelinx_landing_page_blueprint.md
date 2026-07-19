@@ -1,10 +1,10 @@
-# Aurelius Landing Page Blueprint
+# Aurelinx Landing Page Blueprint
 
 ## Goal
-Create a landing page that explains Aurelius clearly, shows the product value fast, and supports future enterprise sales.
+Create a landing page that explains Aurelinx clearly, shows the product value fast, and supports future enterprise sales.
 
 ## Positioning Statement
-Aurelius is an operational HR Intelligence platform that helps teams detect risk, act on it, and measure outcomes in one workflow.
+Aurelinx is an operational HR Intelligence platform that helps teams detect risk, act on it, and measure outcomes in one workflow.
 
 ## Core Message
 1. Find workforce risk early.
@@ -34,7 +34,7 @@ Headline:
 Operational HR Intelligence for faster decisions and measurable outcomes.
 
 Subheadline:
-Aurelius unifies workforce risk, interventions, compliance checks, and scenario planning in one lean platform.
+Aurelinx unifies workforce risk, interventions, compliance checks, and scenario planning in one lean platform.
 
 Primary CTA:
 Request demo

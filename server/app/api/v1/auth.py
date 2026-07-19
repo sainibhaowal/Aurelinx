@@ -255,7 +255,7 @@ async def google_login(
     # Construct redirect URI
     base = str(request.base_url).rstrip("/")
     if "averqel.com" in base or settings.ENVIRONMENT == "production":
-        redirect_uri = "https://aurelius.averqel.com/api/v1/auth/google/callback"
+        redirect_uri = "https://aurelinx.averqel.com/api/v1/auth/google/callback"
     else:
         redirect_uri = f"{base}/api/v1/auth/google/callback"
         
@@ -285,7 +285,7 @@ async def google_callback(
     # Construct redirect URI
     base = str(request.base_url).rstrip("/")
     if "averqel.com" in base or settings.ENVIRONMENT == "production":
-        redirect_uri = "https://aurelius.averqel.com/api/v1/auth/google/callback"
+        redirect_uri = "https://aurelinx.averqel.com/api/v1/auth/google/callback"
     else:
         redirect_uri = f"{base}/api/v1/auth/google/callback"
         
@@ -368,7 +368,7 @@ async def github_login(
     # Construct redirect URI
     base = str(request.base_url).rstrip("/")
     if "averqel.com" in base or settings.ENVIRONMENT == "production":
-        redirect_uri = "https://aurelius.averqel.com/api/v1/auth/github/callback"
+        redirect_uri = "https://aurelinx.averqel.com/api/v1/auth/github/callback"
     else:
         redirect_uri = f"{base}/api/v1/auth/github/callback"
         
@@ -397,7 +397,7 @@ async def github_callback(
     # Construct redirect URI
     base = str(request.base_url).rstrip("/")
     if "averqel.com" in base or settings.ENVIRONMENT == "production":
-        redirect_uri = "https://aurelius.averqel.com/api/v1/auth/github/callback"
+        redirect_uri = "https://aurelinx.averqel.com/api/v1/auth/github/callback"
     else:
         redirect_uri = f"{base}/api/v1/auth/github/callback"
         
@@ -423,7 +423,7 @@ async def github_callback(
         # Get user info
         user_info_res = await client.get(
             "https://api.github.com/user",
-            headers={"Authorization": f"Bearer {access_token}", "User-Agent": "Aurelius"}
+            headers={"Authorization": f"Bearer {access_token}", "User-Agent": "Aurelinx"}
         )
         if user_info_res.status_code != 200:
             logger.error(f"GitHub userinfo failed: {user_info_res.text}")
@@ -437,7 +437,7 @@ async def github_callback(
         if not email:
             emails_res = await client.get(
                 "https://api.github.com/user/emails",
-                headers={"Authorization": f"Bearer {access_token}", "User-Agent": "Aurelius"}
+                headers={"Authorization": f"Bearer {access_token}", "User-Agent": "Aurelinx"}
             )
             if emails_res.status_code == 200:
                 emails_list = emails_res.json()

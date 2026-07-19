@@ -27,14 +27,14 @@ cp "$EXAMPLE_FILE" "$ENV_FILE"
 
 # Replace placeholders with generated secrets
 # Using sed (Linux compatible)
-sed -i "s/AureliusPg_2026\!ChangeMe/$DB_PASS/g" "$ENV_FILE"
-sed -i "s/AureliusRedis_2026\!ChangeMe/$REDIS_PASS/g" "$ENV_FILE"
-sed -i "s/AureliusSecretKey_2026_ChangeThisValue_BeforeInternetExposure/$SECRET_KEY_GEN/g" "$ENV_FILE"
+sed -i "s/AurelinxPg_2026\!ChangeMe/$DB_PASS/g" "$ENV_FILE"
+sed -i "s/AurelinxRedis_2026\!ChangeMe/$REDIS_PASS/g" "$ENV_FILE"
+sed -i "s/AurelinxSecretKey_2026_ChangeThisValue_BeforeInternetExposure/$SECRET_KEY_GEN/g" "$ENV_FILE"
 
 # Ask user for URLs if running in interactive mode
 if [ -t 0 ]; then
     echo ""
-    read -p "Enter your site domain (e.g. https://aurelius.averqel.com) [Press Enter for default http://localhost]: " SITE_ADDR
+    read -p "Enter your site domain (e.g. https://aurelinx.averqel.com) [Press Enter for default http://localhost]: " SITE_ADDR
     if [ -n "$SITE_ADDR" ]; then
         # Remove trailing slash
         SITE_ADDR=${SITE_ADDR%/}

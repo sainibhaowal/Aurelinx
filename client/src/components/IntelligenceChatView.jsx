@@ -860,7 +860,7 @@ const IntelligenceChatView = () => {
         sessionId = created.id;
       }
 
-      const cfgRaw = localStorage.getItem("AURELIUS_PROVIDERS_CONFIG");
+      const cfgRaw = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
       const cfg = cfgRaw ? JSON.parse(cfgRaw) : {};
       const provider = cfg.activeProvider || "lmstudio";
       const providerCfg = cfg[provider] || {};
@@ -936,7 +936,7 @@ const IntelligenceChatView = () => {
         setSelectedSessionId(created.id);
         sessionId = created.id;
         try {
-          const cfgRaw = localStorage.getItem("AURELIUS_PROVIDERS_CONFIG");
+          const cfgRaw = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
           const cfg = cfgRaw ? JSON.parse(cfgRaw) : {};
           const provider = cfg.activeProvider || "lmstudio";
           const providerCfg = cfg[provider] || {};
@@ -977,7 +977,7 @@ const IntelligenceChatView = () => {
       }
 
       try {
-        const cfgRaw = localStorage.getItem("AURELIUS_PROVIDERS_CONFIG");
+        const cfgRaw = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
         const cfg = cfgRaw ? JSON.parse(cfgRaw) : {};
         const provider = cfg.activeProvider || "lmstudio";
         const providerCfg = cfg[provider] || {};
@@ -1052,14 +1052,14 @@ const IntelligenceChatView = () => {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-extrabold">
-                Aurelius Intelligence Chat
+                Aurelinx Intelligence Chat
               </h2>
               <button
                 type="button"
                 onClick={() => setHelpOpen((v) => !v)}
                 className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 hover:text-cyan-200 transition-colors"
-                title="What Aurelius Intelligence Chat can do"
-                aria-label="What Aurelius Intelligence Chat can do"
+                title="What Aurelinx Intelligence Chat can do"
+                aria-label="What Aurelinx Intelligence Chat can do"
               >
                 <Info size={12} />
               </button>
@@ -1123,7 +1123,7 @@ const IntelligenceChatView = () => {
                 No Active Workflow Sessions
               </h3>
               <p className="text-xs text-slate-400 max-w-xs mb-6 leading-relaxed">
-                Create a new session to begin interacting with the Aurelius
+                Create a new session to begin interacting with the Aurelinx
                 Intelligence agent.
               </p>
               <button
@@ -1179,7 +1179,7 @@ const IntelligenceChatView = () => {
                 )}
                 {!messages.length && (
                   <div className="text-sm text-slate-400">
-                    Start a chat session and ask Aurelius to search, analyze,
+                    Start a chat session and ask Aurelinx to search, analyze,
                     and update data.
                   </div>
                 )}
@@ -1244,7 +1244,7 @@ const IntelligenceChatView = () => {
                     {/* Seamless Borderless Input */}
                     <textarea
                       className="flex-1 bg-transparent border-0 outline-none focus:ring-0 text-slate-100 placeholder:text-slate-500 text-sm py-2 resize-none h-9 max-h-28 overflow-y-auto leading-relaxed custom-scrollbar"
-                      placeholder="Ask Aurelius to analyze, search, update employee data, or drive workflows..."
+                      placeholder="Ask Aurelinx to analyze, search, update employee data, or drive workflows..."
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={(e) => {

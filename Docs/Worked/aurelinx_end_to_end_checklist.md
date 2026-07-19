@@ -1,4 +1,4 @@
-# Aurelius End-To-End Checklist
+# Aurelinx End-To-End Checklist
 
 ## Purpose
 Single source of truth for product completion, launch readiness, and remaining optional hardening work.

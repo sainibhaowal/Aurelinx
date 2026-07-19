@@ -1,4 +1,4 @@
-# Aurelius Readiness Remaining Todo
+# Aurelinx Readiness Remaining Todo
 
 ## Goal
 Close the last enterprise-readiness gaps from the addendum in a lean, startup-friendly way.

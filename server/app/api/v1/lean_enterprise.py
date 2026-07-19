@@ -1577,7 +1577,7 @@ def _run_connection_sync(
         db.commit()
         _audit(
             db,
-            TokenData(user_id="system", email="system@aurelius.local", is_admin=True),
+            TokenData(user_id="system", email="system@aurelinx.local", is_admin=True),
             "SYNC_CONNECTION",
             "integration_connection",
             conn.id,
@@ -1603,7 +1603,7 @@ def _run_connection_sync(
         db.add(job)
         _audit(
             db,
-            TokenData(user_id="system", email="system@aurelius.local", is_admin=True),
+            TokenData(user_id="system", email="system@aurelinx.local", is_admin=True),
             "SYNC_CONNECTION_FAILED",
             "integration_connection",
             conn.id,
@@ -2919,14 +2919,14 @@ async def export_dataset_bundle(
         "EXPORT_DATASET_BUNDLE",
         "dataset",
         None,
-        {"file_name": "aurelius-dataset-bundle.zip"},
+        {"file_name": "aurelinx-dataset-bundle.zip"},
     )
     db.commit()
     return Response(
         content=bundle_bytes,
         media_type="application/zip",
         headers={
-            "Content-Disposition": 'attachment; filename="aurelius-dataset-bundle.zip"'
+            "Content-Disposition": 'attachment; filename="aurelinx-dataset-bundle.zip"'
         },
     )
 
@@ -2977,7 +2977,7 @@ async def get_executive_packet(
     packet = {
         "template": template,
         "generated_at": datetime.utcnow().isoformat(),
-        "headline": "Aurelius executive packet",
+        "headline": "Aurelinx executive packet",
         "summary": {
             "workforce": analytics["total"],
             "at_risk": analytics["atRisk"],

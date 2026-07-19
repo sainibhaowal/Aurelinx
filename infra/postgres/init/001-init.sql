@@ -1,3 +1,3 @@
-CREATE SCHEMA IF NOT EXISTS app AUTHORIZATION aurelius;
+CREATE SCHEMA IF NOT EXISTS app AUTHORIZATION aurelinx;
 
-ALTER ROLE aurelius IN DATABASE aurelius_db SET search_path TO app, public;
+ALTER ROLE aurelinx IN DATABASE aurelinx_db SET search_path TO app, public;

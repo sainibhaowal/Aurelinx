@@ -1,11 +1,11 @@
-# Aurelius Implementation Record
+# Aurelinx Implementation Record
 
 ## Purpose
-This file is the durable record of what Aurelius is, what has been implemented, and what remains to be completed.
+This file is the durable record of what Aurelinx is, what has been implemented, and what remains to be completed.
 Use this as the source of truth for future engineering, product, and launch work.
 
 ## Current Product Position
-Aurelius is a lean HR Intelligence platform that works end to end without vendor auth.
+Aurelinx is a lean HR Intelligence platform that works end to end without vendor auth.
 It supports local CSV import, bundled demo data loading, explainable attrition, interventions, compliance policy checks, sync history, drift snapshots, scenario runs, and tenant-scoped enterprise operations.
 
 ## What Is Implemented

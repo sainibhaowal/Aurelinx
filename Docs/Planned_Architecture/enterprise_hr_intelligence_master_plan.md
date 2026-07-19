@@ -1,4 +1,4 @@
-# Aurelius Enterprise HR Intelligence Master Plan
+# Aurelinx Enterprise HR Intelligence Master Plan
 
 ## 1. Why The Current App Feels Weak
 The current product mostly shows records and basic metrics. It does not yet provide:
@@ -183,7 +183,7 @@ Model quality metrics:
 5. Add monthly executive packet generator with configurable templates.
 
 ## 10. What “World Class” Looks Like
-Aurelius is world-class when:
+Aurelinx is world-class when:
 1. Every recommendation has evidence and confidence.
 2. Every action has measurable business impact.
 3. Leaders can run scenarios before making headcount decisions.

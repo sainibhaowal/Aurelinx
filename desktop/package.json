@@ -1,8 +1,8 @@
 {
-  "name": "aurelius-desktop",
+  "name": "aurelinx-desktop",
   "private": true,
   "version": "1.0.0",
-  "description": "Aurelius desktop shell for GitHub release builds",
+  "description": "Aurelinx desktop shell for GitHub release builds",
   "scripts": {
     "tauri": "tauri",
     "build": "node scripts/prepare-config.js && tauri build",
@@ -10,6 +10,6 @@
     "prepare:config": "node scripts/prepare-config.js"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0"
+    "@tauri-apps/cli": "^2.11.4"
   }
 }

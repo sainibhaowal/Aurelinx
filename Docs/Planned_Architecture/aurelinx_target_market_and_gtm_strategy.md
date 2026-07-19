@@ -1,7 +1,7 @@
-# Aurelius Target Market and GTM Strategy
+# Aurelinx Target Market and GTM Strategy
 
 ## 1. Strategic Position
-Aurelius is positioned as an operational intelligence layer above existing HR suites, not a rip-and-replace HRIS.
+Aurelinx is positioned as an operational intelligence layer above existing HR suites, not a rip-and-replace HRIS.
 
 ## 2. Target Customer Segments
 1. Enterprise with fragmented HR stack:
@@ -26,13 +26,13 @@ Aurelius is positioned as an operational intelligence layer above existing HR su
    - Workforce economics and scenario planning.
 
 ## 5. Package Design (Recommended)
-1. `Aurelius Core`:
+1. `Aurelinx Core`:
    - Risk, dashboards, interventions, audit.
-2. `Aurelius Talent`:
+2. `Aurelinx Talent`:
    - Matching, mobility, TA intelligence.
-3. `Aurelius Economics`:
+3. `Aurelinx Economics`:
    - Forecasts, optimizer, finance-grade scenarios.
-4. `Aurelius Governance`:
+4. `Aurelinx Governance`:
    - Compliance packs, fairness and policy controls.
 
 ## 6. Deployment Model

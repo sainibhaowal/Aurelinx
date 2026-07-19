@@ -79,7 +79,7 @@ def revoke_code(code_id_str):
         print(f"\nSuccess: Admin ID {code_id_str} has been deleted/revoked.\n")
 
 def main():
-    parser = argparse.ArgumentParser(description="Manage Aurelius Admin IDs / Registration Codes.")
+    parser = argparse.ArgumentParser(description="Manage Aurelinx Admin IDs / Registration Codes.")
     parser.add_argument("--generate", action="store_true", help="Generate a new secure Admin ID")
     parser.add_argument("--length", type=int, default=12, help="Length of the code to generate (8-32, default 12)")
     parser.add_argument("--list", action="store_true", help="List all generated codes")

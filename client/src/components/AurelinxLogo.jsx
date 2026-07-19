@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 
-const AureliusLogo = ({ size = 24, collapsed = false }) => {
+const AurelinxLogo = ({ size = 24, collapsed = false }) => {
   return (
     <div
       className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}
@@ -14,8 +14,8 @@ const AureliusLogo = ({ size = 24, collapsed = false }) => {
         style={{ width: size + 10, height: size + 10 }}
       >
         <img
-          src="/aurelius-logo-4k.svg"
-          alt="Aurelius Logo"
+          src="/aurelinx-logo-4k.svg"
+          alt="Aurelinx Logo"
           style={{ width: "120%", height: "120%", objectFit: "contain" }}
         />
       </motion.div>
@@ -26,12 +26,12 @@ const AureliusLogo = ({ size = 24, collapsed = false }) => {
           animate={{ opacity: 1, x: 0 }}
           className="text-2xl font-extrabold tracking-tight text-cyan-300"
         >
-          Aurelius
+          Aurelinx
         </motion.span>
       )}
     </div>
   );
 };
 
-export default AureliusLogo;
+export default AurelinxLogo;
 

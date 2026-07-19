@@ -1,7 +1,7 @@
-# Aurelius Master Backlog
+# Aurelinx Master Backlog
 
 ## Goal
-Track every remaining enterprise gap and implement Aurelius as a lean but production-grade HR intelligence platform.
+Track every remaining enterprise gap and implement Aurelinx as a lean but production-grade HR intelligence platform.
 
 ## Completed
 1. Connector sync framework with field mappings and sync history.

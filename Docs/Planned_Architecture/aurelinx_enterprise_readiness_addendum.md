@@ -1,18 +1,18 @@
-# Aurelius Enterprise Readiness Addendum
+# Aurelinx Enterprise Readiness Addendum
 
 ## Purpose
-Close the final enterprise execution gaps so Aurelius is implementation-ready, procurement-ready, and compliance-ready.
+Close the final enterprise execution gaps so Aurelinx is implementation-ready, procurement-ready, and compliance-ready.
 
 ## 1. Commercial Model and Packaging
 
 ### 1.1 Product Tiers
-1. `Aurelius Core`:
+1. `Aurelinx Core`:
    - Risk command center, intervention workflow, audit logs.
-2. `Aurelius Intelligence`:
+2. `Aurelinx Intelligence`:
    - Talent matching, mobility, explainability, benchmark insights.
-3. `Aurelius Economics`:
+3. `Aurelinx Economics`:
    - Workforce optimizer, scenario planning, CFO exports.
-4. `Aurelius Governance`:
+4. `Aurelinx Governance`:
    - Fairness suite, compliance packs, policy engine.
 
 ### 1.2 Pricing Model (Reference)

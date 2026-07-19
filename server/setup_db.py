@@ -30,31 +30,31 @@ def setup_database():
     print("🔧 Setting up PostgreSQL...")
     
     # Try connecting as postgres first (might not need password on local)
-    print("\n1. Attempting to create aurelius_db...")
-    run_psql("DROP DATABASE IF EXISTS aurelius_db;")
-    if not run_psql("CREATE DATABASE aurelius_db;"):
+    print("\n1. Attempting to create aurelinx_db...")
+    run_psql("DROP DATABASE IF EXISTS aurelinx_db;")
+    if not run_psql("CREATE DATABASE aurelinx_db;"):
         print("⚠️  Could not create database. Trying with password...")
         # Sometimes local connections work without password
         print("⚠️  Note: You may need to set postgres password in PostgreSQL")
         return False
     
-    print("✅ Created aurelius_db")
+    print("✅ Created aurelinx_db")
     
-    print("\n2. Attempting to create aurelius role...")
-    run_psql("DROP ROLE IF EXISTS aurelius;")
-    if not run_psql("CREATE ROLE aurelius WITH LOGIN PASSWORD 'aurelius_password';"):
+    print("\n2. Attempting to create aurelinx role...")
+    run_psql("DROP ROLE IF EXISTS aurelinx;")
+    if not run_psql("CREATE ROLE aurelinx WITH LOGIN PASSWORD 'aurelinx_password';"):
         print("❌ Could not create role")
         return False
     
-    print("✅ Created aurelius role")
+    print("✅ Created aurelinx role")
     
     print("\n3. Granting privileges...")
-    run_psql("ALTER ROLE aurelius CREATEDB;")
+    run_psql("ALTER ROLE aurelinx CREATEDB;")
     
-    # Connect as aurelius to verify
-    print("\n4. Verifying connection as aurelius...")
+    # Connect as aurelinx to verify
+    print("\n4. Verifying connection as aurelinx...")
     result = subprocess.run(
-        'psql -U aurelius -d aurelius_db -c "SELECT 1;"',
+        'psql -U aurelinx -d aurelinx_db -c "SELECT 1;"',
         shell=True,
         capture_output=True,
         text=True,
@@ -66,7 +66,7 @@ def setup_database():
         print("   On Windows, restart PostgreSQL with a known password")
         return False
     
-    print("✅ aurelius user can connect")
+    print("✅ aurelinx user can connect")
     return True
 
 if __name__ == "__main__":

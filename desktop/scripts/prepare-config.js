@@ -1,11 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 
-const appUrl = process.env.AURELIUS_APP_URL;
+const appUrl = process.env.AURELINX_APP_URL;
 
 if (!appUrl) {
   throw new Error(
-    "AURELIUS_APP_URL is required. Set it in GitHub Actions or your local shell before building.",
+    "AURELINX_APP_URL is required. Set it in GitHub Actions or your local shell before building.",
   );
 }
 
@@ -29,7 +29,7 @@ const htmlContent = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aurelius Gateway</title>
+  <title>Aurelinx Gateway</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
     
@@ -238,7 +238,7 @@ const htmlContent = `<!DOCTYPE html>
   <div class="container">
     <div class="logo-container">
       <div class="logo-glow"></div>
-      <div class="logo">Aurelius</div>
+      <div class="logo">Aurelinx</div>
     </div>
     
     <div id="loader">
@@ -370,4 +370,4 @@ const htmlContent = `<!DOCTYPE html>
 </html>`;
 
 fs.writeFileSync(path.join(distDir, "index.html"), htmlContent);
-console.log(`Prepared Aurelius desktop config. Primary URL set to ${appUrl}`);
+console.log(`Prepared Aurelinx desktop config. Primary URL set to ${appUrl}`);

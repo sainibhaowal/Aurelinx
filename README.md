@@ -1,6 +1,6 @@
-# Aurelius
+# Aurelinx
 
-![Aurelius Logo](client/public/logo.png)
+![Aurelinx Logo](client/public/logo.png)
 
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=nextdotjs)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-Aurelius is a full-stack HR intelligence platform designed for organizations that need more than a dashboard. It brings together employee intelligence, candidate analysis, sentiment visibility, enterprise workflows, and secure API services in one product-ready system.
+Aurelinx is a full-stack HR intelligence platform designed for organizations that need more than a dashboard. It brings together employee intelligence, candidate analysis, sentiment visibility, enterprise workflows, and secure API services in one product-ready system.
 
 The repository is structured as a production-oriented monorepo:
 
@@ -30,13 +30,13 @@ The repository is structured as a production-oriented monorepo:
 - [Getting Started](#getting-started)
 - [Production Deployment](#production-deployment)
 - [API Surface](#api-surface)
-- [Why Aurelius Feels Commercial](#why-aurelius-feels-commercial)
+- [Why Aurelinx Feels Commercial](#why-aurelinx-feels-commercial)
 - [Key Files to Review](#key-files-to-review)
 - [Brand Asset](#brand-asset)
 
 ## Product Positioning
 
-Aurelius is built for teams that want a single operating layer for HR intelligence. The application is designed to support:
+Aurelinx is built for teams that want a single operating layer for HR intelligence. The application is designed to support:
 
 - executive visibility into workforce health and retention risk
 - candidate screening and talent scouting workflows
@@ -90,7 +90,7 @@ The deployment stack in `infra/` is built for repeatable production-style execut
 ## Repository Layout
 
 ```text
-Aurelius/
+Aurelinx/
 ├── client/      # Next.js workspace and public-facing UI
 ├── server/      # FastAPI application, models, services, tests, migrations
 ├── infra/       # Docker, compose, and environment files
@@ -148,9 +148,9 @@ This stack is designed around a production runtime with web, API, worker, schedu
 
 ## Desktop Builds
 
-Aurelius now includes a Tauri-based desktop shell under `desktop/`. It is built for GitHub Actions release packaging and can produce Windows and Linux installers.
+Aurelinx now includes a Tauri-based desktop shell under `desktop/`. It is built for GitHub Actions release packaging and can produce Windows and Linux installers.
 
-To make release builds work, set the repository variable `AURELIUS_APP_URL` to the deployed Aurelius web app URL. The desktop shell will redirect users to that URL when it launches.
+To make release builds work, set the repository variable `AURELINX_APP_URL` to the deployed Aurelinx web app URL. The desktop shell will redirect users to that URL when it launches.
 
 The GitHub workflow in `.github/workflows/desktop-release.yml` builds:
 
@@ -174,7 +174,7 @@ The backend exposes standard API documentation and health endpoints:
 
 The versioned API includes route groups for authentication, employees, candidates, analysis, chat, enterprise operations, integrations, and intelligence workflows.
 
-## Why Aurelius Feels Commercial
+## Why Aurelinx Feels Commercial
 
 The project is structured like a real product, not a prototype:
 
@@ -184,7 +184,7 @@ The project is structured like a real product, not a prototype:
 - secure backend bootstrap and request tracing
 - reporting and workflow features that support operational use
 
-That combination gives Aurelius a credible enterprise footprint and a strong foundation for a customer-facing product.
+That combination gives Aurelinx a credible enterprise footprint and a strong foundation for a customer-facing product.
 
 ## Key Files to Review
 

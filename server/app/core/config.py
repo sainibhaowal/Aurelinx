@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     """Production-grade application settings"""
 
     # App Settings
-    APP_NAME: str = "Aurelius"
+    APP_NAME: str = "Aurelinx"
     VERSION: str = "1.0.0"
     DEBUG: bool | str = False
     ENVIRONMENT: str = "development"
@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = (
-        "postgresql+psycopg://aurelius:aurelius_password@localhost:5432/aurelius_db"
+        "postgresql+psycopg://aurelinx:aurelinx_password@localhost:5432/aurelinx_db"
     )
 
     # Security

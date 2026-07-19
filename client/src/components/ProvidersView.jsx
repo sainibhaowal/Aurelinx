@@ -211,7 +211,7 @@ const ProvidersView = () => {
   const [inventoryMode, setInventoryMode] = useState("list"); // 'list' or 'select-family'
 
   const [linkedConnections, setLinkedConnections] = useState(() => {
-    const saved = localStorage.getItem("AURELIUS_PROVIDERS_CONFIG");
+    const saved = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
     if (saved) {
       const parsed = JSON.parse(saved);
       // Return a list of linked providers based on what is in localStorage
@@ -260,7 +260,7 @@ const ProvidersView = () => {
   const [loadingTokens, setLoadingTokens] = useState(false);
   const [newTokenName, setNewTokenName] = useState("My-Company-Webhook");
   const [generatedKey, setGeneratedKey] = useState("");
-  const [employeeEmail, setEmployeeEmail] = useState("silas.vance@aurelius.io");
+  const [employeeEmail, setEmployeeEmail] = useState("silas.vance@aurelinx.io");
   const [simulatingWebhook, setSimulatingWebhook] = useState(null); // 'slack' | 'jira' | 'workday'
   const [integrationLogs, setIntegrationLogs] = useState([]);
   const [webhookEvents, setWebhookEvents] = useState([]);
@@ -480,8 +480,8 @@ const ProvidersView = () => {
         endpoint = `${apiBase}/api/v1/integrations/jira`;
         payload = {
           reporter_email: employeeEmail,
-          assignee_email: "clara.sutton@aurelius.io",
-          issue_key: "AURELIUS-789",
+          assignee_email: "clara.sutton@aurelinx.io",
+          issue_key: "AURELINX-789",
           activity_type: "pr_reviewed",
         };
       } else if (type === "workday") {
@@ -490,7 +490,7 @@ const ProvidersView = () => {
           action: "hire",
           employee: {
             full_name: "Silas Vance",
-            email: "silas.vance@aurelius.io",
+            email: "silas.vance@aurelinx.io",
             department: "Engineering",
             role: "Lead AI Platform Architect",
             skills: [
@@ -759,7 +759,7 @@ const ProvidersView = () => {
       };
     });
     localStorage.setItem(
-      "AURELIUS_PROVIDERS_CONFIG",
+      "AURELINX_PROVIDERS_CONFIG",
       JSON.stringify(savedConfig),
     );
     showToast(`Successfully linked ${selectedConnection.name}!`, "success");
@@ -771,14 +771,14 @@ const ProvidersView = () => {
     const filtered = linkedConnections.filter((c) => c.id !== connId);
     setLinkedConnections(filtered);
 
-    const saved = localStorage.getItem("AURELIUS_PROVIDERS_CONFIG");
+    const saved = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
     if (saved) {
       const parsed = JSON.parse(saved);
       delete parsed[connId];
       if (parsed.activeProvider === connId) {
         parsed.activeProvider = filtered[0]?.id || "";
       }
-      localStorage.setItem("AURELIUS_PROVIDERS_CONFIG", JSON.stringify(parsed));
+      localStorage.setItem("AURELINX_PROVIDERS_CONFIG", JSON.stringify(parsed));
     }
     showToast("Unlinked connection", "info");
     if (selectedConnection?.id === connId) {
@@ -787,11 +787,11 @@ const ProvidersView = () => {
   };
 
   const handleToggleActive = (connId) => {
-    const saved = localStorage.getItem("AURELIUS_PROVIDERS_CONFIG");
+    const saved = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
     if (saved) {
       const parsed = JSON.parse(saved);
       parsed.activeProvider = connId;
-      localStorage.setItem("AURELIUS_PROVIDERS_CONFIG", JSON.stringify(parsed));
+      localStorage.setItem("AURELINX_PROVIDERS_CONFIG", JSON.stringify(parsed));
     }
 
     setLinkedConnections((prev) =>
@@ -1241,7 +1241,7 @@ const ProvidersView = () => {
                                 End-to-End Credential Privacy
                               </h5>
                               <p className="text-[10px] text-slate-400 leading-relaxed">
-                                Aurelius enforces strict zero-knowledge security
+                                Aurelinx enforces strict zero-knowledge security
                                 protocols. All authorization tokens, keys, and
                                 endpoint credentials reside securely inside your
                                 local browser client memory. They are never
@@ -1330,11 +1330,11 @@ const ProvidersView = () => {
                                 <option value={employeeEmail}>
                                   {employeeEmail} (Active Dev)
                                 </option>
-                                <option value="silas.vance@aurelius.io">
-                                  silas.vance@aurelius.io (Seed lead)
+                                <option value="silas.vance@aurelinx.io">
+                                  silas.vance@aurelinx.io (Seed lead)
                                 </option>
-                                <option value="clara.sutton@aurelius.io">
-                                  clara.sutton@aurelius.io (Senior dev)
+                                <option value="clara.sutton@aurelinx.io">
+                                  clara.sutton@aurelinx.io (Senior dev)
                                 </option>
                               </select>
                             </div>
@@ -1812,13 +1812,13 @@ const ProvidersView = () => {
                           <div className="flex items-center gap-2 mb-4">
                             <Code size={16} className="text-cyan-400" />
                             <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                              Aurelius Developer SDK Setup Guide
+                              Aurelinx Developer SDK Setup Guide
                             </h3>
                           </div>
 
                           <p className="text-[10px] text-slate-400 leading-relaxed mb-4">
                             Integrate your enterprise backend pipeline directly
-                            to feed Aurelius. You can import our library into
+                            to feed Aurelinx. You can import our library into
                             B2C/B2B services to push telemetry events instantly.
                           </p>
 
@@ -1831,7 +1831,7 @@ const ProvidersView = () => {
                               </span>
                             </div>
                             <div className="p-3.5 bg-black/60 text-emerald-400 select-all border-b border-white/5">
-                              $ npm install @aurelius/intelligence-sdk --save
+                              $ npm install @aurelinx/intelligence-sdk --save
                             </div>
 
                             {/* SDK code example */}
@@ -1839,15 +1839,15 @@ const ProvidersView = () => {
                               Javascript Integration Snippet
                             </div>
                             <div className="p-4 bg-slate-950/80 overflow-x-auto whitespace-pre leading-relaxed select-all text-slate-300">
-                              {`import AureliusSDK from '@aurelius/intelligence-sdk';
+                              {`import AurelinxSDK from '@aurelinx/intelligence-sdk';
 
-const aurelius = new AureliusSDK({
+const aurelinx = new AurelinxSDK({
   apiKey: "${generatedKey || "aur_your_secure_ingestion_api_token"}",
   endpoint: "${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100"}/api/v1"
 });
 
 // 1. Ingest Workday HRIS directories automatically
-await aurelius.syncEmployee({
+await aurelinx.syncEmployee({
   action: "hire",
   employee: {
     full_name: "Silas Vance",
@@ -1859,7 +1859,7 @@ await aurelius.syncEmployee({
 });
 
 // 2. Feed Slack sentiment metrics dynamically to Attrition Cox Curves
-await aurelius.pushSentimentMetric({
+await aurelinx.pushSentimentMetric({
   email: "${employeeEmail}",
   sentiment_score: 0.85,
   message_count: 142

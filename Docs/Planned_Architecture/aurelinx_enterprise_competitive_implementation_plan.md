@@ -1,7 +1,7 @@
-# Aurelius Enterprise Competitive Implementation Plan
+# Aurelinx Enterprise Competitive Implementation Plan
 
 ## 1. Mission
-Build Aurelius into an operational HR Intelligence platform that competes with SAP SuccessFactors, Oracle HCM, and Workday by delivering faster decisions, measurable outcomes, and explainable AI.
+Build Aurelinx into an operational HR Intelligence platform that competes with SAP SuccessFactors, Oracle HCM, and Workday by delivering faster decisions, measurable outcomes, and explainable AI.
 
 ## 2. Target Market and Ideal Customers
 
@@ -35,7 +35,7 @@ Build Aurelius into an operational HR Intelligence platform that competes with S
 5. Governance:
    - Audit trails, fairness checks, policy controls, regional compliance.
 
-### Aurelius Wedge
+### Aurelinx Wedge
 Operational HR Intelligence, not dashboard analytics.
 
 ## 4. Product Pillars and Required Capabilities

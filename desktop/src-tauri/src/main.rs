@@ -10,5 +10,5 @@ fn main() {
 
     tauri::Builder::default()
         .run(tauri::generate_context!())
-        .expect("error while running Aurelius desktop shell");
+        .expect("error while running Aurelinx desktop shell");
 }

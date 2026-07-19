@@ -1,10 +1,10 @@
-# Aurelius Status Report
+# Aurelinx Status Report
 
 ## Date
 2026-05-19
 
 ## Executive Summary
-Aurelius is now operational in local startup mode without vendor auth.
+Aurelinx is now operational in local startup mode without vendor auth.
 The product can ingest CSV data or load the bundled demo dataset, compute explainable attrition risk, create interventions, run policy checks, track sync jobs, snapshot drift, persist scenarios, render a public landing page, and operate DR/procurement admin screens.
 
 ## What Works End to End
@@ -51,7 +51,7 @@ The product can ingest CSV data or load the bundled demo dataset, compute explai
 6. The landing page blueprint is implemented end to end; only screenshot and media assets remain as polish.
 7. The landing page now matches the supplied reference direction with a black premium hero, compact workflow cards, and a polished glass system.
 8. The landing page has been tightened again to lean harder into the supplied black reference style, including animated geometry, a separate teams/logo section, and smaller Inter-based hero type.
-8. The startup checklist is now centralized in `Docs/Worked/aurelius_end_to_end_checklist.md`.
+8. The startup checklist is now centralized in `Docs/Worked/aurelinx_end_to_end_checklist.md`.
 
 ## Next Recommended Work
 1. Add polished screenshots and demo steps.

@@ -47,7 +47,7 @@ const ApprovalModal = ({ isOpen, action, onConfirm, onCancel }) => {
           </div>
 
           <h2 style={{ fontSize: "24px", marginBottom: "12px" }}>
-            Aurelius Requires Approval
+            Aurelinx Requires Approval
           </h2>
           <p
             style={{

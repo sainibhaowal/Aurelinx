@@ -1,5 +1,5 @@
 """
-Aurelius Core Intelligence Engine
+Aurelinx Core Intelligence Engine
 Advanced Algorithms & Data Structures for Talent Optimization
 """
 

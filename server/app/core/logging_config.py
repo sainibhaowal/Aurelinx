@@ -60,8 +60,8 @@ def setup_logging(log_level: str = "INFO"):
 # ============ CUSTOM EXCEPTIONS ============
 
 
-class AureliusException(Exception):
-    """Base exception for all Aurelius errors"""
+class AurelinxException(Exception):
+    """Base exception for all Aurelinx errors"""
 
     def __init__(
         self,
@@ -77,28 +77,28 @@ class AureliusException(Exception):
         super().__init__(self.message)
 
 
-class AuthenticationError(AureliusException):
+class AuthenticationError(AurelinxException):
     """Authentication failed"""
 
     def __init__(self, message: str = "Authentication failed"):
         super().__init__("AUTH_ERROR", message, 401)
 
 
-class AuthorizationError(AureliusException):
+class AuthorizationError(AurelinxException):
     """User not authorized for action"""
 
     def __init__(self, message: str = "Not authorized"):
         super().__init__("AUTH_FORBIDDEN", message, 403)
 
 
-class ValidationError(AureliusException):
+class ValidationError(AurelinxException):
     """Request validation failed"""
 
     def __init__(self, message: str, details: dict = None):
         super().__init__("VALIDATION_ERROR", message, 422, details)
 
 
-class NotFoundError(AureliusException):
+class NotFoundError(AurelinxException):
     """Resource not found"""
 
     def __init__(self, resource: str, resource_id: str = None):
@@ -108,21 +108,21 @@ class NotFoundError(AureliusException):
         super().__init__("NOT_FOUND", msg, 404)
 
 
-class ConflictError(AureliusException):
+class ConflictError(AurelinxException):
     """Resource conflict (duplicate, etc)"""
 
     def __init__(self, message: str):
         super().__init__("CONFLICT", message, 409)
 
 
-class RateLimitExceededError(AureliusException):
+class RateLimitExceededError(AurelinxException):
     """Rate limit exceeded"""
 
     def __init__(self, message: str = "Rate limit exceeded"):
         super().__init__("RATE_LIMIT_EXCEEDED", message, 429)
 
 
-class InternalServerError(AureliusException):
+class InternalServerError(AurelinxException):
     """Internal server error"""
 
     def __init__(self, message: str = "Internal server error", details: dict = None):
@@ -132,7 +132,7 @@ class InternalServerError(AureliusException):
 # ============ ERROR HANDLERS ============
 
 
-def format_error_response(exc: AureliusException, request_id: Optional[str] = None):
+def format_error_response(exc: AurelinxException, request_id: Optional[str] = None):
     """Format exception as JSON response"""
     return {
         "error_code": exc.error_code,

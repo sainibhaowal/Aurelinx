@@ -112,7 +112,7 @@ const TalentScoutView = () => {
   const handleSearch = async () => {
     let config = {};
     try {
-      const configRaw = localStorage.getItem("AURELIUS_PROVIDERS_CONFIG");
+      const configRaw = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
       config = configRaw ? JSON.parse(configRaw) : {};
     } catch {
       config = {};
@@ -236,7 +236,7 @@ const TalentScoutView = () => {
             <div className="flex items-center gap-3 mb-6 text-cyan-200">
               <Sparkles size={24} />
               <h3 className="text-lg md:text-xl font-bold tracking-tight">
-                Aurelius Intelligence Report
+                Aurelinx Intelligence Report
               </h3>
             </div>
             <div className="text-slate-100/90 leading-relaxed text-base md:text-lg max-w-none">
