@@ -1291,7 +1291,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 </div>
 
                 <div className="relative h-44 bg-slate-900/80 rounded-lg border border-white/5 overflow-hidden flex items-center justify-center">
-                  <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:14px_24px]" />
+                  <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:14px_14px]" />
                   
                   <svg className="absolute inset-0 h-full w-full pointer-events-none">
                     <line x1="20%" y1="50%" x2="40%" y2="25%" stroke="rgba(244,63,94,0.3)" strokeWidth="2" strokeDasharray="3 3" />

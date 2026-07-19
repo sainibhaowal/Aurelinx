@@ -243,7 +243,11 @@ async function request(url, options = {}, responseType = "json") {
         ) {
           const requestUrl = requestUrls[requestIndex];
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+          let timedOut = false;
+          const timeoutId = setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+          }, timeoutMs);
 
           try {
             response = await fetch(requestUrl, {
@@ -264,7 +268,11 @@ async function request(url, options = {}, responseType = "json") {
               options.method,
             )
           ) {
+            clearTimeout(timeoutId);
             continue;
+          }
+          if (error?.name === "AbortError" && !timedOut) {
+            throw error;
           }
           throw error;
         } finally {
@@ -303,7 +311,7 @@ async function request(url, options = {}, responseType = "json") {
         data = rawBody;
       }
 
-      if (response.status === 401 && isAuthEndpoint(requestUrlUsed)) {
+      if (response.status === 401 && !isAuthEndpoint(requestUrlUsed)) {
         localStorage.removeItem("auth_token");
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("auth:expired"));
@@ -350,14 +358,20 @@ async function request(url, options = {}, responseType = "json") {
         error?.name === "AbortError" ||
         /aborted/i.test(error?.message || "")
       ) {
-        lastError = new Error(`Request timed out after ${timeoutMs}ms`);
-        if (attempt < MAX_RETRIES - 1) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, RETRY_DELAY * Math.pow(2, attempt)),
-          );
-          continue;
+        const isTimeoutAbort = error?.message?.includes("timeout") || 
+                               error?.message?.includes("timed out") ||
+                               (error?.name === "AbortError" && !error?.message?.includes("reason"));
+        if (isTimeoutAbort) {
+          lastError = new Error(`Request timed out after ${timeoutMs}ms`);
+          if (attempt < MAX_RETRIES - 1) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, RETRY_DELAY * Math.pow(2, attempt)),
+            );
+            continue;
+          }
+          throw lastError;
         }
-        throw lastError;
+        throw error;
       }
 
       // Retry with exponential backoff

@@ -330,7 +330,7 @@ const App = () => {
     content = (
       <div className="flex h-screen bg-[#07111f] text-slate-100 relative overflow-hidden selection:bg-primary/30 antialiased">
       {/* DOTTED GRID BACKGROUND */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none z-0" />
+      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none z-0" />
 
       <Toast
         isVisible={toast.visible}
