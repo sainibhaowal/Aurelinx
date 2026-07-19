@@ -597,6 +597,7 @@ export const analysisAPI = {
         base_url: baseUrl,
         model,
       }),
+      timeoutMs: LONG_REQUEST_TIMEOUT,
     }),
 
   getSentimentReport: (department = null, includeAtRiskOnly = false) => {

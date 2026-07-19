@@ -183,18 +183,7 @@ const TalentScoutView = () => {
 
   return (
     <div className="w-full">
-      <header className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-white">
-            Talent Scout
-          </h1>
-          <p className="text-slate-400 text-sm md:text-base leading-relaxed max-w-3xl">
-            Semantic candidate discovery for high-confidence hiring decisions and
-            role-fit analysis.
-          </p>
-        </div>
-        <UserManualButton defaultTab="scout" className="flex-none mt-2" />
-      </header>
+
 
       <div className="mb-10 md:mb-12">
         <div className="flex flex-col md:flex-row gap-3">
