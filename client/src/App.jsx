@@ -27,6 +27,7 @@ import TalentCard from "./components/TalentCard";
 import AureliusLogo from "./components/AureliusLogo";
 import Toast from "./components/Toast";
 import AuthScreen from "./components/AuthScreen";
+import WindowControls from "./components/WindowControls";
 import {
   analysisAPI,
   candidatesAPI,
@@ -311,8 +312,9 @@ const App = () => {
     visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
   };
 
+  let content;
   if (route !== "app") {
-    return (
+    content = (
       <Suspense fallback={<LoadingScreen label="Loading landing page" />}>
         <LandingPage
           onEnterWorkspace={() => navigate("/app", defaultWorkspaceTab)}
@@ -320,19 +322,13 @@ const App = () => {
         />
       </Suspense>
     );
-  }
-
-  if (authLoading) {
-    return <LoadingScreen label="Checking account access" />;
-  }
-
-  if (!isAuthenticated) {
-    return <AuthScreen />;
-  }
-
-
-  return (
-    <div className="flex h-screen bg-[#07111f] text-slate-100 relative overflow-hidden selection:bg-primary/30 antialiased">
+  } else if (authLoading) {
+    content = <LoadingScreen label="Checking account access" />;
+  } else if (!isAuthenticated) {
+    content = <AuthScreen />;
+  } else {
+    content = (
+      <div className="flex h-screen bg-[#07111f] text-slate-100 relative overflow-hidden selection:bg-primary/30 antialiased">
       {/* DOTTED GRID BACKGROUND */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none z-0" />
 
@@ -355,7 +351,8 @@ const App = () => {
           className="bg-[#0f1f33]/85 border border-white/10 flex flex-col h-full relative overflow-hidden shadow-2xl rounded-2xl"
         >
           <div
-            className={`h-14 px-2 mb-2 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start"}`}
+            data-tauri-drag-region
+            className={`h-14 px-2 mb-2 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start"} cursor-move`}
           >
             <AureliusLogo collapsed={isSidebarCollapsed} size={24} />
           </div>
@@ -939,6 +936,26 @@ const App = () => {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full relative overflow-hidden">
+      {/* Custom Floating Window controls (top right floating) */}
+      <div className="fixed top-4 right-4 z-[99999] pointer-events-auto">
+        <WindowControls />
+      </div>
+      
+      {/* Invisible global drag handle at the top of the window */}
+      {typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__) && (
+        <div 
+          data-tauri-drag-region 
+          className="fixed top-0 left-0 right-36 h-6 z-[99998] cursor-move select-none"
+        />
+      )}
+      
+      {content}
     </div>
   );
 };
