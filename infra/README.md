@@ -1,6 +1,6 @@
-# Aurelius Docker Infra
+# Aurelinx Docker Infra
 
-This directory contains the production-oriented Docker setup for Aurelius.
+This directory contains the production-oriented Docker setup for Aurelinx.
 
 ## Files
 

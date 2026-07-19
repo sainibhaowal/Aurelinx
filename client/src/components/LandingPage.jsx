@@ -39,7 +39,7 @@ const simulatorScenarios = [
     tag: "HRIS",
     tagColor: "#6ee7b7",
     payload: {
-      email: "elena.rodriguez@aurelius.io",
+      email: "elena.rodriguez@aurelinx.io",
       department: "Engineering",
       morale: 0.32,
       retention_prob: 0.45,
@@ -59,7 +59,7 @@ const simulatorScenarios = [
       },
       {
         title: "Gold Explainable AI Inference",
-        desc: "Aurelius Ruleboost ML model scores the employee. Morale score of 0.32 evaluates to a high exit probability of 84% (is_at_risk=True).",
+        desc: "Aurelinx Ruleboost ML model scores the employee. Morale score of 0.32 evaluates to a high exit probability of 84% (is_at_risk=True).",
         log: "ML_ENGINE: Inferred exit risk for WD-89241 is 84.15%. Flagged is_at_risk = True.",
       },
       {
@@ -69,7 +69,7 @@ const simulatorScenarios = [
       },
       {
         title: "Active Retention Intervention",
-        desc: "Aurelius automatically queues a high-priority 30-day retention loop, mapping owner assignment, estimated retention cost, and target ROI.",
+        desc: "Aurelinx automatically queues a high-priority 30-day retention loop, mapping owner assignment, estimated retention cost, and target ROI.",
         log: "TASK_QUEUE: Created active retention intervention task #INT-3029. Owner: HR Director US. Cost: $4,500.",
       },
     ],
@@ -665,14 +665,14 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl"
               >
                 <img
-                  src="/aurelius-logo-4k.svg"
-                  alt="Aurelius Logo"
+                  src="/aurelinx-logo-4k.svg"
+                  alt="Aurelinx Logo"
                   style={{ width: "120%", height: "120%", objectFit: "contain" }}
                 />
               </div>
               <div>
                 <div className="text-xs font-black tracking-[0.28em] text-white">
-                  AURELIUS
+                  AURELINX
                 </div>
                 <div
                   className="text-[9px] font-bold uppercase tracking-[0.22em]"
@@ -780,7 +780,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-6 max-w-[580px] text-base leading-relaxed"
               style={{ color: "rgba(148,163,184,0.7)" }}
             >
-              Aurelius converts raw talent inputs, risk indicators, and
+              Aurelinx converts raw talent inputs, risk indicators, and
               compliance gate parameters into a unified, dense control panel
               built for security-conscious enterprise teams.
             </motion.p>
@@ -928,7 +928,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       Live Telemetry Control
                     </div>
                     <div className="mt-1 text-base font-bold text-white">
-                      Aurelius Management OS
+                      Aurelinx Management OS
                     </div>
                   </div>
                   <span
@@ -1206,7 +1206,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
-              Aurelius pipelines continuously sync files and API endpoints,
+              Aurelinx pipelines continuously sync files and API endpoints,
               curate them into Silver SQL tables, score exit risks, check
               security policies, and trigger retention interventions. Select a
               scenario and trace its journey.
@@ -1499,7 +1499,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             <SectionLabel>
               <BrainCircuit className="h-3.5 w-3.5" /> Analytical Core
             </SectionLabel>
-            <SectionHeading>Aurelius Math-Engine Pillars</SectionHeading>
+            <SectionHeading>Aurelinx Math-Engine Pillars</SectionHeading>
             <p
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
@@ -1617,7 +1617,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
-              Aurelius converts raw talent inputs, risk indicators, and
+              Aurelinx converts raw talent inputs, risk indicators, and
               compliance gate parameters into a beautifully unified, highly
               dense control panel.
             </p>
@@ -1780,7 +1780,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               <div className="flex flex-col justify-between rounded-2xl bg-slate-950/40 border border-white/5 p-6">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500 mb-6">
-                    AURELIUS IMPACT FORECAST
+                    AURELINX IMPACT FORECAST
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 mb-6">
@@ -1800,7 +1800,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
                   <div className="border-t border-white/5 pt-6 space-y-4">
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-400">Retained Employees via Aurelius</span>
+                      <span className="text-slate-400">Retained Employees via Aurelinx</span>
                       <span className="font-bold text-emerald-400 font-mono">
                         +{Math.round(calcWorkforce * (calcTurnover / 100) * (calcReduction / 100))} / year
                       </span>
@@ -1872,7 +1872,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
               Review technical metrics, CAIQ compliance packs, disaster recovery
-              profiles, and model drifts fetched directly from the Aurelius
+              profiles, and model drifts fetched directly from the Aurelinx
               APIs.
             </p>
           </div>
@@ -2214,7 +2214,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="text-[10px] font-semibold uppercase tracking-[0.22em]"
               style={{ color: "rgba(148,163,184,0.35)" }}
             >
-              Aurelius OS &copy; {new Date().getFullYear()} — Operational talent
+              Aurelinx OS &copy; {new Date().getFullYear()} — Operational talent
               intelligence.
             </div>
             <div

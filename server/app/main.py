@@ -14,7 +14,7 @@ import httpx
 
 from app.models.database import create_db_and_tables
 from app.core.config import settings
-from app.core.logging_config import setup_logging, AureliusException, get_logger
+from app.core.logging_config import setup_logging, AurelinxException, get_logger
 from app.core.provider_utils import build_local_provider_base_candidates
 from app.api.v1 import (
     auth,
@@ -39,7 +39,7 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     """Application startup and shutdown events"""
     # Startup
-    logger.info(f"Starting Aurelius API - Environment: {settings.ENVIRONMENT}")
+    logger.info(f"Starting Aurelinx API - Environment: {settings.ENVIRONMENT}")
     logger.info(
         f"Database: {settings.DATABASE_URL.split('@')[1] if '@' in settings.DATABASE_URL else 'unknown'}"
     )
@@ -64,13 +64,13 @@ async def lifespan(app: FastAPI):
         lean_enterprise.stop_scheduler()
     except Exception:  # nosec B110
         pass
-    logger.info("Shutting down Aurelius API")
+    logger.info("Shutting down Aurelinx API")
 
 
 # ============ CREATE APP ============
 
 app = FastAPI(
-    title="Aurelius Intelligence API",
+    title="Aurelinx Intelligence API",
     description="Production-grade HR Intelligence Platform with Agentic AI",
     version="1.0.0",
     docs_url="/api/v1/docs",
@@ -151,9 +151,9 @@ async def add_request_id(request: Request, call_next):
 # ============ EXCEPTION HANDLERS ============
 
 
-@app.exception_handler(AureliusException)
-async def aurelius_exception_handler(request: Request, exc: AureliusException):
-    """Handle custom Aurelius exceptions"""
+@app.exception_handler(AurelinxException)
+async def aurelinx_exception_handler(request: Request, exc: AurelinxException):
+    """Handle custom Aurelinx exceptions"""
     request_id = getattr(request.state, "request_id", None)
 
     logger.error(
@@ -213,7 +213,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "service": "aurelius",
+        "service": "aurelinx",
         "version": "1.0.0",
         "environment": settings.ENVIRONMENT,
         "timestamp": datetime.utcnow().isoformat(),
@@ -224,7 +224,7 @@ async def health_check():
 async def root():
     """Root endpoint"""
     return {
-        "name": "Aurelius Intelligence API",
+        "name": "Aurelinx Intelligence API",
         "version": "1.0.0",
         "docs": "/api/v1/docs",
         "status": "operational",

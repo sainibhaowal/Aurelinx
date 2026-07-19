@@ -1,6 +1,6 @@
-# Aurelius: Implementation & Verification Log
+# Aurelinx: Implementation & Verification Log
 
-This file tracks every single technical step taken in the development of Aurelius. Each entry confirms adherence to the **Rules of Engagement**.
+This file tracks every single technical step taken in the development of Aurelinx. Each entry confirms adherence to the **Rules of Engagement**.
 
 ---
 
@@ -70,8 +70,8 @@ This file tracks every single technical step taken in the development of Aureliu
 - **Verification:** API structure initialized with `/health` and `/docs` ready for testing.
 
 ### ✅ Step 14: Strategic Pivot & Global Renaming
-- **Action:** Renamed project from "NexusAI" to **"Aurelius"** across all 9 core files (Docs, Config, UI, and Backend).
-- **Why:** To ensure a unique, premium, and authoritative brand identity that reflects autonomous leadership (Marcus Aurelius).
+- **Action:** Renamed project from "NexusAI" to **"Aurelinx"** across all 9 core files (Docs, Config, UI, and Backend).
+- **Why:** To ensure a unique, premium, and authoritative brand identity that reflects autonomous leadership (Marcus Aurelinx).
 - **Verification:** Global search confirmed zero instances of the old name remaining in the primary codebase.
 
 ### ✅ Step 15: "Real Intelligence" Algorithmic Pivot
@@ -80,7 +80,7 @@ This file tracks every single technical step taken in the development of Aureliu
     - **Graph Adjacency:** For skill-matching logic.
     - **Sentiment Velocity:** For predictive turnover risk.
     - **Linear Optimization:** For budgetary hiring strategy.
-- **Why:** To ensure Aurelius solves real managerial problems using complex, deterministic mathematics in combination with AI.
+- **Why:** To ensure Aurelinx solves real managerial problems using complex, deterministic mathematics in combination with AI.
 - **Verification:** Specs now include Graph Engines and Constraint Optimizers.
 
 ### ✅ Step 16: Database Schema & Talent Modeling
@@ -91,7 +91,7 @@ This file tracks every single technical step taken in the development of Aureliu
 ### ✅ Step 17: High-Fidelity Data Seeding
 - **Action:** Implemented `seed_data.py` and generated 50 realistic profiles.
 - **Why:** To provide a rich dataset for testing "Real Intelligence" algorithms.
-- **Verification:** 50 records successfully committed to `aurelius.db`.
+- **Verification:** 50 records successfully committed to `aurelinx.db`.
 
 ### ✅ Step 18: Frontend Data Integration
 - **Action:** Created `TalentCard.jsx` and connected `App.jsx` to the new `/api/v1/employees` endpoint.
@@ -106,7 +106,7 @@ This file tracks every single technical step taken in the development of Aureliu
 ### ✅ Step 20: SQL Data Tool Integration
 - **Action:** Created `agents/tools.py` with `get_talent_pool` and `analyze_department_sentiment`.
 - **Why:** To give the AI "eyes" to see real database records without hallucination.
-- **Verification:** Tools successfully query `aurelius.db` and return structured JSON for LLM consumption.
+- **Verification:** Tools successfully query `aurelinx.db` and return structured JSON for LLM consumption.
 
 ### ✅ Step 21: Predictive Sentiment Pipeline
 - **Action:** Implemented `SentimentAnalyzer` in `services/sentiment_analyzer.py`.
@@ -121,7 +121,7 @@ This file tracks every single technical step taken in the development of Aureliu
 ---
 
 ## 🏆 Project Status: 100% COMPLETE
-**Aurelius is now a production-grade, multi-agent management hub.** 
+**Aurelinx is now a production-grade, multi-agent management hub.** 
 - **Real Intelligence:** Implemented via FAISS and LangGraph.
 - **Real Value:** Implemented via PDF Reporting and Sentiment Analysis.
 - **Real Design:** Implemented via Glassmorphism and Framer Motion.
@@ -146,13 +146,13 @@ This file tracks every single technical step taken in the development of Aureliu
 
 ### ? Step 30: Enterprise Competitive Implementation Plan Added
 - **Action:** Added a full-scale implementation blueprint focused on competing with SuccessFactors, Oracle HCM, and Workday.
-- **Location:** `Docs/Planned_Architecture/aurelius_enterprise_competitive_implementation_plan.md`
+- **Location:** `Docs/Planned_Architecture/aurelinx_enterprise_competitive_implementation_plan.md`
 - **Why:** User requested a powerful, non-compromised enterprise direction with massive integrations and decision-grade HR intelligence.
 - **Verification:** Document includes target market, integration architecture, algorithm stack, phased rollout, and measurable KPI framework.
 
 ### ? Step 31: Target Market and GTM Strategy Added
 - **Action:** Added target-customer and go-to-market strategy document for enterprise expansion.
-- **Location:** `Docs/Planned_Architecture/aurelius_target_market_and_gtm_strategy.md`
+- **Location:** `Docs/Planned_Architecture/aurelinx_target_market_and_gtm_strategy.md`
 - **Why:** Product strategy and commercial execution needed to align with enterprise buyer motion.
 - **Verification:** Document defines ICP, buying triggers, packaging, deployment models, and 12-month market attack plan.
 
@@ -160,7 +160,7 @@ This file tracks every single technical step taken in the development of Aureliu
 
 ### ? Step 32: Enterprise Readiness Addendum Completed
 - **Action:** Added comprehensive enterprise-readiness documentation covering commercial model, operating RACI, schema governance, security architecture, compliance execution, experimentation framework, DR/SRE, and adoption operations.
-- **Location:** `Docs/Planned_Architecture/aurelius_enterprise_readiness_addendum.md`
+- **Location:** `Docs/Planned_Architecture/aurelinx_enterprise_readiness_addendum.md`
 - **Why:** User requested full coverage with no enterprise planning gaps.
 - **Verification:** Addendum includes a deployment gate checklist and mandatory artifacts for production readiness.
 
@@ -168,7 +168,7 @@ This file tracks every single technical step taken in the development of Aureliu
 
 ### ? Step 33: Master Backlog Created
 - **Action:** Added a strict execution backlog for the remaining enterprise gaps.
-- **Location:** `Docs/Worked/aurelius_master_backlog.md`
+- **Location:** `Docs/Worked/aurelinx_master_backlog.md`
 - **Why:** Needed a single source of truth to track remaining work until end-to-end completion.
 - **Verification:** Backlog groups remaining work by connectors, pipeline, ML, compliance, scenario optimization, security, and frontend.
 
@@ -185,14 +185,14 @@ This file tracks every single technical step taken in the development of Aureliu
 - **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
 
 ### ? Step 36: Local End-to-End Import Mode Added
-- **Action:** Added CSV upload endpoints, demo bundle import, demo reset, and frontend file-upload controls so Aurelius can run fully without vendor auth.
+- **Action:** Added CSV upload endpoints, demo bundle import, demo reset, and frontend file-upload controls so Aurelinx can run fully without vendor auth.
 - **Location:** `server/app/api/v1/lean_enterprise.py`, `client/src/services/apiClient.js`, `client/src/components/EnterpriseOpsView.jsx`
 - **Why:** User explicitly wanted the app to work end to end even without enterprise vendor credentials.
 - **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
 
 ### ? Step 37: Repository Records and Landing Blueprint Added
 - **Action:** Added durable implementation record, status report, and landing-page blueprint MD files for future tracking and launch work.
-- **Location:** `Docs/Worked/aurelius_implementation_record.md`, `Docs/Worked/aurelius_status_report.md`, `Docs/Planned_Architecture/aurelius_landing_page_blueprint.md`
+- **Location:** `Docs/Worked/aurelinx_implementation_record.md`, `Docs/Worked/aurelinx_status_report.md`, `Docs/Planned_Architecture/aurelinx_landing_page_blueprint.md`
 - **Why:** User requested full markdown records to keep the repo history, implementation trail, and landing-page plan organized.
 - **Verification:** Documentation files added successfully.
 
@@ -204,7 +204,7 @@ This file tracks every single technical step taken in the development of Aureliu
 
 ### ? Step 39: Launch / Onboarding UI Added
 - **Action:** Added a dedicated launch screen and wired it into the application shell so the product now has a clear first-run entry experience.
-- **Location:** `client/src/components/LaunchPadView.jsx`, `client/src/App.jsx`, `Docs/Worked/aurelius_status_report.md`, `Docs/Worked/aurelius_implementation_record.md`
+- **Location:** `client/src/components/LaunchPadView.jsx`, `client/src/App.jsx`, `Docs/Worked/aurelinx_status_report.md`, `Docs/Worked/aurelinx_implementation_record.md`
 - **Why:** The frontend needed a proper product entry flow and UX path before the operational workspace.
 - **Verification:** Frontend build passed with `npm run build`.
 
@@ -216,13 +216,13 @@ This file tracks every single technical step taken in the development of Aureliu
 
 ### ? Step 41: Landing Blueprint Completed
 - **Action:** Expanded the landing page to include the problem, solution, modules, demo proof, integrations, governance, value, and CTA sections, plus a local demo-request capture form.
-- **Location:** `client/src/components/LandingPage.jsx`, `Docs/Worked/aurelius_landing_page_remaining_todo.md`
+- **Location:** `client/src/components/LandingPage.jsx`, `Docs/Worked/aurelinx_landing_page_remaining_todo.md`
 - **Why:** The landing page blueprint needed to be implemented fully so the public entry experience matches the planned product narrative.
 - **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
 
 ### ? Step 42: Import Validation and Executive Packet Added
 - **Action:** Added import validation scorecards, an executive packet endpoint, frontend packet display, and the end-to-end checklist.
-- **Location:** `server/app/api/v1/lean_enterprise.py`, `client/src/services/apiClient.js`, `client/src/components/EnterpriseOpsView.jsx`, `Docs/Worked/aurelius_end_to_end_checklist.md`
+- **Location:** `server/app/api/v1/lean_enterprise.py`, `client/src/services/apiClient.js`, `client/src/components/EnterpriseOpsView.jsx`, `Docs/Worked/aurelinx_end_to_end_checklist.md`
 - **Why:** The remaining product gaps from the roadmap needed to be made visible and operational in the UI before only optional hardening work remained.
 - **Verification:** Backend compile passed with `.venv\\Scripts\\python.exe -m compileall app`; frontend build passed with `npm run build`.
 

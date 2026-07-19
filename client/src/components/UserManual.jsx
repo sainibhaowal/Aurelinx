@@ -77,10 +77,10 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-                <BookOpen className="text-cyan-400 h-5 w-5" /> Aurelius Platform Overview
+                <BookOpen className="text-cyan-400 h-5 w-5" /> Aurelinx Platform Overview
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                Welcome to Aurelius, an enterprise-grade Talent Intelligence & Org Health Platform. Aurelius integrates live business telemetry (Slack, Jira, Workday) with explainable Machine Learning models, policy compliance gates, and cognitive AI agents to help organizations optimize retention and build high-performance teams.
+                Welcome to Aurelinx, an enterprise-grade Talent Intelligence & Org Health Platform. Aurelinx integrates live business telemetry (Slack, Jira, Workday) with explainable Machine Learning models, policy compliance gates, and cognitive AI agents to help organizations optimize retention and build high-performance teams.
               </p>
             </div>
 
@@ -123,7 +123,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <MessageSquare className="text-rose-400 h-5 w-5" /> Agentic Workflow Chat
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                The Workflow Chat is Aurelius's cognitive agent console. Rather than a static conversational bot, this agent dynamically inspects your intent, executes database commands, checks compliance rules, and mutates tables in real-time.
+                The Workflow Chat is Aurelinx's cognitive agent console. Rather than a static conversational bot, this agent dynamically inspects your intent, executes database commands, checks compliance rules, and mutates tables in real-time.
               </p>
             </div>
 
@@ -228,7 +228,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5">
                   <span className="text-cyan-300 font-bold block mb-1">Set Employee Risk Flags</span>
                   <code className="text-emerald-300 bg-black/30 px-1.5 py-0.5 rounded block w-full mt-1.5 font-mono text-[10px]">
-                    "Set employee liam@aurelius.com risk to true"
+                    "Set employee liam@aurelinx.com risk to true"
                   </code>
                 </div>
 
@@ -244,7 +244,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5">
                   <span className="text-cyan-300 font-bold block mb-1">Add New Workforce Entries</span>
                   <code className="text-emerald-300 bg-black/30 px-1.5 py-0.5 rounded block w-full mt-1.5 font-mono text-[10px]">
-                    "Add employee Silas Vance, email silas@aurelius.com, role Lead Developer, dept Technical"
+                    "Add employee Silas Vance, email silas@aurelinx.com, role Lead Developer, dept Technical"
                   </code>
                 </div>
 
@@ -264,7 +264,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               <div className="text-xs">
                 <h4 className="font-bold text-red-300">Human-in-the-Loop Safe Aborts</h4>
                 <p className="text-slate-300 mt-1 leading-relaxed">
-                  **Aurelius Governance Protocol:** The agent is strictly prohibited from executing deletion operations (<code className="font-mono text-[10px] text-red-300 bg-black/30 px-1 py-0.5 rounded">delete</code>, <code className="font-mono text-[10px] text-red-300 bg-black/30 px-1 py-0.5 rounded">remove</code>, or <code className="font-mono text-[10px] text-red-300 bg-black/30 px-1 py-0.5 rounded">purge</code>) under any circumstances. If requested, the pipeline safely aborts the operation, prompting the administrator to verify the deletion manually.
+                  **Aurelinx Governance Protocol:** The agent is strictly prohibited from executing deletion operations (<code className="font-mono text-[10px] text-red-300 bg-black/30 px-1 py-0.5 rounded">delete</code>, <code className="font-mono text-[10px] text-red-300 bg-black/30 px-1 py-0.5 rounded">remove</code>, or <code className="font-mono text-[10px] text-red-300 bg-black/30 px-1 py-0.5 rounded">purge</code>) under any circumstances. If requested, the pipeline safely aborts the operation, prompting the administrator to verify the deletion manually.
                 </p>
               </div>
             </div>
@@ -280,7 +280,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <Search className="text-cyan-400 h-5 w-5" /> Talent Scout Matchmaker
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                Talent Scout is the intelligent search and matchmaking component of Aurelius, designed to connect high-level conceptual roles with matching personnel profiles.
+                Talent Scout is the intelligent search and matchmaking component of Aurelinx, designed to connect high-level conceptual roles with matching personnel profiles.
               </p>
             </div>
 
@@ -402,7 +402,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <Heart className="h-3.5 w-3.5" /> Retention-Aware Onboarding
               </h4>
               <p className="text-[11px] text-slate-300 mt-1.5 leading-relaxed">
-                **Aurelius is built on safety.** When a candidate matches a role, the system analyzes the target department's morale, workload, and attrition trends. If a candidate is placed into a team with high burnout, the engine flags a warning, advising leadership to stabilize the team prior to onboarding.
+                **Aurelinx is built on safety.** When a candidate matches a role, the system analyzes the target department's morale, workload, and attrition trends. If a candidate is placed into a team with high burnout, the engine flags a warning, advising leadership to stabilize the team prior to onboarding.
               </p>
             </div>
           </div>
@@ -417,20 +417,20 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <BarChart3 className="text-emerald-400 h-5 w-5" /> Sentiment Intelligence & Org Pulse
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                Sentiment Intelligence is the core forecasting engine of Aurelius. It maps the continuous emotional health of your workforce by analyzing active communication streams.
+                Sentiment Intelligence is the core forecasting engine of Aurelinx. It maps the continuous emotional health of your workforce by analyzing active communication streams.
               </p>
             </div>
 
-            {/* Why Sentiment / Why Aurelius Section */}
+            {/* Why Sentiment / Why Aurelinx Section */}
             <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-950/10 space-y-3">
               <h4 className="text-xs font-black uppercase tracking-wider text-emerald-300">
-                Why Sentiment? The Philosophy of Aurelius
+                Why Sentiment? The Philosophy of Aurelinx
               </h4>
               <p className="text-xs text-slate-300 leading-relaxed">
                 Traditional organizations rely on **annual surveys** to measure company culture. Surveys fail because they suffer from <em>recency bias</em>, <em>low participation rates</em>, and are <em>too late</em>—by the time the survey is analyzed, key talent has already resigned.
               </p>
               <p className="text-xs text-slate-300 leading-relaxed">
-                <strong>Aurelius was built to solve this.</strong> It replaces static surveys with passive, privacy-preserving **live sentiment telemetry**. By scanning the emotional tone of collaboration logs, Aurelius detects early warning signs of burnout, team conflict, and career dissatisfaction in real-time.
+                <strong>Aurelinx was built to solve this.</strong> It replaces static surveys with passive, privacy-preserving **live sentiment telemetry**. By scanning the emotional tone of collaboration logs, Aurelinx detects early warning signs of burnout, team conflict, and career dissatisfaction in real-time.
               </p>
             </div>
 
@@ -491,7 +491,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-white">The Three Pillars of Live Indicators</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Aurelius measures three independent values to generate high-fidelity, actionable employee profiles:
+                Aurelinx measures three independent values to generate high-fidelity, actionable employee profiles:
               </p>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -544,7 +544,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     <Activity className="h-3.5 w-3.5 text-primary" /> System Status (Live Telemetry)
                   </strong>
                   <p className="text-slate-300 leading-relaxed">
-                    This left card displays the raw live telemetry counts ingested by the Aurelius pipeline:
+                    This left card displays the raw live telemetry counts ingested by the Aurelinx pipeline:
                   </p>
                   <ul className="list-disc pl-4 space-y-1 text-slate-400">
                     <li><strong className="text-slate-300">Total Analyzed:</strong> Count of employees currently tracked by sentiment telemetry.</li>
@@ -741,7 +741,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <Users className="text-purple-400 h-5 w-5" /> Talent Directory
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                The Talent Directory is Aurelius's primary analytical gateway. It acts as a unified interface that aggregates live organizational telemetry, predictive machine learning models, and skills inventory.
+                The Talent Directory is Aurelinx's primary analytical gateway. It acts as a unified interface that aggregates live organizational telemetry, predictive machine learning models, and skills inventory.
               </p>
             </div>
 
@@ -754,7 +754,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <strong>What is ONA?</strong> ONA stands for <strong>Organizational Network Analysis</strong>. Rather than viewing a company as a flat list or static hierarchy, ONA models the organization as a living network of nodes (employees) and edges (interactions like Slack messages, Jira ticket collaborations, and Git code reviews).
               </p>
               <p className="text-xs text-slate-300 leading-relaxed">
-                By tracking these connections, Aurelius detects who is doing the heavy lifting, who acts as an key information broker, and who is structurally isolated. When an employee with high network value (many incoming collaboration links) displays low morale, the system flags them as high-risk, as their departure would cause a major communication gap.
+                By tracking these connections, Aurelinx detects who is doing the heavy lifting, who acts as an key information broker, and who is structurally isolated. When an employee with high network value (many incoming collaboration links) displays low morale, the system flags them as high-risk, as their departure would cause a major communication gap.
               </p>
             </div>
 
@@ -919,7 +919,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-white">The Skills Ontology & Level Scale</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Aurelius classifies capability metrics based on three tiers of execution:
+                Aurelinx classifies capability metrics based on three tiers of execution:
               </p>
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5">
@@ -967,7 +967,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <Network className="text-pink-400 h-5 w-5" /> Intelligence Center (Decision Workbench)
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                The **Intelligence Center** is the mathematical core of the Aurelius platform. While typical enterprise directories rely on static lists, Aurelius implements a dynamic decision workbench powered by graph algorithms, global combinatorial search solvers, and semi-parametric survival models to optimize organizational structures.
+                The **Intelligence Center** is the mathematical core of the Aurelinx platform. While typical enterprise directories rely on static lists, Aurelinx implements a dynamic decision workbench powered by graph algorithms, global combinatorial search solvers, and semi-parametric survival models to optimize organizational structures.
               </p>
             </div>
 
@@ -1230,7 +1230,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     What is an Adjacency?
                   </p>
                   <p className="text-slate-300 leading-relaxed">
-                    In graph theory, two nodes are &quot;adjacent&quot; if they are directly connected by an edge. In Aurelius, a skill adjacency represents a direct transfer relationship between two competencies (e.g., Python is adjacent to FastAPI). 
+                    In graph theory, two nodes are &quot;adjacent&quot; if they are directly connected by an edge. In Aurelinx, a skill adjacency represents a direct transfer relationship between two competencies (e.g., Python is adjacent to FastAPI). 
                   </p>
                   <p className="text-slate-300 leading-relaxed">
                     **Solving Adjacencies** is the process of executing a shortest-path solver (such as Dijkstra&#39;s algorithm) to find indirect pathways (e.g. `Vue.js &rarr; JavaScript &rarr; React`) when no direct match exists. This exposes hidden talent by calculating the learning proximity between skills.
@@ -1406,7 +1406,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
 
               <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4 text-left text-xs">
                 <p className="text-slate-300 leading-relaxed">
-                  <strong>What is it?</strong> The Markov Career Path is a predictive modeling framework that maps potential employee career progression as a probabilistic state transition network. Rather than viewing career paths as static, linear ladders, Aurelius recognizes that employees move across departments and roles stochastically, modeled as a <strong>First-Order Markov Chain</strong>.
+                  <strong>What is it?</strong> The Markov Career Path is a predictive modeling framework that maps potential employee career progression as a probabilistic state transition network. Rather than viewing career paths as static, linear ladders, Aurelinx recognizes that employees move across departments and roles stochastically, modeled as a <strong>First-Order Markov Chain</strong>.
                 </p>
                 <p className="text-slate-300 leading-relaxed">
                   <strong>Why we need it:</strong> Traditional performance reviews and development plans are qualitative and subjective. By modeling career paths mathematically, managers can see where employees are structurally headed, identify potential retention risks, and design optimized development paths based on actual skills gaps.
@@ -1515,7 +1515,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <Key className="text-amber-400 h-5 w-5" /> Providers & Webhook Registry
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                Connect Aurelius directly to external HRIS and communication suites. Secure connections use token headers and HMAC payload signatures.
+                Connect Aurelinx directly to external HRIS and communication suites. Secure connections use token headers and HMAC payload signatures.
               </p>
             </div>
 
@@ -1580,7 +1580,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               <div className="flex items-center gap-3">
                 <BookOpen className="h-6 w-6 text-cyan-400" />
                 <div>
-                  <h1 className="text-lg font-black text-white leading-none">Aurelius System User Manual</h1>
+                  <h1 className="text-lg font-black text-white leading-none">Aurelinx System User Manual</h1>
                   <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Operational Guide & Telemetry Handbooks</p>
                 </div>
               </div>
@@ -1642,7 +1642,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
 
             {/* Footer */}
             <div className="p-4 border-t border-white/10 bg-slate-950/40 flex justify-between items-center text-[10px] text-slate-400">
-              <div>Aurelius Core Version v4.1.0-Release</div>
+              <div>Aurelinx Core Version v4.1.0-Release</div>
               <div className="flex items-center gap-1.5">
                 <Code size={12} className="text-cyan-400" /> Grounded in ONA, ML, and Policy compliance
               </div>

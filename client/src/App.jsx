@@ -24,7 +24,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import TalentCard from "./components/TalentCard";
-import AureliusLogo from "./components/AureliusLogo";
+import AurelinxLogo from "./components/AurelinxLogo";
 import Toast from "./components/Toast";
 import AuthScreen from "./components/AuthScreen";
 import WindowControls from "./components/WindowControls";
@@ -62,9 +62,9 @@ const isAppPath = (pathname = "") =>
 const App = () => {
   const { isAuthenticated, loading: authLoading, logout, user } = useAuth();
 
-  const EMPLOYEE_CACHE_KEY = "aurelius_dashboard_employees_cache";
-  const CANDIDATE_CACHE_KEY = "aurelius_dashboard_candidates_cache";
-  const SNAPSHOT_CACHE_KEY = "aurelius_dashboard_snapshot_cache";
+  const EMPLOYEE_CACHE_KEY = "aurelinx_dashboard_employees_cache";
+  const CANDIDATE_CACHE_KEY = "aurelinx_dashboard_candidates_cache";
+  const SNAPSHOT_CACHE_KEY = "aurelinx_dashboard_snapshot_cache";
   const [employees, setEmployees] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -235,9 +235,9 @@ const App = () => {
       primaryRecords.length > 0
         ? ((atRisk / primaryRecords.length) * 100).toFixed(1)
         : "0.0";
-    const summary = `Aurelius: ${employees.length} employees, ${candidates.length} candidates, Risk ${ratio}%.`;
-    const { generateAureliusReport } = await import("./utils/reportGenerator");
-    generateAureliusReport(primaryRecords, summary, format);
+    const summary = `Aurelinx: ${employees.length} employees, ${candidates.length} candidates, Risk ${ratio}%.`;
+    const { generateAurelinxReport } = await import("./utils/reportGenerator");
+    generateAurelinxReport(primaryRecords, summary, format);
     showToast(`Exported ${String(format).toUpperCase()}`, "success");
   };
 
@@ -352,7 +352,7 @@ const App = () => {
             data-tauri-drag-region
             className={`h-14 px-2 mb-2 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start"} cursor-move`}
           >
-            <AureliusLogo collapsed={isSidebarCollapsed} size={24} />
+            <AurelinxLogo collapsed={isSidebarCollapsed} size={24} />
           </div>
 
           {!isSidebarCollapsed && (

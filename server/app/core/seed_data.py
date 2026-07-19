@@ -103,14 +103,14 @@ def seed_production_data():
         # Create test users
         users = [
             UserTable(
-                email="admin@aurelius.com",
+                email="admin@aurelinx.com",
                 full_name="Admin User",
                 hashed_password=hash_password("AdminPassword123"),
                 is_active=True,
                 is_admin=True,
             ),
             UserTable(
-                email="manager@aurelius.com",
+                email="manager@aurelinx.com",
                 full_name="Manager User",
                 hashed_password=hash_password("ManagerPassword123"),
                 is_active=True,
@@ -263,8 +263,8 @@ def seed_production_data():
         print(f"   - Employees: {len(employees)}")
         print(f"   - Candidates: {len(candidates)}")
         print("\n📝 Test credentials:")
-        print("   Admin: admin@aurelius.com / AdminPassword123")
-        print("   User: manager@aurelius.com / ManagerPassword123")
+        print("   Admin: admin@aurelinx.com / AdminPassword123")
+        print("   User: manager@aurelinx.com / ManagerPassword123")
 
 
 if __name__ == "__main__":

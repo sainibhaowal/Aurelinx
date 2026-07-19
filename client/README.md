@@ -1,4 +1,4 @@
-# Aurelius Frontend - Next.js
+# Aurelinx Frontend - Next.js
 
 Modern React frontend built with Next.js, TypeScript, Tailwind CSS, and Framer Motion.
 

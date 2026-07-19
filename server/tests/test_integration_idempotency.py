@@ -6,7 +6,7 @@ from app.models.database import IntegrationWebhookEventTable
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+psycopg://aurelius:AureliusPg_2026!ChangeMe@localhost:5432/aurelius_db?options=-csearch_path%3Dtest,public",
+    "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:5432/aurelinx_db?options=-csearch_path%3Dtest,public",
 )
 
 
@@ -14,7 +14,7 @@ TEST_DATABASE_URL = os.getenv(
 def in_memory_engine():
     engine = create_engine(TEST_DATABASE_URL, echo=False, pool_pre_ping=True)
     with engine.begin() as conn:
-        conn.exec_driver_sql("CREATE SCHEMA IF NOT EXISTS test AUTHORIZATION aurelius")
+        conn.exec_driver_sql("CREATE SCHEMA IF NOT EXISTS test AUTHORIZATION aurelinx")
     SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
     return engine

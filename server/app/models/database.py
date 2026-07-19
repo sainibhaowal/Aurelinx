@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # Database configuration
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+psycopg://aurelius:aurelius_password@localhost:5432/aurelius_db",
+    "postgresql+psycopg://aurelinx:aurelinx_password@localhost:5432/aurelinx_db",
 )
 
 ALLOW_SQLITE = os.getenv("ALLOW_SQLITE", "").strip().lower() in {
@@ -197,7 +197,7 @@ class AuditLogTable(SQLModel, table=True):
 
 # ============ INTELLIGENCE CHAT ============
 class ChatSessionTable(SQLModel, table=True):
-    """Persistent chat sessions for Aurelius Intelligence chat"""
+    """Persistent chat sessions for Aurelinx Intelligence chat"""
 
     __tablename__ = "chat_sessions"
 

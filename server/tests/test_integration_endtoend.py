@@ -8,7 +8,7 @@ import os
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+psycopg://aurelius:AureliusPg_2026!ChangeMe@localhost:5432/aurelius_db?options=-csearch_path%3Dtest,public",
+    "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:5432/aurelinx_db?options=-csearch_path%3Dtest,public",
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["ALLOWED_HOSTS"] = "*"
@@ -29,7 +29,7 @@ from app.models.database import IntegrationApiKeyTable  # noqa: E402
 def client_db(monkeypatch, tmp_path):
     engine = create_engine_fn(TEST_DATABASE_URL, echo=False, pool_pre_ping=True)
     with engine.begin() as conn:
-        conn.exec_driver_sql("CREATE SCHEMA IF NOT EXISTS test AUTHORIZATION aurelius")
+        conn.exec_driver_sql("CREATE SCHEMA IF NOT EXISTS test AUTHORIZATION aurelinx")
     SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
 
@@ -65,7 +65,7 @@ def test_signature_and_header_auth_and_expiry(client_db):
         s.refresh(key)
 
     payload = {
-        "email": "silas.vance@aurelius.io",
+        "email": "silas.vance@aurelinx.io",
         "sentiment_score": 0.6,
         "message_count": 10,
     }

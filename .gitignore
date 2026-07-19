@@ -52,7 +52,7 @@ build/
 out/
 .next/
 .serverless/
-deliverables/AURELIUS_University_Submission_Deck_FINAL*.pptx
+deliverables/AURELINX_University_Submission_Deck_FINAL*.pptx
 !deliverables/artifact-build-manifest.json
 
 # Temporary / Lock files
@@ -122,3 +122,8 @@ coverage/
 .parcel-cache/
 .next
 out
+
+# Tauri Desktop Build artifacts
+desktop/src-tauri/target/
+desktop/node_modules/
+desktop/dist/

@@ -3,7 +3,7 @@
 set -e
 
 echo "========================================="
-echo "   Aurelius Admin Account Creator"
+echo "   Aurelinx Admin Account Creator"
 echo "========================================="
 echo ""
 

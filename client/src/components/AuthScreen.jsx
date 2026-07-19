@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
-import AureliusLogo from "./AureliusLogo";
+import AurelinxLogo from "./AurelinxLogo";
 import { useAuth } from "../contexts/AuthContext";
 
 const initialRegisterState = {
@@ -179,7 +179,7 @@ const AuthScreen = () => {
       >
         {/* Logo */}
         <div className="flex-none">
-          <AureliusLogo collapsed={false} size={24} />
+          <AurelinxLogo collapsed={false} size={24} />
         </div>
 
         {/* Main copy */}
@@ -249,7 +249,7 @@ const AuthScreen = () => {
         >
           {/* Mobile logo */}
           <div className="lg:hidden mb-10">
-            <AureliusLogo collapsed={false} size={22} />
+            <AurelinxLogo collapsed={false} size={22} />
           </div>
 
           {/* Glass card */}
@@ -469,7 +469,7 @@ const AuthScreen = () => {
                   </SubmitBtn>
 
                   <p className="text-sm text-slate-500 text-center">
-                    New to Aurelius?{" "}
+                    New to Aurelinx?{" "}
                     <button
                       type="button"
                       className="font-semibold transition-colors"

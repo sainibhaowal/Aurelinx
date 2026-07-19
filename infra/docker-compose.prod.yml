@@ -1,20 +1,20 @@
-name: aurelius
+name: aurelinx
 
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-aurelius_db}
-      POSTGRES_USER: ${POSTGRES_USER:-aurelius}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-AureliusPg_2026!ChangeMe}
+      POSTGRES_DB: ${POSTGRES_DB:-aurelinx_db}
+      POSTGRES_USER: ${POSTGRES_USER:-aurelinx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-AurelinxPg_2026!ChangeMe}
     ports:
       - "${POSTGRES_PORT:-55433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aurelius} -d ${POSTGRES_DB:-aurelius_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aurelinx} -d ${POSTGRES_DB:-aurelinx_db}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -22,13 +22,13 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-AureliusRedis_2026!ChangeMe}"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-AurelinxRedis_2026!ChangeMe}"]
     ports:
       - "${REDIS_PORT:-6380}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-AureliusRedis_2026!ChangeMe} ping"]
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-AurelinxRedis_2026!ChangeMe} ping"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -57,8 +57,8 @@ services:
     env_file:
       - ./.env.production
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://aurelius:AureliusPg_2026!ChangeMe@postgres:5432/aurelius_db?options=-csearch_path%3Dapp,public}
-      REDIS_URL: ${REDIS_URL:-redis://:AureliusRedis_2026!ChangeMe@redis:6379/0}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@postgres:5432/aurelinx_db?options=-csearch_path%3Dapp,public}
+      REDIS_URL: ${REDIS_URL:-redis://:AurelinxRedis_2026!ChangeMe@redis:6379/0}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       PYTHONPATH: /app
       CHAT_UPLOAD_ROOT: ${CHAT_UPLOAD_ROOT:-/app/data/chat}
@@ -89,8 +89,8 @@ services:
     env_file:
       - ./.env.production
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://aurelius:AureliusPg_2026!ChangeMe@postgres:5432/aurelius_db?options=-csearch_path%3Dapp,public}
-      REDIS_URL: ${REDIS_URL:-redis://:AureliusRedis_2026!ChangeMe@redis:6379/0}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@postgres:5432/aurelinx_db?options=-csearch_path%3Dapp,public}
+      REDIS_URL: ${REDIS_URL:-redis://:AurelinxRedis_2026!ChangeMe@redis:6379/0}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
     depends_on:
       postgres:
@@ -109,8 +109,8 @@ services:
     env_file:
       - ./.env.production
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://aurelius:AureliusPg_2026!ChangeMe@postgres:5432/aurelius_db?options=-csearch_path%3Dapp,public}
-      REDIS_URL: ${REDIS_URL:-redis://:AureliusRedis_2026!ChangeMe@redis:6379/0}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@postgres:5432/aurelinx_db?options=-csearch_path%3Dapp,public}
+      REDIS_URL: ${REDIS_URL:-redis://:AurelinxRedis_2026!ChangeMe@redis:6379/0}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       PYTHONPATH: /app
     depends_on:

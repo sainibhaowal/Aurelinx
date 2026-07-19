@@ -128,11 +128,11 @@ def _get_dev_fallback_user() -> Optional[TokenData]:
 
         with Session(engine) as session:
             user = session.exec(
-                select(UserTable).where(UserTable.email == "admin@aurelius.com")
+                select(UserTable).where(UserTable.email == "admin@aurelinx.com")
             ).first()
             if not user:
                 user = session.exec(
-                    select(UserTable).where(UserTable.email == "manager@aurelius.com")
+                    select(UserTable).where(UserTable.email == "manager@aurelinx.com")
                 ).first()
             if not user:
                 return None

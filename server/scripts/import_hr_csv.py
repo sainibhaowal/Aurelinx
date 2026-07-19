@@ -1,5 +1,5 @@
 """
-Import HR data from CSV files into Aurelius tables.
+Import HR data from CSV files into Aurelinx tables.
 
 Usage (from server directory):
   python scripts/import_hr_csv.py --employees employees.csv
@@ -295,7 +295,7 @@ def _import_experience(
 
 
 def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Import HR CSV data into Aurelius")
+    p = argparse.ArgumentParser(description="Import HR CSV data into Aurelinx")
     p.add_argument("--employees", type=Path, help="employees.csv")
     p.add_argument("--candidates", type=Path, help="candidates.csv")
     p.add_argument(

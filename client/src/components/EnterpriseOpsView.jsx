@@ -714,7 +714,7 @@ const EnterpriseOpsView = () => {
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed mb-4 max-w-5xl">
               This dashboard manages the operational backbone and data pipelines
-              of Aurelius. It registers active integrations, monitors sync jobs,
+              of Aurelinx. It registers active integrations, monitors sync jobs,
               audits model fairness, retrains models, tracks SRE Disaster
               Recovery drills, and details corporate compliance.
             </p>
@@ -1273,7 +1273,7 @@ const EnterpriseOpsView = () => {
                           Bundle Import
                         </div>
                         <p className="text-[10px] text-slate-400 leading-normal mt-0.5 max-w-xl">
-                          Upload a single `aurelius-dataset-bundle.zip` to load
+                          Upload a single `aurelinx-dataset-bundle.zip` to load
                           employees, candidates, skills, and experience in one
                           pass.
                         </p>

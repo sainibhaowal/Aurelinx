@@ -338,7 +338,7 @@ async def _call_openai_compatible_model(
         )
 
     system_msg = (
-        "You are Aurelius Talent Intelligence. Provide concise, high-signal hiring analysis. "
+        "You are Aurelinx Talent Intelligence. Provide concise, high-signal hiring analysis. "
         "Use the candidate/profile evidence exactly as provided. No generic filler."
     )
     user_msg = (
@@ -413,7 +413,7 @@ async def _call_copilot_model(
         raise ValueError(f"Copilot provider adapter is not configured for '{provider}'")
 
     system_msg = (
-        "You are Aurelius Copilot, an HR intelligence assistant that turns workforce data into "
+        "You are Aurelinx Copilot, an HR intelligence assistant that turns workforce data into "
         "decisions. Be practical, concise, and evidence-backed. Use the provided context only. "
         "Always mention the key evidence, recommended actions, and any risks or caveats. "
         "Do not invent facts not present in the context. "
@@ -656,7 +656,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "service": "aurelius-ai",
+        "service": "aurelinx-ai",
         "timestamp": datetime.utcnow().isoformat(),
     }
 

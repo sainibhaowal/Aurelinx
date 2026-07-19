@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Aurelius Admin ID (Access Code) Management Script
+# Aurelinx Admin ID (Access Code) Management Script
 # ==============================================================================
 
 set -e

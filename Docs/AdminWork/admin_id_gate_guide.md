@@ -1,6 +1,6 @@
-# Administrator Guide: Aurelius Admin ID Gating System
+# Administrator Guide: Aurelinx Admin ID Gating System
 
-Aurelius is protected by a secure, invitation-only **Post-Authentication Admin ID Gate**. Users can register freely or perform OAuth login via Google/GitHub, but they are gated from viewing the application workspace until they verify a valid **Admin ID** (access code).
+Aurelinx is protected by a secure, invitation-only **Post-Authentication Admin ID Gate**. Users can register freely or perform OAuth login via Google/GitHub, but they are gated from viewing the application workspace until they verify a valid **Admin ID** (access code).
 
 ---
 
@@ -10,13 +10,13 @@ Aurelius is protected by a secure, invitation-only **Post-Authentication Admin I
    - Users can register using email and password, Google OAuth, or GitHub OAuth without inputting an Admin ID upfront.
    - This ensures a frictionless onboarding flow and flawless OAuth callbacks.
 2. **Post-Authentication Gating**:
-   - Once authenticated, if the browser session does not contain a verified `aurelius_admin_id`, the user is intercepted by the **Verify Admin Access** gate screen inside `/app`.
+   - Once authenticated, if the browser session does not contain a verified `aurelinx_admin_id`, the user is intercepted by the **Verify Admin Access** gate screen inside `/app`.
    - The user is prevented from viewing the metrics or interacting with the dashboard until they enter a valid Admin ID code.
 3. **One-Time Code Consumption**:
    - When a user enters an Admin ID, the backend verifies the code and consumes it, linking the code to that user's email.
    - Once linked, the code is marked as `is_used = true` and cannot be consumed by other users.
 4. **Persistent Browser Session**:
-   - The verified code is stored in the browser's `localStorage` as `aurelius_admin_id`.
+   - The verified code is stored in the browser's `localStorage` as `aurelinx_admin_id`.
    - The next time the user logs in from the same device, the app automatically checks the code against `/verify-gate` in the background and unlocks the dashboard instantly.
 
 ---
@@ -33,7 +33,7 @@ ssh root@144.91.118.196
 
 ### 2. Navigate to the Infrastructure Directory
 ```bash
-cd /opt/aurelius/infra
+cd /opt/aurelinx/infra
 ```
 
 ### 3. Run the Management Commands
@@ -76,7 +76,7 @@ To apply this security system to your live website, execute the following comman
 
 1. **Pull the latest codebase updates**:
    ```bash
-   cd /opt/aurelius
+   cd /opt/aurelinx
    git pull origin master
    ```
 2. **Rebuild and restart the container services**:
@@ -85,5 +85,5 @@ To apply this security system to your live website, execute the following comman
    ```
 3. **Make the management script executable (if needed)**:
    ```bash
-   chmod +x /opt/aurelius/infra/manage-codes.sh
+   chmod +x /opt/aurelinx/infra/manage-codes.sh
    ```

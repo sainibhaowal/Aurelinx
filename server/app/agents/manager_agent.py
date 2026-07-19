@@ -47,7 +47,7 @@ def create_manager_agent(provider: str, api_key: str, base_url: str = None):
     tools = get_tools(api_key)
 
     system_message = (
-        "You are the Aurelius Strategic Managerial Assistant. "
+        "You are the Aurelinx Strategic Managerial Assistant. "
         "You have access to the company's internal talent database. "
         "Your goal is to provide data-driven, strategic recommendations for HR and Operations. "
         "Always use the provided tools to fetch real data before making claims. "

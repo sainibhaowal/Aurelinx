@@ -1,6 +1,6 @@
-# Production Deployment Guide: Aurelius on VPS
+# Production Deployment Guide: Aurelinx on VPS
 
-This guide provides step-by-step instructions to deploy the Aurelius HR Intelligence Platform on your Virtual Private Server (VPS) at **144.91.118.196** using Docker Compose.
+This guide provides step-by-step instructions to deploy the Aurelinx HR Intelligence Platform on your Virtual Private Server (VPS) at **144.91.118.196** using Docker Compose.
 
 ---
 
@@ -45,7 +45,7 @@ docker buildx version
 
 
 ```
-cd /opt/aurelius
+cd /opt/aurelinx
 git pull origin main
 docker compose -f infra/docker-compose.prod.yml up -d --build --no-deps
 ```
@@ -72,14 +72,14 @@ docker buildx version
 
 ## Step 2: Clone the Repository
 
-Clone the Aurelius codebase onto your VPS. Since your repository is on GitHub (`sainibhaowal/Aurelius`), run:
+Clone the Aurelinx codebase onto your VPS. Since your repository is on GitHub (`sainibhaowal/Aurelinx`), run:
 
 ```bash
 # Clone using HTTPS (simplest for VPS without SSH keys registered on GitHub)
-git clone https://github.com/sainibhaowal/Aurelius.git /var/www/aurelius
+git clone https://github.com/sainibhaowal/Aurelinx.git /var/www/aurelinx
 
 # Navigate to the repository
-cd /var/www/aurelius
+cd /var/www/aurelinx
 ```
 
 > [!NOTE]
@@ -91,7 +91,7 @@ cd /var/www/aurelius
 
 1. Navigate to the `infra/` folder:
    ```bash
-   cd /var/www/aurelius/infra
+   cd /var/www/aurelinx/infra
    ```
 2. Create your production environment file from the example:
    ```bash
@@ -112,12 +112,12 @@ DEBUG=false
 LOG_LEVEL=INFO
 
 # --- Database Credentials (Change the default passwords for security!) ---
-POSTGRES_DB=aurelius_db
-POSTGRES_USER=aurelius
+POSTGRES_DB=aurelinx_db
+POSTGRES_USER=aurelinx
 POSTGRES_PASSWORD=SECURE_DATABASE_PASSWORD_HERE
 POSTGRES_PORT=55433
 POSTGRES_SCHEMA=app
-DATABASE_URL=postgresql+psycopg://aurelius:SECURE_DATABASE_PASSWORD_HERE@postgres:5432/aurelius_db?options=-csearch_path%3Dapp,public
+DATABASE_URL=postgresql+psycopg://aurelinx:SECURE_DATABASE_PASSWORD_HERE@postgres:5432/aurelinx_db?options=-csearch_path%3Dapp,public
 
 # --- Redis Configuration ---
 REDIS_PASSWORD=SECURE_REDIS_PASSWORD_HERE
@@ -166,13 +166,13 @@ docker compose -f infra/docker-compose.prod.yml ps
 ```
 
 You should see 7 running services:
-- `aurelius-postgres` (healthy)
-- `aurelius-redis` (healthy)
-- `aurelius-qdrant` (healthy)
-- `aurelius-api` (healthy)
-- `aurelius-worker` (running)
-- `aurelius-scheduler` (running)
-- `aurelius-web` (healthy)
+- `aurelinx-postgres` (healthy)
+- `aurelinx-redis` (healthy)
+- `aurelinx-qdrant` (healthy)
+- `aurelinx-api` (healthy)
+- `aurelinx-worker` (running)
+- `aurelinx-scheduler` (running)
+- `aurelinx-web` (healthy)
 
 ---
 
@@ -186,7 +186,7 @@ docker compose -f infra/docker-compose.prod.yml exec api python -m app.core.seed
 
 > [!TIP]
 > After seeding, you can log in with:
-> - **Username**: `admin@aurelius.com`
+> - **Username**: `admin@aurelinx.com`
 > - **Password**: `AdminPassword123`
 
 ---
@@ -207,7 +207,7 @@ To expose the application over secure HTTPS (`https://yourdomain.com`) instead o
    ```bash
    apt-get install -y nginx
    ```
-2. **Configure Nginx**: Create `/etc/nginx/sites-available/aurelius` with:
+2. **Configure Nginx**: Create `/etc/nginx/sites-available/aurelinx` with:
    ```nginx
    server {
        listen 80;
@@ -236,7 +236,7 @@ To expose the application over secure HTTPS (`https://yourdomain.com`) instead o
    ```
 3. **Enable configuration and reload**:
    ```bash
-   ln -s /etc/nginx/sites-available/aurelius /etc/nginx/sites-enabled/
+   ln -s /etc/nginx/sites-available/aurelinx /etc/nginx/sites-enabled/
    rm /etc/nginx/sites-enabled/default
    nginx -t && systemctl restart nginx
    ```

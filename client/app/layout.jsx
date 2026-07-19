@@ -2,7 +2,7 @@ import "../src/index.css";
 import "../src/App.css";
 
 export const metadata = {
-  title: "Aurelius | Management Intelligence",
+  title: "Aurelinx | Management Intelligence",
   description: "Enterprise HR Intelligence Platform",
 };
 

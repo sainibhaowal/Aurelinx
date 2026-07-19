@@ -652,7 +652,7 @@ const IntelligenceCenterView = () => {
               Intelligence Center
             </h1>
             <p className="text-slate-400 text-sm leading-relaxed max-w-3xl">
-              Aurelius state-of-the-art decision workbench. Powered by graph
+              Aurelinx state-of-the-art decision workbench. Powered by graph
               theory, combinatorial solvers, survival models, and Markov
               transition matrices.
             </p>

@@ -1,5 +1,5 @@
 """
-Aurelius Intelligence Chat endpoints
+Aurelinx Intelligence Chat endpoints
 Persistent sessions, messages, uploads, and tool-enabled agent responses.
 """
 
@@ -555,7 +555,7 @@ def _direct_workspace_answer(db: Session, user_text: str) -> str | None:
     data_ops = snapshot["data_ops"]
 
     lines = [
-        "## Aurelius Workspace Snapshot",
+        "## Aurelinx Workspace Snapshot",
         f"- Workforce: **{workforce['total_workforce']}**",
         f"- At risk employees: **{workforce['at_risk']}**",
         f"- Average morale: **{workforce['avg_morale']}**",
@@ -1214,7 +1214,7 @@ async def _llm_stream_response(
         return
 
     system = (
-        "You are Aurelius, the authoritative AI intelligence of the Aurelius Management OS — "
+        "You are Aurelinx, the authoritative AI intelligence of the Aurelinx Management OS — "
         "an executive-grade HR platform.\n"
         "You have live access to the HR employee directory, candidates database, analytics, "
         "compliance policies, integrations, enterprise ops, and agentic tools.\n"
@@ -1453,7 +1453,7 @@ async def _llm_response(
     casual_chat = _is_casual_chat(user_text)
 
     system = (
-        "You are Aurelius, the authoritative AI intelligence of the Aurelius Management OS — "
+        "You are Aurelinx, the authoritative AI intelligence of the Aurelinx Management OS — "
         "an executive-grade HR platform.\n"
         "You have live access to the HR employee directory, candidates database, analytics, "
         "compliance policies, integrations, enterprise ops, and agentic tools.\n"
@@ -1668,7 +1668,7 @@ def _sanitize_llm_response(text: str, user_text: str) -> str:
 
 def _direct_casual_reply(user_text: str) -> str:
     # Retained as a fallback if model calls fail entirely
-    return "Hi, I am Aurelius. Let me know how I can assist with HR analytics, employee tracking, or database management."
+    return "Hi, I am Aurelinx. Let me know how I can assist with HR analytics, employee tracking, or database management."
 
 
 def _build_context_payload(
@@ -1817,7 +1817,7 @@ def _execute_tools(
                 "tool": "human_approval_delete",
                 "blocked": True,
                 "reason": (
-                    "Aurelius Governance Protocol Violation: Delete actions cannot be automated by the AI agent "
+                    "Aurelinx Governance Protocol Violation: Delete actions cannot be automated by the AI agent "
                     "under any circumstances without manual Human-in-the-Loop approval. Safe abort triggered. "
                     "Instruct the user that manual confirmation is strictly required to delete this resource."
                 ),

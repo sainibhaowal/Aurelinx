@@ -1,8 +1,8 @@
 [package]
-name = "aurelius-desktop"
+name = "aurelinx-desktop"
 version = "1.0.0"
-description = "Aurelius desktop shell"
-authors = ["Aurelius"]
+description = "Aurelinx desktop shell"
+authors = ["Aurelinx"]
 edition = "2021"
 rust-version = "1.77"
 

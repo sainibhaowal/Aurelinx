@@ -1,5 +1,5 @@
 """
-Aurelius B2B/B2C Enterprise API Integration Middleware
+Aurelinx B2B/B2C Enterprise API Integration Middleware
 Secure endpoint ingestions for Slack, Jira, and Workday systems.
 """
 

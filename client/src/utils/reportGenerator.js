@@ -41,7 +41,7 @@ function exportPdf(employees = [], analysis = "") {
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
-  doc.text("AURELIUS MANAGEMENT INTELLIGENCE", 20, 25);
+  doc.text("AURELINX MANAGEMENT INTELLIGENCE", 20, 25);
 
   doc.setFontSize(10);
   doc.text(`Generated on: ${timestamp}`, 150, 32);
@@ -60,7 +60,7 @@ function exportPdf(employees = [], analysis = "") {
 
   if (analysis) {
     doc.setFontSize(14);
-    doc.text("Aurelius Strategic Analysis", 20, 85);
+    doc.text("Aurelinx Strategic Analysis", 20, 85);
     doc.setFontSize(9);
     const splitText = doc.splitTextToSize(analysis, 170);
     doc.text(splitText, 20, 95);
@@ -86,7 +86,7 @@ function exportPdf(employees = [], analysis = "") {
     },
   });
 
-  doc.save(`Aurelius_Management_Report_${Date.now()}.pdf`);
+  doc.save(`Aurelinx_Management_Report_${Date.now()}.pdf`);
 }
 
 function exportMarkdown(employees = [], analysis = "") {
@@ -94,7 +94,7 @@ function exportMarkdown(employees = [], analysis = "") {
   const atRisk = employees.filter((e) => e.is_at_risk).length;
 
   const lines = [
-    "# Aurelius Management Intelligence Report",
+    "# Aurelinx Management Intelligence Report",
     "",
     `Generated on: ${timestamp}`,
     "",
@@ -105,7 +105,7 @@ function exportMarkdown(employees = [], analysis = "") {
   ];
 
   if (analysis) {
-    lines.push("", "## Aurelius Strategic Analysis", analysis.trim());
+    lines.push("", "## Aurelinx Strategic Analysis", analysis.trim());
   }
 
   lines.push(
@@ -123,7 +123,7 @@ function exportMarkdown(employees = [], analysis = "") {
   const blob = new Blob([lines.join("\n")], {
     type: "text/markdown;charset=utf-8",
   });
-  downloadBlob(blob, `Aurelius_Management_Report_${Date.now()}.md`);
+  downloadBlob(blob, `Aurelinx_Management_Report_${Date.now()}.md`);
 }
 
 function exportExcel(employees = [], analysis = "") {
@@ -132,7 +132,7 @@ function exportExcel(employees = [], analysis = "") {
   const atRisk = employees.filter((e) => e.is_at_risk).length;
 
   const summarySheet = XLSX.utils.aoa_to_sheet([
-    ["Aurelius Management Intelligence Report"],
+    ["Aurelinx Management Intelligence Report"],
     ["Generated At", timestamp],
     ["Employees Analyzed", employees.length],
     ["At-Risk Employees", atRisk],
@@ -159,10 +159,10 @@ function exportExcel(employees = [], analysis = "") {
 
   XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
   XLSX.utils.book_append_sheet(workbook, employeesSheet, "Employees");
-  XLSX.writeFile(workbook, `Aurelius_Management_Report_${Date.now()}.xlsx`);
+  XLSX.writeFile(workbook, `Aurelinx_Management_Report_${Date.now()}.xlsx`);
 }
 
-export const generateAureliusReport = (employees, analysis, format = "pdf") => {
+export const generateAurelinxReport = (employees, analysis, format = "pdf") => {
   const normalizedFormat = String(format || "pdf").toLowerCase();
 
   if (normalizedFormat === "excel" || normalizedFormat === "xlsx") {

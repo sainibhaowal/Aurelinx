@@ -1,10 +1,10 @@
-# Aurelius Enterprise Execution Program
+# Aurelinx Enterprise Execution Program
 
 ## Date
 2026-05-18
 
 ## Objective
-Transform Aurelius from a basic data viewer into a decision-grade enterprise HR Intelligence platform.
+Transform Aurelinx from a basic data viewer into a decision-grade enterprise HR Intelligence platform.
 
 ## Program Structure
 
