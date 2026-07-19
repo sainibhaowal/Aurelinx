@@ -333,6 +333,9 @@ const App = () => {
 
   return (
     <div className="flex h-screen bg-[#07111f] text-slate-100 relative overflow-hidden selection:bg-primary/30 antialiased">
+      {/* DOTTED GRID BACKGROUND */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none z-0" />
+
       <Toast
         isVisible={toast.visible}
         message={toast.message}
@@ -342,7 +345,7 @@ const App = () => {
 
       {/* ATMOSPHERE - SUBTLE */}
       <div className="absolute top-0 right-0 w-[680px] h-[680px] bg-cyan-400/10 blur-[130px] rounded-full -translate-y-1/2 translate-x-1/4 pointer-events-none z-0" />
-      <div className="absolute bottom-0 left-1/3 w-[520px] h-[520px] bg-amber-300/5 blur-[140px] rounded-full pointer-events-none z-0" />
+      <div className="absolute bottom-0 left-1/3 w-[520px] h-[520px] bg-[#f59e0b]/5 blur-[140px] rounded-full pointer-events-none z-0" />
 
       <div className="relative z-20 flex w-full h-full p-1.5 md:p-2 gap-1.5 md:gap-2">
         <motion.aside
