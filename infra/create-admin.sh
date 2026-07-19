@@ -7,6 +7,8 @@ echo "   Aurelius Admin Account Creator"
 echo "========================================="
 echo ""
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 read -p "Enter Admin Email: " ADMIN_EMAIL
 read -sp "Enter Admin Password: " ADMIN_PASSWORD
 echo ""
@@ -15,7 +17,7 @@ echo ""
 
 echo "Creating admin account inside docker..."
 
-docker compose -f docker-compose.prod.yml exec -T api python -c "
+docker compose -f "${SCRIPT_DIR}/docker-compose.prod.yml" exec -T api python -c "
 import sys
 from sqlmodel import Session
 from app.models.database import engine, UserTable
