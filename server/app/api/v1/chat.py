@@ -915,139 +915,141 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
     lowered = user_text.lower()
     mutation_log = {"updated": False, "actions": []}
 
-    risk_match = re.search(
-        r"set\s+employee\s+([^\s]+@[^\s]+)\s+risk\s+(true|false)", lowered
-    )
-    if risk_match:
-        email = risk_match.group(1)
-        value = risk_match.group(2) == "true"
-        emp = db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
-        if emp:
-            emp.is_at_risk = value
-            emp.updated_at = datetime.utcnow()
-            db.add(emp)
-            mutation_log["updated"] = True
-            mutation_log["actions"].append(f"Set risk={value} for {email}")
+    # Extract email and standard fields robustly
+    email = None
+    email_match = re.search(r"([a-zA-Z0-9\.\-\_\+]+@[a-zA-Z0-9\.\-\_]+\.[a-zA-Z]{2,})", user_text)
+    if email_match:
+        email = email_match.group(1)
 
-    move_match = re.search(
-        r"move\s+employee\s+([^\s]+@[^\s]+)\s+to\s+department\s+(.+)", lowered
-    )
-    if move_match:
-        email = move_match.group(1)
-        dept = move_match.group(2).strip().title()
-        emp = db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
-        if emp:
-            emp.department = dept
-            emp.updated_at = datetime.utcnow()
-            db.add(emp)
-            mutation_log["updated"] = True
-            mutation_log["actions"].append(f"Moved {email} to {dept}")
-
-    if "add employee" in lowered or "create employee" in lowered:
-        name_match = re.search(
-            r"(?:name|employee)\s+([a-zA-Z\s]+)(?:,|$|\s+email)",
-            user_text,
-            re.IGNORECASE,
-        )
-        email_match = re.search(
-            r"email\s+([a-zA-Z0-9\.\-\_\@\+]+)", user_text, re.IGNORECASE
-        )
-        role_match = re.search(r"role\s+([a-zA-Z0-9\s\-\_]+)", user_text, re.IGNORECASE)
-        dept_match = re.search(
-            r"(?:dept|department)\s+([a-zA-Z0-9\s\-\_]+)", user_text, re.IGNORECASE
-        )
-
-        name = name_match.group(1).strip() if name_match else None
-        email = email_match.group(1).strip() if email_match else None
-        role = (
-            role_match.group(1).strip().title() if role_match else "Software Engineer"
-        )
-        dept = dept_match.group(1).strip().title() if dept_match else "Engineering"
-
-        if name and email:
-            exists = db.exec(
-                select(EmployeeTable).where(EmployeeTable.email == email)
-            ).first()
-            if not exists:
-                emp = EmployeeTable(
-                    full_name=name,
-                    email=email,
-                    role=role,
-                    department=dept,
-                    sentiment_score=0.75,
-                    is_at_risk=False,
-                    retention_prob=0.95,
-                )
+    # 1. Check for risk updates
+    if "risk" in lowered:
+        val_match = re.search(r"\b(true|false|yes|no|high|low)\b", lowered)
+        if email and val_match:
+            value = val_match.group(1) in ["true", "yes", "high"]
+            emp = db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
+            if emp:
+                emp.is_at_risk = value
+                emp.updated_at = datetime.utcnow()
                 db.add(emp)
                 mutation_log["updated"] = True
-                mutation_log["actions"].append(
-                    f"Created employee {name} ({email}) in department {dept} as {role}"
-                )
+                mutation_log["actions"].append(f"Set risk={value} for {email}")
 
-    if "add candidate" in lowered or "create candidate" in lowered:
-        name_match = re.search(
-            r"(?:name|candidate)\s+([a-zA-Z\s]+)(?:,|$|\s+email)",
-            user_text,
-            re.IGNORECASE,
-        )
-        email_match = re.search(
-            r"email\s+([a-zA-Z0-9\.\-\_\@\+]+)", user_text, re.IGNORECASE
-        )
-        role_match = re.search(r"role\s+([a-zA-Z0-9\s\-\_]+)", user_text, re.IGNORECASE)
-        dept_match = re.search(
-            r"(?:dept|department)\s+([a-zA-Z0-9\s\-\_]+)", user_text, re.IGNORECASE
-        )
+    # 2. Check for department moves
+    if any(k in lowered for k in ["move", "transfer", "change department", "dept"]):
+        dept_match = re.search(r"(?:to|department|dept)\s+(?:is\s+|:\s*|of\s+)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+for|\s+email)", user_text, re.IGNORECASE)
+        if email and dept_match:
+            dept = dept_match.group(1).strip().title()
+            for prefix in ["department", "dept"]:
+                if dept.lower().startswith(prefix + " "):
+                    dept = dept[len(prefix)+1:].strip()
+            emp = db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
+            if emp:
+                emp.department = dept
+                emp.updated_at = datetime.utcnow()
+                db.add(emp)
+                mutation_log["updated"] = True
+                mutation_log["actions"].append(f"Moved {email} to {dept}")
 
-        name = name_match.group(1).strip() if name_match else None
-        email = email_match.group(1).strip() if email_match else None
-        role = (
-            role_match.group(1).strip().title() if role_match else "Software Engineer"
-        )
-        dept = dept_match.group(1).strip().title() if dept_match else "Engineering"
+    # 3. Add Employee / Candidate
+    is_add_employee = ("employee" in lowered) and any(kw in lowered for kw in ["add", "create", "insert", "register"])
+    is_add_candidate = ("candidate" in lowered) and any(kw in lowered for kw in ["add", "create", "insert", "register"])
+
+    if is_add_employee or is_add_candidate:
+        name = None
+        name_patterns = [
+            r"(?:name|employee|candidate)\s+(?:is\s+|:\s*|named\s+)?([a-zA-Z\s]+?)(?:,|$|\s+email|\s+role|\s+dept|\s+department|\s+with)",
+            r"(?:add|create|insert|register)\s+(?:employee|candidate|new\s+employee|new\s+candidate)?\s+([a-zA-Z\s]+?)(?:,|$|\s+email|\s+role|\s+dept|\s+department|\s+with)"
+        ]
+        for pattern in name_patterns:
+            m = re.search(pattern, user_text, re.IGNORECASE)
+            if m:
+                name = m.group(1).strip()
+                for prefix in ["named", "is", "employee", "candidate", "new", "a"]:
+                    if name.lower().startswith(prefix + " "):
+                        name = name[len(prefix)+1:].strip()
+                break
+
+        role = "Software Engineer"
+        role_match = re.search(r"role\s+(?:is\s+|:\s*|to\s+)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+email|\s+dept|\s+department|\s+with)", user_text, re.IGNORECASE)
+        if role_match:
+            role = role_match.group(1).strip().title()
+
+        dept = "Engineering"
+        dept_match = re.search(r"(?:dept|department)\s+(?:is\s+|:\s*|to\s+)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+email|\s+role|\s+with)", user_text, re.IGNORECASE)
+        if dept_match:
+            dept = dept_match.group(1).strip().title()
 
         if name and email:
-            exists = db.exec(
-                select(CandidateTable).where(CandidateTable.email == email)
-            ).first()
-            if not exists:
-                cand = CandidateTable(
-                    full_name=name,
-                    email=email,
-                    role=role,
-                    department=dept,
-                    sentiment_score=0.65,
-                    match_score=0.85,
-                )
-                db.add(cand)
-                mutation_log["updated"] = True
-                mutation_log["actions"].append(
-                    f"Created candidate {name} ({email}) in department {dept} as {role}"
-                )
+            if is_add_candidate:
+                exists = db.exec(
+                    select(CandidateTable).where(CandidateTable.email == email)
+                ).first()
+                if not exists:
+                    cand = CandidateTable(
+                        full_name=name,
+                        email=email,
+                        role=role,
+                        department=dept,
+                        sentiment_score=0.65,
+                        match_score=0.85,
+                    )
+                    db.add(cand)
+                    mutation_log["updated"] = True
+                    mutation_log["actions"].append(
+                        f"Created candidate {name} ({email}) in department {dept} as {role}"
+                    )
+            else:
+                exists = db.exec(
+                    select(EmployeeTable).where(EmployeeTable.email == email)
+                ).first()
+                if not exists:
+                    emp = EmployeeTable(
+                        full_name=name,
+                        email=email,
+                        role=role,
+                        department=dept,
+                        sentiment_score=0.75,
+                        is_at_risk=False,
+                        retention_prob=0.95,
+                    )
+                    db.add(emp)
+                    mutation_log["updated"] = True
+                    mutation_log["actions"].append(
+                        f"Created employee {name} ({email}) in department {dept} as {role}"
+                    )
 
-    update_match = re.search(
-        r"(?:update|correct|change|fix)\s+employee\s+([^\s]+@[^\s]+)\s+(?:role|department|name)\s+(?:to|set)\s+(.+)",
-        lowered,
-    )
-    if update_match:
-        email = update_match.group(1)
-        val = update_match.group(2).strip().title()
+    # 4. General updates
+    if any(k in lowered for k in ["update", "correct", "change", "fix", "set"]) and email:
         emp = db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
         if emp:
-            if "role" in lowered:
+            updated = False
+            role_match = re.search(r"role\s+(?:to\s+|set\s+|is\s+|:\s*)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+for)", user_text, re.IGNORECASE)
+            if role_match:
+                val = role_match.group(1).strip().title()
                 emp.role = val
-                action_desc = f"Updated role to {val} for {email}"
-            elif "department" in lowered or "dept" in lowered:
+                mutation_log["actions"].append(f"Updated role to {val} for {email}")
+                updated = True
+            
+            dept_match = re.search(r"(?:dept|department)\s+(?:to\s+|set\s+|is\s+|:\s*)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+for)", user_text, re.IGNORECASE)
+            if dept_match:
+                val = dept_match.group(1).strip().title()
                 emp.department = val
-                action_desc = f"Updated department to {val} for {email}"
-            else:
+                mutation_log["actions"].append(f"Updated department to {val} for {email}")
+                updated = True
+
+            name_match = re.search(r"name\s+(?:to\s+|set\s+|is\s+|:\s*)?([a-zA-Z\s]+?)(?:,|$|\.|\s+for)", user_text, re.IGNORECASE)
+            if name_match:
+                val = name_match.group(1).strip().title()
                 emp.full_name = val
-                action_desc = f"Updated full name to {val} for {email}"
+                mutation_log["actions"].append(f"Updated full name to {val} for {email}")
+                updated = True
 
-            emp.updated_at = datetime.utcnow()
-            db.add(emp)
-            mutation_log["updated"] = True
-            mutation_log["actions"].append(action_desc)
+            if updated:
+                emp.updated_at = datetime.utcnow()
+                db.add(emp)
+                mutation_log["updated"] = True
 
+    # 5. Integration connection mutations
     if (
         "add connection" in lowered
         or "create connection" in lowered
@@ -1258,9 +1260,11 @@ async def _llm_stream_response(
             if workspace_snapshot
             else ""
         )
+        attachment_ctx = tool_ctx.get("attachment_text_context", "")
         user_content = (
             f"User request: {user_text}\n\n"
             f"--- WORKSPACE SNAPSHOT ---\n{workspace_block}\n"
+            f"--- ATTACHMENT/FILE CONTENT ---\n{attachment_ctx}\n"
             f"--- LIVE TOOL DATA ---\n{tool_block}\n"
             f"Active integrations: {json.dumps(integrations)}\n"
             f"Compliance policies: {json.dumps(compliance)}\n"
@@ -1497,9 +1501,11 @@ async def _llm_response(
             if workspace_snapshot
             else ""
         )
+        attachment_ctx = tool_ctx.get("attachment_text_context", "")
         user_content = (
             f"User request: {user_text}\n\n"
             f"--- WORKSPACE SNAPSHOT ---\n{workspace_block}\n"
+            f"--- ATTACHMENT/FILE CONTENT ---\n{attachment_ctx}\n"
             f"--- LIVE TOOL DATA ---\n{tool_block}\n"
             f"Active integrations: {json.dumps(integrations)}\n"
             f"Compliance policies: {json.dumps(compliance)}\n"
@@ -1589,32 +1595,13 @@ async def _llm_response(
 def _tool_policy(user_text: str) -> List[str]:
     text = user_text.lower()
     tools = []
-    if any(
-        k in text
-        for k in ["employee", "workforce", "directory", "team", "people", "department"]
-    ):
+    
+    # If not a casual chat, always include search and dashboard tools to provide maximal context
+    if not _is_casual_chat(user_text):
         tools.append("search_employees")
-    if any(k in text for k in ["candidate", "hiring", "scout", "recruit", "talent"]):
         tools.append("search_candidates")
-    if any(
-        k in text
-        for k in [
-            "dashboard",
-            "analytics",
-            "summary",
-            "risk",
-            "sentiment",
-            "morale",
-            "retention",
-            "intervention",
-            "policy",
-            "system status",
-            "cluster",
-            "priority",
-            "predictive",
-        ]
-    ):
         tools.append("dashboard_snapshot")
+
     if any(
         k in text
         for k in [
@@ -1629,6 +1616,7 @@ def _tool_policy(user_text: str) -> List[str]:
             "change",
             "ingest",
             "import",
+            "register",
         ]
     ):
         tools.append("mutate_data")
@@ -1636,7 +1624,7 @@ def _tool_policy(user_text: str) -> List[str]:
         tools.append("human_approval_delete")
     if any(k in text for k in ["csv", "excel", "file"]):
         tools.append("parse_csv_attachment")
-    return tools
+    return list(set(tools))
 
 
 TOOL_RBAC = {
@@ -1835,7 +1823,7 @@ def _execute_tools(
                 ),
             }
         )
-    if "parse_csv_attachment" in tools:
+    if "parse_csv_attachment" in tools or any(att.original_name.lower().endswith(".csv") for att in attachments):
         csv_log = _parse_csv_and_ingest(db, attachments)
         result["tool_runs"].append({"tool": "parse_csv_attachment", "output": csv_log})
 
@@ -2087,6 +2075,23 @@ async def upload_attachment(
     db.add(row)
     db.commit()
     db.refresh(att)
+
+    # Automatically parse and ingest CSV on upload!
+    if target.suffix.lower() == ".csv":
+        try:
+            _parse_csv_and_ingest(db, [att])
+            att.parsing_status = "parsed"
+            db.add(att)
+            db.commit()
+            db.refresh(att)
+        except Exception as e:
+            db.rollback()
+            att.parsing_status = "failed"
+            att.parsing_error = str(e)
+            db.add(att)
+            db.commit()
+            db.refresh(att)
+
     return _to_attachment_out(att)
 
 
