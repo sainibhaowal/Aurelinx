@@ -139,7 +139,7 @@ function formatErrorMessage(data, fallback = "Request failed") {
   return fallback;
 }
 
-async function consumeEventStream(response, handlers = {}) {
+async function consumeEventStream(response, handlers = {}, signal = null) {
   if (!response.ok || !response.body) {
     const err = new Error(`Stream request failed: ${response.status}`);
     err.status = response.status;
@@ -151,34 +151,41 @@ async function consumeEventStream(response, handlers = {}) {
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const events = buffer.split("\n\n");
-    buffer = events.pop() || "";
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
 
-    for (const eventBlock of events) {
-      const lines = eventBlock.split("\n");
-      const eventLine = lines.find((line) => line.startsWith("event:"));
-      const dataLine = lines.find((line) => line.startsWith("data:"));
-      if (!eventLine || !dataLine) continue;
+      for (const eventBlock of events) {
+        const lines = eventBlock.split("\n");
+        const eventLine = lines.find((line) => line.startsWith("event:"));
+        const dataLine = lines.find((line) => line.startsWith("data:"));
+        if (!eventLine || !dataLine) continue;
 
-      const eventName = eventLine.replace("event:", "").trim();
-      const rawData = dataLine.replace("data:", "").trim();
-      let data = rawData;
-      try {
-        data = JSON.parse(rawData);
-      } catch {
-        // Leave non-JSON payloads as raw text.
-      }
+        const eventName = eventLine.replace("event:", "").trim();
+        const rawData = dataLine.replace("data:", "").trim();
+        let data = rawData;
+        try {
+          data = JSON.parse(rawData);
+        } catch {
+          // Leave non-JSON payloads as raw text.
+        }
 
-      const handler = handlers[eventName] || handlers.onMessage;
-      if (typeof handler === "function") {
-        handler(data, eventName);
+        const handler = handlers[eventName] || handlers.onMessage;
+        if (typeof handler === "function") {
+          handler(data, eventName);
+        }
       }
     }
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return false;
+    }
+    throw error;
   }
 
   return true;
@@ -192,15 +199,22 @@ async function streamRequest(url, handlers = {}, signal = null) {
     throw err;
   }
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    signal,
-  });
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      signal,
+    });
 
-  return consumeEventStream(response, handlers);
+    return consumeEventStream(response, handlers, signal);
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return false;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -923,24 +937,31 @@ export const chatAPI = {
       err.status = 401;
       throw err;
     }
-    const response = await fetch(
-      `${API_V1}/chat/sessions/${sessionId}/message/stream`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+    try {
+      const response = await fetch(
+        `${API_V1}/chat/sessions/${sessionId}/message/stream`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+          signal,
         },
-        body: JSON.stringify(payload),
-        signal,
-      },
-    );
-    return consumeEventStream(response, {
-      chunk: handlers.onChunk,
-      status: handlers.onStatus,
-      done: handlers.onDone,
-      error: handlers.onError,
-    });
+      );
+      return consumeEventStream(response, {
+        chunk: handlers.onChunk,
+        status: handlers.onStatus,
+        done: handlers.onDone,
+        error: handlers.onError,
+      }, signal);
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        return false;
+      }
+      throw error;
+    }
   },
 };
 
