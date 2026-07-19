@@ -16,47 +16,43 @@ const NeonParticlesWave = () => {
     let width = (canvas.width = canvas.offsetWidth);
     let height = (canvas.height = canvas.offsetHeight);
 
-    // Particle settings
-    // 2500 particles is a sweet spot for high density & buttery performance
-    const particleCount = 3000; 
+    // Particle settings optimized for 120Hz+ buttery performance
+    const particleCount = 800; 
     const particles = [];
 
     // Mouse tracking
     const mouse = {
       x: null,
       y: null,
-      radius: 120, // Interaction radius
+      radius: 140, // Interaction radius
     };
 
     // Initialize particles
-    // Let's create an organic grid/wave shape of particles
     for (let i = 0; i < particleCount; i++) {
-      // Distribute particles across the canvas space
       const px = Math.random() * width;
       const py = Math.random() * height;
       
-      // Select varying neon cyan/blue/emerald colors with alpha for depth
       const colors = [
         "rgba(34, 211, 238, ",  // Cyan
         "rgba(52, 211, 153, ",  // Emerald
         "rgba(129, 140, 248, ", // Indigo
       ];
       const colorBase = colors[Math.floor(Math.random() * colors.length)];
-      const opacity = 0.2 + Math.random() * 0.6;
+      const opacity = 0.25 + Math.random() * 0.55;
 
       particles.push({
         x: px,
         y: py,
         baseX: px,
         baseY: py,
-        size: 0.4 + Math.random() * 0.9, // Very tiny particles (under 1.5px)
+        size: 0.5 + Math.random() * 0.8, // Very tiny performance-friendly size
         color: `${colorBase}${opacity})`,
         angle: Math.random() * Math.PI * 2,
-        speed: 0.2 + Math.random() * 0.5,
-        phase: Math.random() * 100, // Offset for wave functions
-        waveAmpX: 10 + Math.random() * 30,
-        waveAmpY: 15 + Math.random() * 45,
-        waveSpeed: 0.005 + Math.random() * 0.015,
+        speed: 0.15 + Math.random() * 0.4,
+        phase: Math.random() * 100,
+        waveAmpX: 10 + Math.random() * 25,
+        waveAmpY: 15 + Math.random() * 35,
+        waveSpeed: 0.004 + Math.random() * 0.012,
       });
     }
 
@@ -79,7 +75,6 @@ const NeonParticlesWave = () => {
       width = canvas.width = canvas.offsetWidth;
       height = canvas.height = canvas.offsetHeight;
       
-      // Re-distribute base positions on resize
       particles.forEach((p) => {
         p.baseX = Math.random() * width;
         p.baseY = Math.random() * height;
@@ -87,38 +82,35 @@ const NeonParticlesWave = () => {
     };
     window.addEventListener("resize", handleResize);
 
-    // Animation Loop
+    // Animation Loop with delta time mapping for smooth 120Hz-200Hz refresh rates
+    let lastTimestamp = performance.now();
     let time = 0;
-    const animate = () => {
-      time += 0.5;
+    
+    const animate = (timestamp) => {
+      const elapsed = timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
       
-      // Very slight tail effect to keep particles sharp but allow wave blending
+      // Target 60fps as base factor (16.67ms per frame)
+      const delta = Math.min(elapsed / 16.667, 3);
+      time += 0.5 * delta;
+      
+      // Slight tail trails
       ctx.fillStyle = "rgba(7, 17, 31, 0.08)";
       ctx.fillRect(0, 0, width, height);
-
-      // Draw dot grid in background inside canvas to make it feel coherent and single layer
-      ctx.fillStyle = "rgba(103, 232, 249, 0.02)";
-      const dotSpacing = 30;
-      for (let x = 0; x < width; x += dotSpacing) {
-        for (let y = 0; y < height; y += dotSpacing) {
-          ctx.fillRect(x, y, 1, 1);
-        }
-      }
 
       // Render/update particles
       for (let i = 0; i < particleCount; i++) {
         const p = particles[i];
 
-        // Wave movement (Sine wave nature flow)
-        // Combine multiple sine waves for rich, non-repeating organic motion
+        // Wave movement
         const waveX = Math.sin(p.phase + time * p.waveSpeed) * p.waveAmpX;
         const waveY = Math.cos(p.phase + time * p.waveSpeed * 0.8) * p.waveAmpY + 
-                      Math.sin(p.phase * 0.5 + time * 0.02) * 15;
+                      Math.sin(p.phase * 0.5 + time * 0.02) * 12;
 
         let targetX = p.baseX + waveX;
         let targetY = p.baseY + waveY;
 
-        // Mouse interaction (Fluid push effect)
+        // Mouse push interaction
         if (mouse.x !== null && mouse.y !== null) {
           const dx = mouse.x - targetX;
           const dy = mouse.y - targetY;
@@ -126,21 +118,20 @@ const NeonParticlesWave = () => {
           
           if (distance < mouse.radius) {
             const force = (mouse.radius - distance) / mouse.radius;
-            // Push direction
             const angle = Math.atan2(dy, dx);
-            const pushX = Math.cos(angle) * force * 45;
-            const pushY = Math.sin(angle) * force * 45;
+            const pushX = Math.cos(angle) * force * 35;
+            const pushY = Math.sin(angle) * force * 35;
             
             targetX -= pushX;
             targetY -= pushY;
           }
         }
 
-        // Smoothly interpolate to target position
-        p.x += (targetX - p.x) * 0.15;
-        p.y += (targetY - p.y) * 0.15;
+        // Interpolate using normalized delta time to make movement liquid-smooth
+        p.x += (targetX - p.x) * 0.12 * delta;
+        p.y += (targetY - p.y) * 0.12 * delta;
 
-        // Boundary checks to wrap particles around screen edges
+        // Boundary checks
         if (p.x < 0) {
           p.x = width;
           p.baseX = width;
@@ -157,17 +148,16 @@ const NeonParticlesWave = () => {
           p.baseY = 0;
         }
 
-        // Draw particle
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        // Draw particle using fast GPU-friendly fillRect
         ctx.fillStyle = p.color;
-        ctx.fill();
+        const size2 = p.size * 2;
+        ctx.fillRect(p.x - p.size, p.y - p.size, size2, size2);
       }
 
       animationFrameId = requestAnimationFrame(animate);
     };
 
-    animate();
+    animationFrameId = requestAnimationFrame(animate);
 
     return () => {
       cancelAnimationFrame(animationFrameId);

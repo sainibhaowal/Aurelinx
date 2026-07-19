@@ -637,7 +637,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-20">
+      <div className="relative z-10 mx-auto max-w-[1800px] px-4 sm:px-6 lg:px-10">
         {/* ══════════ NAV ══════════ */}
         <header className="sticky top-4 z-50 mb-4 pt-4">
           <div
@@ -832,7 +832,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           </div>
 
           {/* ── LIVE PREVIEW GRID ── */}
-          <div className="mx-auto mt-14 grid max-w-[1160px] gap-5 lg:grid-cols-[260px_1fr_230px]">
+          <div className="mx-auto mt-14 grid max-w-[1600px] gap-5 lg:grid-cols-[260px_1fr_230px]">
             {/* LEFT — Workspace streams */}
             <motion.div
               initial={{ opacity: 0, x: -14 }}
@@ -1204,7 +1204,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           </div>
 
           {/* Console layout */}
-          <div className="mx-auto mt-12 grid max-w-[1093px] gap-5 lg:grid-cols-[360px_1fr]">
+          <div className="mx-auto mt-12 grid max-w-[1600px] gap-5 lg:grid-cols-[360px_1fr]">
             {/* Scenario panel */}
             <div className="space-y-3">
               <div
@@ -1498,7 +1498,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             </p>
           </div>
 
-          <div className="mx-auto mt-12 grid max-w-[1093px] gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="mx-auto mt-12 grid max-w-[1600px] gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[
               {
                 title: "Semantic Skills Graph & Adjacencies",
@@ -1613,7 +1613,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             </p>
           </div>
 
-          <div className="mx-auto mt-12 grid max-w-[1093px] gap-5 sm:grid-cols-2">
+          <div className="mx-auto mt-12 grid max-w-[1600px] gap-5 sm:grid-cols-2">
             {PLATFORM_MODULES.map((mod) => {
               const Icon = mod.icon;
               return (
@@ -1681,7 +1681,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             </p>
           </div>
 
-          <div className="mx-auto max-w-[1093px]">
+          <div className="mx-auto max-w-[1600px]">
             <GlassCard className="p-8 grid gap-8 lg:grid-cols-2">
               {/* Sliders Side */}
               <div className="space-y-6">
@@ -1837,7 +1837,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               HRIS, ATS, and directory systems with live validation.
             </p>
           </div>
-          <div className="mx-auto mt-12 grid max-w-[1093px] gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mx-auto mt-12 grid max-w-[1600px] gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {displayConnectors.slice(0, 6).map((c, i) => (
               <ConnectorTile key={`${c.name}-${i}`} {...c} />
             ))}
@@ -1868,7 +1868,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           </div>
 
           {/* Accordion */}
-          <div className="mx-auto mt-12 max-w-[1093px]">
+          <div className="mx-auto mt-12 max-w-[1600px]">
             <GlassCard className="p-6">
               {/* Tabs */}
               <div
