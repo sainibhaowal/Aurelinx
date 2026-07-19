@@ -1,6 +1,6 @@
 # Aurelinx
 
-![Aurelinx Logo](client/public/logo.png)
+![Aurelinx Logo](client/public/aurelinx-logo-final-clean-transparent.png)
 
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=nextdotjs)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -196,4 +196,4 @@ That combination gives Aurelinx a credible enterprise footprint and a strong fou
 
 ## Brand Asset
 
-The logo used in this README is sourced from [client/public/logo.png](client/public/logo.png).
+The logo used in this README is sourced from [client/public/aurelinx-logo-final-clean-transparent.png](client/public/aurelinx-logo-final-clean-transparent.png).
