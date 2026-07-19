@@ -1,0 +1,19 @@
+{
+  "name": "aurelius-platform",
+  "version": "1.0.0",
+  "description": "Executive Talent Intelligence Platform - Unified Workspace",
+  "main": "start-all.js",
+  "scripts": {
+    "dev": "node start-all.js",
+    "dev:down": "docker compose -f docker-compose.dev.yml down"
+  },
+  "keywords": [
+    "talent",
+    "intelligence",
+    "agentic-ai",
+    "fastapi",
+    "vite"
+  ],
+  "author": "Google DeepMind pair-programmer",
+  "license": "MIT"
+}

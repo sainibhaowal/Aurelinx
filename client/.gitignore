@@ -1,0 +1,48 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Next.js
+.next/
+out/
+build/
+.vercel/
+.turbo/
+public/sw.js
+
+# Testing
+.nyc_output
+coverage
+
+# Misc
+.env.local
+.env.*.local
+*.pem
+*.lock
+
+# IDE and Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
