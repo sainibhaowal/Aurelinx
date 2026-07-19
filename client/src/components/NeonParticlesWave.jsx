@@ -94,9 +94,8 @@ const NeonParticlesWave = () => {
       const delta = Math.min(elapsed / 16.667, 3);
       time += 0.5 * delta;
       
-      // Slight tail trails
-      ctx.fillStyle = "rgba(7, 17, 31, 0.08)";
-      ctx.fillRect(0, 0, width, height);
+      // Clear the canvas on each frame to prevent trace artifacts or background shading lines
+      ctx.clearRect(0, 0, width, height);
 
       // Render/update particles
       for (let i = 0; i < particleCount; i++) {

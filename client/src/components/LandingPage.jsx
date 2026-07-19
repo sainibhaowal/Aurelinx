@@ -637,6 +637,17 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         />
       </div>
 
+      {/* FULL VIEWPORT END-TO-END HERO PARTICLES BACKGROUND WITH FADE-OUT MASK */}
+      <div 
+        className="absolute top-0 left-0 right-0 h-[85vh] min-h-[600px] max-h-[1000px] overflow-hidden pointer-events-none z-0"
+        style={{
+          maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)",
+          WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)"
+        }}
+      >
+        <NeonParticlesWave />
+      </div>
+
       <div className="relative z-10 mx-auto max-w-[1800px] px-4 sm:px-6 lg:px-10">
         {/* ══════════ NAV ══════════ */}
         <header className="sticky top-4 z-50 mb-4 pt-4">
@@ -736,7 +747,6 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
         {/* ══════════ HERO ══════════ */}
         <section id="section-0" className="relative pb-16 pt-16 lg:pt-20 overflow-hidden">
-          <NeonParticlesWave />
           <div className="relative z-10 mx-auto flex max-w-[860px] flex-col items-center text-center">
             <motion.div
               initial={{ opacity: 0, y: 8 }}
