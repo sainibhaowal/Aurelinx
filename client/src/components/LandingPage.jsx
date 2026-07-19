@@ -27,6 +27,7 @@ import {
   healthAPI,
 } from "../services/apiClient";
 import { useAuth } from "../contexts/AuthContext";
+import NeonParticlesWave from "./NeonParticlesWave";
 
 /* ─────────────────────────────────────────
    CONSTANTS
@@ -634,22 +635,6 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             backgroundSize: "30px 30px",
           }}
         />
-        {/* Glow orbs */}
-        <motion.div
-          animate={{ opacity: [0.5, 0.75, 0.5] }}
-          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute left-1/2 top-[10%] h-[800px] w-[800px] -translate-x-1/2 rounded-full blur-[160px]"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(103,232,249,0.07) 0%, rgba(99,102,241,0.05) 50%, transparent 70%)",
-          }}
-        />
-        <motion.div
-          animate={{ opacity: [0.4, 0.6, 0.4] }}
-          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute bottom-0 right-[10%] h-[600px] w-[600px] rounded-full blur-[140px]"
-          style={{ background: "rgba(110,231,183,0.05)" }}
-        />
       </div>
 
       <div className="relative z-10 mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-20">
@@ -750,8 +735,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         </header>
 
         {/* ══════════ HERO ══════════ */}
-        <section id="section-0" className="pb-16 pt-16 lg:pt-20">
-          <div className="mx-auto flex max-w-[860px] flex-col items-center text-center">
+        <section id="section-0" className="relative pb-16 pt-16 lg:pt-20 overflow-hidden">
+          <NeonParticlesWave />
+          <div className="relative z-10 mx-auto flex max-w-[860px] flex-col items-center text-center">
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
