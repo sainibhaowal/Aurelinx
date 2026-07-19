@@ -1417,7 +1417,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     Mathematical Modeling & Chapman-Kolmogorov Theorem
                   </strong>
                   <p className="leading-relaxed">
-                    The career transition network represents roles as states. The transition probability from state $i$ to state $j$ in a single epoch (1 year) is denoted as $P_{ij}$.
+                    The career transition network represents roles as states. The transition probability from state $i$ to state $j$ in a single epoch (1 year) is denoted as P_ij.
                   </p>
                   <p className="leading-relaxed">
                     To personalize this progression, the base historical transition rate is adjusted by the employee&apos;s <strong>Skills Coverage Ratio</strong> for the target role:
