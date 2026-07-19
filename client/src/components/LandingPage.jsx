@@ -665,14 +665,14 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl"
               >
                 <img
-                  src="/icon.png"
-                  alt="Aurelius Logo"
+                  src="/icon.svg"
+                  alt="Aurelinx Logo"
                   style={{ width: "120%", height: "120%", objectFit: "contain" }}
                 />
               </div>
               <div>
                 <div className="text-xs font-black tracking-[0.28em] text-white">
-                  AURELIUS
+                  AURELINX
                 </div>
                 <div
                   className="text-[9px] font-bold uppercase tracking-[0.22em]"
