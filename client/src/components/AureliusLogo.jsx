@@ -14,8 +14,8 @@ const AureliusLogo = ({ size = 24, collapsed = false }) => {
         style={{ width: size + 10, height: size + 10 }}
       >
         <img
-          src="/icon.svg"
-          alt="Aurelinx Logo"
+          src="/aurelius-logo-4k.svg"
+          alt="Aurelius Logo"
           style={{ width: "120%", height: "120%", objectFit: "contain" }}
         />
       </motion.div>
@@ -26,7 +26,7 @@ const AureliusLogo = ({ size = 24, collapsed = false }) => {
           animate={{ opacity: 1, x: 0 }}
           className="text-2xl font-extrabold tracking-tight text-cyan-300"
         >
-          Aurelinx
+          Aurelius
         </motion.span>
       )}
     </div>

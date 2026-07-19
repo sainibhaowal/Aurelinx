@@ -638,7 +638,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
       </div>
 
       {/* FULL VIEWPORT END-TO-END HERO PARTICLES BACKGROUND WITH FADE-OUT MASK */}
-      <div 
+      <div
         className="absolute top-0 left-0 right-0 h-[85vh] min-h-[600px] max-h-[1000px] overflow-hidden pointer-events-none z-0"
         style={{
           maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)",
@@ -665,14 +665,14 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl"
               >
                 <img
-                  src="/icon.svg"
-                  alt="Aurelinx Logo"
+                  src="/aurelius-logo-4k.svg"
+                  alt="Aurelius Logo"
                   style={{ width: "120%", height: "120%", objectFit: "contain" }}
                 />
               </div>
               <div>
                 <div className="text-xs font-black tracking-[0.28em] text-white">
-                  AURELINX
+                  AURELIUS
                 </div>
                 <div
                   className="text-[9px] font-bold uppercase tracking-[0.22em]"
