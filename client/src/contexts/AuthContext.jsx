@@ -59,15 +59,8 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(userData));
           setError(null);
         } catch (err) {
-          // Keep the last known user visible if the browser refresh races the backend.
+          // Clear expired/invalid session and force login
           if (err?.status === 401 || err?.status === 403) {
-            const cached = readCachedUser();
-            if (cached) {
-              setUser(cached);
-              setError(err);
-              setLoading(false);
-              return;
-            }
             localStorage.removeItem("auth_token");
             localStorage.removeItem(AUTH_USER_CACHE_KEY);
             setToken(null);

@@ -8,7 +8,7 @@ let getCurrentWindow = null;
 let LogicalSize = null;
 let LogicalPosition = null;
 
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
   import("@tauri-apps/api/window")
     .then((mod) => {
       getCurrentWindow = mod.getCurrentWindow;

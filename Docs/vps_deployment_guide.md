@@ -43,6 +43,13 @@ docker compose version
 docker buildx version
 ```
 
+
+```
+cd /opt/aurelius
+git pull origin main
+docker compose -f infra/docker-compose.prod.yml up -d --build --no-deps
+```
+
 ### Troubleshooting: Missing `buildx` Plugin Warning
 If you see the warning:
 `WARN[0000] Docker Compose requires buildx plugin to be installed`

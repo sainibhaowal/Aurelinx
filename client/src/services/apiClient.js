@@ -33,6 +33,31 @@ function parseUrlSafe(value) {
   }
 }
 
+/**
+ * Custom error handling utility
+ */
+export class APIError extends Error {
+  constructor(errorCode, message, status = 500, details = null) {
+    super(message);
+    this.name = "APIError";
+    this.errorCode = errorCode;
+    this.status = status;
+    this.details = details;
+  }
+
+  isNetworkError() {
+    return this.status >= 500 || this.status === 0;
+  }
+
+  isValidationError() {
+    return this.status === 422;
+  }
+
+  isAuthError() {
+    return this.status === 401 || this.status === 403;
+  }
+}
+
 function isAuthEndpoint(url) {
   return typeof url === "string" && /\/api\/v1\/auth\//.test(url);
 }
@@ -283,8 +308,10 @@ async function request(url, options = {}, responseType = "json") {
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("auth:expired"));
         }
-        throw new Error(
+        throw new APIError(
+          "UNAUTHORIZED",
           formatErrorMessage(data, "Session expired. Please login again."),
+          response.status,
         );
       }
 
@@ -911,30 +938,6 @@ export const healthAPI = {
     request(`${API_BASE}/health`).catch(() => ({ status: "offline" })),
 };
 
-/**
- * Custom error handling utility
- */
-export class APIError extends Error {
-  constructor(errorCode, message, status = 500, details = null) {
-    super(message);
-    this.name = "APIError";
-    this.errorCode = errorCode;
-    this.status = status;
-    this.details = details;
-  }
-
-  isNetworkError() {
-    return this.status >= 500 || this.status === 0;
-  }
-
-  isValidationError() {
-    return this.status === 422;
-  }
-
-  isAuthError() {
-    return this.status === 401 || this.status === 403;
-  }
-}
 
 export default {
   authAPI,
