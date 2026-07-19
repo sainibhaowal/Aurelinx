@@ -520,9 +520,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
       },
     ]
     : [
-      { label: "Workforce Size", value: "22" },
-      { label: "Risk Cluster", value: "7" },
-      { label: "Avg Morale", value: "0.64" },
+      { label: "Workforce Size", value: "1,240" },
+      { label: "Risk Cluster", value: "42" },
+      { label: "Avg Morale", value: "0.78" },
     ];
 
   const displayConnectors =
@@ -695,7 +695,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               {[
                 "Overview",
                 "Pipeline",
-                "Architecture",
+                "Math Engine",
+                "Specs",
                 "Connectors",
                 "Compliance",
               ].map((item, i) => (
@@ -1000,7 +1001,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       className="mt-2 text-5xl font-black"
                       style={{ color: "#67e8f9" }}
                     >
-                      {snapshot ? snapshot.total : "22"}
+                      {snapshot ? snapshot.total : "1,240"}
                     </div>
                     <div
                       className="mt-1.5 text-[10px] font-semibold uppercase tracking-wider"
@@ -1031,7 +1032,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       <TrendingUp className="h-3 w-3" /> Risk High
                     </div>
                     <div className="mt-2 text-lg font-black text-white">
-                      {snapshot ? `${snapshot.atRisk} cases` : "7 cases"}
+                      {snapshot ? `${snapshot.atRisk} cases` : "42 cases"}
                     </div>
                     <div
                       className="mt-0.5 text-[10px]"
@@ -1078,14 +1079,14 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   {[
                     {
                       label: "Risk Overview",
-                      value: snapshot ? snapshot.atRisk : "7 cases",
+                      value: snapshot ? snapshot.atRisk : "42 cases",
                       sub: "Exit prob > 70%",
                     },
                     {
                       label: "Retention Pulse",
                       value: snapshot
                         ? `${(100 - snapshot.atRiskPct).toFixed(0)}%`
-                        : "68%",
+                        : "96.6%",
                       sub: "Stable workforce",
                     },
                     {
@@ -1492,9 +1493,122 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           </div>
         </section>
 
-        {/* ══════════ MODULES ══════════ */}
+        {/* ══════════ MATH ENGINE ══════════ */}
         <section
           id="section-2"
+          className="py-20"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+        >
+          <div className="mx-auto max-w-[700px] text-center">
+            <SectionLabel>
+              <BrainCircuit className="h-3.5 w-3.5" /> Analytical Core
+            </SectionLabel>
+            <SectionHeading>Aurelius Math-Engine Pillars</SectionHeading>
+            <p
+              className="mt-5 text-sm leading-relaxed"
+              style={{ color: "rgba(148,163,184,0.6)" }}
+            >
+              Mathematically-grounded solvers and simulation parameters powering advanced workforce optimizations, career projection pathways, and retention sandbox analytics.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-12 grid max-w-[1093px] gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                title: "Semantic Skills Graph & Adjacencies",
+                formula: "G = (V, E) | min(D_ij)",
+                accent: "#0ea5a4",
+                desc: "Resolves multidimensional skill match requirements by building a weighted directional adjacency matrix. Evaluates skills overlap, identifies critical gaps, and projects the shortest path from candidate vectors to target role nodes.",
+                highlight: "Shortest Path Dijkstra Routing",
+              },
+              {
+                title: "Optimal Team Assembly (Simulated Annealing)",
+                formula: "P = exp(ΔE / T) | T_k = T_0 * α^k",
+                accent: "#fbbf24",
+                desc: "Searches the vast combinatorics space of employee-skill pairings using a stochastic simulated annealing engine. Constrained by strict budget caps, maximum team size limits, and role-skill density matrices.",
+                highlight: "Metropolis-Hastings Solver",
+              },
+              {
+                title: "Attrition Sandbox & Cox Hazards",
+                formula: "h(t) = h_0(t) * exp(Σ β_i * X_i)",
+                accent: "#ef4444",
+                desc: "Estimates cumulative baseline hazards across double-Gaussian peak tenures. Integrates SHAP-covariate weights (morale, salary ratio, workload fatigue) to compute dynamic hazard multipliers and flight risk mitigation paths.",
+                highlight: "Proportional Hazards Regression",
+              },
+              {
+                title: "Organizational Network Analysis (ONA)",
+                formula: "PR(u) = (1-d)/N + d * Σ (PR(v) / L(v))",
+                accent: "#ec4899",
+                desc: "Maps pull request reviews, collaboration commits, and communication telemetry weights onto an interactive organizational interaction graph. Computes influence via PageRank and bridge-strength via Betweenness.",
+                highlight: "Brandes Betweenness Centrality",
+              },
+              {
+                title: "Markov Career Path Horizons",
+                formula: "P^(n) = P^n | Σ P_ij = 1",
+                accent: "#a78bfa",
+                desc: "Models internal role transitions as a discrete-time Markov chain. Projects state probability matrices over a 3-year horizon, scaling step velocity dynamically with employee skills coverage ratios.",
+                highlight: "Chapman-Kolmogorov Horizon Projection",
+              }
+            ].map((pillar) => (
+              <div
+                key={pillar.title}
+                className="group relative overflow-hidden rounded-[22px] p-6 transition-all duration-300 flex flex-col justify-between"
+                style={{
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid rgba(255,255,255,0.07)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = pillar.accent + "40";
+                  e.currentTarget.style.background = "rgba(255,255,255,0.035)";
+                  e.currentTarget.style.transform = "translateY(-3px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
+                  e.currentTarget.style.background = "rgba(255,255,255,0.02)";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span
+                      className="rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest"
+                      style={{
+                        background: pillar.accent + "12",
+                        border: "1px solid " + pillar.accent + "30",
+                        color: pillar.accent,
+                      }}
+                    >
+                      {pillar.highlight}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-extrabold text-white mb-2 leading-snug">
+                    {pillar.title}
+                  </h3>
+                  <p
+                    className="text-xs leading-relaxed mb-6"
+                    style={{ color: "rgba(148,163,184,0.65)" }}
+                  >
+                    {pillar.desc}
+                  </p>
+                </div>
+                <div
+                  className="rounded-xl p-3 font-mono text-[11px] text-center"
+                  style={{
+                    background: "rgba(0,0,0,0.25)",
+                    border: "1px solid rgba(255,255,255,0.04)",
+                    color: pillar.accent,
+                  }}
+                >
+                  {pillar.formula}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ══════════ MODULES ══════════ */}
+        <section
+          id="section-3"
           className="py-20"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
         >
@@ -1722,7 +1836,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
         {/* ══════════ CONNECTORS ══════════ */}
         <section
-          id="section-3"
+          id="section-4"
           className="py-20"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
         >
@@ -1746,7 +1860,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
         {/* ══════════ COMPLIANCE ══════════ */}
         <section
-          id="section-4"
+          id="section-5"
           className="py-20"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
         >
