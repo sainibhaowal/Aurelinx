@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Aurelinx HR Intelligence logo</title>
+  <desc id="desc">A blue and gold winged human intelligence emblem with circuit nodes and Aurelinx wordmark on a transparent background.</desc>
+  <defs>
+    <linearGradient id="blueTop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#19c8ff"/>
+      <stop offset="0.45" stop-color="#0789ee"/>
+      <stop offset="1" stop-color="#0043a9"/>
+    </linearGradient>
+    <linearGradient id="blueDeep" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0c72d9"/>
+      <stop offset="1" stop-color="#08216f"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff27a"/>
+      <stop offset="0.32" stop-color="#ffc800"/>
+      <stop offset="0.68" stop-color="#e88900"/>
+      <stop offset="1" stop-color="#8b4300"/>
+    </linearGradient>
+    <linearGradient id="goldWord" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd61c"/>
+      <stop offset="0.45" stop-color="#e89b00"/>
+      <stop offset="1" stop-color="#7b3900"/>
+    </linearGradient>
+    <linearGradient id="blueWord" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#13b7ff"/>
+      <stop offset="0.5" stop-color="#087fe0"/>
+      <stop offset="1" stop-color="#07347d"/>
+    </linearGradient>
+    <radialGradient id="head" cx="35%" cy="25%" r="75%">
+      <stop offset="0" stop-color="#fffbd1"/>
+      <stop offset="0.18" stop-color="#fff46d"/>
+      <stop offset="0.5" stop-color="#ffc400"/>
+      <stop offset="1" stop-color="#d76b00"/>
+    </radialGradient>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#00193d" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Emblem -->
+  <g transform="translate(800 110)" filter="url(#softShadow)">
+    <!-- outer blue wings -->
+    <path d="M-42 244 C-170 174 -310 93 -520 24 C-505 76 -480 118 -443 149 C-305 193 -191 234 -83 294 Z" fill="url(#blueTop)" stroke="#004a9f" stroke-width="3"/>
+    <path d="M42 244 C170 174 310 93 520 24 C505 76 480 118 443 149 C305 193 191 234 83 294 Z" fill="url(#blueTop)" stroke="#004a9f" stroke-width="3"/>
+
+    <!-- inner blue feathers -->
+    <path d="M-75 286 C-185 219 -302 157 -462 125 C-446 173 -421 209 -385 235 C-263 257 -164 284 -91 320 Z" fill="url(#blueDeep)" stroke="#031d68" stroke-width="3"/>
+    <path d="M75 286 C185 219 302 157 462 125 C446 173 421 209 385 235 C263 257 164 284 91 320 Z" fill="url(#blueDeep)" stroke="#031d68" stroke-width="3"/>
+
+    <!-- gold lower wings -->
+    <path d="M-83 306 C-200 251 -305 222 -414 218 C-382 271 -343 308 -296 332 C-205 331 -138 340 -86 359 Z" fill="url(#gold)" stroke="#9f5500" stroke-width="3"/>
+    <path d="M83 306 C200 251 305 222 414 218 C382 271 343 308 296 332 C205 331 138 340 86 359 Z" fill="url(#gold)" stroke="#9f5500" stroke-width="3"/>
+
+    <!-- feather facets -->
+    <path d="M-492 62 L-108 279 L-173 254 L-451 129 Z" fill="#006fd6" opacity="0.8"/>
+    <path d="M492 62 L108 279 L173 254 L451 129 Z" fill="#006fd6" opacity="0.8"/>
+    <path d="M-396 239 L-111 325 L-186 327 L-337 299 Z" fill="#ffbd00" opacity="0.75"/>
+    <path d="M396 239 L111 325 L186 327 L337 299 Z" fill="#ffbd00" opacity="0.75"/>
+
+    <!-- circuit lines -->
+    <g fill="none" stroke-linecap="round" stroke-width="10">
+      <path d="M-247 210 L-135 210 L-77 260" stroke="#fff"/>
+      <path d="M247 210 L135 210 L77 260" stroke="#fff"/>
+      <path d="M-280 258 L-168 258 L-92 310" stroke="#ffd51a"/>
+      <path d="M280 258 L168 258 L92 310" stroke="#ffd51a"/>
+    </g>
+    <g stroke="#ffffff" stroke-width="8">
+      <circle cx="-230" cy="210" r="18" fill="#ffd51a"/>
+      <circle cx="230" cy="210" r="18" fill="#0b78dd"/>
+    </g>
+    <g stroke="#ffd51a" stroke-width="8">
+      <circle cx="-274" cy="258" r="18" fill="#fff"/>
+      <circle cx="274" cy="258" r="18" fill="#0b78dd"/>
+    </g>
+
+    <!-- human body / central A -->
+    <path d="M0 224 L-112 408 L-62 440 L0 328 L62 440 L112 408 Z" fill="url(#gold)" stroke="#9f5500" stroke-width="3"/>
+    <path d="M0 224 L0 328 L62 440 L112 408 Z" fill="url(#blueTop)" stroke="#004a9f" stroke-width="3"/>
+    <path d="M0 260 L-42 378 L0 350 L42 378 Z" fill="#fff4bf" opacity="0.85"/>
+
+    <!-- head -->
+    <circle cx="0" cy="95" r="57" fill="url(#head)" stroke="#d57400" stroke-width="4"/>
+    <ellipse cx="-15" cy="76" rx="22" ry="14" fill="#fff" opacity="0.68"/>
+  </g>
+
+  <!-- Wordmark -->
+  <g transform="translate(800 665)">
+    <text x="-10" y="0" text-anchor="end" font-family="Montserrat, Arial, sans-serif" font-size="108" font-weight="800" letter-spacing="-5" fill="url(#goldWord)">AURE</text>
+    <text x="0" y="0" text-anchor="start" font-family="Montserrat, Arial, sans-serif" font-size="108" font-weight="800" letter-spacing="-5" fill="url(#blueWord)">LINX</text>
+    <g transform="translate(0 56)" fill="#4a4f57">
+      <rect x="-375" y="-6" width="115" height="4" rx="2"/>
+      <rect x="260" y="-6" width="115" height="4" rx="2"/>
+      <text x="0" y="8" text-anchor="middle" font-family="Montserrat, Arial, sans-serif" font-size="34" font-weight="700" letter-spacing="8">HR INTELLIGENCE</text>
+    </g>
+  </g>
+</svg>
