@@ -17,8 +17,44 @@ import {
   ChevronRight,
   Code,
   PieChart,
-  TrendingUp
+  TrendingUp,
+  Cpu,
+  Brain,
+  Zap
 } from "lucide-react";
+
+const MATH_ENGINE_PIPELINE_ASCII = `+---------------------------------------------------------------------------------+
+|                                USER INPUT STAGE                                 |
+|  [Define Skill Node] + [Proficiency Scale] + [Budget Limit] + [Max Team Size]   |
++---------------------------------------------------------------------------------+
+                                         |
+                                         v
++---------------------------------------------------------------------------------+
+|                            1. SEMANTIC ADJACENCY RESOLVER                       |
+|   * Dijkstra shortest path finder computes similarity weight distance matrix.   |
+|   * Resolves conceptual transfers: [Vue.js] --> [JS] --> [React]                |
++---------------------------------------------------------------------------------+
+                                         |
+                                         v
++---------------------------------------------------------------------------------+
+|                            2. COMBINATORIAL TEAM BUILDER                        |
+|   * Simulated Annealing starts global exploration at high temperature (T).      |
+|   * Roster perturbation swaps candidates to optimize overall capability cost.   |
+|   * Cools parameter T to converge on global budget/skill optima.               |
++---------------------------------------------------------------------------------+
+                                         |
+                                         v
++---------------------------------------------------------------------------------+
+|                            3. SURVIVAL SANDBOX FORECASTER                       |
+|   * Applies Cox Proportional Hazards Model to predict attrition probability.    |
+|   * Computes Hazard Ratios: HR = exp(B1*Morale + B2*Salary + B3*Workload).      |
++---------------------------------------------------------------------------------+
+                                         |
+                                         v
++---------------------------------------------------------------------------------+
+|                               OUTPUT RESULTS STAGE                              |
+|   * Optimal Team Roster + Learning Paths + 12-Month Retention Probabilities      |
++---------------------------------------------------------------------------------+`;
 
 export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
@@ -924,148 +960,513 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
 
       case "intelligence":
         return (
-          <div className="space-y-6">
+          <div className="space-y-8">
+            {/* Header section */}
             <div>
               <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-                <Network className="text-pink-400 h-5 w-5" /> Intelligence Center & ONA
+                <Network className="text-pink-400 h-5 w-5" /> Intelligence Center (Decision Workbench)
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                Welcome to the Aurelius Decision Workbench (Math-Engine). This interface runs live mathematical optimization models, graph algorithms, and statistical simulators to solve key talent planning challenges.
+                The **Intelligence Center** is the mathematical core of the Aurelius platform. While typical enterprise directories rely on static lists, Aurelius implements a dynamic decision workbench powered by graph algorithms, global combinatorial search solvers, and semi-parametric survival models to optimize organizational structures.
               </p>
             </div>
 
-            {/* Executive Decision Workbench Section */}
-            <div className="p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5 space-y-3">
-              <h4 className="text-xs font-black uppercase tracking-wider text-indigo-300">
-                Executive Decision Workbench (Math-Engine)
-              </h4>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                This page acts as your strategic talent playground. Unlike simple static tables, it runs live mathematical algorithms on your workforce data to solve operational problems:
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs mt-2">
-                <div className="bg-slate-950/40 p-3 rounded-lg border border-white/5">
-                  <span className="font-extrabold text-[10px] text-indigo-300 uppercase tracking-wider block mb-1">
-                    1. Semantic Skills Graph
-                  </span>
-                  <p className="text-[10px] text-slate-400 leading-normal">
-                    Finds hidden talent matching your target requirements. By building a skills adjacency graph and executing a shortest-path algorithm (Dijkstra), it proves that employees with "Vue.js" are highly transferable to "React" positions, saving external hiring costs.
-                  </p>
-                </div>
-                <div className="bg-slate-950/40 p-3 rounded-lg border border-white/5">
-                  <span className="font-extrabold text-[10px] text-indigo-300 uppercase tracking-wider block mb-1">
-                    2. Optimal Team Assembly
-                  </span>
-                  <p className="text-[10px] text-slate-400 leading-normal">
-                    Solves headcount constraints automatically. Uses a physics-inspired solver (Simulated Annealing) to compile high-performing team combinations that perfectly fit your budget caps while maximizing necessary project skills.
-                  </p>
-                </div>
-                <div className="bg-slate-950/40 p-3 rounded-lg border border-white/5">
-                  <span className="font-extrabold text-[10px] text-indigo-300 uppercase tracking-wider block mb-1">
-                    3. Attrition Sandbox Simulator
-                  </span>
-                  <p className="text-[10px] text-slate-400 leading-normal">
-                    Test your talent policies risk-free. Adjust the interactive salary boosts, workload scales, or morale shifts to see predicted retention forecasts modeled dynamically, letting you justify compensation changes with math before spending budget.
-                  </p>
+            {/* Architecture Flow Diagram */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <Cpu className="h-4 w-4 text-indigo-400" /> Math-Engine Architecture & Optimization Pipeline
+              </h3>
+              <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4">
+                <div className="font-mono text-[10px] text-cyan-200/90 leading-relaxed whitespace-pre overflow-x-auto p-4 bg-slate-900/50 rounded-lg border border-white/5">
+{`+---------------------------------------------------------------------------------+
+|                                USER INPUT STAGE                                 |
+|  [Define Skill Node] + [Proficiency Scale] + [Budget Limit] + [Max Team Size]   |
++---------------------------------------------------------------------------------+
+                                         |
+                                         v
++---------------------------------------------------------------------------------+
+|                            1. SEMANTIC ADJACENCY RESOLVER                       |
+|   * Dijkstra shortest path finder computes similarity weight distance matrix.   |
+|   * Resolves conceptual transfers: [Vue.js] --> [JS] --> [React]                |
++---------------------------------------------------------------------------------+
+                                         |
+                                         v
++---------------------------------------------------------------------------------+
+|                            2. COMBINATORIAL TEAM BUILDER                        |
+|   * Simulated Annealing starts global exploration at high temperature (T).      |
+|   * Roster perturbation swaps candidates to optimize overall capability cost.   |
+|   * Cools parameter T to converge on global budget/skill optima.               |
++---------------------------------------------------------------------------------+
+                                         |
+                                         v
++---------------------------------------------------------------------------------+
+|                            3. SURVIVAL SANDBOX FORECASTER                       |
+|   * Applies Cox Proportional Hazards Model to predict attrition probability.    |
+|   * Computes Hazard Ratios: HR = exp(B1*Morale + B2*Salary + B3*Workload).      |
++---------------------------------------------------------------------------------+
+                                         |
+                                         v
++---------------------------------------------------------------------------------+
+|                               OUTPUT RESULTS STAGE                              |
+|   * Optimal Team Roster + Learning Paths + 12-Month Retention Probabilities      |
++---------------------------------------------------------------------------------+`}
                 </div>
               </div>
             </div>
 
-            {/* Visual ONA Graph Structure Explanation */}
+            {/* The Three Computational Pillars */}
             <div className="space-y-4">
-                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                  <Network className="text-pink-400 h-4 w-4" /> ONA Network Centrality Blueprint
-                </h3>
-                
-                <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4">
-                  <div className="relative h-44 bg-slate-900/80 rounded-lg border border-white/5 overflow-hidden flex items-center justify-center">
-                    {/* Grid background */}
-                    <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:14px_24px]" />
-                    
-                    {/* Visual SVG Connections */}
-                    <svg className="absolute inset-0 h-full w-full pointer-events-none">
-                      <line x1="20%" y1="50%" x2="40%" y2="25%" stroke="rgba(244,63,94,0.3)" strokeWidth="2" strokeDasharray="3 3" />
-                      <line x1="20%" y1="50%" x2="40%" y2="75%" stroke="rgba(244,63,94,0.3)" strokeWidth="2" strokeDasharray="3 3" />
-                      <line x1="40%" y1="25%" x2="60%" y2="50%" stroke="rgba(236,72,153,0.8)" strokeWidth="3" />
-                      <line x1="40%" y1="75%" x2="60%" y2="50%" stroke="rgba(236,72,153,0.8)" strokeWidth="3" />
-                      <line x1="60%" y1="50%" x2="80%" y2="30%" stroke="rgba(6,182,212,0.4)" strokeWidth="2" />
-                      <line x1="60%" y1="50%" x2="80%" y2="70%" stroke="rgba(6,182,212,0.4)" strokeWidth="2" />
-                    </svg>
-  
-                    {/* Node 1: Ingestion / Peripheral */}
-                    <div className="absolute left-[15%] top-[40%] flex flex-col items-center">
-                      <div className="h-6 w-6 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center text-[8px] text-slate-400 font-bold">
-                        A
-                      </div>
-                      <span className="text-[9px] text-slate-400 mt-1">Isolated</span>
-                    </div>
-  
-                    {/* Node 2: Hub */}
-                    <div className="absolute left-[36%] top-[15%] flex flex-col items-center">
-                      <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(6,182,212,0.4)]">
-                        B
-                      </div>
-                      <span className="text-[9px] text-cyan-300 mt-1">High PageRank</span>
-                    </div>
-  
-                    {/* Node 3: Hub */}
-                    <div className="absolute left-[36%] top-[65%] flex flex-col items-center">
-                      <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(6,182,212,0.4)]">
-                        C
-                      </div>
-                      <span className="text-[9px] text-cyan-300 mt-1">Team Hub</span>
-                    </div>
-  
-                    {/* Node 4: Broker (High Betweenness) */}
-                    <div className="absolute left-[56%] top-[40%] flex flex-col items-center">
-                      <div className="h-10 w-10 rounded-full bg-pink-500 border-2 border-pink-400 flex items-center justify-center text-[11px] text-slate-950 font-black shadow-[0_0_12px_rgba(236,72,153,0.6)]">
-                        D
-                      </div>
-                      <span className="text-[9px] text-pink-400 font-extrabold mt-1">Key Broker</span>
-                    </div>
-  
-                    {/* Node 5: Target Dept Output */}
-                    <div className="absolute left-[76%] top-[20%] flex flex-col items-center">
-                      <div className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-500 flex items-center justify-center text-[9px] text-slate-300 font-bold">
-                        E
-                      </div>
-                      <span className="text-[9px] text-slate-400 mt-1">Operational</span>
-                    </div>
-  
-                    <div className="absolute left-[76%] top-[60%] flex flex-col items-center">
-                      <div className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-500 flex items-center justify-center text-[9px] text-slate-300 font-bold">
-                        F
-                      </div>
-                      <span className="text-[9px] text-slate-400 mt-1">Operational</span>
-                    </div>
+              <h3 className="text-sm font-bold text-white">The Three Computational Pillars</h3>
+              
+              <div className="space-y-4">
+                {/* Pillar 1 */}
+                <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-2 text-left">
+                  <div className="flex items-center gap-2">
+                    <Brain className="text-indigo-400 h-4.5 w-4.5" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-indigo-300">
+                      1. Semantic Skills Graph (Dijkstra's Solver)
+                    </h4>
                   </div>
-  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300">
-                    <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
-                      <strong className="text-pink-300 block flex items-center gap-1">
-                        <Network className="h-3.5 w-3.5" /> Betweenness Centrality (Brokerage)
-                      </strong>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Measures how often a node sits on the shortest communication path between other nodes (like Node <strong>D</strong>). High betweenness combined with low morale signals an imminent organizational bottleneck.
-                      </p>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    **What is it**: A graph representation of competencies where skills are nodes and edges represent learning/transfer paths.
+                  </p>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    **Why we need it**: Keywords block candidates. A search for a "React Developer" shouldn't ignore a "Vue.js Developer" with years of framework knowledge.
+                  </p>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    **What you get**: The graph solver computes adjacency path weights (e.g. `Vue.js &rarr; JavaScript &rarr; React`). If the total path cost is low, the engine flags them as a match and suggests a micro-training learning path.
+                  </p>
+                </div>
+
+                {/* Pillar 2 */}
+                <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-3 text-left">
+                  <div className="flex items-center gap-2">
+                    <Zap className="text-pink-400 h-4.5 w-4.5" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-pink-300">
+                      2. Optimal Team Assembly (Simulated Annealing Math)
+                    </h4>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    **What is it**: An optimization model that solves the team configuration problem: picking a team of $K$ employees from a pool of $N$ candidates to satisfy a set of skill matrix demands while remaining under a budget cap (CFO Limit) and minimizing cost.
+                  </p>
+                  <p className="text-xs text-slate-300 leading-relaxed font-semibold text-pink-200">
+                    Why we need it: The Combinatorial Explosion
+                  </p>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Assembling a team is an NP-Hard combinatorial optimization problem. Selecting a team of $K = 5$ members from an organization of $N = 100$ employees yields $\binom{100}{5} = 75,287,520$ possible combinations. Brute-force calculation would halt the server, whereas Simulated Annealing maps the search space and converges on the global optimum in milliseconds.
+                  </p>
+
+                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                      Core Mathematical Formulation
+                    </strong>
+                    <p className="leading-relaxed">
+                      At each step, the model calculates the team&apos;s <strong>Energy ($E$)</strong>, which we seek to maximize:
+                    </p>
+                    <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
+                      E = (Coverage Percentage &times; 10.0) - Cost Penalty
                     </div>
-  
-                    <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
-                      <strong className="text-cyan-300 block flex items-center gap-1">
-                        <Activity className="h-3.5 w-3.5" /> PageRank Centrality (Influence)
-                      </strong>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Measures structural prestige and network reach. A node connected to other high-influence nodes receives a higher ranking, identifying key decision-makers.
-                      </p>
+                    <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                      <li>
+                        <strong>Coverage Percentage:</strong> Evaluates skills in the merged roster. For each target skill $T_j$ at target level $L_j$, the solver checks team members&apos; skills using Dijkstra graph distances: <br />
+                        <code className="text-cyan-300">effective_level = candidate_level &times; (1 / (1 + dijkstra_distance))</code> <br />
+                        The achievement ratio for that skill is bounded at 1.0: <code className="text-cyan-300">min(1.0, effective_level / L_j)</code>.
+                      </li>
+                      <li>
+                        <strong>CFO Budget Cap Constraint:</strong> Salaries are algorithmically estimated from role lengths: <code className="text-cyan-300">cost = $80,000 + (length(role) &times; $1,500)</code>. If total cost exceeds the Budget Cap, a severe penalty is applied: <br />
+                        <code className="text-rose-400">Cost Penalty = ((Total Cost - Budget Cap) / Budget Cap) &times; 5.0</code>.
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-pink-300">
+                      The Metropolis-Hastings Acceptance Criterion
+                    </strong>
+                    <p className="leading-relaxed">
+                      At each iteration, the solver proposes a neighboring team by swapping a random roster member with a non-member. If the energy difference (Delta E = E_new - E_current) is greater than 0, the swap is <strong>always accepted</strong>. If the candidate team is worse (Delta E is less than 0), it is accepted probabilistically based on the current <strong>Temperature ($T$)</strong>:
+                    </p>
+                    <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
+                      P(Accept) = exp(&Delta;E / T)
                     </div>
+                    <p className="leading-relaxed">
+                      *Why this works*: High temperature at the beginning (T_0 = 10.0) allows the solver to accept worse teams, exploring the organization and escaping local suboptimal traps. As the temperature cools down by a factor of alpha = 0.85 (T = T &times; 0.85) toward T_min = 0.1, the solver stabilizes, narrowing down to lock in the absolute global optimum.
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-amber-300">
+                      Stochastic Convergence (Why results may vary)
+                    </strong>
+                    <p className="leading-relaxed">
+                      You may notice that running the solver multiple times for the same inputs yields different employee names. <strong>This is mathematically expected behavior:</strong>
+                    </p>
+                    <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                      <li>The search starts with a random initial team selection.</li>
+                      <li>Because Simulated Annealing is a stochastic (probabilistic) solver, the exploration path accepts temporary suboptimal states randomly.</li>
+                      <li>If your organization contains multiple employees with matching/similar skill sets (e.g. multiple engineers with Python or Docker), there exist <strong>multiple mathematically equivalent global optima</strong>. The solver will converge on different, but equally perfect, teams depending on its random seed trajectory.</li>
+                    </ul>
+                  </div>
+
+                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-emerald-300">
+                      Roster & Convergence Outputs
+                    </strong>
+                    <p className="leading-relaxed">
+                      When a run finishes, the workbench displays:
+                    </p>
+                    <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                      <li><strong>Assembly Roster:</strong> The optimized team configuration showing the roles and estimated cost.</li>
+                      <li><strong>Total Skills Coverage:</strong> The coverage percentage and achievement pathways showing how the team covers the matrix demand (including bridge matches).</li>
+                      <li><strong>Total Team Cost Calculation:</strong> Aggregated salaries verified against the CFO Limit.</li>
+                      <li><strong>Convergence Timeline:</strong> An SVG line chart showing how the system energy stabilized as temperature cooled down.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Pillar 3 */}
+                <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-3 text-left">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="text-emerald-400 h-4.5 w-4.5" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-emerald-300">
+                      3. Attrition Sandbox Simulator (Cox Proportional Hazards Model)
+                    </h4>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    **What is it**: An interactive forecasting sandbox powered by the Cox Proportional Hazards regression model that calculates employee survival probability and flight risk over a 12-month timeline.
+                  </p>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    **Why we need it**: Retaining key talent is a critical business objective. Instead of relying on static indicators or retroactive exit interviews, the engine uses semi-parametric survival models to estimate the probability of resignation based on organizational morale, compensation adjustment, tenure milestones, and skill fatigue.
+                  </p>
+
+                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                      Mathematical Foundations
+                    </strong>
+                    <p className="leading-relaxed">
+                      The model calculates the hazard rate $h(t)$ for an employee at tenure $t$ using the formulation:
+                    </p>
+                    <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
+                      h(t) = h_0(t) &times; exp(&sum; &beta;_i &times; X_i)
+                    </div>
+                    <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                      <li>
+                        <strong>h_0(t) (Baseline Hazard Function):</strong> Represents the underlying risk of resignation over time. Based on historical data, attrition rates are not flat; they feature Gaussian peaks at organizational boundaries: 1-year (12 months) and 3-year (36 months) milestones. <br />
+                        <code className="text-cyan-300">h_0(t) = 0.04 + 0.1 &times; exp(-0.5 &times; ((t - 12) / 3)^2) + 0.06 &times; exp(-0.5 &times; ((t - 36) / 6)^2)</code>
+                      </li>
+                      <li>
+                        <strong>Hazard Multiplier (Simulated Attrition Multiplier):</strong> The exponential term <code className="text-cyan-300">exp(&sum; &beta;_i &times; X_i)</code>. A multiplier above 1.0 indicates accelerated flight risk compared to average baseline probability (e.g. x1.25), whereas a multiplier below 1.0 (e.g. x0.45) represents protective factors.
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-pink-300">
+                      Baseline Covariates (SHAP Explainability)
+                    </strong>
+                    <p className="leading-relaxed">
+                      The parameters $X_i$ represent covariates that directly modify the log hazard ratio:
+                    </p>
+                    <ul className="list-disc pl-4 space-y-2 text-[11px] leading-relaxed">
+                      <li>
+                        <strong>Organizational Morale Index:</strong> Calculated from sentiment scores. Low sentiment pushes the hazard ratio up; high sentiment provides a protective buffer. The effect is modeled as: <br />
+                        <code className="text-cyan-300">moraleEffect = -2.5 &times; (Morale_Simulated - Morale_Original)</code>
+                      </li>
+                      <li>
+                        <strong>Historical Risk Trigger Flag:</strong> Represents administrative flags (`is_at_risk`). If active, it injects a major baseline hazard penalty of <code className="text-cyan-300">+1.2</code> to the log hazard ratio.
+                      </li>
+                      <li>
+                        <strong>Skill Density / Task Fatigue:</strong> A proxy for employee overload. If an employee has a high skill count, they are prone to task fatigue and burnout. The workload adjustment delta modifies the log hazard ratio: <br />
+                        <code className="text-cyan-300">workloadEffect = 0.25 &times; (Skills_Simulated - Skills_Original)</code>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-amber-300">
+                      Flight Risk Mitigation Simulator & Sandbox
+                    </strong>
+                    <p className="leading-relaxed">
+                      This sandbox provides managers with control sliders to simulate &quot;what-if&quot; scenarios for any selected employee:
+                    </p>
+                    <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                      <li><strong>Morale Index Slider:</strong> Simulates structural interventions (e.g. team changes, workload relief) to lift morale.</li>
+                      <li><strong>Salary Boost Slider:</strong> Simulates a target salary raise (0% to 50%). It offsets the hazard ratio: <code className="text-cyan-300">salaryEffect = -1.8 &times; Salary_Boost</code>.</li>
+                      <li><strong>Workload Skill Slider:</strong> Simulates adding or removing technical ownership responsibilities to adjust task complexity and prevent burnout.</li>
+                    </ul>
+                    <p className="leading-relaxed mt-1">
+                      <strong>The Benefit:</strong> Managers get live updates of the adjusted hazard ratio and the resulting 12-month survival curve, allowing them to calculate the exact ROI of salary increases or task redistribution before allocating budgets.
+                    </p>
                   </div>
                 </div>
               </div>
-  
-              <div className="space-y-3">
-                <h3 className="text-sm font-bold text-white">Compliance Approval Gates</h3>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  High-impact interventions or structural updates (such as releasing department reorganizations) trigger **Mandatory Policy Pack Gates**. These gates require administrative override keys to authorize releases.
+            </div>
+
+            {/* UI Controls Glossary */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white">UI Controls & Technical Terminology</h3>
+              
+              <div className="space-y-3.5 text-xs text-left">
+                {/* Control 1 */}
+                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                  <strong className="text-white block text-xs">🎯 Target Requirements & Skill Node</strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    The skill token (e.g. `TypeScript`, `Docker`) selected as a search requirement.
+                  </p>
+                </div>
+
+                {/* Control 2 */}
+                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                  <strong className="text-white block text-xs">📊 Minimum Proficiency</strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    The capability target required for the match (L1: Foundational, L2: Operational, L3: Strategic).
+                  </p>
+                </div>
+
+                {/* Control 3 */}
+                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                  <strong className="text-white block text-xs">🔗 Solving Adjacencies (Graph Theory)</strong>
+                  <p className="text-slate-300 leading-relaxed font-semibold text-cyan-300">
+                    What is an Adjacency?
+                  </p>
+                  <p className="text-slate-300 leading-relaxed">
+                    In graph theory, two nodes are &quot;adjacent&quot; if they are directly connected by an edge. In Aurelius, a skill adjacency represents a direct transfer relationship between two competencies (e.g., Python is adjacent to FastAPI). 
+                  </p>
+                  <p className="text-slate-300 leading-relaxed">
+                    **Solving Adjacencies** is the process of executing a shortest-path solver (such as Dijkstra&#39;s algorithm) to find indirect pathways (e.g. `Vue.js &rarr; JavaScript &rarr; React`) when no direct match exists. This exposes hidden talent by calculating the learning proximity between skills.
+                  </p>
+                </div>
+
+                {/* Control 4 */}
+                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                  <strong className="text-white block text-xs">🧮 Semantic Matching Matrix</strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    The underlying grid computed by the Math-Engine that indexes target requirements against candidate resumes. It calculates the overlap score using semantic distances, role similarities, and direct/indirect skill matches.
+                  </p>
+                </div>
+
+                {/* Control 5 */}
+                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                  <strong className="text-white block text-xs">🗺️ Path Analysis</strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    The visual mapping of skill distances (e.g., a Vue developer matching a React project with a path cost of `0.15`). Path Analysis shows you the exact sequence of competencies a candidate needs to bridge the gap.
+                  </p>
+                </div>
+
+                {/* Control 6 */}
+                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                  <strong className="text-white block text-xs">📊 Target Match Breakdown</strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    An analytical panel detailing the transition options for a selected candidate. It evaluates target skills against candidate competencies and categorizes them (e.g., <em>Perfect Match</em>, <em>Highly Transferable</em>, or <em>Trainable Gap</em>). It displays the exact transfer sequence and computed semantic distance (e.g., `Vue.js &rarr; JavaScript &rarr; React` with weight `0.15`). If no connection is found, it marks the distance as infinite.
+                  </p>
+                </div>
+
+                {/* Control 7 */}
+                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                  <strong className="text-white block text-xs">🕸️ Shortest Path Graph View (Dijkstra Visualizer)</strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    An interactive, neon-colored SVG network showing skills as nodes and competency overlaps as links.
+                  </p>
+                  <ul className="text-slate-300 list-disc pl-4 space-y-1 mt-1">
+                    <li><strong className="text-emerald-400">Neon Green Nodes:</strong> Represent skills currently present in the candidate&apos;s profile (their existing competency islands).</li>
+                    <li><strong className="text-cyan-400">Neon Cyan Edges:</strong> Highlight the shortest mathematical transition path from the candidate&apos;s existing skills to the required target skills.</li>
+                    <li><strong className="text-cyan-300">Traveling Light Particles:</strong> Flow dynamically along the active cyan paths, showing the direction and speed of the learning/transition pathway.</li>
+                  </ul>
+                  <p className="text-slate-300 leading-relaxed mt-1">
+                    This network changes the way managers look at human talent, moving from a static keyword-matching list to a dynamic network.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ONA explanation block */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <Network className="text-pink-400 h-4 w-4" /> ONA Network Centrality Blueprint
+              </h3>
+              
+              <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4">
+                <div className="text-xs text-slate-300 leading-relaxed">
+                  <strong>What is ONA?</strong> ONA stands for <strong>Organizational Network Analysis</strong>. While traditional organizational charts show only the formal reporting hierarchy, ONA models the informal network of communications, collaborations, and advice flows. This reveals the actual collaborative engine of the company, answering: <em>Who is the true node of influence? Who acts as the bridge between isolated departments?</em>
+                </div>
+
+                <div className="relative h-44 bg-slate-900/80 rounded-lg border border-white/5 overflow-hidden flex items-center justify-center">
+                  <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:14px_24px]" />
+                  
+                  <svg className="absolute inset-0 h-full w-full pointer-events-none">
+                    <line x1="20%" y1="50%" x2="40%" y2="25%" stroke="rgba(244,63,94,0.3)" strokeWidth="2" strokeDasharray="3 3" />
+                    <line x1="20%" y1="50%" x2="40%" y2="75%" stroke="rgba(244,63,94,0.3)" strokeWidth="2" strokeDasharray="3 3" />
+                    <line x1="40%" y1="25%" x2="60%" y2="50%" stroke="rgba(236,72,153,0.8)" strokeWidth="3" />
+                    <line x1="40%" y1="75%" x2="60%" y2="50%" stroke="rgba(236,72,153,0.8)" strokeWidth="3" />
+                    <line x1="60%" y1="50%" x2="80%" y2="30%" stroke="rgba(6,182,212,0.4)" strokeWidth="2" />
+                    <line x1="60%" y1="50%" x2="80%" y2="70%" stroke="rgba(6,182,212,0.4)" strokeWidth="2" />
+                  </svg>
+
+                  <div className="absolute left-[15%] top-[40%] flex flex-col items-center">
+                    <div className="h-6 w-6 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center text-[8px] text-slate-400 font-bold">
+                      A
+                    </div>
+                    <span className="text-[9px] text-slate-400 mt-1">Isolated</span>
+                  </div>
+
+                  <div className="absolute left-[36%] top-[15%] flex flex-col items-center">
+                    <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(6,182,212,0.4)]">
+                      B
+                    </div>
+                    <span className="text-[9px] text-cyan-300 mt-1">High PageRank</span>
+                  </div>
+
+                  <div className="absolute left-[36%] top-[65%] flex flex-col items-center">
+                    <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(6,182,212,0.4)]">
+                      C
+                    </div>
+                    <span className="text-[9px] text-cyan-300 mt-1">Team Hub</span>
+                  </div>
+
+                  <div className="absolute left-[56%] top-[40%] flex flex-col items-center">
+                    <div className="h-10 w-10 rounded-full bg-pink-500 border-2 border-pink-400 flex items-center justify-center text-[11px] text-slate-950 font-black shadow-[0_0_12px_rgba(236,72,153,0.6)]">
+                      D
+                    </div>
+                    <span className="text-[9px] text-pink-400 font-extrabold mt-1">Key Broker</span>
+                  </div>
+
+                  <div className="absolute left-[76%] top-[20%] flex flex-col items-center">
+                    <div className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-500 flex items-center justify-center text-[9px] text-slate-300 font-bold">
+                      E
+                    </div>
+                    <span className="text-[9px] text-slate-400 mt-1">Operational</span>
+                  </div>
+
+                  <div className="absolute left-[76%] top-[60%] flex flex-col items-center">
+                    <div className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-500 flex items-center justify-center text-[9px] text-slate-300 font-bold">
+                      F
+                    </div>
+                    <span className="text-[9px] text-slate-400 mt-1">Operational</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300 text-left">
+                  {/* Metric 1 */}
+                  <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
+                    <strong className="text-cyan-300 block flex items-center gap-1">
+                      <Activity className="h-3.5 w-3.5" /> PageRank Centrality (Influence)
+                    </strong>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      <strong>Measures:</strong> Overall connectivity and communication propagation strength. High PageRank nodes act as information multipliers.
+                    </p>
+                    <p className="text-[11px] text-slate-400 leading-relaxed font-mono bg-black/30 p-1.5 rounded">
+                      PR(u) = (1-d)/N + d &times; &sum; [PR(v) / L(v)]
+                    </p>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      *Logic*: Adopted from Google&apos;s web-ranking algorithm, it measures structural prestige. An employee receives high PageRank if they are connected to other highly connected employees, indicating key decision-makers who can broadcast communications effectively.
+                    </p>
+                  </div>
+
+                  {/* Metric 2 */}
+                  <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
+                    <strong className="text-pink-300 block flex items-center gap-1">
+                      <Network className="h-3.5 w-3.5" /> Betweenness Centrality (Bridges)
+                    </strong>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      <strong>Measures:</strong> Structural bridge strength across siloed departments. High betweenness employees prevent organizational communication bottlenecks.
+                    </p>
+                    <p className="text-[11px] text-slate-400 leading-relaxed font-mono bg-black/30 p-1.5 rounded">
+                      C_B(v) = &sum; [&sigma;_st(v) / &sigma;_st]
+                    </p>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      *Logic*: Calculated via Brandes&apos; algorithm, it represents the fraction of all shortest communication paths that pass through an employee. High-betweenness employees act as bridges (like Node <strong>D</strong>). If a bridge is at risk of resigning, communication silos will form.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-black/40 rounded-xl border border-white/5 space-y-2 text-left text-xs">
+                  <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-indigo-300">
+                    Dynamic Collaboration Weight Ingestion (Jira Logs)
+                  </strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    Rather than relying on self-reported survey matrices, the collaboration links in the ONA graph are calculated by compiling actual, passive interaction events:
+                  </p>
+                  <ul className="list-disc pl-4 space-y-1 text-slate-400 text-[11px]">
+                    <li><strong className="text-slate-300">Shared Department adjacency:</strong> Injects a base connection weight of <code className="text-indigo-300">+0.4</code>.</li>
+                    <li><strong className="text-slate-300">Skills Overlap adjacency:</strong> Injects <code className="text-indigo-300">+0.1</code> per overlapping skill (capped at <code className="text-indigo-300">+0.4</code>).</li>
+                    <li><strong className="text-slate-300">Dynamic Jira Log Ingestion:</strong> Evaluates project logs. If two employee emails are found co-assigned or collaborating on the same Jira ticket, the edge weight increases by <code className="text-emerald-400">+0.3</code> per log (capped at <code className="text-emerald-400">+0.9</code>).</li>
+                  </ul>
+                  <p className="text-slate-300 leading-relaxed">
+                    An interaction link is established between two employees if the total aggregate weight exceeds <code className="text-indigo-300">0.1</code>. This makes the force-directed graph a real representation of informal workflow channels.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Markov Career Path Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <TrendingUp className="text-cyan-400 h-4 w-4" /> Markov Career Path & Transition Horizon
+              </h3>
+
+              <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4 text-left text-xs">
+                <p className="text-slate-300 leading-relaxed">
+                  <strong>What is it?</strong> The Markov Career Path is a predictive modeling framework that maps potential employee career progression as a probabilistic state transition network. Rather than viewing career paths as static, linear ladders, Aurelius recognizes that employees move across departments and roles stochastically, modeled as a <strong>First-Order Markov Chain</strong>.
                 </p>
+                <p className="text-slate-300 leading-relaxed">
+                  <strong>Why we need it:</strong> Traditional performance reviews and development plans are qualitative and subjective. By modeling career paths mathematically, managers can see where employees are structurally headed, identify potential retention risks, and design optimized development paths based on actual skills gaps.
+                </p>
+
+                <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                  <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                    Mathematical Modeling & Chapman-Kolmogorov Theorem
+                  </strong>
+                  <p className="leading-relaxed">
+                    The career transition network represents roles as states. The transition probability from state $i$ to state $j$ in a single epoch (1 year) is denoted as $P_{ij}$.
+                  </p>
+                  <p className="leading-relaxed">
+                    To personalize this progression, the base historical transition rate is adjusted by the employee&apos;s <strong>Skills Coverage Ratio</strong> for the target role:
+                  </p>
+                  <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
+                    P&apos;_ij = P_ij &times; Skills_Coverage_Ratio(employee, role_j)
+                  </div>
+                  <p className="leading-relaxed">
+                    This is then normalized across all outgoing transitions from state $i$:
+                  </p>
+                  <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
+                    P&apos;&apos;_ij = P&apos;_ij / &sum;_k P&apos;_ik
+                  </div>
+                  <p className="leading-relaxed">
+                    To compute the transition probabilities over a <strong>3-year horizon</strong>, we apply the <strong>Chapman-Kolmogorov Equations</strong> by raising the transition probability matrix to the 3rd power:
+                  </p>
+                  <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
+                    P^(3) = P^3
+                  </div>
+                  <p className="leading-relaxed">
+                    The resulting values are the cumulative transition probabilities displayed in the visual career tracker.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                  <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-pink-300">
+                    Understanding Career Tracker Terminology
+                  </strong>
+                  <ul className="list-disc pl-4 space-y-2 text-[11px] leading-relaxed">
+                    <li>
+                      <strong>Active Career Tracker:</strong> The visualization workbench that loads an employee&apos;s profile and renders their career path transition graph showing nodes (roles) and connecting directional arrows.
+                    </li>
+                    <li>
+                      <strong>Transition Probability (% Prob.):</strong> The percentage displayed on each future role card represents the mathematical probability that the employee will occupy that role state at the end of the transition horizon (3 years).
+                    </li>
+                    <li>
+                      <strong>Interactive Career Planning:</strong> If an employee&apos;s transition probability to a desired role (e.g., Lead Engineer) is low due to skill gaps, the workbench outlines the precise skills they must acquire. Once those skills are marked as acquired, the Skills Coverage Ratio increases, raising their transition probability and updating their career roadmap in real-time.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Compliance approval gates */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Compliance Approval Gates</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                High-impact interventions or structural updates (such as releasing department reorganizations) trigger **Mandatory Policy Pack Gates**. These gates require administrative override keys to authorize releases.
+              </p>
             </div>
           </div>
         );
