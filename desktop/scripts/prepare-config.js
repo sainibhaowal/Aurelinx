@@ -497,30 +497,38 @@ const htmlContent = `<!DOCTYPE html>
       }
     };
 
-    function checkServerActive(url, timeoutMs = 3000) {
-      return new Promise((resolve) => {
-        const img = new Image();
-        const timer = setTimeout(() => {
-          img.src = "";
-          resolve(false);
-        }, timeoutMs);
-        
-        img.onload = () => {
-          clearTimeout(timer);
-          resolve(true);
-        };
-        
-        img.onerror = () => {
-          clearTimeout(timer);
-          resolve(false);
-        };
-        
-        let checkUrl = url || "";
-        if (checkUrl.endsWith("/")) {
-          checkUrl = checkUrl.slice(0, -1);
-        }
-        img.src = checkUrl + "/favicon.ico?_cb=" + Date.now();
-      });
+    async function checkServerActive(url, timeoutMs = 5000) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        await fetch(url, { mode: 'no-cors', signal: controller.signal });
+        clearTimeout(timeoutId);
+        return true;
+      } catch (e) {
+        return new Promise((resolve) => {
+          const img = new Image();
+          const timer = setTimeout(() => {
+            img.src = "";
+            resolve(false);
+          }, timeoutMs);
+          
+          img.onload = () => {
+            clearTimeout(timer);
+            resolve(true);
+          };
+          
+          img.onerror = () => {
+            clearTimeout(timer);
+            resolve(navigator.onLine);
+          };
+          
+          let checkUrl = url || "";
+          if (checkUrl.endsWith("/")) {
+            checkUrl = checkUrl.slice(0, -1);
+          }
+          img.src = checkUrl + "/favicon.ico?_cb=" + Date.now();
+        });
+      }
     }
 
     async function loadIframe(url) {
