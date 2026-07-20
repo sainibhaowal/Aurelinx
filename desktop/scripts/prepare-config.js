@@ -368,7 +368,8 @@ const htmlContent = `<!DOCTYPE html>
       const val = document.getElementById('customUrl').value.trim();
       if (val) {
         let url = val;
-        if (!/^https?:\/\//i.test(url)) {
+        const lowerUrl = url.toLowerCase();
+        if (!lowerUrl.startsWith("http://") && !lowerUrl.startsWith("https://")) {
           url = "https://" + url;
         }
         redirectTo(url);
