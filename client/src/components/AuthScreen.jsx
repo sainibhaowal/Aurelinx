@@ -44,14 +44,14 @@ const AuthScreen = () => {
   const [registerError, setRegisterError] = useState("");
   const [loginError, setLoginError] = useState("");
   const [registerSuccess, setRegisterSuccess] = useState("");
+  const [showEmailSuggestion, setShowEmailSuggestion] = useState(false);
+  const [showPasswordSuggestion, setShowPasswordSuggestion] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [authError, setAuthError] = useState("");
 
-  // Prefill saved credentials from Tauri parent shell if available
+  // Prefill saved credentials from Tauri parent shell if available (transition to login tab only, fields remain blank)
   useEffect(() => {
     if (savedCreds?.email && savedCreds?.password) {
-      setLoginForm({
-        email: savedCreds.email,
-        password: savedCreds.password,
-      });
       setMode("login");
     }
   }, [savedCreds]);
@@ -462,16 +462,91 @@ const AuthScreen = () => {
                     type="email"
                     value={loginForm.email}
                     onChange={(v) => updateLoginField("email", v)}
+                    onFocus={() => setShowEmailSuggestion(true)}
+                    onBlur={() => setTimeout(() => setShowEmailSuggestion(false), 200)}
                     placeholder="you@company.com"
-                  />
+                  >
+                    {showEmailSuggestion && savedCreds?.email && (
+                      <div className="absolute left-0 right-0 mt-1.5 bg-[#091524] border border-[#67e8f9]/20 rounded-2xl p-1.5 shadow-2xl z-50 animate-fade-in backdrop-blur-md">
+                        <button
+                          type="button"
+                          className="w-full text-left px-4 py-3 hover:bg-[#67e8f9]/10 rounded-xl transition-all duration-150 flex items-center gap-3 cursor-pointer"
+                          onClick={() => {
+                            setLoginForm(prev => ({ ...prev, email: savedCreds.email }));
+                            setShowEmailSuggestion(false);
+                          }}
+                        >
+                          <div className="flex-none h-2 w-2 rounded-full bg-[#67e8f9] animate-pulse" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs text-slate-400 font-semibold tracking-wider uppercase">Saved Account</div>
+                            <div className="text-sm font-semibold text-slate-200 truncate">{savedCreds.email}</div>
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </LineField>
 
                   <LineField
                     label="Password"
                     type="password"
                     value={loginForm.password}
                     onChange={(v) => updateLoginField("password", v)}
+                    onFocus={() => {
+                      if (loginForm.email.trim() === savedCreds?.email && !loginForm.password) {
+                        setShowPasswordSuggestion(true);
+                      }
+                    }}
+                    onBlur={() => setTimeout(() => setShowPasswordSuggestion(false), 200)}
                     placeholder="••••••••"
-                  />
+                  >
+                    {showPasswordSuggestion && savedCreds?.password && (
+                      <div className="absolute left-0 right-0 mt-1.5 bg-[#091524] border border-[#67e8f9]/20 rounded-2xl p-1.5 shadow-2xl z-50 animate-fade-in backdrop-blur-md">
+                        <button
+                          type="button"
+                          disabled={isAuthenticating}
+                          className="w-full text-left px-4 py-3 hover:bg-[#67e8f9]/10 rounded-xl transition-all duration-150 flex items-center gap-3 cursor-pointer disabled:opacity-50"
+                          onClick={async () => {
+                            setIsAuthenticating(true);
+                            setAuthError("");
+                            try {
+                              if (window.__TAURI__ && window.__TAURI__.core) {
+                                const success = await window.__TAURI__.core.invoke("authenticate_user");
+                                if (success) {
+                                  setLoginForm(prev => ({ ...prev, password: savedCreds.password }));
+                                  setLoginError("");
+                                } else {
+                                  setAuthError("OS authentication failed or cancelled.");
+                                }
+                              } else {
+                                setAuthError("OS authentication is only supported in desktop shell.");
+                              }
+                            } catch (e) {
+                              console.error("OS authentication error:", e);
+                              setAuthError("Failed to trigger OS authentication.");
+                            } finally {
+                              setIsAuthenticating(false);
+                              setShowPasswordSuggestion(false);
+                            }
+                          }}
+                        >
+                          <span className="text-base">🔑</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs text-slate-400 font-semibold tracking-wider uppercase">Autofill Protection</div>
+                            <div className="text-sm font-semibold text-slate-200">
+                              {isAuthenticating ? "Awaiting system verification..." : "Use saved password (Verify via OS)"}
+                            </div>
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </LineField>
+
+                  {authError && (
+                    <div className="text-xs text-red-400 mt-1 font-semibold flex items-center gap-1.5 animate-pulse">
+                      <AlertCircle size={12} />
+                      {authError}
+                    </div>
+                  )}
 
                   {loginError && <StatusMsg tone="error" text={loginError} />}
 
@@ -559,8 +634,8 @@ const TabBtn = ({ active, children, onClick }) => (
   </button>
 );
 
-const LineField = ({ label, type = "text", value, onChange, placeholder }) => (
-  <div>
+const LineField = ({ label, type = "text", value, onChange, placeholder, onFocus, onBlur, children }) => (
+  <div className="relative">
     <label
       className="block text-[10px] uppercase font-semibold mb-2"
       style={{ letterSpacing: "0.2em", color: "rgba(148,163,184,0.5)" }}
@@ -585,11 +660,14 @@ const LineField = ({ label, type = "text", value, onChange, placeholder }) => (
       }}
       onFocus={(e) => {
         e.currentTarget.style.borderColor = "rgba(103,232,249,0.42)";
+        if (onFocus) onFocus(e);
       }}
       onBlur={(e) => {
         e.currentTarget.style.borderColor = "rgba(103,232,249,0.12)";
+        if (onBlur) onBlur(e);
       }}
     />
+    {children}
   </div>
 );
 
