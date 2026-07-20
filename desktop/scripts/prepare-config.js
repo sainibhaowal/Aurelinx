@@ -295,7 +295,11 @@ const htmlContent = `<!DOCTYPE html>
           resolve(false);
         };
         
-        img.src = url.replace(/\/+$/, "") + "/favicon.ico?_cb=" + Date.now();
+        let checkUrl = url || "";
+        if (checkUrl.endsWith("/")) {
+          checkUrl = checkUrl.slice(0, -1);
+        }
+        img.src = checkUrl + "/favicon.ico?_cb=" + Date.now();
       });
     }
 
