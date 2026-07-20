@@ -63,22 +63,22 @@ jobs:
       - name: Verify app URL
         shell: bash
         run: |
-          APP_URL="${{ vars.AURELINX_APP_URL || vars.AURELIUS_APP_URL }}"
+          APP_URL="${{ vars.AURELINX || vars.AURELIUS || vars.AURELINX_APP_URL || vars.AURELIUS_APP_URL }}"
           if [ -z "$APP_URL" ]; then
-            echo "AURELINX_APP_URL (or fallback AURELIUS_APP_URL) repository variable is required for desktop builds." >&2
+            echo "AURELINX (or fallback variables) repository variable is required for desktop builds." >&2
             exit 1
           fi
 
       - name: Prepare desktop config
         working-directory: desktop
         env:
-          AURELINX_APP_URL: ${{ vars.AURELINX_APP_URL || vars.AURELIUS_APP_URL }}
+          AURELINX_APP_URL: ${{ vars.AURELINX || vars.AURELIUS || vars.AURELINX_APP_URL || vars.AURELIUS_APP_URL }}
         run: npm run prepare:config
 
       - name: Build desktop package
         working-directory: desktop
         env:
-          AURELINX_APP_URL: ${{ vars.AURELINX_APP_URL || vars.AURELIUS_APP_URL }}
+          AURELINX_APP_URL: ${{ vars.AURELINX || vars.AURELIUS || vars.AURELINX_APP_URL || vars.AURELIUS_APP_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build
 
