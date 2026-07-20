@@ -475,6 +475,30 @@ const htmlContent = `<!DOCTYPE html>
       } else if (data.type === "AURELINX_CLEAR_CREDS") {
         localStorage.removeItem("auth_token");
         localStorage.removeItem("auth_user");
+      } else if (data.type === "AURELINX_AUTH_USER") {
+        if (window.__TAURI__ && window.__TAURI__.core) {
+          window.__TAURI__.core.invoke("authenticate_user")
+            .then((success) => {
+              event.source.postMessage({
+                type: "AURELINX_AUTH_USER_RESULT",
+                success: success
+              }, event.origin);
+            })
+            .catch((err) => {
+              console.error("Parent OS auth invoke error:", err);
+              event.source.postMessage({
+                type: "AURELINX_AUTH_USER_RESULT",
+                success: false,
+                error: String(err)
+              }, event.origin);
+            });
+        } else {
+          event.source.postMessage({
+            type: "AURELINX_AUTH_USER_RESULT",
+            success: false,
+            error: "Tauri not available in parent shell"
+          }, event.origin);
+        }
       }
     });
 

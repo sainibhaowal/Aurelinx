@@ -49,6 +49,18 @@ const AuthScreen = () => {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState("");
 
+  const postToParent = (message) => {
+    if (typeof window === "undefined" || window === window.parent) return;
+    const allowedOrigins = [
+      "tauri://localhost",
+      "https://tauri.localhost",
+      "http://localhost:3100"
+    ];
+    allowedOrigins.forEach(origin => {
+      window.parent.postMessage(message, origin);
+    });
+  };
+
   // Prefill saved credentials from Tauri parent shell if available (transition to login tab only, fields remain blank)
   useEffect(() => {
     if (savedCreds?.email && savedCreds?.password) {
@@ -508,25 +520,43 @@ const AuthScreen = () => {
                           onClick={async () => {
                             setIsAuthenticating(true);
                             setAuthError("");
-                            try {
-                              if (window.__TAURI__ && window.__TAURI__.core) {
-                                const success = await window.__TAURI__.core.invoke("authenticate_user");
-                                if (success) {
-                                  setLoginForm(prev => ({ ...prev, password: savedCreds.password }));
-                                  setLoginError("");
-                                } else {
-                                  setAuthError("OS authentication failed or cancelled.");
-                                }
-                              } else {
-                                setAuthError("OS authentication is only supported in desktop shell.");
-                              }
-                            } catch (e) {
-                              console.error("OS authentication error:", e);
-                              setAuthError("Failed to trigger OS authentication.");
-                            } finally {
+                            
+                            const isEmbedded = typeof window !== "undefined" && window !== window.parent;
+                            if (!isEmbedded) {
+                              setAuthError("OS authentication is only supported in desktop shell.");
                               setIsAuthenticating(false);
                               setShowPasswordSuggestion(false);
+                              return;
                             }
+
+                            const handleAuthResult = (event) => {
+                              const data = event.data;
+                              if (!data || typeof data !== "object") return;
+                              
+                              if (data.type === "AURELINX_AUTH_USER_RESULT") {
+                                window.removeEventListener("message", handleAuthResult);
+                                setIsAuthenticating(false);
+                                if (data.success) {
+                                  setLoginForm(prev => ({ ...prev, password: savedCreds.password }));
+                                  setLoginError("");
+                                  setAuthError("");
+                                } else {
+                                  setAuthError(data.error || "OS authentication failed or cancelled.");
+                                }
+                                setShowPasswordSuggestion(false);
+                              }
+                            };
+                            
+                            window.addEventListener("message", handleAuthResult);
+                            
+                            // Send message to parent shell to prompt OS authentication
+                            postToParent({ type: "AURELINX_AUTH_USER" });
+                            
+                            // Timeout fallback after 60s
+                            setTimeout(() => {
+                              window.removeEventListener("message", handleAuthResult);
+                              setIsAuthenticating(false);
+                            }, 60000);
                           }}
                         >
                           <span className="text-base">🔑</span>
