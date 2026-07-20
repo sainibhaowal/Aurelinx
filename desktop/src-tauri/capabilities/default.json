@@ -25,8 +25,7 @@
   ],
   "remote": {
     "urls": [
-      "https://aurelinx.averqel.com/*",
-      "http://localhost:3100/*"
+      "https://aurelinx.averqel.com/*"
     ]
   }
 }

@@ -67,8 +67,7 @@ const capabilityConfig = {
   ],
   "remote": {
     "urls": [
-      originUrl + "/*",
-      "http://localhost:3100/*"
+      originUrl + "/*"
     ]
   }
 };
@@ -435,11 +434,6 @@ const htmlContent = `<!DOCTYPE html>
             <span>Retry Connection</span>
           </button>
         </div>
-
-        <div class="custom-url-input" style="margin-top: 1.5rem;">
-          <input type="text" id="customUrl" class="input" placeholder="Enter custom URL (e.g. https://example.com)">
-          <button class="btn btn-primary" onclick="connectCustom()">Connect</button>
-        </div>
       </div>
     </div>
     
@@ -588,17 +582,7 @@ const htmlContent = `<!DOCTYPE html>
       await loadIframe(PRIMARY_URL);
     }
 
-    function connectCustom() {
-      const val = document.getElementById('customUrl').value.trim();
-      if (val) {
-        let url = val;
-        const lowerUrl = url.toLowerCase();
-        if (!lowerUrl.startsWith("http://") && !lowerUrl.startsWith("https://")) {
-          url = "https://" + url;
-        }
-        loadIframe(url);
-      }
-    }
+
 
     async function initConnection() {
       await loadIframe(PRIMARY_URL);
