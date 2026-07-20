@@ -447,9 +447,42 @@ const htmlContent = `<!DOCTYPE html>
   </div>
 
   <script>
-    const PRIMARY_URL = "${appUrl}";
+    const PRIMARY_URL = "${appUrl.endsWith('/') ? appUrl + 'app' : appUrl + '/app'}";
     const frame = document.getElementById('app-frame');
     const gatewayCard = document.getElementById('gateway-card');
+
+    // Secure credentials syncing across Parent-Child cross-origin iframe boundary
+    window.addEventListener("message", (event) => {
+      try {
+        const allowedOrigin = new URL(PRIMARY_URL).origin;
+        if (event.origin !== allowedOrigin) return;
+      } catch (e) {
+        return;
+      }
+
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+
+      if (data.type === "AURELINX_GET_CREDS") {
+        const token = localStorage.getItem("auth_token");
+        const user = localStorage.getItem("auth_user");
+        const savedCreds = localStorage.getItem("saved_creds");
+        
+        event.source.postMessage({
+          type: "AURELINX_SEND_CREDS",
+          token: token || null,
+          user: user || null,
+          savedCreds: savedCreds ? JSON.parse(savedCreds) : null
+        }, event.origin);
+      } else if (data.type === "AURELINX_SAVE_CREDS") {
+        if (data.token) localStorage.setItem("auth_token", data.token);
+        if (data.user) localStorage.setItem("auth_user", typeof data.user === "string" ? data.user : JSON.stringify(data.user));
+        if (data.savedCreds) localStorage.setItem("saved_creds", JSON.stringify(data.savedCreds));
+      } else if (data.type === "AURELINX_CLEAR_CREDS") {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_user");
+      }
+    });
 
     function getWindow() {
       if (window.__TAURI__ && window.__TAURI__.window) {

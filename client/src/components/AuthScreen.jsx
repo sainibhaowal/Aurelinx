@@ -37,13 +37,24 @@ const FEATURES = [
 ];
 
 const AuthScreen = () => {
-  const { login, register, loading } = useAuth();
+  const { login, register, loading, savedCreds } = useAuth();
   const [mode, setMode] = useState("register");
   const [registerForm, setRegisterForm] = useState(initialRegisterState);
   const [loginForm, setLoginForm] = useState(initialLoginState);
   const [registerError, setRegisterError] = useState("");
   const [loginError, setLoginError] = useState("");
   const [registerSuccess, setRegisterSuccess] = useState("");
+
+  // Prefill saved credentials from Tauri parent shell if available
+  useEffect(() => {
+    if (savedCreds?.email && savedCreds?.password) {
+      setLoginForm({
+        email: savedCreds.email,
+        password: savedCreds.password,
+      });
+      setMode("login");
+    }
+  }, [savedCreds]);
 
   // Handle OAuth callback parameters on mount
   useEffect(() => {

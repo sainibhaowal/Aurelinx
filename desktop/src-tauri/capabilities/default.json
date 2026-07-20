@@ -1,0 +1,32 @@
+{
+  "$schema": "../schemas/capability-schema.json",
+  "identifier": "default",
+  "description": "Default permissions for Aurelinx desktop application",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-close",
+    "core:window:allow-is-maximized",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "core:window:allow-current-monitor",
+    "core:window:allow-start-dragging",
+    "core:window:allow-toggle-maximize"
+  ],
+  "webviews": [
+    "main"
+  ],
+  "remote": {
+    "urls": [
+      "https://aurelinx.averqel.com/*",
+      "http://localhost:3100/*"
+    ]
+  }
+}

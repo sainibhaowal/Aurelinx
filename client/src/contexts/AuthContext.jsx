@@ -26,12 +26,15 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [savedCreds, setSavedCreds] = useState(null);
   const [token, setToken] = useState(() => {
     if (typeof window === "undefined") {
       return null;
     }
     return localStorage.getItem("auth_token");
   });
+
+  const isEmbeddedIframe = typeof window !== "undefined" && window !== window.parent;
 
   const resolveWithTimeout = useCallback((promise, timeoutMs = 4000) => {
     return Promise.race([
@@ -65,15 +68,64 @@ export const AuthProvider = ({ children }) => {
             localStorage.removeItem(AUTH_USER_CACHE_KEY);
             setToken(null);
             setUser(null);
+            if (isEmbeddedIframe) {
+              window.parent.postMessage({ type: "AURELINX_CLEAR_CREDS" }, "*");
+            }
           }
           setError(err);
         }
       }
-      setLoading(false);
+      if (!isEmbeddedIframe || token) {
+        setLoading(false);
+      }
     };
 
     checkAuth();
   }, [resolveWithTimeout, token]);
+
+  // Sync credentials from parent window if inside Tauri iframe
+  useEffect(() => {
+    if (!isEmbeddedIframe) return;
+
+    const handleMessage = (event) => {
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+
+      if (data.type === "AURELINX_SEND_CREDS") {
+        let hasToken = false;
+        if (data.token) {
+          localStorage.setItem("auth_token", data.token);
+          setToken(data.token);
+          hasToken = true;
+        }
+        if (data.user) {
+          const userStr = typeof data.user === "string" ? data.user : JSON.stringify(data.user);
+          localStorage.setItem(AUTH_USER_CACHE_KEY, userStr);
+          setUser(JSON.parse(userStr));
+        }
+        if (data.savedCreds) {
+          setSavedCreds(data.savedCreds);
+        }
+        if (!hasToken) {
+          setLoading(false);
+        }
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    // Request credentials from the parent Tauri shell
+    window.parent.postMessage({ type: "AURELINX_GET_CREDS" }, "*");
+
+    const fallbackTimer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      clearTimeout(fallbackTimer);
+    };
+  }, []);
 
   useEffect(() => {
     const handleAuthExpired = () => {
@@ -82,6 +134,9 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setError(null);
       setLoading(false);
+      if (isEmbeddedIframe) {
+        window.parent.postMessage({ type: "AURELINX_CLEAR_CREDS" }, "*");
+      }
     };
 
     window.addEventListener("auth:expired", handleAuthExpired);
@@ -104,6 +159,16 @@ export const AuthProvider = ({ children }) => {
         const userData = await resolveWithTimeout(authAPI.getCurrentUser());
         setUser(userData);
         localStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(userData));
+
+        // Save to parent if in iframe
+        if (isEmbeddedIframe) {
+          window.parent.postMessage({
+            type: "AURELINX_SAVE_CREDS",
+            token: response.access_token,
+            user: userData,
+            savedCreds: { email, password }
+          }, "*");
+        }
 
         return { success: true, user: userData };
       } catch (err) {
@@ -150,6 +215,11 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     setError(null);
+    if (isEmbeddedIframe) {
+      window.parent.postMessage({
+        type: "AURELINX_CLEAR_CREDS"
+      }, "*");
+    }
   }, []);
 
   const value = {
@@ -160,6 +230,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    savedCreds,
     isAuthenticated: !!user && !!token,
   };
 
