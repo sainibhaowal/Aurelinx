@@ -29,11 +29,36 @@ const WindowControls = () => {
   useEffect(() => {
     // Check if running inside Tauri or preview mode
     if (typeof window !== "undefined") {
-      const isTauriEnv = !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+      const isTauriEnv = !!(
+        window.__TAURI_INTERNALS__ ||
+        window.__TAURI__ ||
+        navigator.userAgent.includes("Aurelinx-Desktop-App") ||
+        window.location.search.includes("tauri=true") ||
+        sessionStorage.getItem("isTauri") === "true"
+      );
       const isPreview = window.location.search.includes("preview-controls") || localStorage.getItem("PREVIEW_WINDOW_CONTROLS") === "true";
       
       if (isTauriEnv || isPreview) {
         setIsTauri(true);
+        if (isTauriEnv) {
+          sessionStorage.setItem("isTauri", "true");
+        }
+
+        // Dynamically import Tauri window APIs if they aren't loaded yet
+        const loadTauriApis = async () => {
+          if (!getCurrentWindow) {
+            try {
+              const mod = await import("@tauri-apps/api/window");
+              getCurrentWindow = mod.getCurrentWindow;
+              LogicalSize = mod.LogicalSize;
+              LogicalPosition = mod.LogicalPosition;
+            } catch (err) {
+              console.warn("Failed to load Tauri window APIs dynamically:", err);
+            }
+          }
+        };
+
+        loadTauriApis();
 
         // Track maximization state if possible
         const checkMaximized = async () => {
@@ -43,7 +68,7 @@ const WindowControls = () => {
               const max = await win.isMaximized();
               setIsMaximized(max);
             } catch (e) {
-              console.error(e);
+              // Ignore API failures on non-Tauri preview environments
             }
           }
         };

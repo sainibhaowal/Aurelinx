@@ -946,10 +946,10 @@ const App = () => {
       </div>
       
       {/* Invisible global drag handle at the top of the window */}
-      {typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__) && (
+      {typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__ || sessionStorage.getItem("isTauri") === "true") && (
         <div 
           data-tauri-drag-region 
-          className="fixed top-0 left-0 right-36 h-6 z-[99998] cursor-move select-none"
+          className="fixed top-0 left-0 right-36 h-8 z-[99998] cursor-move select-none"
         />
       )}
       

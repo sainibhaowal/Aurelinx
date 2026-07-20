@@ -16,8 +16,57 @@ const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 config.build.frontendDist = "../dist";
 config.build.devUrl = "http://localhost:3100";
 config.app.windows[0].url = "index.html";
+config.app.windows[0].userAgent = "Aurelinx-Desktop-App";
 
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+
+// Update/create src-tauri/capabilities/default.json
+const capabilitiesDir = path.join(__dirname, "..", "src-tauri", "capabilities");
+if (!fs.existsSync(capabilitiesDir)) {
+  fs.mkdirSync(capabilitiesDir, { recursive: true });
+}
+
+// Clean appUrl to get just the protocol + host (no trailing paths)
+let originUrl = appUrl.trim();
+try {
+  const parsed = new URL(originUrl);
+  originUrl = `${parsed.protocol}//${parsed.host}`;
+} catch (e) {
+  // Fallback if parsing fails
+}
+
+const capabilityConfig = {
+  "$schema": "../schemas/capability-schema.json",
+  "identifier": "default",
+  "description": "Default permissions for Aurelinx desktop application",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-close",
+    "core:window:allow-is-maximized",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "core:window:allow-current-monitor"
+  ],
+  "webviews": [
+    "main",
+    originUrl,
+    "http://localhost:3100"
+  ]
+};
+
+fs.writeFileSync(
+  path.join(capabilitiesDir, "default.json"),
+  JSON.stringify(capabilityConfig, null, 2) + "\n"
+);
+console.log(`Generated Tauri capabilities for remote origin: ${originUrl}`);
 
 // Create dist directory
 const distDir = path.join(__dirname, "..", "dist");
@@ -273,7 +322,13 @@ const htmlContent = `<!DOCTYPE html>
 
     function redirectTo(url) {
       updateText("Connecting...", "Redirecting to " + url);
-      window.location.replace(url);
+      let targetUrl = url;
+      if (targetUrl.includes("?")) {
+        targetUrl += "&tauri=true";
+      } else {
+        targetUrl += "?tauri=true";
+      }
+      window.location.replace(targetUrl);
     }
 
     // Elegant Image-based check to bypass CORS and accurately detect real images vs Cloudflare HTML error pages
