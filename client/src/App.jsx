@@ -462,6 +462,12 @@ const App = () => {
             />
           </div>
 
+          <div className="mt-auto pb-2 text-center select-none pointer-events-none">
+            <span className="text-[10px] text-slate-500 font-mono tracking-wider">
+              {isSidebarCollapsed ? "v1.0.0" : "AURELINX v1.0.0"}
+            </span>
+          </div>
+
           <div className={`${isSidebarCollapsed ? "px-1" : "px-2"} pb-2`}>
             <button
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
