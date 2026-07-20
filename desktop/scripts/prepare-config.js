@@ -377,10 +377,7 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     async function initConnection() {
-      updateText("Connecting to server...", "Checking " + PRIMARY_URL);
-      
-      const primaryOnline = await checkServerActive(PRIMARY_URL, 3000);
-      if (primaryOnline) {
+      if (navigator.onLine) {
         redirectTo(PRIMARY_URL);
       } else {
         document.getElementById('loader').style.display = 'none';
