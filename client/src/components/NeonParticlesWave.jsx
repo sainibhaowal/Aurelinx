@@ -12,7 +12,7 @@ const NeonParticlesWave = () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let animationFrameId;
+    let animationFrameId = null;
     let width = (canvas.width = canvas.offsetWidth);
     let height = (canvas.height = canvas.offsetHeight);
 
@@ -56,8 +56,10 @@ const NeonParticlesWave = () => {
       });
     }
 
+    // Cache the bounding rectangle to prevent layout thrashing (reflows) on mousemove
+    let rect = canvas.getBoundingClientRect();
+
     const handleMouseMove = (e) => {
-      const rect = canvas.getBoundingClientRect();
       mouse.x = e.clientX - rect.left;
       mouse.y = e.clientY - rect.top;
     };
@@ -67,11 +69,12 @@ const NeonParticlesWave = () => {
       mouse.y = null;
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseleave", handleMouseLeave);
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    window.addEventListener("mouseleave", handleMouseLeave, { passive: true });
 
     const handleResize = () => {
       if (!canvas) return;
+      rect = canvas.getBoundingClientRect();
       width = canvas.width = canvas.offsetWidth;
       height = canvas.height = canvas.offsetHeight;
       
@@ -80,13 +83,25 @@ const NeonParticlesWave = () => {
         p.baseY = Math.random() * height;
       });
     };
-    window.addEventListener("resize", handleResize);
+    window.addEventListener("resize", handleResize, { passive: true });
 
-    // Animation Loop with delta time mapping for smooth 120Hz-200Hz refresh rates
+    const handleScroll = () => {
+      if (!canvas) return;
+      rect = canvas.getBoundingClientRect();
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    // Animation Loop with delta time mapping for smooth 120Hz-200Hz+ refresh rates
     let lastTimestamp = performance.now();
     let time = 0;
+    let isVisible = true;
     
     const animate = (timestamp) => {
+      if (!isVisible) {
+        animationFrameId = null;
+        return;
+      }
+
       const elapsed = timestamp - lastTimestamp;
       lastTimestamp = timestamp;
       
@@ -94,7 +109,7 @@ const NeonParticlesWave = () => {
       const delta = Math.min(elapsed / 16.667, 3);
       time += 0.5 * delta;
       
-      // Clear the canvas on each frame to prevent trace artifacts or background shading lines
+      // Clear the canvas on each frame to prevent trace artifacts
       ctx.clearRect(0, 0, width, height);
 
       // Render/update particles
@@ -156,13 +171,36 @@ const NeonParticlesWave = () => {
       animationFrameId = requestAnimationFrame(animate);
     };
 
-    animationFrameId = requestAnimationFrame(animate);
+    // Use Intersection Observer to pause drawing loop when canvas is off-screen
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry.isIntersecting;
+        if (isVisible) {
+          lastTimestamp = performance.now();
+          if (!animationFrameId) {
+            animationFrameId = requestAnimationFrame(animate);
+          }
+        } else {
+          if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+          }
+        }
+      },
+      { threshold: 0.01 }
+    );
+    
+    observer.observe(canvas);
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      observer.disconnect();
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseleave", handleMouseLeave);
       window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleScroll);
     };
   }, []);
 
@@ -170,7 +208,7 @@ const NeonParticlesWave = () => {
     <canvas
       ref={canvasRef}
       className="absolute inset-0 w-full h-full pointer-events-none z-0 opacity-80"
-      style={{ mixBlendMode: "screen" }}
+      style={{ mixBlendMode: "screen", willChange: "transform" }}
     />
   );
 };
