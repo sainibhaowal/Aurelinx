@@ -90,6 +90,20 @@ const App = () => {
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [selectedProfileLoading, setSelectedProfileLoading] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [isTauri, setIsTauri] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const isTauriEnv = !!(
+        window.__TAURI_INTERNALS__ ||
+        window.__TAURI__ ||
+        navigator.userAgent.includes("Aurelinx-Desktop-App") ||
+        window.location.search.includes("tauri=true") ||
+        sessionStorage.getItem("isTauri") === "true"
+      );
+      setIsTauri(isTauriEnv);
+    }
+  }, []);
 
   const [analyticsSnapshot, setAnalyticsSnapshot] = useState({
     total: 0,
@@ -939,7 +953,7 @@ const App = () => {
   }
 
   return (
-    <div className="w-full h-full relative overflow-hidden flex flex-col">
+    <div className={`w-full h-full relative overflow-hidden flex flex-col ${isTauri ? "pt-10" : ""}`}>
       <WindowControls />
       <div className="flex-1 w-full overflow-hidden relative">
         {content}

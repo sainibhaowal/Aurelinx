@@ -208,7 +208,7 @@ const WindowControls = () => {
   // so the user can see and enjoy the UI features anyway!
   // Beautiful theme-matched custom title bar header
   return (
-    <div className="w-full h-10 flex items-center justify-between px-4 bg-[#0a0f1d] border-b border-white/5 select-none relative z-[99999]">
+    <div className="fixed top-0 left-0 right-0 w-full h-10 flex items-center justify-between px-4 bg-[#0a0f1d] border-b border-white/5 select-none z-[99999]">
       {/* Draggable region spanning the title bar except the buttons area */}
       <div 
         data-tauri-drag-region 
