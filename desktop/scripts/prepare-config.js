@@ -15,6 +15,7 @@ const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 
 config.build.frontendDist = "../dist";
 config.build.devUrl = "http://localhost:3100";
+config.app.windows[0].label = "main";
 config.app.windows[0].url = "index.html";
 config.app.windows[0].userAgent = "Aurelinx-Desktop-App";
 config.app.withGlobalTauri = true;
@@ -57,7 +58,9 @@ const capabilityConfig = {
     "core:window:allow-show",
     "core:window:allow-set-size",
     "core:window:allow-set-position",
-    "core:window:allow-current-monitor"
+    "core:window:allow-current-monitor",
+    "core:window:allow-start-dragging",
+    "core:window:allow-toggle-maximize"
   ],
   "webviews": [
     "main",
