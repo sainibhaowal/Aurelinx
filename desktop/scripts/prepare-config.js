@@ -17,7 +17,7 @@ config.build.frontendDist = "../dist";
 config.build.devUrl = "http://localhost:3100";
 config.app.windows[0].label = "main";
 config.app.windows[0].url = "index.html";
-config.app.windows[0].userAgent = "Aurelinx-Desktop-App";
+delete config.app.windows[0].userAgent;
 config.app.withGlobalTauri = true;
 config.app.security = {
   csp: null
@@ -544,13 +544,7 @@ const htmlContent = `<!DOCTYPE html>
       
       const isUp = await checkServerActive(url);
       if (isUp) {
-        let targetUrl = url;
-        if (targetUrl.includes("?")) {
-          targetUrl += "&tauri=true";
-        } else {
-          targetUrl += "?tauri=true";
-        }
-        frame.src = targetUrl;
+        frame.src = url;
       } else {
         document.getElementById('loader').style.display = 'none';
         document.getElementById('fallback').style.display = 'block';
