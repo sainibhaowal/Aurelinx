@@ -939,21 +939,11 @@ const App = () => {
   }
 
   return (
-    <div className="w-full h-full relative overflow-hidden">
-      {/* Custom Floating Window controls (top right floating) */}
-      <div className="fixed top-4 right-4 z-[99999] pointer-events-auto">
-        <WindowControls />
+    <div className="w-full h-full relative overflow-hidden flex flex-col">
+      <WindowControls />
+      <div className="flex-1 w-full overflow-hidden relative">
+        {content}
       </div>
-      
-      {/* Invisible global drag handle at the top of the window */}
-      {typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__ || sessionStorage.getItem("isTauri") === "true") && (
-        <div 
-          data-tauri-drag-region 
-          className="fixed top-0 left-0 right-36 h-8 z-[99998] cursor-move select-none"
-        />
-      )}
-      
-      {content}
     </div>
   );
 };

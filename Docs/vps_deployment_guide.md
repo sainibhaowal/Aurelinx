@@ -1,7 +1,9 @@
 # Production Deployment Guide: Aurelinx on VPS
 
 This guide provides clean, step-by-step instructions to deploy and update the Aurelinx HR Intelligence Platform on your VPS at **144.91.118.196**.
-
+```
+ssh root@144.91.118.196
+```
 ---
 
 ## 🛠️ Prerequisites
@@ -109,3 +111,41 @@ docker compose -f infra/docker-compose.prod.yml exec api python -m app.core.seed
   ```bash
   docker compose -f infra/docker-compose.prod.yml logs -f
   ```
+
+
+
+```
+To clean up all unused Docker containers, build cache, volumes, and images to free up disk space on your VPS, run these commands:
+
+### 1. Clean Stopped Containers, Networks, and Dangling Images
+This removes all stopped containers, unused networks, and dangling build images:
+```bash
+docker system prune -f
+```
+
+### 2. Clean Unused Volumes (Reclaims database/storage space)
+This deletes all volumes that are **not** currently attached to any active container (this will clean up the old `aurelius` volumes while keeping your running `aurelinx` volumes safe):
+```bash
+docker volume prune -f
+```
+
+### 3. Clean Docker Build Cache (Reclaims massive disk space)
+This cleans up all cache created during previous `docker build` runs:
+```bash
+docker builder prune -f
+```
+
+### 4. Clean All Unused Images
+This removes all images that are not associated with a running container (old versions of Next.js, FastAPI, Node, Postgres, etc.):
+```bash
+docker image prune -a -f
+```
+
+---
+
+### Combined One-Line Cleanup Command
+You can run this single command to execute all the cleanups together:
+```bash
+docker system prune -a --volumes -f && docker builder prune -f
+```
+```

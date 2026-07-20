@@ -8,6 +8,7 @@ let getCurrentWindow = null;
 let LogicalSize = null;
 let LogicalPosition = null;
 
+// Dynamically import Tauri APIs if available at import time
 if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
   import("@tauri-apps/api/window")
     .then((mod) => {
@@ -19,6 +20,26 @@ if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAU
       console.warn("Tauri Window APIs not available in this environment.", err);
     });
 }
+
+// Robust resolver to look up Tauri APIs globally or via dynamic imports
+const getTauriApi = () => {
+  if (typeof window !== "undefined") {
+    // Try global window.__TAURI__ first (withGlobalTauri: true exposes this on remote domains)
+    if (window.__TAURI__ && window.__TAURI__.window) {
+      return {
+        getCurrentWindow: window.__TAURI__.window.getCurrentWindow,
+        LogicalSize: window.__TAURI__.window.LogicalSize,
+        LogicalPosition: window.__TAURI__.window.LogicalPosition
+      };
+    }
+  }
+  // Fallback to NPM module imports
+  return {
+    getCurrentWindow,
+    LogicalSize,
+    LogicalPosition
+  };
+};
 
 const WindowControls = () => {
   const [isTauri, setIsTauri] = useState(false);
@@ -46,7 +67,8 @@ const WindowControls = () => {
 
         // Dynamically import Tauri window APIs if they aren't loaded yet
         const loadTauriApis = async () => {
-          if (!getCurrentWindow) {
+          const apis = getTauriApi();
+          if (!apis.getCurrentWindow) {
             try {
               const mod = await import("@tauri-apps/api/window");
               getCurrentWindow = mod.getCurrentWindow;
@@ -62,9 +84,10 @@ const WindowControls = () => {
 
         // Track maximization state if possible
         const checkMaximized = async () => {
-          if (getCurrentWindow) {
+          const apis = getTauriApi();
+          if (apis.getCurrentWindow) {
             try {
-              const win = getCurrentWindow();
+              const win = apis.getCurrentWindow();
               const max = await win.isMaximized();
               setIsMaximized(max);
             } catch (e) {
@@ -82,9 +105,10 @@ const WindowControls = () => {
   if (!isTauri) return null;
 
   const handleMinimize = async (toTray = false) => {
-    if (!getCurrentWindow) return;
+    const apis = getTauriApi();
+    if (!apis.getCurrentWindow) return;
     try {
-      const win = getCurrentWindow();
+      const win = apis.getCurrentWindow();
       if (toTray) {
         // In Tauri v2 we can hide the window
         await win.hide();
@@ -97,9 +121,10 @@ const WindowControls = () => {
   };
 
   const handleMaximizeToggle = async () => {
-    if (!getCurrentWindow) return;
+    const apis = getTauriApi();
+    if (!apis.getCurrentWindow) return;
     try {
-      const win = getCurrentWindow();
+      const win = apis.getCurrentWindow();
       if (await win.isMaximized()) {
         await win.unmaximize();
         setIsMaximized(false);
@@ -113,9 +138,10 @@ const WindowControls = () => {
   };
 
   const handleClose = async () => {
-    if (!getCurrentWindow) return;
+    const apis = getTauriApi();
+    if (!apis.getCurrentWindow) return;
     try {
-      const win = getCurrentWindow();
+      const win = apis.getCurrentWindow();
       await win.close();
     } catch (err) {
       console.error("Close error:", err);
@@ -123,9 +149,10 @@ const WindowControls = () => {
   };
 
   const handleSnap = async (zone) => {
-    if (!getCurrentWindow || !LogicalSize || !LogicalPosition) return;
+    const apis = getTauriApi();
+    if (!apis.getCurrentWindow || !apis.LogicalSize || !apis.LogicalPosition) return;
     try {
-      const win = getCurrentWindow();
+      const win = apis.getCurrentWindow();
       
       if (await win.isMaximized()) {
         await win.unmaximize();
@@ -148,17 +175,17 @@ const WindowControls = () => {
       const adjustedH = logicalH - 10;
 
       if (zone === "left") {
-        await win.setSize(new LogicalSize(logicalW / 2, adjustedH));
-        await win.setPosition(new LogicalPosition(logicalX, logicalY));
+        await win.setSize(new apis.LogicalSize(logicalW / 2, adjustedH));
+        await win.setPosition(new apis.LogicalPosition(logicalX, logicalY));
       } else if (zone === "right") {
-        await win.setSize(new LogicalSize(logicalW / 2, adjustedH));
-        await win.setPosition(new LogicalPosition(logicalX + logicalW / 2, logicalY));
+        await win.setSize(new apis.LogicalSize(logicalW / 2, adjustedH));
+        await win.setPosition(new apis.LogicalPosition(logicalX + logicalW / 2, logicalY));
       } else if (zone === "top") {
-        await win.setSize(new LogicalSize(logicalW, adjustedH / 2));
-        await win.setPosition(new LogicalPosition(logicalX, logicalY));
+        await win.setSize(new apis.LogicalSize(logicalW, adjustedH / 2));
+        await win.setPosition(new apis.LogicalPosition(logicalX, logicalY));
       } else if (zone === "bottom") {
-        await win.setSize(new LogicalSize(logicalW, adjustedH / 2));
-        await win.setPosition(new LogicalPosition(logicalX, logicalY + adjustedH / 2));
+        await win.setSize(new apis.LogicalSize(logicalW, adjustedH / 2));
+        await win.setPosition(new apis.LogicalPosition(logicalX, logicalY + adjustedH / 2));
       }
       setActiveMenu(null);
     } catch (err) {
@@ -179,180 +206,166 @@ const WindowControls = () => {
 
   // If not running in Tauri, render developer simulator for web debugging
   // so the user can see and enjoy the UI features anyway!
+  // Beautiful theme-matched custom title bar header
   return (
-    <div className="relative flex items-center gap-1.5 p-1 rounded-full bg-slate-950/40 border border-white/5 backdrop-blur-md z-[9999]">
-      {/* DRAG ZONES */}
-      {isTauri && (
-        <div 
-          data-tauri-drag-region 
-          className="absolute -left-[50vw] top-0 h-10 w-[50vw] pointer-events-auto cursor-move z-[-1]"
-        />
-      )}
-
-      {/* MINIMIZE BUTTON */}
-      <div
-        className="relative"
-        onMouseEnter={() => showMenu("minimize")}
-        onMouseLeave={hideMenu}
-      >
-        <button
-          onClick={() => handleMinimize(false)}
-          className="w-7 h-7 rounded-full flex items-center justify-center border border-cyan-500/10 bg-cyan-950/20 text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-200 transition-all duration-300 relative group overflow-hidden"
-          title="Minimize Window"
-        >
-          <span className="absolute inset-0 bg-cyan-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full blur-sm" />
-          <Minus size={12} className="relative z-10" />
-        </button>
-
-        <AnimatePresence>
-          {activeMenu === "minimize" && (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 5, scale: 0.95 }}
-              className="absolute right-0 top-9 w-40 rounded-xl border border-white/10 bg-slate-950/90 p-1.5 shadow-2xl backdrop-blur-md z-[99999]"
-            >
-              <button
-                onClick={() => {
-                  handleMinimize(false);
-                  setActiveMenu(null);
-                }}
-                className="w-full text-left px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-              >
-                Standard Minimize
-              </button>
-              <button
-                onClick={() => {
-                  handleMinimize(true);
-                  setActiveMenu(null);
-                }}
-                className="w-full text-left px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-              >
-                Minimize to Tray
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+    <div className="w-full h-10 flex items-center justify-between px-4 bg-[#0a0f1d] border-b border-white/5 select-none relative z-[99999]">
+      {/* Draggable region spanning the title bar except the buttons area */}
+      <div 
+        data-tauri-drag-region 
+        className="absolute inset-0 right-36 h-full cursor-grab active:cursor-grabbing z-0"
+      />
+      
+      {/* App branding on the left */}
+      <div className="flex items-center gap-2 relative z-10 pointer-events-none">
+        <span className="text-xs font-extrabold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent tracking-widest uppercase">
+          Aurelinx
+        </span>
       </div>
 
-      {/* MAXIMIZE BUTTON */}
-      <div
-        className="relative"
-        onMouseEnter={() => showMenu("maximize")}
-        onMouseLeave={hideMenu}
-      >
-        <button
-          onClick={handleMaximizeToggle}
-          className="w-7 h-7 rounded-full flex items-center justify-center border border-emerald-500/10 bg-emerald-955/20 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-200 transition-all duration-300 relative group overflow-hidden"
-          title="Maximize / Snapping Layouts"
+      {/* Control Buttons on the right */}
+      <div className="flex items-center gap-2 relative z-20 pointer-events-auto">
+        {/* MINIMIZE BUTTON */}
+        <div
+          className="relative"
+          onMouseEnter={() => showMenu("minimize")}
+          onMouseLeave={hideMenu}
         >
-          <span className="absolute inset-0 bg-emerald-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full blur-sm" />
-          <Square size={10} className="relative z-10" />
-        </button>
+          <button
+            onClick={() => handleMinimize(false)}
+            className="w-6 h-6 rounded-full flex items-center justify-center border border-cyan-500/10 bg-cyan-950/20 text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-200 transition-all duration-300 relative group overflow-hidden"
+            title="Minimize"
+          >
+            <span className="absolute inset-0 bg-cyan-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full blur-sm" />
+            <Minus size={10} className="relative z-10" />
+          </button>
 
-        <AnimatePresence>
-          {activeMenu === "maximize" && (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 5, scale: 0.95 }}
-              className="absolute right-0 top-9 w-44 rounded-2xl border border-white/10 bg-slate-950/90 p-2.5 shadow-2xl backdrop-blur-md z-[99999]"
-            >
-              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 px-1">
-                Snap Window Layouts
-              </div>
-              <div className="grid grid-cols-2 gap-1.5 mb-2">
-                <button
-                  onClick={() => handleSnap("left")}
-                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-white/5 hover:border-emerald-500/30 hover:bg-white/5 transition-all group"
-                >
-                  <div className="w-8 h-5 border border-slate-700 rounded flex overflow-hidden">
-                    <div className="w-1/2 bg-emerald-500/20 border-r border-slate-800" />
-                    <div className="w-1/2" />
-                  </div>
-                  <span className="text-[7px] font-bold uppercase tracking-wider text-slate-400 mt-1">Left Half</span>
-                </button>
-
-                <button
-                  onClick={() => handleSnap("right")}
-                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-white/5 hover:border-emerald-500/30 hover:bg-white/5 transition-all group"
-                >
-                  <div className="w-8 h-5 border border-slate-700 rounded flex overflow-hidden">
-                    <div className="w-1/2" />
-                    <div className="w-1/2 bg-emerald-500/20 border-l border-slate-800" />
-                  </div>
-                  <span className="text-[7px] font-bold uppercase tracking-wider text-slate-400 mt-1">Right Half</span>
-                </button>
-
-                <button
-                  onClick={() => handleSnap("top")}
-                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-white/5 hover:border-emerald-500/30 hover:bg-white/5 transition-all group"
-                >
-                  <div className="w-8 h-5 border border-slate-700 rounded flex flex-col overflow-hidden">
-                    <div className="h-1/2 bg-emerald-500/20 border-b border-slate-800" />
-                    <div className="h-1/2" />
-                  </div>
-                  <span className="text-[7px] font-bold uppercase tracking-wider text-slate-400 mt-1">Top Half</span>
-                </button>
-
-                <button
-                  onClick={() => handleSnap("bottom")}
-                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-white/5 hover:border-emerald-500/30 hover:bg-white/5 transition-all group"
-                >
-                  <div className="w-8 h-5 border border-slate-700 rounded flex flex-col overflow-hidden">
-                    <div className="h-1/2" />
-                    <div className="h-1/2 bg-emerald-500/20 border-t border-slate-800" />
-                  </div>
-                  <span className="text-[7px] font-bold uppercase tracking-wider text-slate-400 mt-1">Bottom Half</span>
-                </button>
-              </div>
-
-              <div className="border-t border-white/5 pt-1.5">
-                <button
-                  onClick={handleMaximizeToggle}
-                  className="w-full text-left px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors flex items-center justify-between"
-                >
-                  <span>{isMaximized ? "Restore Size" : "Full Maximize"}</span>
-                  <Monitor size={10} className="text-emerald-400" />
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* CLOSE BUTTON */}
-      <div
-        className="relative"
-        onMouseEnter={() => showMenu("close")}
-        onMouseLeave={hideMenu}
-      >
-        <button
-          onClick={handleClose}
-          className="w-7 h-7 rounded-full flex items-center justify-center border border-rose-500/10 bg-rose-950/20 text-rose-400 hover:bg-rose-500/20 hover:text-rose-200 transition-all duration-300 relative group overflow-hidden"
-          title="Close Application"
-        >
-          <span className="absolute inset-0 bg-rose-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full blur-sm" />
-          <X size={12} className="relative z-10" />
-        </button>
-
-        <AnimatePresence>
-          {activeMenu === "close" && (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 5, scale: 0.95 }}
-              className="absolute right-0 top-9 w-40 rounded-xl border border-white/10 bg-slate-950/90 p-1.5 shadow-2xl backdrop-blur-md z-[99999]"
-            >
-              <button
-                onClick={handleClose}
-                className="w-full text-left px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-300 hover:text-rose-100 hover:bg-rose-500/10 rounded-lg transition-colors"
+          <AnimatePresence>
+            {activeMenu === "minimize" && (
+              <motion.div
+                initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 3, scale: 0.95 }}
+                className="absolute right-0 top-8 w-36 rounded-lg border border-white/10 bg-slate-950/90 p-1 shadow-2xl backdrop-blur-md z-[99999]"
               >
-                Exit Application
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <button
+                  onClick={() => {
+                    handleMinimize(false);
+                    setActiveMenu(null);
+                  }}
+                  className="w-full text-left px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-300 hover:text-white hover:bg-white/5 rounded transition-colors"
+                >
+                  Standard Minimize
+                </button>
+                <button
+                  onClick={() => {
+                    handleMinimize(true);
+                    setActiveMenu(null);
+                  }}
+                  className="w-full text-left px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-300 hover:text-white hover:bg-white/5 rounded transition-colors"
+                >
+                  Minimize to Tray
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* MAXIMIZE BUTTON */}
+        <div
+          className="relative"
+          onMouseEnter={() => showMenu("maximize")}
+          onMouseLeave={hideMenu}
+        >
+          <button
+            onClick={handleMaximizeToggle}
+            className="w-6 h-6 rounded-full flex items-center justify-center border border-emerald-500/10 bg-emerald-955/20 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-200 transition-all duration-300 relative group overflow-hidden"
+            title="Maximize"
+          >
+            <span className="absolute inset-0 bg-emerald-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full blur-sm" />
+            <Square size={8} className="relative z-10" />
+          </button>
+
+          <AnimatePresence>
+            {activeMenu === "maximize" && (
+              <motion.div
+                initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 3, scale: 0.95 }}
+                className="absolute right-0 top-8 w-40 rounded-xl border border-white/10 bg-slate-950/90 p-2 shadow-2xl backdrop-blur-md z-[99999]"
+              >
+                <div className="text-[7px] font-black uppercase tracking-[0.15em] text-slate-500 mb-1.5 px-1">
+                  Snap Window Layouts
+                </div>
+                <div className="grid grid-cols-2 gap-1 mb-1.5">
+                  <button
+                    onClick={() => handleSnap("left")}
+                    className="flex flex-col items-center justify-center p-1.5 rounded border border-white/5 hover:border-emerald-500/30 hover:bg-white/5 transition-all"
+                  >
+                    <div className="w-6 h-4 border border-slate-700 rounded flex overflow-hidden">
+                      <div className="w-1/2 bg-emerald-500/20 border-r border-slate-800" />
+                      <div className="w-1/2" />
+                    </div>
+                    <span className="text-[6px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Left Half</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleSnap("right")}
+                    className="flex flex-col items-center justify-center p-1.5 rounded border border-white/5 hover:border-emerald-500/30 hover:bg-white/5 transition-all"
+                  >
+                    <div className="w-6 h-4 border border-slate-700 rounded flex overflow-hidden">
+                      <div className="w-1/2" />
+                      <div className="w-1/2 bg-emerald-500/20 border-l border-slate-800" />
+                    </div>
+                    <span className="text-[6px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Right Half</span>
+                  </button>
+                </div>
+                <div className="border-t border-white/5 pt-1.5">
+                  <button
+                    onClick={handleMaximizeToggle}
+                    className="w-full text-left px-1.5 py-1 text-[8px] font-bold uppercase tracking-wider text-slate-300 hover:text-white hover:bg-white/5 rounded transition-colors flex items-center justify-between"
+                  >
+                    <span>{isMaximized ? "Restore Size" : "Full Maximize"}</span>
+                    <Monitor size={8} className="text-emerald-400" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* CLOSE BUTTON */}
+        <div
+          className="relative"
+          onMouseEnter={() => showMenu("close")}
+          onMouseLeave={hideMenu}
+        >
+          <button
+            onClick={handleClose}
+            className="w-6 h-6 rounded-full flex items-center justify-center border border-rose-500/10 bg-rose-950/20 text-rose-400 hover:bg-rose-500/20 hover:text-rose-200 transition-all duration-300 relative group overflow-hidden"
+            title="Close"
+          >
+            <span className="absolute inset-0 bg-rose-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full blur-sm" />
+            <X size={10} className="relative z-10" />
+          </button>
+
+          <AnimatePresence>
+            {activeMenu === "close" && (
+              <motion.div
+                initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 3, scale: 0.95 }}
+                className="absolute right-0 top-8 w-32 rounded-lg border border-white/10 bg-slate-950/90 p-1 shadow-2xl backdrop-blur-md z-[99999]"
+              >
+                <button
+                  onClick={handleClose}
+                  className="w-full text-left px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-rose-300 hover:text-rose-100 hover:bg-rose-500/10 rounded transition-colors"
+                >
+                  Exit Application
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );

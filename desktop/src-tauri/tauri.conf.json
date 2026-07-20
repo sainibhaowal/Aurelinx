@@ -16,11 +16,13 @@
         "height": 960,
         "resizable": true,
         "fullscreen": false,
-        "decorations": false
+        "decorations": false,
+        "userAgent": "Aurelinx-Desktop-App"
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "withGlobalTauri": true
     }
   },
   "bundle": {

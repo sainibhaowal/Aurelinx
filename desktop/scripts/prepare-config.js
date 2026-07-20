@@ -17,6 +17,10 @@ config.build.frontendDist = "../dist";
 config.build.devUrl = "http://localhost:3100";
 config.app.windows[0].url = "index.html";
 config.app.windows[0].userAgent = "Aurelinx-Desktop-App";
+config.app.security = {
+  csp: null,
+  withGlobalTauri: true
+};
 
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
 
