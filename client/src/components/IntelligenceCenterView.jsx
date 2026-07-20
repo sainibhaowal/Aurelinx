@@ -448,9 +448,9 @@ const IntelligenceCenterView = () => {
 
   const handleNodeMouseDown = (nodeId) => {
     dragNodeRef.current = nodeId;
+    const rect = canvasRef.current ? canvasRef.current.getBoundingClientRect() : null;
     const updateCoords = (moveEvent) => {
-      if (!canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
+      if (!rect) return;
       const clientX = moveEvent.clientX ?? moveEvent.touches?.[0]?.clientX;
       const clientY = moveEvent.clientY ?? moveEvent.touches?.[0]?.clientY;
 

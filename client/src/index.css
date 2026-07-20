@@ -13,12 +13,16 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    text-rendering: optimizeSpeed;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   body {
     @apply bg-[#07111f] text-slate-100 antialiased overflow-x-hidden selection:bg-primary/30;
     font-family: "Manrope", system-ui, sans-serif;
     color-scheme: dark;
-    text-rendering: optimizeLegibility;
+    text-rendering: optimizeSpeed;
+    transform: translate3d(0, 0, 0);
   }
 
   /* COMPLETE VISUAL HIDING OF BROWSER SCROLLBARS (SCROLLING REMAINS 100% FUNCTIONAL) */
@@ -96,4 +100,12 @@ input:-webkit-autofill:active {
   box-shadow: 0 0 0 1000px rgba(7, 17, 31, 0.96) inset !important;
   transition: background-color 9999s ease-in-out 0s;
   caret-color: #67e8f9;
+}
+
+/* GPU compositing layout boost class */
+.gpu-boost {
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
 }
