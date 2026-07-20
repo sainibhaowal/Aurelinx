@@ -244,32 +244,20 @@ const htmlContent = `<!DOCTYPE html>
     <div id="loader">
       <div class="spinner"></div>
       <div class="status-text" id="statusText">Connecting to server...</div>
-      <div class="status-subtext" id="statusSubtext">Checking primary connection...</div>
+      <div class="status-subtext" id="statusSubtext">Checking connection...</div>
     </div>
 
     <div class="fallback-container" id="fallback">
-      <div class="fallback-title">Could not reach the primary server</div>
+      <div class="fallback-title">Could not reach the server</div>
+      <div class="status-subtext" style="margin-bottom: 2rem;">Please check your internet connection or try again.</div>
       <div class="btn-group">
-        <button class="btn" onclick="retryPrimary()">
-          <span>Retry Primary Server</span>
-          <span class="badge" id="primaryBadge">Offline</span>
-        </button>
-        <button class="btn" onclick="redirectTo('http://localhost:3100')">
-          <span>Localhost (Next.js - Port 3100)</span>
-          <span class="badge" id="port3100Badge">Checking...</span>
-        </button>
-        <button class="btn" onclick="redirectTo('http://localhost:3001')">
-          <span>Localhost (Next.js - Port 3001)</span>
-          <span class="badge" id="port3001Badge">Checking...</span>
-        </button>
-        <button class="btn" onclick="redirectTo('http://localhost:3000')">
-          <span>Localhost (Next.js - Port 3000)</span>
-          <span class="badge" id="port3000Badge">Checking...</span>
+        <button class="btn btn-primary" onclick="retryPrimary()" style="justify-content: center; width: 100%;">
+          <span>Retry Connection</span>
         </button>
       </div>
 
-      <div class="custom-url-input">
-        <input type="text" id="customUrl" class="input" placeholder="Enter custom URL (e.g. http://192.168.1.5:3100)" value="http://localhost:3100">
+      <div class="custom-url-input" style="margin-top: 1.5rem;">
+        <input type="text" id="customUrl" class="input" placeholder="Enter custom URL (e.g. https://example.com)">
         <button class="btn btn-primary" onclick="connectCustom()">Connect</button>
       </div>
     </div>
@@ -289,7 +277,7 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     // Elegant Image-based check to bypass CORS and accurately detect real images vs Cloudflare HTML error pages
-    function checkServerActive(url, timeoutMs = 2000) {
+    function checkServerActive(url, timeoutMs = 3000) {
       return new Promise((resolve) => {
         const img = new Image();
         const timer = setTimeout(() => {
@@ -307,38 +295,8 @@ const htmlContent = `<!DOCTYPE html>
           resolve(false);
         };
         
-        img.src = url.replace(/\\/+$/, "") + "/favicon.ico?_cb=" + Date.now();
+        img.src = url.replace(/\/+$/, "") + "/favicon.ico?_cb=" + Date.now();
       });
-    }
-
-    async function checkLocalhosts() {
-      const up3100 = await checkServerActive('http://localhost:3100', 800);
-      updateBadge('port3100Badge', up3100);
-
-      const up3001 = await checkServerActive('http://localhost:3001', 800);
-      updateBadge('port3001Badge', up3001);
-
-      const up3000 = await checkServerActive('http://localhost:3000', 800);
-      updateBadge('port3000Badge', up3000);
-
-      if (up3100) {
-        redirectTo('http://localhost:3100');
-      } else if (up3001) {
-        redirectTo('http://localhost:3001');
-      } else if (up3000) {
-        redirectTo('http://localhost:3000');
-      } else {
-        document.getElementById('loader').style.display = 'none';
-        document.getElementById('fallback').style.display = 'block';
-      }
-    }
-
-    function updateBadge(id, isOnline) {
-      const badge = document.getElementById(id);
-      if (badge) {
-        badge.innerText = isOnline ? 'Online' : 'Offline';
-        badge.className = isOnline ? 'badge online' : 'badge';
-      }
     }
 
     async function retryPrimary() {
@@ -349,18 +307,24 @@ const htmlContent = `<!DOCTYPE html>
 
     function connectCustom() {
       const val = document.getElementById('customUrl').value.trim();
-      if (val) redirectTo(val);
+      if (val) {
+        let url = val;
+        if (!/^https?:\/\//i.test(url)) {
+          url = "https://" + url;
+        }
+        redirectTo(url);
+      }
     }
 
     async function initConnection() {
-      updateText("Connecting to server...", "Checking primary domain " + PRIMARY_URL);
+      updateText("Connecting to server...", "Checking " + PRIMARY_URL);
       
-      const primaryOnline = await checkServerActive(PRIMARY_URL, 2500);
+      const primaryOnline = await checkServerActive(PRIMARY_URL, 3000);
       if (primaryOnline) {
         redirectTo(PRIMARY_URL);
       } else {
-        updateText("Primary offline", "Checking local servers...");
-        await checkLocalhosts();
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('fallback').style.display = 'block';
       }
     }
 
