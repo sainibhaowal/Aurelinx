@@ -22,6 +22,18 @@ function readCachedUser() {
   }
 }
 
+const postToParent = (message) => {
+  if (typeof window === "undefined" || window === window.parent) return;
+  const allowedOrigins = [
+    "tauri://localhost",
+    "https://tauri.localhost",
+    "http://localhost:3100"
+  ];
+  allowedOrigins.forEach(origin => {
+    window.parent.postMessage(message, origin);
+  });
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -69,7 +81,7 @@ export const AuthProvider = ({ children }) => {
             setToken(null);
             setUser(null);
             if (isEmbeddedIframe) {
-              window.parent.postMessage({ type: "AURELINX_CLEAR_CREDS" }, "*");
+              postToParent({ type: "AURELINX_CLEAR_CREDS" });
             }
           }
           setError(err);
@@ -114,8 +126,8 @@ export const AuthProvider = ({ children }) => {
 
     window.addEventListener("message", handleMessage);
 
-    // Request credentials from the parent Tauri shell
-    window.parent.postMessage({ type: "AURELINX_GET_CREDS" }, "*");
+    // Request credentials from the parent Tauri shell securely
+    postToParent({ type: "AURELINX_GET_CREDS" });
 
     const fallbackTimer = setTimeout(() => {
       setLoading(false);
@@ -135,7 +147,7 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       setLoading(false);
       if (isEmbeddedIframe) {
-        window.parent.postMessage({ type: "AURELINX_CLEAR_CREDS" }, "*");
+        postToParent({ type: "AURELINX_CLEAR_CREDS" });
       }
     };
 
@@ -162,12 +174,12 @@ export const AuthProvider = ({ children }) => {
 
         // Save to parent if in iframe
         if (isEmbeddedIframe) {
-          window.parent.postMessage({
+          postToParent({
             type: "AURELINX_SAVE_CREDS",
             token: response.access_token,
             user: userData,
             savedCreds: { email, password }
-          }, "*");
+          });
         }
 
         return { success: true, user: userData };
@@ -216,9 +228,9 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setError(null);
     if (isEmbeddedIframe) {
-      window.parent.postMessage({
+      postToParent({
         type: "AURELINX_CLEAR_CREDS"
-      }, "*");
+      });
     }
   }, []);
 
