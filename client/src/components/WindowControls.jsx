@@ -102,7 +102,7 @@ const WindowControls = () => {
     }
   }, []);
 
-  if (!isTauri) return null;
+  if (!isTauri || (typeof window !== "undefined" && window !== window.parent)) return null;
 
   const handleMinimize = async (toTray = false) => {
     const apis = getTauriApi();
