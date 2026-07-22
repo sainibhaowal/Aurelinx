@@ -1981,6 +1981,13 @@ def _provider_error_label(error: Any) -> str:
     }.get(code, "provider request failure")
 
 
+def _visible_answer_preview(text: str, limit: int = 1200) -> str:
+    """Keep private reasoning markers out of visible workflow event summaries."""
+    visible = re.sub(r"<think>.*?</think>", "", text or "", flags=re.IGNORECASE | re.DOTALL)
+    visible = visible.replace("<think>", "").replace("</think>", "").strip()
+    return visible[:limit]
+
+
 def _safe_provider_failure_reply(context_payload: Dict, error: Any = None) -> str:
     """Return a useful failure response without leaking raw internal payloads."""
     tool_context = context_payload.get("tool_context", {})
@@ -2523,6 +2530,21 @@ async def _stream_true_agent_loop(
             else:
                 break
 
+        controller_completed = emit_workflow_event(
+            workflow_run.id,
+            "controller_call",
+            "planning",
+            "Controller turn returned a safe progress update",
+            status="completed",
+            result_summary={
+                "iteration": iteration,
+                "progress": decision.get("message") or "The controller selected the next bounded step.",
+                "action": decision.get("action"),
+            },
+        )
+        events.append(controller_completed)
+        yield f"event: agent_step\ndata: {_json_dumps(controller_completed)}\n\n"
+
         action = decision.get("action")
         if action == "tool":
             decision_title = decision.get("message") or f"I’m checking {_agent_tool_label(decision.get('tool', 'the requested data'))}."
@@ -2677,7 +2699,11 @@ async def _stream_true_agent_loop(
         "response",
         f"Streaming final answer from the {response_source}",
         status="running",
-        result_summary={"tool_calls": len(tool_transcript), "source": response_source},
+        result_summary={
+            "tool_calls": len(tool_transcript),
+            "source": response_source,
+            "content_status": "writing from verified workflow results",
+        },
     )
     events.append(model_started)
     yield f"event: agent_step\ndata: {_json_dumps(model_started)}\n\n"
@@ -2718,6 +2744,7 @@ async def _stream_true_agent_loop(
             "characters": len(assistant_text),
             "tool_calls": len(tool_transcript),
             "source": response_source,
+            "answer_preview": _visible_answer_preview(assistant_text),
             **({"reason": _provider_error_label(last_err)} if last_err else {}),
         },
         error_code=_provider_error_code(last_err) if last_err else None,

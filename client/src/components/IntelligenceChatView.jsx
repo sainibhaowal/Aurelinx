@@ -510,6 +510,10 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
   // Determine if active thinking is occurring
   const isThinkingActive = isBusy && parsed.content === "";
 
+  // The live activity timeline owns controller progress. Do not render a
+  // second fake cognitive card while the controller is making its decision.
+  if (isBusy && !rawText) return null;
+
   // Only render if we actually have model thoughts (past or current) or are currently thinking
   if (!parsed.thinking && !isThinkingActive) {
     if (parsed.content) {
@@ -584,6 +588,7 @@ const naturalStepDetail = (step) => {
   const summary = step.result_summary;
   if (step.type === "controller_call") {
     if (step.status === "failed") return `The controller could not complete this turn: ${summary?.reason || "the provider did not respond"}.`;
+    if (summary?.progress) return summary.progress;
     return "Aurelinx is evaluating the request and choosing the next safe step.";
   }
   if (step.type === "tool_call") {
@@ -595,16 +600,21 @@ const naturalStepDetail = (step) => {
     return step.display_message || "The internal tool returned a verified operational result.";
   }
   if (step.type === "agent_decision") {
-    if (summary?.controller_note && summary.controller_note !== step.display_message) {
-      return `Controller note: ${summary.controller_note}`;
+    if (step.display_message) {
+      return summary?.answer_preview
+        ? `${step.display_message} Answer: ${summary.answer_preview}`
+        : step.display_message;
     }
+    if (summary?.controller_note) return summary.controller_note;
     if (summary?.answer_preview) return `Answer prepared: ${summary.answer_preview}`;
   }
-  if (step.type === "final_response_started") return "The answer is being written from the observed workflow results.";
+  if (step.type === "final_response_started") {
+    return summary?.content_status || "The answer is being written from the observed workflow results.";
+  }
   if (step.type === "final_response_completed") {
     return step.status === "failed"
       ? `The answer provider did not finish: ${summary?.reason || "provider request failure"}.`
-      : "The final answer is ready.";
+      : summary?.answer_preview || "The final answer is ready.";
   }
   if (step.type === "validation_completed") {
     return step.status === "failed"
@@ -670,6 +680,8 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
                 : "text-cyan-300";
           const title = step.type === "controller_call"
             ? (isError ? "The model could not continue" : "Thinking…")
+            : step.type === "agent_decision"
+              ? (step.result_summary?.action === "tool" ? "Next action selected" : step.result_summary?.action === "approval_required" ? "Safety decision" : "Answer decision")
             : step.type === "final_response_started"
               ? "Writing the final answer…"
               : step.type === "final_response_completed"
