@@ -151,6 +151,14 @@ async function consumeEventStream(response, handlers = {}, signal = null) {
   const decoder = new TextDecoder();
   let buffer = "";
 
+  const yieldForPaint = async () => {
+    if (typeof requestAnimationFrame === "function") {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  };
+
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -178,6 +186,12 @@ async function consumeEventStream(response, handlers = {}, signal = null) {
         const handler = handlers[eventName] || handlers.onMessage;
         if (typeof handler === "function") {
           handler(data, eventName);
+          // A proxy or browser read can contain several SSE frames at once.
+          // Yield after each operational event so React paints a real timeline
+          // row-by-row instead of committing the whole checklist together.
+          if (eventName === "agent_step") {
+            await yieldForPaint();
+          }
         }
       }
     }

@@ -1117,6 +1117,49 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
     return mutation_log
 
 
+def _verify_mutation(db: Session, user_text: str, mutation_log: Dict[str, Any]) -> Dict[str, Any]:
+    """Read back the exact target after a permitted mutation.
+
+    This is intentionally a separate tool step. A successful write is not
+    treated as complete until the committed row can be observed again.
+    """
+    if mutation_log.get("blocked"):
+        return {"verified": False, "reason": "Mutation was blocked by policy"}
+    if not mutation_log.get("updated"):
+        return {
+            "verified": False,
+            "reason": "No database change was reported; nothing was verified",
+            "actions": mutation_log.get("actions", []),
+        }
+
+    email_match = re.search(
+        r"([a-zA-Z0-9.\-_+]+@[a-zA-Z0-9.\-_]+\.[a-zA-Z]{2,})", user_text
+    )
+    if not email_match:
+        return {"verified": False, "reason": "Mutation result did not include a verifiable email target"}
+
+    email = email_match.group(1)
+    lowered = user_text.lower()
+    is_candidate = "candidate" in lowered and "employee" not in lowered
+    row = (
+        db.exec(select(CandidateTable).where(CandidateTable.email == email)).first()
+        if is_candidate
+        else db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
+    )
+    if not row:
+        return {"verified": False, "reason": f"Committed target {email} was not found on read-back"}
+
+    return {
+        "verified": True,
+        "entity": "candidate" if is_candidate else "employee",
+        "id": str(row.id),
+        "email": row.email,
+        "full_name": row.full_name,
+        "role": row.role,
+        "department": row.department,
+    }
+
+
 def _attachment_text_context(
     attachments: List[ChatAttachmentTable], max_chars: int = 12000
 ) -> str:
@@ -2780,6 +2823,38 @@ async def send_message_stream(
             tool_context = context_payload.get("tool_context", {})
             awaiting_approval = False
             approval_id = None
+            if "mutate_data" in tool_context.get("tool_policy", []):
+                mutation_started = emit_workflow_event(
+                    workflow_run.id,
+                    "verification_started",
+                    "verification",
+                    "Reading back the committed mutation for post-write verification",
+                    status="running",
+                    tool_name="data.verify",
+                    safe_input={"query": request.content[:240]},
+                )
+                yield workflow_sse(mutation_started)
+                db.expire_all()
+                mutation_verification = _verify_mutation(
+                    db,
+                    request.content,
+                    tool_context.get("mutations", {}),
+                )
+                tool_context.setdefault("mutations", {})["verification"] = mutation_verification
+                tool_context.setdefault("tool_runs", []).append(
+                    {"tool": "data.verify", "output": mutation_verification}
+                )
+                mutation_verified = emit_workflow_event(
+                    workflow_run.id,
+                    "verification_result",
+                    "verification",
+                    "Committed mutation read-back completed",
+                    status="completed" if mutation_verification.get("verified") else "failed",
+                    tool_name="data.verify",
+                    result_summary=mutation_verification,
+                    error_code=None if mutation_verification.get("verified") else "MUTATION_READBACK_FAILED",
+                )
+                yield workflow_sse(mutation_verified)
             if "human_approval_delete" in tool_context.get("tool_policy", []):
                 awaiting_approval = True
                 approval_id = str(uuid4())
@@ -2814,11 +2889,17 @@ async def send_message_stream(
                 workflow_run.id,
                 "verification_completed",
                 "verification",
-                "Permissions, governance safeguards, and tool results verified",
-                status="completed",
+                "Permissions, governance safeguards, tool results, and mutation read-back verified",
+                status=(
+                    "failed"
+                    if tool_context.get("mutations", {}).get("verification")
+                    and not tool_context["mutations"]["verification"].get("verified")
+                    else "completed"
+                ),
                 result_summary={
                     "rbac_role": tool_context.get("rbac_role"),
                     "mutation_blocked": tool_context.get("mutations", {}).get("blocked", False),
+                    "mutation_verification": tool_context.get("mutations", {}).get("verification"),
                 },
             )
             yield workflow_sse(verified)
