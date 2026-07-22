@@ -1245,7 +1245,11 @@ async def _llm_stream_response(
         "IMPORTANT RULES:\n"
         "- Always respond in clear, beautiful Markdown with tables, bullet points, bold text where appropriate.\n"
         "- Never dump raw JSON or technical payloads to the user.\n"
-        "- Never fabricate data — only use what is provided in the tool context.\n"
+        "- Never fabricate workspace data. Employee, candidate, metric, policy, and system facts must come only from verified live tool output or clearly identified conversation context.\n"
+        "- You may answer general knowledge and conversational questions naturally, but do not present unverified or time-sensitive claims as live Aurelinx facts.\n"
+        "- If evidence is missing, say that it is not verified and explain which live query or source is needed. Never fill gaps with plausible names, numbers, or actions.\n"
+        "- Clearly distinguish what was found, what was inferred, and what is only a recommendation.\n"
+        "- Never claim a mutation, deletion, search, or external action happened unless the tool result explicitly confirms it.\n"
         "- Be natural, direct, and executive in tone.\n"
         "- If asked about employees, present the data in a clean formatted table or list.\n"
         "- If deletion is requested, firmly state it requires human approval and cannot be automated."
@@ -1298,7 +1302,12 @@ async def _llm_stream_response(
             "Present employee data as a formatted table. Do not include raw JSON in your response."
         )
     else:
-        user_content = f"{user_text}\n\n" "Answer naturally and conversationally."
+        request_plan = context_payload.get("request_plan", {})
+        user_content = (
+            f"Request mode: {request_plan.get('mode', 'conversation')}\n"
+            f"User request: {user_text}\n"
+            "No live workspace retrieval was required for this request. Use the conversation history for continuity, answer naturally, and do not invent Aurelinx records or current metrics."
+        )
 
     session_history = context_payload.get("session_history", [])
     history_messages = []
@@ -1484,7 +1493,11 @@ async def _llm_response(
         "IMPORTANT RULES:\n"
         "- Always respond in clear, beautiful Markdown with tables, bullet points, bold text where appropriate.\n"
         "- Never dump raw JSON or technical payloads to the user.\n"
-        "- Never fabricate data — only use what is provided in the tool context.\n"
+        "- Never fabricate workspace data. Employee, candidate, metric, policy, and system facts must come only from verified live tool output or clearly identified conversation context.\n"
+        "- You may answer general knowledge and conversational questions naturally, but do not present unverified or time-sensitive claims as live Aurelinx facts.\n"
+        "- If evidence is missing, say that it is not verified and explain which live query or source is needed. Never fill gaps with plausible names, numbers, or actions.\n"
+        "- Clearly distinguish what was found, what was inferred, and what is only a recommendation.\n"
+        "- Never claim a mutation, deletion, search, or external action happened unless the tool result explicitly confirms it.\n"
         "- Be natural, direct, and executive in tone.\n"
         "- If asked about employees, present the data in a clean formatted table or list.\n"
         "- If deletion is requested, firmly state it requires human approval and cannot be automated."
@@ -1539,7 +1552,12 @@ async def _llm_response(
             "Present employee data as a formatted table. Do not include raw JSON in your response."
         )
     else:
-        user_content = f"{user_text}\n\n" "Answer naturally and conversationally."
+        request_plan = context_payload.get("request_plan", {})
+        user_content = (
+            f"Request mode: {request_plan.get('mode', 'conversation')}\n"
+            f"User request: {user_text}\n"
+            "No live workspace retrieval was required for this request. Use the conversation history for continuity, answer naturally, and do not invent Aurelinx records or current metrics."
+        )
 
     # Build multi-turn chat history from clean session context (never include tool dump messages)
     session_history = context_payload.get("session_history", [])
@@ -1615,39 +1633,74 @@ async def _llm_response(
         )
 
 
-def _tool_policy(user_text: str) -> List[str]:
-    text = user_text.lower()
-    tools = []
-    
-    # If not a casual chat, always include search and dashboard tools to provide maximal context
-    if not _is_casual_chat(user_text):
-        tools.append("search_employees")
-        tools.append("search_candidates")
-        tools.append("dashboard_snapshot")
+def _request_plan(user_text: str, has_attachments: bool = False) -> Dict[str, Any]:
+    """Route a request before retrieval or mutation.
 
-    if any(
-        k in text
-        for k in [
-            "add",
-            "create",
-            "insert",
-            "update",
-            "set",
-            "move",
-            "correct",
-            "fix",
-            "change",
-            "ingest",
-            "import",
-            "register",
-        ]
-    ):
-        tools.append("mutate_data")
-    if any(k in text for k in ["delete", "remove", "purge", "clear"]):
-        tools.append("human_approval_delete")
-    if any(k in text for k in ["csv", "excel", "file"]):
-        tools.append("parse_csv_attachment")
-    return list(set(tools))
+    This is deliberately an operational intent router, not hidden model reasoning.
+    It keeps general conversation useful while ensuring workspace facts trigger live
+    tools and mutations/deletions are never inferred from a vague sentence.
+    """
+    text = user_text.strip().lower()
+    mutation_words = ("add", "create", "insert", "update", "set", "move", "transfer", "correct", "fix", "change", "ingest", "import", "register")
+    delete_words = ("delete", "remove", "purge", "clear")
+    employee_words = ("employee", "employees", "staff", "workforce", "team member", "people", "directory", "worker")
+    candidate_words = ("candidate", "candidates", "applicant", "applicants", "talent scout", "hiring", "recruit")
+    analytics_words = ("dashboard", "analytics", "metric", "metrics", "sentiment", "morale", "retention", "at-risk", "at risk", "risk", "burnout")
+    enterprise_words = ("integration", "connection", "compliance", "policy", "policies", "release gate", "quarantine", "sync", "runbook", "intervention")
+    data_verbs = ("show", "find", "search", "list", "lookup", "look up", "who", "which", "count", "how many", "analyze", "compare", "rank", "top", "current", "live", "our", "my", "data", "records", "report")
+
+    is_mutation = any(word in text for word in mutation_words)
+    is_delete = any(word in text for word in delete_words)
+    mentions_employee = any(word in text for word in employee_words)
+    mentions_candidate = any(word in text for word in candidate_words)
+    mentions_analytics = any(word in text for word in analytics_words)
+    mentions_enterprise = any(word in text for word in enterprise_words)
+    asks_for_data = any(word in text for word in data_verbs)
+    asks_count = any(word in text for word in ("count", "how many", "total", "number of"))
+    workspace_signal = (
+        mentions_employee
+        or mentions_candidate
+        or mentions_analytics
+        or mentions_enterprise
+    ) and (asks_for_data or is_mutation or is_delete or len(text.split()) > 2)
+    workspace_signal = workspace_signal or is_mutation or is_delete or has_attachments
+
+    capabilities = ["conversation_context"]
+    if workspace_signal:
+        if mentions_employee or (not mentions_candidate and not mentions_enterprise and (mentions_analytics or asks_for_data)):
+            capabilities.append("search_employees")
+        if mentions_candidate:
+            capabilities.append("search_candidates")
+        if mentions_analytics or asks_count or (workspace_signal and not mentions_employee and not mentions_candidate and not mentions_enterprise):
+            capabilities.append("dashboard_snapshot")
+        if mentions_enterprise:
+            capabilities.append("workspace_snapshot")
+    if is_mutation:
+        capabilities.append("mutate_data")
+    if is_delete:
+        capabilities.append("human_approval_delete")
+    if has_attachments or any(word in text for word in ("csv", "excel", "spreadsheet", "file", "attachment")):
+        capabilities.append("parse_csv_attachment")
+
+    if is_delete:
+        mode = "governed_mutation"
+    elif is_mutation:
+        mode = "mutation"
+    elif workspace_signal:
+        mode = "workspace_analysis"
+    else:
+        mode = "conversation"
+
+    return {
+        "mode": mode,
+        "needs_live_data": workspace_signal,
+        "capabilities": list(dict.fromkeys(capabilities)),
+        "reason": "live workspace evidence requested" if workspace_signal else "general conversation or knowledge request",
+    }
+
+
+def _tool_policy(user_text: str, has_attachments: bool = False) -> List[str]:
+    return _request_plan(user_text, has_attachments).get("capabilities", ["conversation_context"])
 
 
 TOOL_RBAC = {
@@ -1665,19 +1718,7 @@ def _user_role(current_user: TokenData) -> str:
 
 
 def _is_casual_chat(user_text: str) -> bool:
-    text = user_text.strip().lower()
-    casual_phrases = {
-        "hi",
-        "hello",
-        "hey",
-        "who are you",
-        "what can you do",
-        "help",
-        "good morning",
-        "good afternoon",
-        "good evening",
-    }
-    return text in casual_phrases or (len(text.split()) <= 2 and not _tool_policy(text))
+    return _request_plan(user_text).get("mode") == "conversation"
 
 
 def _sanitize_llm_response(text: str, user_text: str) -> str:
@@ -1734,7 +1775,7 @@ def _build_context_payload(
     - Tool context is always included but session history is strictly filtered.
     - Poisoned turns (raw JSON dumps, LLM failure messages) are stripped at source.
     """
-    casual_chat = _is_casual_chat(user_text)
+    request_plan = _request_plan(user_text, bool(attachments))
     tool_context = _execute_tools(
         db,
         user_text,
@@ -1744,17 +1785,8 @@ def _build_context_payload(
         event_sink=event_sink,
     )
 
-    if casual_chat:
-        return {
-            "tool_context": {
-                "tool_policy": tool_context.get("tool_policy", []),
-                "tool_runs": [],
-                "rbac_role": tool_context.get("rbac_role"),
-            },
-            "session_history": [],
-        }
-
-    # Fetch last 6 messages (3 turns) for multi-turn context
+    # Every request gets conversation context, including greetings. This is an
+    # operational context tool, not a claim that the database was queried.
     history_rows = db.exec(
         select(ChatMessageTable)
         .where(ChatMessageTable.session_id == str(session_id))
@@ -1775,9 +1807,27 @@ def _build_context_payload(
             continue
         clean_history.append({"role": m.role, "content": content[:400]})
 
+    if workflow_run_id:
+        context_scope = ToolEventScope(
+            workflow_run_id,
+            "conversation.context",
+            "context",
+            "Loading relevant conversation context",
+            sink=event_sink,
+        )
+        context_scope.start({"session_id": str(session_id), "turn_limit": 6})
+        context_scope.complete({"messages_loaded": len(clean_history), "mode": request_plan["mode"]})
+        tool_context.setdefault("tool_runs", []).append(
+            {
+                "tool": "conversation_context",
+                "output": {"messages_loaded": len(clean_history), "mode": request_plan["mode"]},
+            }
+        )
+
     return {
         "tool_context": tool_context,
         "session_history": clean_history,
+        "request_plan": request_plan,
     }
 
 
@@ -1789,8 +1839,9 @@ def _execute_tools(
     workflow_run_id: Optional[str] = None,
     event_sink=None,
 ) -> Dict:
-    tools = _tool_policy(user_text)
-    result = {"tool_policy": tools, "tool_runs": []}
+    request_plan = _request_plan(user_text, bool(attachments))
+    tools = request_plan["capabilities"]
+    result = {"tool_policy": tools, "tool_runs": [], "request_plan": request_plan}
     mutation_log = {"updated": False, "actions": [], "blocked": False}
 
     def scope(tool_name: str, phase: str, message: str) -> Optional[ToolEventScope]:
@@ -1967,8 +2018,33 @@ def _execute_tools(
                 error_code="CSV_INGEST_FAILED" if csv_log.get("errors") else None,
             )
 
-    result["workspace_snapshot"] = _workspace_snapshot(db, user_text)
-    result["record_counts"] = _record_counts(db)
+    if request_plan["needs_live_data"]:
+        snapshot_scope = scope(
+            "workspace.snapshot",
+            "retrieval",
+            "Preparing verified workspace context",
+        )
+        result["workspace_snapshot"] = _workspace_snapshot(db, user_text)
+        result["record_counts"] = _record_counts(db)
+        if snapshot_scope:
+            snapshot_scope.complete(
+                {
+                    "sections": sorted(result["workspace_snapshot"].keys()),
+                    "record_counts": result["record_counts"],
+                }
+            )
+        result["tool_runs"].append(
+            {
+                "tool": "workspace_snapshot",
+                "output": {
+                    "sections": sorted(result["workspace_snapshot"].keys()),
+                    "record_counts": result["record_counts"],
+                },
+            }
+        )
+    else:
+        result["workspace_snapshot"] = {}
+        result["record_counts"] = {}
 
     # Enrich context with live integration connections and active interventions
     try:
@@ -2580,6 +2656,12 @@ async def send_message_stream(
                 getattr(current_user, "tenant_id", None) or "default",
             )
 
+            attachments = db.exec(
+                select(ChatAttachmentTable).where(
+                    ChatAttachmentTable.session_id == chat_session.id
+                )
+            ).all()
+
             def workflow_sse(event: Dict[str, Any]) -> str:
                 return f"event: agent_step\ndata: {_json_dumps(event)}\n\n"
 
@@ -2593,15 +2675,21 @@ async def send_message_stream(
             )
             yield workflow_sse(started)
 
-            policy = _tool_policy(request.content)
-            intent = "mutation" if "mutate_data" in policy else "analysis"
+            request_plan = _request_plan(request.content, bool(attachments))
+            policy = request_plan["capabilities"]
+            intent = request_plan["mode"]
             classified = emit_workflow_event(
                 workflow_run.id,
                 "intent_classified",
                 "planning",
                 f"Request classified as {intent}",
                 status="completed",
-                result_summary={"intent": intent, "requested_capabilities": policy},
+                result_summary={
+                    "intent": intent,
+                    "requested_capabilities": policy,
+                    "needs_live_data": request_plan["needs_live_data"],
+                    "reason": request_plan["reason"],
+                },
             )
             yield workflow_sse(classified)
             update_workflow_run(workflow_run.id, "planning", "planning")
@@ -2616,27 +2704,23 @@ async def send_message_stream(
             )
             yield workflow_sse(planned)
 
-            attachments = db.exec(
-                select(ChatAttachmentTable).where(
-                    ChatAttachmentTable.session_id == chat_session.id
-                )
-            ).all()
-
             queue: asyncio.Queue = asyncio.Queue()
             loop = asyncio.get_running_loop()
 
             def event_sink(event: Dict[str, Any]) -> None:
                 asyncio.run_coroutine_threadsafe(queue.put(event), loop)
 
-            retrieval_started = emit_workflow_event(
+            context_phase = "retrieval" if request_plan["needs_live_data"] else "context"
+            context_status = "retrieving" if request_plan["needs_live_data"] else "contextualizing"
+            context_started = emit_workflow_event(
                 workflow_run.id,
-                "retrieval_started",
-                "retrieval",
-                "Retrieving live records and attachment context",
+                "retrieval_started" if request_plan["needs_live_data"] else "context_started",
+                context_phase,
+                "Retrieving verified live records and attachment context" if request_plan["needs_live_data"] else "Loading conversation context and request state",
                 status="running",
             )
-            yield workflow_sse(retrieval_started)
-            update_workflow_run(workflow_run.id, "retrieving", "retrieval")
+            yield workflow_sse(context_started)
+            update_workflow_run(workflow_run.id, context_status, context_phase)
 
             worker_task = asyncio.create_task(
                 asyncio.wait_for(
@@ -2668,22 +2752,22 @@ async def send_message_stream(
                 else:
                     queue_task.cancel()
 
-            retrieval_completed = emit_workflow_event(
+            context_completed = emit_workflow_event(
                 workflow_run.id,
-                "retrieval_completed",
-                "retrieval",
-                "Live records and attachment context retrieved",
+                "retrieval_completed" if request_plan["needs_live_data"] else "context_completed",
+                context_phase,
+                "Verified live records and attachment context retrieved" if request_plan["needs_live_data"] else "Conversation context and request state loaded",
                 status="completed",
                 result_summary={
                     "tool_runs": len(context_payload.get("tool_context", {}).get("tool_runs", [])),
                 },
             )
-            yield workflow_sse(retrieval_completed)
+            yield workflow_sse(context_completed)
             validation = emit_workflow_event(
                 workflow_run.id,
                 "validation_completed",
                 "validation",
-                "Retrieved data passed workflow validation checks",
+                "Retrieved data passed workflow validation checks" if request_plan["needs_live_data"] else "Conversation context passed workflow validation checks",
                 status="completed",
                 result_summary={
                     "tool_runs": len(context_payload.get("tool_context", {}).get("tool_runs", [])),
