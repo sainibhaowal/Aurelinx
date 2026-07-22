@@ -1828,6 +1828,7 @@ def _parse_agent_decision(raw_text: str) -> Dict[str, Any]:
     return {
         "action": "respond",
         "message": str(payload.get("message", "Model selected a final response"))[:500],
+        "answer": str(payload.get("answer", "")).strip()[:12000],
     }
 
 
@@ -1844,7 +1845,7 @@ def _agent_controller_prompt(
         "You are not the final answer writer. Do not expose chain-of-thought.\n"
         "Allowed JSON shapes:\n"
         '{"action":"tool","tool":"employee.search","arguments":{"query":"..."},"message":"short safe reason"}\n'
-        '{"action":"respond","message":"no more tools are needed"}\n'
+        '{"action":"respond","message":"no more tools are needed","answer":"final user-facing answer for a conversation-only request"}\n'
         '{"action":"approval_required","message":"explain why admin approval is required"}\n'
         "Rules:\n"
         "- Select at most one tool per turn, then wait for its result.\n"
@@ -1923,7 +1924,25 @@ def _direct_casual_reply(user_text: str) -> str:
     return "Hi, I am Aurelinx. Let me know how I can assist with HR analytics, employee tracking, or database management."
 
 
-def _safe_provider_failure_reply(context_payload: Dict) -> str:
+def _provider_error_code(error: Any) -> str:
+    text = str(error or "").lower()
+    if "429" in text or "rate limit" in text or "too many requests" in text:
+        return "MODEL_RATE_LIMITED"
+    if "401" in text or "403" in text or "unauthorized" in text:
+        return "MODEL_AUTH_FAILED"
+    return "MODEL_PROVIDER_FAILED"
+
+
+def _provider_error_label(error: Any) -> str:
+    code = _provider_error_code(error)
+    return {
+        "MODEL_RATE_LIMITED": "provider rate limit (HTTP 429)",
+        "MODEL_AUTH_FAILED": "provider authentication/authorization failure",
+        "MODEL_PROVIDER_FAILED": "provider request failure",
+    }.get(code, "provider request failure")
+
+
+def _safe_provider_failure_reply(context_payload: Dict, error: Any = None) -> str:
     """Return a useful failure response without leaking raw internal payloads."""
     tool_context = context_payload.get("tool_context", {})
     runs = tool_context.get("tool_runs", [])
@@ -1941,10 +1960,11 @@ def _safe_provider_failure_reply(context_payload: Dict) -> str:
             else:
                 summaries.append(f"{name}: completed")
     evidence = "; ".join(summaries) if summaries else "no retrieval tools were required"
+    reason = _provider_error_label(error) if error else "provider did not return a response"
     return (
         "I completed the permitted retrieval and safety checks, but the configured language "
-        "model provider did not return a response. No unsupported database change was made. "
-        f"Operational results: {evidence}. Please check the provider configuration and retry."
+        f"model provider returned a {reason}. No unsupported database change was made. "
+        f"Operational results: {evidence}. Please retry or switch to another configured provider."
     )
 
 
@@ -2370,15 +2390,25 @@ async def _stream_true_agent_loop(
         + "."
     )
 
+    controller_answer = ""
+    controller_error = None
     for iteration in range(1, max_iterations + 1):
-        yield emit(
-            "model_decision_started",
+        controller_started = emit_workflow_event(
+            workflow_run.id,
+            "controller_call",
             "planning",
-            "LLM controller is deciding the next bounded action",
+            f"Controller model turn {iteration} started",
             status="running",
-            result_summary={"iteration": iteration, "max_iterations": max_iterations},
+            result_summary={
+                "iteration": iteration,
+                "max_iterations": max_iterations,
+                "provider": request.provider or "lmstudio",
+                "model": request.model or "provider_default",
+                "observed_tool_calls": len(tool_transcript),
+            },
         )
-
+        events.append(controller_started)
+        yield f"event: agent_step\ndata: {_json_dumps(controller_started)}\n\n"
         planner_prompt = _agent_controller_prompt(
             request.content,
             history,
@@ -2386,20 +2416,35 @@ async def _stream_true_agent_loop(
             current_user,
             bool(db.exec(select(ChatAttachmentTable).where(ChatAttachmentTable.session_id == str(chat_session.id))).all()),
         )
-        raw_decision = await _llm_response(
-            provider=request.provider or "lmstudio",
-            api_key=request.api_key,
-            base_url=request.base_url,
-            model=request.model,
-            user_text=planner_prompt,
-            context_payload={
-                "request_plan": {"mode": "agent_controller", "needs_live_data": False},
-                "tool_context": {"tool_runs": [], "rbac_role": "admin" if current_user.is_admin else "member"},
-                "session_history": history,
-            },
-            system_override=controller_system,
-            temperature_override=0.0,
-        )
+        try:
+            raw_decision = await _llm_response(
+                provider=request.provider or "lmstudio",
+                api_key=request.api_key,
+                base_url=request.base_url,
+                model=request.model,
+                user_text=planner_prompt,
+                context_payload={
+                    "request_plan": {"mode": "agent_controller", "needs_live_data": False},
+                    "tool_context": {"tool_runs": [], "rbac_role": "admin" if current_user.is_admin else "member"},
+                    "session_history": history,
+                },
+                system_override=controller_system,
+                temperature_override=0.0,
+            )
+        except Exception as exc:
+            controller_error = str(exc)
+            controller_failed = emit_workflow_event(
+                workflow_run.id,
+                "controller_call",
+                "planning",
+                "Controller model call failed; no action was executed",
+                status="failed",
+                result_summary={"iteration": iteration, "reason": _provider_error_label(exc)},
+                error_code=_provider_error_code(exc),
+            )
+            events.append(controller_failed)
+            yield f"event: agent_step\ndata: {_json_dumps(controller_failed)}\n\n"
+            break
         decision = _parse_agent_decision(raw_decision)
 
         if any(word in request.content.lower() for word in ("delete", "remove", "purge", "clear")) and decision.get("action") == "respond":
@@ -2439,20 +2484,33 @@ async def _stream_true_agent_loop(
             else:
                 break
 
+        action = decision.get("action")
+        if action == "tool":
+            decision_title = decision.get("message") or f"Controller selected {decision.get('tool')}"
+        elif action == "respond":
+            decision_title = "Controller selected the final response stage"
+        elif action == "approval_required":
+            decision_title = decision.get("message") or "Controller requested human approval"
+        else:
+            decision_title = "Controller returned an invalid action"
+        decision_result = {
+            "iteration": iteration,
+            "action": action,
+            "tool": decision.get("tool"),
+            "arguments": decision.get("arguments", {}),
+            "controller_note": decision.get("message"),
+        }
+        if decision.get("answer"):
+            decision_result["answer_preview"] = decision["answer"][:500]
+
         yield emit(
             "agent_decision",
             "planning",
-            decision.get("message", "LLM selected the next action"),
+            decision_title,
             status="completed",
-            result_summary={
-                "iteration": iteration,
-                "action": decision.get("action"),
-                "tool": decision.get("tool"),
-                "arguments": decision.get("arguments", {}),
-            },
+            result_summary=decision_result,
         )
 
-        action = decision.get("action")
         if action == "approval_required":
             approval_id = str(uuid4())
             approval_payload = request.content[:12000]
@@ -2486,6 +2544,12 @@ async def _stream_true_agent_loop(
             if mutation_state.get("updated") and not mutation_state.get("verification", {}).get("verified"):
                 decision = {"action": "tool", "tool": "data.verify", "arguments": {}, "message": "Policy requires read-back verification before final response"}
             else:
+                # Conversation-only turns can use the controller's answer directly.
+                # This avoids a needless second provider request (and avoids making
+                # a free/rate-limited provider fail after a valid controller call).
+                controller_answer = decision.get("answer", "") or (
+                    decision.get("message", "") if not tool_transcript else ""
+                )
                 break
 
         tool_name = decision.get("tool")
@@ -2550,17 +2614,31 @@ async def _stream_true_agent_loop(
     yield emit(
         "validation_completed",
         "validation",
-        "Actual controller decisions and tool results passed workflow validation",
-        status="completed",
-        result_summary={"iterations": len(tool_transcript) + 1, "tool_calls": len(tool_transcript)},
+        "Controller output and tool results passed workflow validation"
+        if not controller_error
+        else "Validation stopped because the controller provider failed",
+        status="completed" if not controller_error else "failed",
+        result_summary={
+            "iterations": len(tool_transcript) + 1,
+            "tool_calls": len(tool_transcript),
+            **({"reason": _provider_error_label(controller_error)} if controller_error else {}),
+        },
+        error_code=_provider_error_code(controller_error) if controller_error else None,
+    )
+    response_source = (
+        "provider_failure"
+        if controller_error
+        else "controller"
+        if controller_answer and not tool_transcript
+        else "response_model"
     )
     model_started = emit_workflow_event(
         workflow_run.id,
         "final_response_started",
         "response",
-        "Generating the final response from the observed tool loop",
+        f"Streaming final answer from the {response_source}",
         status="running",
-        result_summary={"tool_calls": len(tool_transcript)},
+        result_summary={"tool_calls": len(tool_transcript), "source": response_source},
     )
     events.append(model_started)
     yield f"event: agent_step\ndata: {_json_dumps(model_started)}\n\n"
@@ -2568,29 +2646,42 @@ async def _stream_true_agent_loop(
     assistant_text = ""
     last_err = None
     try:
-        async for token in _llm_stream_response(
-            provider=request.provider or "lmstudio",
-            api_key=request.api_key,
-            base_url=request.base_url,
-            model=request.model,
-            user_text=request.content,
-            context_payload=context_payload,
-        ):
-            assistant_text += token
-            yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
+        if controller_error:
+            last_err = controller_error
+            assistant_text = _safe_provider_failure_reply(context_payload, controller_error)
+            yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+        elif controller_answer and not tool_transcript:
+            assistant_text = controller_answer
+            yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+        else:
+            async for token in _llm_stream_response(
+                provider=request.provider or "lmstudio",
+                api_key=request.api_key,
+                base_url=request.base_url,
+                model=request.model,
+                user_text=request.content,
+                context_payload=context_payload,
+            ):
+                assistant_text += token
+                yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
     except Exception as exc:
         last_err = str(exc)
-        assistant_text = _safe_provider_failure_reply(context_payload)
+        assistant_text = _safe_provider_failure_reply(context_payload, exc)
         yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
 
     model_completed = emit_workflow_event(
         workflow_run.id,
         "final_response_completed",
         "response",
-        "Final response generated from verified loop results",
+        "Final answer stream failed" if last_err else "Final answer stream completed",
         status="failed" if last_err else "completed",
-        result_summary={"characters": len(assistant_text), "tool_calls": len(tool_transcript)},
-        error_code="MODEL_FALLBACK" if last_err else None,
+        result_summary={
+            "characters": len(assistant_text),
+            "tool_calls": len(tool_transcript),
+            "source": response_source,
+            **({"reason": _provider_error_label(last_err)} if last_err else {}),
+        },
+        error_code=_provider_error_code(last_err) if last_err else None,
     )
     events.append(model_completed)
     yield f"event: agent_step\ndata: {_json_dumps(model_completed)}\n\n"
