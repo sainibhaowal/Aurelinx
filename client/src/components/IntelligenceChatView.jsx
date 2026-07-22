@@ -600,11 +600,8 @@ const naturalStepDetail = (step) => {
     return step.display_message || "The internal tool returned a verified operational result.";
   }
   if (step.type === "agent_decision") {
-    if (step.display_message) {
-      return summary?.answer_preview
-        ? `${step.display_message} Answer: ${summary.answer_preview}`
-        : step.display_message;
-    }
+    if (summary?.answer_preview) return `Answer: ${summary.answer_preview}`;
+    if (step.display_message) return step.display_message;
     if (summary?.controller_note) return summary.controller_note;
     if (summary?.answer_preview) return `Answer prepared: ${summary.answer_preview}`;
   }
@@ -636,11 +633,29 @@ const workflowTime = (value) => {
 };
 
 const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
-  const meaningfulSteps = steps.filter((step) => {
-    if (step.tool === "conversation.context") return false;
-    return !["workflow_started", "validation_completed", "workflow_completed"].includes(step.type);
-  });
-  const running = meaningfulSteps.some((step) => step.status === "running");
+  const meaningfulSteps = useMemo(() => {
+    const visible = steps.filter((step) => {
+      if (step.tool === "conversation.context") return false;
+      return !["workflow_started", "validation_completed", "workflow_completed"].includes(step.type);
+    });
+    const output = [];
+    const controllerIndexes = new Map();
+    visible.forEach((step) => {
+      if (step.type === "controller_call") {
+        const iteration = step.result_summary?.iteration;
+        const key = iteration == null ? step.event_id : `controller-${iteration}`;
+        if (step.status === "completed" && controllerIndexes.has(key)) {
+          output[controllerIndexes.get(key)] = step;
+          return;
+        }
+        controllerIndexes.set(key, output.length);
+      }
+      output.push(step);
+    });
+    return output;
+  }, [steps]);
+  const lastStep = meaningfulSteps[meaningfulSteps.length - 1];
+  const running = lastStep?.status === "running";
   const failed = meaningfulSteps.some((step) => ["failed", "blocked"].includes(step.status));
   const toolCalls = meaningfulSteps.filter((step) => step.type === "tool_call").length;
 
@@ -689,7 +704,7 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
                 : step.display_message || naturalStepDetail(step);
           return (
             <div key={id} className="relative flex items-start gap-3 text-left">
-              {index < steps.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-cyan-500/15" />}
+              {index < meaningfulSteps.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-cyan-500/15" />}
               <div className="relative z-10 mt-0.5 flex-shrink-0">
                 <span className={`h-5 w-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold border ${
                   status === "completed" ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-300" :
