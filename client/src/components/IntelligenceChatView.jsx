@@ -580,14 +580,41 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
   );
 };
 
-const workflowValue = (value) => {
-  if (value == null) return "—";
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
+const naturalStepDetail = (step) => {
+  const summary = step.result_summary;
+  if (step.type === "controller_call") {
+    if (step.status === "failed") return `The controller could not complete this turn: ${summary?.reason || "the provider did not respond"}.`;
+    return "Aurelinx is evaluating the request and choosing the next safe step.";
   }
+  if (step.type === "tool_call") {
+    const args = step.safe_input?.arguments;
+    if (args?.query) return `Searching with the request: “${args.query}”`;
+    return "The internal tool received its bounded input.";
+  }
+  if (step.type === "tool_result") {
+    return step.display_message || "The internal tool returned a verified operational result.";
+  }
+  if (step.type === "agent_decision") {
+    if (summary?.controller_note && summary.controller_note !== step.display_message) {
+      return `Controller note: ${summary.controller_note}`;
+    }
+    if (summary?.answer_preview) return `Answer prepared: ${summary.answer_preview}`;
+  }
+  if (step.type === "final_response_started") return "The answer is being written from the observed workflow results.";
+  if (step.type === "final_response_completed") {
+    return step.status === "failed"
+      ? `The answer provider did not finish: ${summary?.reason || "provider request failure"}.`
+      : "The final answer is ready.";
+  }
+  if (step.type === "validation_completed") {
+    return step.status === "failed"
+      ? `Validation stopped: ${summary?.reason || "the workflow could not be validated"}.`
+      : "The observed results passed the workflow and permission checks.";
+  }
+  if (step.type === "workflow_started") return "Aurelinx accepted the request and opened a protected workflow.";
+  if (step.type === "workflow_completed") return "Everything completed and the result was saved to the conversation.";
+  if (step.type === "tool_result" && step.error_code) return `The step was stopped by policy: ${step.error_code}.`;
+  return step.display_message || "Workflow activity recorded.";
 };
 
 const workflowTime = (value) => {
@@ -608,17 +635,16 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
 
   return (
     <div className="flex flex-col gap-2 my-2">
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-white/10">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
         <div>
-          <div className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
+          <div className="text-[10px] font-bold text-cyan-400/80 uppercase tracking-wider flex items-center gap-2">
             <span className={`h-2.5 w-2.5 rounded-full ${running ? "bg-cyan-400 animate-pulse" : failed ? "bg-rose-400" : "bg-emerald-400"}`} />
             {running ? "Live workflow execution" : failed ? "Workflow ended with a problem" : "Workflow execution trace"}
           </div>
         </div>
         <div className="flex items-center gap-2 text-[9px] font-mono text-slate-500 uppercase">
-          <span>{steps.length} events</span>
-          <span>·</span>
-          <span>{toolCalls} calls</span>
+          <span>{steps.length} updates</span>
+          {toolCalls > 0 && <><span>·</span><span>{toolCalls} tool call{toolCalls === 1 ? "" : "s"}</span></>}
           {phase && <><span>·</span><span>{phase}</span></>}
         </div>
       </div>
@@ -629,13 +655,7 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
         </div>
       )}
 
-      {steps.length > 0 && toolCalls === 0 && (
-        <div className="py-1 text-[10px] text-slate-500">
-          No workspace tool was required; this turn is using conversation context and the response model.
-        </div>
-      )}
-
-      <div className="space-y-2 max-h-[34rem] overflow-y-auto pr-1">
+      <div className="space-y-1 max-h-[34rem] overflow-y-auto pr-1">
         {steps.map((step, index) => {
           const id = step.event_id || `${step.type}-${step.sequence || index}`;
           const status = step.status || "running";
@@ -664,42 +684,27 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
                 </span>
               </div>
 
-              <div className="flex-1 min-w-0 border-b border-white/5 px-1 pb-2 pt-1">
+              <div className="flex-1 min-w-0 px-1 pb-1 pt-1">
                 <button type="button" onClick={() => hasDetails && toggle(id)} className={`w-full text-left ${hasDetails ? "cursor-pointer" : "cursor-default"}`}>
                   <div className="flex items-start justify-between gap-3">
                     <span className={`text-xs font-bold ${statusColor}`}>
                       <span className="mr-1.5 text-[10px] font-mono text-slate-600">#{step.sequence || index + 1}</span>
                       {step.display_message || step.type || "workflow event"}
                     </span>
-                    <span className="flex-shrink-0 text-[9px] uppercase tracking-wider text-slate-500">
-                      {step.tool || step.phase || "workflow"}
+                    <span className="flex-shrink-0 text-[9px] text-slate-600">
+                      {workflowTime(step.created_at)}
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-2 text-[10px] text-slate-500">
-                    <span>{step.type || "event"}</span>
-                    <span>·</span>
-                    <span>{status}</span>
+                    <span>{naturalStepDetail(step)}</span>
                     {step.duration_ms != null && <><span>·</span><span>{step.duration_ms}ms</span></>}
-                    {workflowTime(step.created_at) && <><span>·</span><span>{workflowTime(step.created_at)}</span></>}
                     {hasDetails && <span className="ml-auto text-cyan-500">{isOpen ? "Hide details ▲" : "Show details ▼"}</span>}
                   </div>
                 </button>
 
                 {isOpen && hasDetails && (
-                  <div className="mt-3 space-y-2 border-t border-white/10 pt-2">
-                    {step.safe_input != null && (
-                      <div>
-                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-cyan-500">Safe input</div>
-                        <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words rounded bg-black/30 p-2 text-[10px] leading-relaxed text-slate-300">{workflowValue(step.safe_input)}</pre>
-                      </div>
-                    )}
-                    {summary != null && (
-                      <div>
-                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-emerald-500">Result / output</div>
-                        <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-black/30 p-2 text-[10px] leading-relaxed text-slate-300">{workflowValue(summary)}</pre>
-                      </div>
-                    )}
-                    {step.error_code && <div className="text-[10px] text-rose-300">Error code: {step.error_code}</div>}
+                  <div className="mt-2 space-y-1 border-l border-cyan-500/20 pl-3">
+                    <div className="text-[10px] leading-relaxed text-slate-400">{naturalStepDetail(step)}</div>
                   </div>
                 )}
 
@@ -719,11 +724,7 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
         })}
       </div>
 
-      {toolResults > 0 && (
-        <div className="border-t border-white/10 pt-2 text-[10px] text-slate-500">
-          Tool loop summary: {toolCalls} internal call{toolCalls === 1 ? "" : "s"}, {toolResults} result{toolResults === 1 ? "" : "s"}. Tool payloads are redacted to safe operational summaries.
-        </div>
-      )}
+      {toolResults > 0 && <div className="pt-1 text-[10px] text-slate-600">Internal work is complete; technical payloads remain protected.</div>}
     </div>
   );
 };
@@ -1254,7 +1255,7 @@ const IntelligenceChatView = () => {
                 {messages.map((m) => (
                   <div
                     key={m.id}
-                    className={`rounded-2xl p-4 border min-w-0 ${m.role === "user" ? "ml-16 bg-primary/10 border-primary/30" : "mr-4 bg-white/5 border-white/10"}`}
+                    className={`min-w-0 ${m.role === "user" ? "ml-16 rounded-2xl p-4 bg-primary/10 border border-primary/30" : "mr-4 py-2"}`}
                   >
                     <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5">
                       {m.role}
@@ -1267,7 +1268,7 @@ const IntelligenceChatView = () => {
                           isBusy={false}
                         />
                         {m.workflow_events?.length > 0 && (
-                          <div className="mt-3 border-t border-white/10 pt-3">
+                          <div className="mt-2 pt-2">
                             <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-cyan-500">
                               <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
                               Agent trace
@@ -1292,7 +1293,7 @@ const IntelligenceChatView = () => {
                   </div>
                 ))}
                 {busy && (
-                  <div className="rounded-2xl p-4 border mr-4 bg-[#081220]/45 border-cyan-500/15 shadow-[0_0_15px_rgba(6,182,212,0.02)] backdrop-blur-sm">
+                  <div className="mr-4 py-2">
                     <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5 flex items-center justify-between">
                       <span>assistant</span>
                     </div>
@@ -1301,7 +1302,7 @@ const IntelligenceChatView = () => {
                       <div className="text-sm">
                         <ThinkingMessageContent text={streamText} isBusy={busy} />
                       </div>
-                      <div className="mt-3 border-t border-white/10 pt-3">
+                      <div className="mt-2 pt-2">
                         <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-cyan-500">
                           <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
                           Live agent trace

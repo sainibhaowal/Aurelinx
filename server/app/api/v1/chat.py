@@ -1785,6 +1785,45 @@ AGENT_TOOL_CATALOG = {
 }
 
 
+def _agent_tool_label(tool_name: str) -> str:
+    return {
+        "employee.search": "employee directory",
+        "candidate.search": "candidate directory",
+        "dashboard.snapshot": "workforce analytics",
+        "workspace.snapshot": "workspace records",
+        "document.csv_ingest": "the attached CSV file",
+        "data.mutate": "the requested data change",
+        "data.verify": "the saved record",
+    }.get(tool_name, tool_name.replace(".", " "))
+
+
+def _agent_tool_result_message(tool_name: str, result: Dict[str, Any]) -> str:
+    if result.get("blocked"):
+        return f"I could not run {_agent_tool_label(tool_name)} because policy blocked it."
+    if tool_name in {"employee.search", "candidate.search"}:
+        return f"I found {len(result.get('matches', []))} matching record(s) in {_agent_tool_label(tool_name)}."
+    if tool_name == "data.mutate":
+        mutation = result.get("result") or {}
+        if mutation.get("updated"):
+            return "The requested data change was committed. I will read it back before finishing."
+        if mutation.get("actions"):
+            return "The data-change step completed with policy results that need to be reviewed."
+    if tool_name == "data.verify":
+        verification = result.get("result") or {}
+        return (
+            "I read the saved record back and verification passed."
+            if verification.get("verified")
+            else "I read the saved record back, but verification did not pass."
+        )
+    if tool_name == "dashboard.snapshot":
+        return "I calculated the current workforce analytics snapshot."
+    if tool_name == "workspace.snapshot":
+        return "I loaded the relevant workspace records."
+    if tool_name == "document.csv_ingest":
+        return "I parsed and validated the attached CSV file."
+    return f"The {_agent_tool_label(tool_name)} step completed."
+
+
 def _parse_agent_decision(raw_text: str) -> Dict[str, Any]:
     """Parse and strictly validate one model controller decision."""
     text = (raw_text or "").strip()
@@ -1842,10 +1881,10 @@ def _agent_controller_prompt(
     catalog = "\n".join(f"- {name}: {description}" for name, description in AGENT_TOOL_CATALOG.items())
     return (
         "You are the Aurelinx execution controller. Choose exactly one next action and return ONLY valid JSON.\n"
-        "You are not the final answer writer. Do not expose chain-of-thought.\n"
+        "You are not the private chain-of-thought writer. Do not expose chain-of-thought.\n"
         "Allowed JSON shapes:\n"
-        '{"action":"tool","tool":"employee.search","arguments":{"query":"..."},"message":"short safe reason"}\n'
-        '{"action":"respond","message":"no more tools are needed","answer":"final user-facing answer for a conversation-only request"}\n'
+        '{"action":"tool","tool":"employee.search","arguments":{"query":"..."},"message":"short natural progress sentence shown in the activity timeline"}\n'
+        '{"action":"respond","message":"short natural progress sentence shown before the answer","answer":"final user-facing answer for a conversation-only request"}\n'
         '{"action":"approval_required","message":"explain why admin approval is required"}\n'
         "Rules:\n"
         "- Select at most one tool per turn, then wait for its result.\n"
@@ -1857,7 +1896,7 @@ def _agent_controller_prompt(
         f"Original user request:\n{user_text}\n\n"
         f"Conversation history:\n{json.dumps(history[-6:], default=str)}\n\n"
         f"Tool calls and results already observed:\n{json.dumps(tool_transcript[-8:], default=str)}\n\n"
-        "Return one JSON decision now."
+        "The message field must be a natural operational update, not JSON, not a greeting, and not hidden chain-of-thought. Return one JSON decision now."
     )
 
 
@@ -2486,9 +2525,9 @@ async def _stream_true_agent_loop(
 
         action = decision.get("action")
         if action == "tool":
-            decision_title = decision.get("message") or f"Controller selected {decision.get('tool')}"
+            decision_title = decision.get("message") or f"I’m checking {_agent_tool_label(decision.get('tool', 'the requested data'))}."
         elif action == "respond":
-            decision_title = "Controller selected the final response stage"
+            decision_title = decision.get("message") or "I have enough verified context to answer you."
         elif action == "approval_required":
             decision_title = decision.get("message") or "Controller requested human approval"
         else:
@@ -2560,7 +2599,7 @@ async def _stream_true_agent_loop(
         yield emit(
             "tool_call",
             "execution" if tool_name.startswith("data.") else "retrieval",
-            f"Executing {tool_name}",
+            f"I’m checking {_agent_tool_label(tool_name)} now.",
             status="running",
             tool_name=tool_name,
             safe_input={"arguments": arguments},
@@ -2583,7 +2622,7 @@ async def _stream_true_agent_loop(
         yield emit(
             "tool_result",
             "execution" if tool_name.startswith("data.") else "retrieval",
-            f"{tool_name} returned a result",
+            _agent_tool_result_message(tool_name, result),
             status="blocked" if result.get("blocked") else "completed",
             tool_name=tool_name,
             result_summary=safe_result,
