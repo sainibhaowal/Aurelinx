@@ -626,12 +626,13 @@ const workflowTime = (value) => {
 };
 
 const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
-  const [expanded, setExpanded] = useState({});
-  const running = steps.some((step) => step.status === "running");
-  const failed = steps.some((step) => ["failed", "blocked"].includes(step.status));
-  const toolCalls = steps.filter((step) => step.type === "tool_call").length;
-  const toolResults = steps.filter((step) => step.type === "tool_result").length;
-  const toggle = (id) => setExpanded((previous) => ({ ...previous, [id]: !previous[id] }));
+  const meaningfulSteps = steps.filter((step) => {
+    if (step.tool === "conversation.context") return false;
+    return !["workflow_started", "validation_completed", "workflow_completed"].includes(step.type);
+  });
+  const running = meaningfulSteps.some((step) => step.status === "running");
+  const failed = meaningfulSteps.some((step) => ["failed", "blocked"].includes(step.status));
+  const toolCalls = meaningfulSteps.filter((step) => step.type === "tool_call").length;
 
   return (
     <div className="flex flex-col gap-2 my-2">
@@ -639,28 +640,27 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
         <div>
           <div className="text-[10px] font-bold text-cyan-400/80 uppercase tracking-wider flex items-center gap-2">
             <span className={`h-2.5 w-2.5 rounded-full ${running ? "bg-cyan-400 animate-pulse" : failed ? "bg-rose-400" : "bg-emerald-400"}`} />
-            {running ? "Live workflow execution" : failed ? "Workflow ended with a problem" : "Workflow execution trace"}
+            {running ? "Aurelinx is working" : failed ? "Aurelinx needs attention" : "Aurelinx activity"}
           </div>
         </div>
         <div className="flex items-center gap-2 text-[9px] font-mono text-slate-500 uppercase">
-          <span>{steps.length} updates</span>
+          <span>{meaningfulSteps.length} updates</span>
           {toolCalls > 0 && <><span>·</span><span>{toolCalls} tool call{toolCalls === 1 ? "" : "s"}</span></>}
           {phase && <><span>·</span><span>{phase}</span></>}
         </div>
       </div>
 
-      {!steps.length && (
+      {!meaningfulSteps.length && (
         <div className="py-2 text-xs text-slate-500">
-          Waiting for the first workflow event…
+          Thinking…
         </div>
       )}
 
       <div className="space-y-1 max-h-[34rem] overflow-y-auto pr-1">
-        {steps.map((step, index) => {
+        {meaningfulSteps.map((step, index) => {
           const id = step.event_id || `${step.type}-${step.sequence || index}`;
           const status = step.status || "running";
           const isError = status === "failed" || status === "blocked";
-          const isOpen = expanded[id] ?? (status === "running" || step.type === "tool_result");
           const statusColor = status === "completed"
             ? "text-emerald-300"
             : isError
@@ -668,8 +668,13 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
               : status === "waiting"
                 ? "text-amber-300"
                 : "text-cyan-300";
-          const summary = step.result_summary;
-          const hasDetails = step.safe_input != null || summary != null || step.error_code;
+          const title = step.type === "controller_call"
+            ? (isError ? "The model could not continue" : "Thinking…")
+            : step.type === "final_response_started"
+              ? "Writing the final answer…"
+              : step.type === "final_response_completed"
+                ? (isError ? "The final answer could not be completed" : "Final answer ready")
+                : step.display_message || naturalStepDetail(step);
           return (
             <div key={id} className="relative flex items-start gap-3 text-left">
               {index < steps.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-cyan-500/15" />}
@@ -685,11 +690,11 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
               </div>
 
               <div className="flex-1 min-w-0 px-1 pb-1 pt-1">
-                <button type="button" onClick={() => hasDetails && toggle(id)} className={`w-full text-left ${hasDetails ? "cursor-pointer" : "cursor-default"}`}>
+                <div className="w-full text-left">
                   <div className="flex items-start justify-between gap-3">
                     <span className={`text-xs font-bold ${statusColor}`}>
                       <span className="mr-1.5 text-[10px] font-mono text-slate-600">#{step.sequence || index + 1}</span>
-                      {step.display_message || step.type || "workflow event"}
+                      {title}
                     </span>
                     <span className="flex-shrink-0 text-[9px] text-slate-600">
                       {workflowTime(step.created_at)}
@@ -698,15 +703,8 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
                   <div className="mt-1 flex flex-wrap gap-x-2 text-[10px] text-slate-500">
                     <span>{naturalStepDetail(step)}</span>
                     {step.duration_ms != null && <><span>·</span><span>{step.duration_ms}ms</span></>}
-                    {hasDetails && <span className="ml-auto text-cyan-500">{isOpen ? "Hide details ▲" : "Show details ▼"}</span>}
                   </div>
-                </button>
-
-                {isOpen && hasDetails && (
-                  <div className="mt-2 space-y-1 border-l border-cyan-500/20 pl-3">
-                    <div className="text-[10px] leading-relaxed text-slate-400">{naturalStepDetail(step)}</div>
-                  </div>
-                )}
+                </div>
 
                 {step.type === "approval_required" && step.result_summary?.approval_id && onApproval && (
                   <div className="flex gap-2 mt-3">
@@ -724,7 +722,6 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
         })}
       </div>
 
-      {toolResults > 0 && <div className="pt-1 text-[10px] text-slate-600">Internal work is complete; technical payloads remain protected.</div>}
     </div>
   );
 };
@@ -1257,12 +1254,11 @@ const IntelligenceChatView = () => {
                     key={m.id}
                     className={`min-w-0 ${m.role === "user" ? "ml-16 rounded-2xl p-4 bg-primary/10 border border-primary/30" : "mr-4 py-2"}`}
                   >
-                    <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5">
-                      {m.role}
-                    </div>
+                    {m.role === "user" && (
+                      <div className="text-[10px] uppercase tracking-[0.12em] text-slate-400 mb-1.5">You</div>
+                    )}
                     {m.role === "assistant" ? (
                       <div className="min-w-0">
-                        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Assistant output</div>
                         <ThinkingMessageContent
                           text={m.content || ""}
                           isBusy={false}
@@ -1271,7 +1267,7 @@ const IntelligenceChatView = () => {
                           <div className="mt-2 pt-2">
                             <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-cyan-500">
                               <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
-                              Agent trace
+                              Live activity
                             </div>
                             <AgenticStepTracker steps={m.workflow_events} onApproval={resolveApproval} />
                           </div>
@@ -1280,32 +1276,18 @@ const IntelligenceChatView = () => {
                     ) : (
                       <div className="text-sm whitespace-pre-wrap">{m.content}</div>
                     )}
-                    {m.role === "assistant" && m.tool_trace && (
-                      <details className="mt-3 text-xs">
-                        <summary className="cursor-pointer text-cyan-300 font-semibold hover:text-cyan-200">
-                          View Ingested Context Trace
-                        </summary>
-                        <pre className="mt-2 p-2.5 rounded-lg bg-black/35 border border-white/10 overflow-x-auto whitespace-pre-wrap text-slate-300">
-                          {m.tool_trace}
-                        </pre>
-                      </details>
-                    )}
                   </div>
                 ))}
                 {busy && (
                   <div className="mr-4 py-2">
-                    <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5 flex items-center justify-between">
-                      <span>assistant</span>
-                    </div>
                     <div className="min-w-0">
-                      <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Live assistant output</div>
                       <div className="text-sm">
                         <ThinkingMessageContent text={streamText} isBusy={busy} />
                       </div>
                       <div className="mt-2 pt-2">
                         <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-cyan-500">
                           <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                          Live agent trace
+                          Live activity
                         </div>
                         <AgenticStepTracker phase={streamPhase} steps={agentSteps} onApproval={resolveApproval} />
                       </div>
