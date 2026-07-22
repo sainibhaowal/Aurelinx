@@ -580,82 +580,138 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
   );
 };
 
+const workflowValue = (value) => {
+  if (value == null) return "—";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+};
+
+const workflowTime = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+};
+
 const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
+  const [expanded, setExpanded] = useState({});
+  const running = steps.some((step) => step.status === "running");
+  const failed = steps.some((step) => ["failed", "blocked"].includes(step.status));
+  const toolCalls = steps.filter((step) => step.type === "tool_call").length;
+  const toolResults = steps.filter((step) => step.type === "tool_result").length;
+  const toggle = (id) => setExpanded((previous) => ({ ...previous, [id]: !previous[id] }));
+
   return (
-    <div className="flex flex-col gap-2 bg-slate-950/40 p-4 border border-cyan-500/10 rounded-xl my-2">
-      <div className="flex items-center justify-between pb-2 border-b border-white/5 mb-1.5">
-        <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
-          </span>
-          Live Workflow Execution
-        </span>
-        <span className="text-[10px] font-mono text-slate-500 uppercase">Observable Tool Loop</span>
+    <div className="flex flex-col gap-3 bg-slate-950/60 p-4 border border-cyan-500/15 rounded-xl my-3 shadow-inner shadow-black/20">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
+        <div>
+          <div className="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
+            <span className={`h-2.5 w-2.5 rounded-full ${running ? "bg-cyan-400 animate-pulse" : failed ? "bg-rose-400" : "bg-emerald-400"}`} />
+            {running ? "Live workflow execution" : failed ? "Workflow ended with a problem" : "Workflow execution trace"}
+          </div>
+          <div className="mt-1 text-[10px] text-slate-500">
+            Every visible row is one streamed internal event. Safe inputs and outputs are shown below.
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500 uppercase">
+          <span>{steps.length} events</span>
+          <span>·</span>
+          <span>{toolCalls} calls</span>
+          {phase && <><span>·</span><span>{phase}</span></>}
+        </div>
       </div>
 
-      <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-        {!steps.length && (
-          <div className="text-[11px] text-slate-500">Starting workflow…</div>
-        )}
-        {steps.map((step) => {
+      {!steps.length && (
+        <div className="rounded-lg border border-cyan-500/10 bg-cyan-500/5 p-3 text-xs text-slate-400">
+          Waiting for the first workflow event…
+        </div>
+      )}
+
+      {steps.length > 0 && toolCalls === 0 && (
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-400">
+          No database or retrieval tool was called for this request. Greetings and other casual messages use the response step only.
+        </div>
+      )}
+
+      <div className="space-y-2 max-h-[34rem] overflow-y-auto pr-1">
+        {steps.map((step, index) => {
+          const id = step.event_id || `${step.type}-${step.sequence || index}`;
           const status = step.status || "running";
+          const isError = status === "failed" || status === "blocked";
+          const isOpen = expanded[id] ?? (status === "running" || step.type === "tool_result");
           const statusColor = status === "completed"
             ? "text-emerald-300"
-            : status === "failed" || status === "blocked"
+            : isError
               ? "text-rose-300"
-              : "text-cyan-300";
+              : status === "waiting"
+                ? "text-amber-300"
+                : "text-cyan-300";
+          const summary = step.result_summary;
+          const hasDetails = step.safe_input != null || summary != null || step.error_code;
           return (
-            <div key={step.event_id || `${step.type}-${step.sequence}`} className="flex items-start gap-3 text-left">
-              <div className="mt-0.5 flex-shrink-0">
-                {status === "completed" && (
-                  <span className="h-4 w-4 rounded-full bg-emerald-500/20 border border-emerald-400/50 inline-flex items-center justify-center text-emerald-400 text-[10px] font-bold">
-                    ✓
-                  </span>
-                )}
-                {status === "running" && (
-                  <span className="h-4 w-4 rounded-full bg-cyan-500/20 border border-cyan-400 inline-flex items-center justify-center text-cyan-400 text-[10px] font-bold animate-pulse">
-                    ●
-                  </span>
-                )}
-                {(status === "failed" || status === "blocked") && (
-                  <span className="h-4 w-4 rounded-full bg-rose-500/20 border border-rose-400 inline-flex items-center justify-center text-rose-400 text-[10px] font-bold">
-                    ✗
-                  </span>
-                )}
+            <div key={id} className="relative flex items-start gap-3 text-left">
+              {index < steps.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-cyan-500/15" />}
+              <div className="relative z-10 mt-0.5 flex-shrink-0">
+                <span className={`h-5 w-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold border ${
+                  status === "completed" ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-300" :
+                  isError ? "bg-rose-500/20 border-rose-400/60 text-rose-300" :
+                  status === "waiting" ? "bg-amber-500/20 border-amber-400/60 text-amber-300" :
+                  "bg-cyan-500/20 border-cyan-400/60 text-cyan-300 animate-pulse"
+                }`}>
+                  {status === "completed" ? "✓" : isError ? "!" : status === "waiting" ? "…" : "●"}
+                </span>
               </div>
-              
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className={`text-xs font-bold ${statusColor}`}>
-                    {step.display_message || step.type}
-                  </span>
-                  <span className="text-[9px] uppercase tracking-wider text-slate-600">
-                    {step.tool || step.phase || "workflow"}
-                  </span>
-                </div>
-                <p className="text-[10px] leading-tight text-slate-500">
-                  {step.result_summary
-                    ? typeof step.result_summary === "object"
-                      ? Object.entries(step.result_summary).map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : value}`).join(" · ")
-                      : step.result_summary
-                    : step.status}
-                  {step.duration_ms != null ? ` · ${step.duration_ms}ms` : ""}
-                </p>
+
+              <div className="flex-1 min-w-0 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2">
+                <button type="button" onClick={() => hasDetails && toggle(id)} className={`w-full text-left ${hasDetails ? "cursor-pointer" : "cursor-default"}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className={`text-xs font-bold ${statusColor}`}>
+                      <span className="mr-1.5 text-[10px] font-mono text-slate-600">#{step.sequence || index + 1}</span>
+                      {step.display_message || step.type || "workflow event"}
+                    </span>
+                    <span className="flex-shrink-0 text-[9px] uppercase tracking-wider text-slate-500">
+                      {step.tool || step.phase || "workflow"}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-2 text-[10px] text-slate-500">
+                    <span>{step.type || "event"}</span>
+                    <span>·</span>
+                    <span>{status}</span>
+                    {step.duration_ms != null && <><span>·</span><span>{step.duration_ms}ms</span></>}
+                    {workflowTime(step.created_at) && <><span>·</span><span>{workflowTime(step.created_at)}</span></>}
+                    {hasDetails && <span className="ml-auto text-cyan-500">{isOpen ? "Hide details ▲" : "Show details ▼"}</span>}
+                  </div>
+                </button>
+
+                {isOpen && hasDetails && (
+                  <div className="mt-3 space-y-2 border-t border-white/10 pt-2">
+                    {step.safe_input != null && (
+                      <div>
+                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-cyan-500">Safe input</div>
+                        <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words rounded bg-black/30 p-2 text-[10px] leading-relaxed text-slate-300">{workflowValue(step.safe_input)}</pre>
+                      </div>
+                    )}
+                    {summary != null && (
+                      <div>
+                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-emerald-500">Result / output</div>
+                        <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-black/30 p-2 text-[10px] leading-relaxed text-slate-300">{workflowValue(summary)}</pre>
+                      </div>
+                    )}
+                    {step.error_code && <div className="text-[10px] text-rose-300">Error code: {step.error_code}</div>}
+                  </div>
+                )}
+
                 {step.type === "approval_required" && step.result_summary?.approval_id && onApproval && (
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      type="button"
-                      className="px-2 py-1 rounded border border-emerald-500/30 text-[10px] text-emerald-300 hover:bg-emerald-500/10"
-                      onClick={() => onApproval("approve", step)}
-                    >
+                  <div className="flex gap-2 mt-3">
+                    <button type="button" className="px-2.5 py-1.5 rounded border border-emerald-500/30 text-[10px] text-emerald-300 hover:bg-emerald-500/10" onClick={() => onApproval("approve", step)}>
                       Approve exact action
                     </button>
-                    <button
-                      type="button"
-                      className="px-2 py-1 rounded border border-rose-500/30 text-[10px] text-rose-300 hover:bg-rose-500/10"
-                      onClick={() => onApproval("reject", step)}
-                    >
+                    <button type="button" className="px-2.5 py-1.5 rounded border border-rose-500/30 text-[10px] text-rose-300 hover:bg-rose-500/10" onClick={() => onApproval("reject", step)}>
                       Reject
                     </button>
                   </div>
@@ -665,6 +721,12 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
           );
         })}
       </div>
+
+      {toolResults > 0 && (
+        <div className="border-t border-white/10 pt-2 text-[10px] text-slate-500">
+          Tool loop summary: {toolCalls} internal call{toolCalls === 1 ? "" : "s"}, {toolResults} result{toolResults === 1 ? "" : "s"}. Tool payloads are redacted to safe operational summaries.
+        </div>
+      )}
     </div>
   );
 };
@@ -1200,18 +1262,24 @@ const IntelligenceChatView = () => {
                     <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5">
                       {m.role}
                     </div>
-                    <div className="text-sm">
-                      {m.role === "assistant" ? (
-                        <ThinkingMessageContent
-                          text={m.content || ""}
-                          isBusy={false}
-                        />
-                      ) : (
-                        <div className="whitespace-pre-wrap">{m.content}</div>
-                      )}
-                    </div>
-                    {m.role === "assistant" && m.workflow_events?.length > 0 && (
-                      <AgenticStepTracker steps={m.workflow_events} onApproval={resolveApproval} />
+                    {m.role === "assistant" ? (
+                      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-3 items-start">
+                        <div className="min-w-0">
+                          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Assistant output</div>
+                          <ThinkingMessageContent
+                            text={m.content || ""}
+                            isBusy={false}
+                          />
+                        </div>
+                        {m.workflow_events?.length > 0 && (
+                          <div className="min-w-0">
+                            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-cyan-500">Internal pipeline</div>
+                            <AgenticStepTracker steps={m.workflow_events} onApproval={resolveApproval} />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-sm whitespace-pre-wrap">{m.content}</div>
                     )}
                     {m.role === "assistant" && m.tool_trace && (
                       <details className="mt-3 text-xs">
@@ -1230,9 +1298,17 @@ const IntelligenceChatView = () => {
                     <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5 flex items-center justify-between">
                       <span>assistant</span>
                     </div>
-                    <AgenticStepTracker phase={streamPhase} steps={agentSteps} onApproval={resolveApproval} />
-                    <div className="text-sm border-t border-white/5 pt-3">
-                      <ThinkingMessageContent text={streamText} isBusy={busy} />
+                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-3 items-start">
+                      <div className="min-w-0">
+                        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Live assistant output</div>
+                        <div className="text-sm border-t border-white/5 pt-3">
+                          <ThinkingMessageContent text={streamText} isBusy={busy} />
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-cyan-500">Live internal pipeline</div>
+                        <AgenticStepTracker phase={streamPhase} steps={agentSteps} onApproval={resolveApproval} />
+                      </div>
                     </div>
                   </div>
                 )}
