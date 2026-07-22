@@ -10,6 +10,7 @@ import asyncio
 import json
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
@@ -71,6 +72,7 @@ from app.workflows.events import (
     ToolEventScope,
     create_workflow_run,
     emit_workflow_event,
+    safe_summary,
     update_workflow_run,
     workflow_event_dict,
 )
@@ -1480,6 +1482,8 @@ async def _llm_response(
     model: str,
     user_text: str,
     context_payload: Dict,
+    system_override: Optional[str] = None,
+    temperature_override: Optional[float] = None,
 ) -> str:
     provider = (provider or "lmstudio").lower()
 
@@ -1527,7 +1531,7 @@ async def _llm_response(
 
     casual_chat = _is_casual_chat(user_text)
 
-    system = (
+    default_system = (
         "You are Aurelinx, the authoritative AI intelligence of the Aurelinx Management OS — "
         "an executive-grade HR platform.\n"
         "You have live access to the HR employee directory, candidates database, analytics, "
@@ -1544,6 +1548,12 @@ async def _llm_response(
         "- Be natural, direct, and executive in tone.\n"
         "- If asked about employees, present the data in a clean formatted table or list.\n"
         "- If deletion is requested, firmly state it requires human approval and cannot be automated."
+    )
+    system = system_override or default_system
+    response_temperature = (
+        temperature_override
+        if temperature_override is not None
+        else (0.7 if casual_chat else 0.3)
     )
 
     # Build clean tool summary — never pass nested session_history inside the tool block
@@ -1625,7 +1635,7 @@ async def _llm_response(
         payload = {
             "model": model_name,
             "max_tokens": 1024,
-            "temperature": 0.7 if casual_chat else 0.3,
+            "temperature": response_temperature,
             "messages": messages,
         }
     elif provider == "claude":
@@ -1634,7 +1644,7 @@ async def _llm_response(
         payload = {
             "model": model_name,
             "max_tokens": 1024,
-            "temperature": 0.7 if casual_chat else 0.3,
+            "temperature": response_temperature,
             "system": system,
             "messages": messages,
         }
@@ -1643,7 +1653,7 @@ async def _llm_response(
         payload = {
             "contents": [{"parts": [{"text": full_prompt}]}],
             "generationConfig": {
-                "temperature": 0.7 if casual_chat else 0.3,
+                "temperature": response_temperature,
                 "maxOutputTokens": 1024,
             },
         }
@@ -1762,6 +1772,141 @@ def _user_role(current_user: TokenData) -> str:
 
 def _is_casual_chat(user_text: str) -> bool:
     return _request_plan(user_text).get("mode") == "conversation"
+
+
+AGENT_TOOL_CATALOG = {
+    "employee.search": "Search verified employee records using a natural-language query.",
+    "candidate.search": "Search verified candidate records using a natural-language query.",
+    "dashboard.snapshot": "Calculate current workforce totals, risk, morale, and department metrics.",
+    "workspace.snapshot": "Retrieve the relevant verified workspace section for analytics, integrations, policy, or operations.",
+    "document.csv_ingest": "Parse and validate an attached CSV file; only use when an attachment is present.",
+    "data.mutate": "Create or update one explicitly requested employee, candidate, or integration record. Admin only.",
+    "data.verify": "Read back a previously committed mutation to verify the exact database state.",
+}
+
+
+def _parse_agent_decision(raw_text: str) -> Dict[str, Any]:
+    """Parse and strictly validate one model controller decision."""
+    text = (raw_text or "").strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE | re.DOTALL).strip()
+    try:
+        payload = json.loads(text)
+    except Exception:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start < 0 or end <= start:
+            return {"action": "invalid", "error": "Controller did not return JSON"}
+        try:
+            payload = json.loads(text[start : end + 1])
+        except Exception:
+            return {"action": "invalid", "error": "Controller returned malformed JSON"}
+
+    if not isinstance(payload, dict):
+        return {"action": "invalid", "error": "Controller decision was not an object"}
+    action = str(payload.get("action", "")).lower().strip()
+    if action not in {"tool", "respond", "approval_required"}:
+        return {"action": "invalid", "error": "Unsupported controller action"}
+    if action == "tool":
+        tool = str(payload.get("tool", "")).strip()
+        if tool not in AGENT_TOOL_CATALOG:
+            return {"action": "invalid", "error": f"Unsupported tool: {tool}"}
+        args = payload.get("arguments")
+        if not isinstance(args, dict):
+            return {"action": "invalid", "error": "Tool arguments must be an object"}
+        return {
+            "action": "tool",
+            "tool": tool,
+            "arguments": args,
+            "message": str(payload.get("message", "Model selected the next bounded tool"))[:500],
+        }
+    if action == "approval_required":
+        return {
+            "action": "approval_required",
+            "message": str(payload.get("message", "Human approval is required before this action"))[:500],
+        }
+    return {
+        "action": "respond",
+        "message": str(payload.get("message", "Model selected a final response"))[:500],
+    }
+
+
+def _agent_controller_prompt(
+    user_text: str,
+    history: List[Dict[str, str]],
+    tool_transcript: List[Dict[str, Any]],
+    current_user: TokenData,
+    has_attachments: bool,
+) -> str:
+    catalog = "\n".join(f"- {name}: {description}" for name, description in AGENT_TOOL_CATALOG.items())
+    return (
+        "You are the Aurelinx execution controller. Choose exactly one next action and return ONLY valid JSON.\n"
+        "You are not the final answer writer. Do not expose chain-of-thought.\n"
+        "Allowed JSON shapes:\n"
+        '{"action":"tool","tool":"employee.search","arguments":{"query":"..."},"message":"short safe reason"}\n'
+        '{"action":"respond","message":"no more tools are needed"}\n'
+        '{"action":"approval_required","message":"explain why admin approval is required"}\n'
+        "Rules:\n"
+        "- Select at most one tool per turn, then wait for its result.\n"
+        "- Use live tools for Aurelinx workspace facts; do not guess records or metrics.\n"
+        "- Never select data.mutate for a delete/remove request; select approval_required instead.\n"
+        f"- Current user role: {'admin' if current_user.is_admin else 'member'}.\n"
+        f"- Attached files available: {has_attachments}.\n"
+        f"Available tools:\n{catalog}\n\n"
+        f"Original user request:\n{user_text}\n\n"
+        f"Conversation history:\n{json.dumps(history[-6:], default=str)}\n\n"
+        f"Tool calls and results already observed:\n{json.dumps(tool_transcript[-8:], default=str)}\n\n"
+        "Return one JSON decision now."
+    )
+
+
+def _execute_agent_tool(
+    tool_name: str,
+    arguments: Dict[str, Any],
+    user_text: str,
+    current_user: TokenData,
+    session_id: str,
+    mutation_state: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Execute exactly one allowlisted tool in an isolated DB session."""
+    with Session(engine) as db:
+        attachments = db.exec(
+            select(ChatAttachmentTable).where(ChatAttachmentTable.session_id == str(session_id))
+        ).all()
+        query = str(arguments.get("query") or user_text)[:12000]
+        if tool_name == "employee.search":
+            rows = _search_employees(db, query, limit=min(int(arguments.get("limit", 8)), 20))
+            return {
+                "tool": tool_name,
+                "matches": [
+                    {"name": row.full_name, "email": row.email, "role": row.role, "department": row.department, "risk": row.is_at_risk}
+                    for row in rows
+                ],
+            }
+        if tool_name == "candidate.search":
+            rows = _search_candidates(db, query, limit=min(int(arguments.get("limit", 8)), 20))
+            return {
+                "tool": tool_name,
+                "matches": [
+                    {"name": row.full_name, "email": row.email, "role": row.role, "department": row.department, "match_score": row.match_score}
+                    for row in rows
+                ],
+            }
+        if tool_name == "dashboard.snapshot":
+            return {"tool": tool_name, "snapshot": _compute_dashboard_snapshot(db)}
+        if tool_name == "workspace.snapshot":
+            return {"tool": tool_name, "snapshot": _workspace_snapshot(db, query), "record_counts": _record_counts(db)}
+        if tool_name == "document.csv_ingest":
+            return {"tool": tool_name, "result": _parse_csv_and_ingest(db, attachments)}
+        if tool_name == "data.mutate":
+            if not current_user.is_admin:
+                return {"tool": tool_name, "blocked": True, "reason": "RBAC requires an admin"}
+            if any(word in user_text.lower() for word in ("delete", "remove", "purge", "clear")):
+                return {"tool": tool_name, "blocked": True, "reason": "Deletion requires human approval"}
+            return {"tool": tool_name, "result": _apply_data_mutation(db, user_text)}
+        if tool_name == "data.verify":
+            return {"tool": tool_name, "result": _verify_mutation(db, user_text, mutation_state or {})}
+        return {"tool": tool_name, "blocked": True, "reason": "Tool was not available"}
 
 
 def _sanitize_llm_response(text: str, user_text: str) -> str:
@@ -2131,6 +2276,366 @@ def _execute_tools(
     result["mutations"] = mutation_log
     result["rbac_role"] = role
     return result
+
+
+async def _stream_true_agent_loop(
+    db: Session,
+    chat_session: ChatSessionTable,
+    user_msg: ChatMessageTable,
+    workflow_run: WorkflowRunTable,
+    request: ChatMessageCreate,
+    current_user: TokenData,
+):
+    """Run the model-directed, bounded tool loop and stream actual events."""
+    events: List[Dict[str, Any]] = []
+    tool_transcript: List[Dict[str, Any]] = []
+    mutation_state: Dict[str, Any] = {}
+    approval_id: Optional[str] = None
+    awaiting_approval = False
+    max_iterations = 6
+
+    def emit(
+        event_type: str,
+        phase: str,
+        message: str,
+        *,
+        status: str = "running",
+        tool_name: Optional[str] = None,
+        safe_input: Any = None,
+        result_summary: Any = None,
+        error_code: Optional[str] = None,
+        duration_ms: Optional[int] = None,
+    ) -> str:
+        event = emit_workflow_event(
+            workflow_run.id,
+            event_type,
+            phase,
+            message,
+            status=status,
+            tool_name=tool_name,
+            safe_input=safe_input,
+            result_summary=result_summary,
+            error_code=error_code,
+            duration_ms=duration_ms,
+        )
+        events.append(event)
+        return f"event: agent_step\ndata: {_json_dumps(event)}\n\n"
+
+    yield emit(
+        "workflow_started",
+        "intake",
+        "Workflow received and authenticated",
+        status="completed",
+        result_summary={"session_id": chat_session.id, "controller": "llm"},
+    )
+
+    history_rows = db.exec(
+        select(ChatMessageTable)
+        .where(ChatMessageTable.session_id == str(chat_session.id))
+        .order_by(ChatMessageTable.created_at.desc())
+        .limit(6)
+    ).all()
+    history: List[Dict[str, str]] = []
+    for row in reversed(history_rows):
+        content = (row.content or "").strip()
+        if content and not content.startswith("LLM failed") and not content.startswith('{"tool_context'):
+            history.append({"role": row.role, "content": content[:600]})
+
+    yield emit(
+        "tool_call",
+        "context",
+        "Loading conversation context for the controller",
+        status="running",
+        tool_name="conversation.context",
+        safe_input={"session_id": chat_session.id, "turn_limit": 6},
+    )
+    yield emit(
+        "tool_result",
+        "context",
+        "Conversation context loaded",
+        status="completed",
+        tool_name="conversation.context",
+        result_summary={"messages_loaded": len(history)},
+        duration_ms=0,
+    )
+
+    controller_system = (
+        "You are the Aurelinx LLM execution controller. Return ONLY one valid JSON object. "
+        "You must choose one next action, never multiple actions. Do not reveal chain-of-thought. "
+        "Use a tool when verified workspace data or a database action is required. "
+        "After each tool result, decide whether another tool is required or the final answer can be written. "
+        "Never mutate on behalf of a member. Never delete; request human approval for deletion. "
+        "Allowed actions: tool, respond, approval_required. Allowed tools: "
+        + ", ".join(AGENT_TOOL_CATALOG.keys())
+        + "."
+    )
+
+    for iteration in range(1, max_iterations + 1):
+        yield emit(
+            "model_decision_started",
+            "planning",
+            "LLM controller is deciding the next bounded action",
+            status="running",
+            result_summary={"iteration": iteration, "max_iterations": max_iterations},
+        )
+
+        planner_prompt = _agent_controller_prompt(
+            request.content,
+            history,
+            tool_transcript,
+            current_user,
+            bool(db.exec(select(ChatAttachmentTable).where(ChatAttachmentTable.session_id == str(chat_session.id))).all()),
+        )
+        raw_decision = await _llm_response(
+            provider=request.provider or "lmstudio",
+            api_key=request.api_key,
+            base_url=request.base_url,
+            model=request.model,
+            user_text=planner_prompt,
+            context_payload={
+                "request_plan": {"mode": "agent_controller", "needs_live_data": False},
+                "tool_context": {"tool_runs": [], "rbac_role": "admin" if current_user.is_admin else "member"},
+                "session_history": history,
+            },
+            system_override=controller_system,
+            temperature_override=0.0,
+        )
+        decision = _parse_agent_decision(raw_decision)
+
+        if any(word in request.content.lower() for word in ("delete", "remove", "purge", "clear")) and decision.get("action") == "respond":
+            decision = {
+                "action": "approval_required",
+                "message": "The request is destructive; human approval is required before any delete action",
+            }
+
+        if decision.get("action") == "invalid":
+            yield emit(
+                "model_decision_invalid",
+                "planning",
+                "LLM controller returned an invalid decision; no tool was executed",
+                status="failed",
+                result_summary={"error": decision.get("error"), "iteration": iteration},
+                error_code="INVALID_CONTROLLER_OUTPUT",
+            )
+            if iteration == 1:
+                fallback = _request_plan(request.content)
+                fallback_tools = [tool for tool in fallback.get("capabilities", []) if tool in AGENT_TOOL_CATALOG]
+                if fallback_tools:
+                    decision = {
+                        "action": "tool",
+                        "tool": fallback_tools[0].replace("search_employees", "employee.search").replace("search_candidates", "candidate.search").replace("dashboard_snapshot", "dashboard.snapshot").replace("workspace_snapshot", "workspace.snapshot").replace("parse_csv_attachment", "document.csv_ingest").replace("mutate_data", "data.mutate"),
+                        "arguments": {"query": request.content},
+                        "message": "Safe deterministic fallback selected after invalid controller output",
+                    }
+                    yield emit(
+                        "controller_fallback",
+                        "planning",
+                        "Safe controller fallback selected; provider output was not executable",
+                        status="completed",
+                        result_summary={"tool": decision["tool"]},
+                    )
+                else:
+                    decision = {"action": "respond", "message": "No tool is required"}
+            else:
+                break
+
+        yield emit(
+            "agent_decision",
+            "planning",
+            decision.get("message", "LLM selected the next action"),
+            status="completed",
+            result_summary={
+                "iteration": iteration,
+                "action": decision.get("action"),
+                "tool": decision.get("tool"),
+                "arguments": decision.get("arguments", {}),
+            },
+        )
+
+        action = decision.get("action")
+        if action == "approval_required":
+            approval_id = str(uuid4())
+            approval_payload = request.content[:12000]
+            db.add(
+                WorkflowApprovalTable(
+                    id=approval_id,
+                    run_id=workflow_run.id,
+                    tenant_id=getattr(current_user, "tenant_id", None) or "default",
+                    requested_by=str(current_user.user_id),
+                    action_type="delete",
+                    action_payload_hash=hashlib.sha256(approval_payload.encode("utf-8")).hexdigest(),
+                    action_payload=approval_payload,
+                    status="pending",
+                    reason="LLM controller requested human approval for deletion",
+                    expires_at=datetime.utcnow() + timedelta(minutes=30),
+                )
+            )
+            db.commit()
+            awaiting_approval = True
+            yield emit(
+                "approval_required",
+                "governance",
+                "Deletion is blocked until an authorized human approves it",
+                status="blocked",
+                result_summary={"approval_required": True, "action": "delete", "approval_id": approval_id},
+                error_code="HUMAN_APPROVAL_REQUIRED",
+            )
+            break
+
+        if action == "respond":
+            if mutation_state.get("updated") and not mutation_state.get("verification", {}).get("verified"):
+                decision = {"action": "tool", "tool": "data.verify", "arguments": {}, "message": "Policy requires read-back verification before final response"}
+            else:
+                break
+
+        tool_name = decision.get("tool")
+        if not tool_name:
+            break
+        arguments = decision.get("arguments") or {}
+        started_at = time.perf_counter()
+        yield emit(
+            "tool_call",
+            "execution" if tool_name.startswith("data.") else "retrieval",
+            f"Executing {tool_name}",
+            status="running",
+            tool_name=tool_name,
+            safe_input={"arguments": arguments},
+        )
+        result = await asyncio.to_thread(
+            _execute_agent_tool,
+            tool_name,
+            arguments,
+            request.content,
+            current_user,
+            chat_session.id,
+            mutation_state,
+        )
+        if tool_name == "data.mutate" and isinstance(result.get("result"), dict):
+            mutation_state = result["result"]
+        if tool_name == "data.verify" and isinstance(result.get("result"), dict):
+            mutation_state["verification"] = result["result"]
+        safe_result = safe_summary(result)
+        tool_transcript.append({"tool": tool_name, "arguments": arguments, "result": safe_result})
+        yield emit(
+            "tool_result",
+            "execution" if tool_name.startswith("data.") else "retrieval",
+            f"{tool_name} returned a result",
+            status="blocked" if result.get("blocked") else "completed",
+            tool_name=tool_name,
+            result_summary=safe_result,
+            duration_ms=int((time.perf_counter() - started_at) * 1000),
+            error_code="TOOL_BLOCKED" if result.get("blocked") else None,
+        )
+
+    tool_runs = [{"tool": item["tool"], "output": item["result"]} for item in tool_transcript]
+    context_payload = {
+        "request_plan": {**_request_plan(request.content), "mode": "agent_loop"},
+        "tool_context": {
+            "tool_policy": [item["tool"] for item in tool_transcript],
+            "tool_runs": tool_runs,
+            "workspace_snapshot": {},
+            "record_counts": {},
+            "mutations": mutation_state,
+            "rbac_role": "admin" if current_user.is_admin else "member",
+            "attachment_text_context": "",
+            "integration_connections": [],
+            "compliance_policies": [],
+        },
+        "session_history": history,
+        "agent_loop": tool_transcript,
+        "workflow_run_id": workflow_run.id,
+        "workflow_events": events,
+    }
+
+    yield emit(
+        "validation_completed",
+        "validation",
+        "Actual controller decisions and tool results passed workflow validation",
+        status="completed",
+        result_summary={"iterations": len(tool_transcript) + 1, "tool_calls": len(tool_transcript)},
+    )
+    model_started = emit_workflow_event(
+        workflow_run.id,
+        "final_response_started",
+        "response",
+        "Generating the final response from the observed tool loop",
+        status="running",
+        result_summary={"tool_calls": len(tool_transcript)},
+    )
+    events.append(model_started)
+    yield f"event: agent_step\ndata: {_json_dumps(model_started)}\n\n"
+
+    assistant_text = ""
+    last_err = None
+    try:
+        async for token in _llm_stream_response(
+            provider=request.provider or "lmstudio",
+            api_key=request.api_key,
+            base_url=request.base_url,
+            model=request.model,
+            user_text=request.content,
+            context_payload=context_payload,
+        ):
+            assistant_text += token
+            yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
+    except Exception as exc:
+        last_err = str(exc)
+        assistant_text = _safe_provider_failure_reply(context_payload)
+        yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+
+    model_completed = emit_workflow_event(
+        workflow_run.id,
+        "final_response_completed",
+        "response",
+        "Final response generated from verified loop results",
+        status="failed" if last_err else "completed",
+        result_summary={"characters": len(assistant_text), "tool_calls": len(tool_transcript)},
+        error_code="MODEL_FALLBACK" if last_err else None,
+    )
+    events.append(model_completed)
+    yield f"event: agent_step\ndata: {_json_dumps(model_completed)}\n\n"
+
+    assistant_msg = ChatMessageTable(
+        session_id=chat_session.id,
+        role="assistant",
+        content=assistant_text,
+        tool_trace=json.dumps(context_payload, default=str),
+    )
+    db.add(assistant_msg)
+    chat_session.updated_at = datetime.utcnow()
+    db.add(chat_session)
+    _write_audit(
+        db,
+        current_user,
+        action="CHAT_MESSAGE_AGENT_LOOP",
+        resource_type="chat_session",
+        resource_id=chat_session.id,
+        details={"tool_calls": len(tool_transcript), "iterations": len(tool_transcript) + 1, "controller": "llm"},
+    )
+    db.commit()
+    db.refresh(assistant_msg)
+    db.refresh(chat_session)
+    update_workflow_run(
+        workflow_run.id,
+        "awaiting_approval" if awaiting_approval else "completed",
+        "governance" if awaiting_approval else "completed",
+    )
+    completed = emit_workflow_event(
+        workflow_run.id,
+        "workflow_paused" if awaiting_approval else "workflow_completed",
+        "governance" if awaiting_approval else "completed",
+        "Workflow paused for authorized approval" if awaiting_approval else "Workflow completed from the live agent loop",
+        status="waiting" if awaiting_approval else "completed",
+        result_summary={"assistant_message_id": assistant_msg.id, "tool_calls": len(tool_transcript)},
+    )
+    events.append(completed)
+    context_payload["workflow_events"] = events
+    assistant_msg.tool_trace = json.dumps(context_payload, default=str)
+    db.add(assistant_msg)
+    db.commit()
+    db.refresh(assistant_msg)
+    yield f"event: agent_step\ndata: {_json_dumps(completed)}\n\n"
+    yield f"event: done\ndata: {_json_dumps({'assistant_message': _to_message_out(assistant_msg).model_dump(mode='json'), 'user_message': _to_message_out(user_msg).model_dump(mode='json'), 'session': _to_session_out(chat_session).model_dump(mode='json')})}\n\n"
 
 
 @router.get("/sessions", response_model=List[ChatSessionOut])
@@ -2698,6 +3203,20 @@ async def send_message_stream(
                 str(current_user.user_id),
                 getattr(current_user, "tenant_id", None) or "default",
             )
+
+            # The live path is an LLM-directed loop. The legacy deterministic
+            # orchestration below remains as a source-compatible fallback, but
+            # normal streaming requests return from the real controller path.
+            async for frame in _stream_true_agent_loop(
+                db,
+                chat_session,
+                user_msg,
+                workflow_run,
+                request,
+                current_user,
+            ):
+                yield frame
+            return
 
             attachments = db.exec(
                 select(ChatAttachmentTable).where(
