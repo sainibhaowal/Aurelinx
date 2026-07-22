@@ -1263,17 +1263,18 @@ const IntelligenceChatView = () => {
                       {m.role}
                     </div>
                     {m.role === "assistant" ? (
-                      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-3 items-start">
-                        <div className="min-w-0">
-                          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Assistant output</div>
-                          <ThinkingMessageContent
-                            text={m.content || ""}
-                            isBusy={false}
-                          />
-                        </div>
+                      <div className="min-w-0">
+                        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Assistant output</div>
+                        <ThinkingMessageContent
+                          text={m.content || ""}
+                          isBusy={false}
+                        />
                         {m.workflow_events?.length > 0 && (
-                          <div className="min-w-0">
-                            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-cyan-500">Internal pipeline</div>
+                          <div className="mt-3 border-t border-white/10 pt-3">
+                            <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-cyan-500">
+                              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+                              Agent trace
+                            </div>
                             <AgenticStepTracker steps={m.workflow_events} onApproval={resolveApproval} />
                           </div>
                         )}
@@ -1298,15 +1299,16 @@ const IntelligenceChatView = () => {
                     <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5 flex items-center justify-between">
                       <span>assistant</span>
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-3 items-start">
-                      <div className="min-w-0">
-                        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Live assistant output</div>
-                        <div className="text-sm border-t border-white/5 pt-3">
-                          <ThinkingMessageContent text={streamText} isBusy={busy} />
-                        </div>
+                    <div className="min-w-0">
+                      <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Live assistant output</div>
+                      <div className="text-sm">
+                        <ThinkingMessageContent text={streamText} isBusy={busy} />
                       </div>
-                      <div className="min-w-0">
-                        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-cyan-500">Live internal pipeline</div>
+                      <div className="mt-3 border-t border-white/10 pt-3">
+                        <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-cyan-500">
+                          <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                          Live agent trace
+                        </div>
                         <AgenticStepTracker phase={streamPhase} steps={agentSteps} onApproval={resolveApproval} />
                       </div>
                     </div>
