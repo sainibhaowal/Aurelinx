@@ -426,6 +426,8 @@ class ChatMessageOut(BaseModel):
     content: str
     tool_trace: Optional[str] = None
     created_at: datetime
+    workflow_run_id: Optional[str] = None
+    workflow_events: List[dict] = Field(default_factory=list)
 
 
 class ChatAttachmentOut(BaseModel):

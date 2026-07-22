@@ -271,6 +271,67 @@ class ChatAttachmentTable(SQLModel, table=True):
         super().__init__(**data)
 
 
+# ============ WORKFLOW ORCHESTRATION ==========
+class WorkflowRunTable(SQLModel, table=True):
+    """Durable state for one observable agent/workflow execution."""
+
+    __tablename__ = "workflow_runs"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    session_id: str = Field(index=True)
+    user_id: str = Field(index=True)
+    tenant_id: str = Field(default="default", index=True)
+    status: str = Field(default="received", index=True)
+    intent: Optional[str] = Field(default=None)
+    current_phase: Optional[str] = Field(default=None)
+    idempotency_key: Optional[str] = Field(default=None, unique=True, index=True)
+    failure_reason: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    completed_at: Optional[datetime] = Field(default=None)
+
+
+class WorkflowEventTable(SQLModel, table=True):
+    """Append-only, safe-to-display operational events for a workflow run."""
+
+    __tablename__ = "workflow_events"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    run_id: str = Field(index=True)
+    sequence: int = Field(index=True)
+    parent_event_id: Optional[str] = Field(default=None)
+    event_type: str = Field(index=True)
+    phase: str = Field(index=True)
+    tool_name: Optional[str] = Field(default=None, index=True)
+    status: str = Field(default="running", index=True)
+    display_message: str
+    safe_input: Optional[str] = Field(default=None)
+    result_summary: Optional[str] = Field(default=None)
+    error_code: Optional[str] = Field(default=None)
+    duration_ms: Optional[int] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class WorkflowApprovalTable(SQLModel, table=True):
+    """Human-in-the-loop approval tied to an exact proposed action."""
+
+    __tablename__ = "workflow_approvals"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    run_id: str = Field(index=True)
+    tenant_id: str = Field(default="default", index=True)
+    requested_by: str = Field(index=True)
+    approved_by: Optional[str] = Field(default=None, index=True)
+    action_type: str = Field(index=True)
+    action_payload_hash: str
+    action_payload: str
+    status: str = Field(default="pending", index=True)
+    reason: Optional[str] = Field(default=None)
+    expires_at: datetime
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    resolved_at: Optional[datetime] = Field(default=None)
+
+
 # ============ ENTERPRISE INTEGRATIONS ============
 class IntegrationConnectionTable(SQLModel, table=True):
     """Configured source system connectors (HRIS/ATS/etc)."""

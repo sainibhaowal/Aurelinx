@@ -580,29 +580,7 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
   );
 };
 
-const AgenticStepTracker = ({ phase, streamText }) => {
-  const steps = [
-    { id: "thinking", label: "Think", desc: "Analyzing request intent and query scope" },
-    { id: "planning", label: "Plan", desc: "Context payload generation and RBAC check" },
-    { id: "exploring", label: "Explore", desc: "Retrieving records from PostgreSQL database" },
-    { id: "modifying", label: "Modify", desc: "Applying database write mutations", optional: true },
-    { id: "verifying", label: "Verify", desc: "Running compliance audit and safeguards" },
-    { id: "completing", label: "Complete", desc: "Streaming response token chunks" }
-  ];
-
-  // Helper to determine status icon
-  const getStepStatus = (stepId, index) => {
-    const activeIndex = steps.findIndex(s => s.id === phase);
-    const stepIndex = steps.findIndex(s => s.id === stepId);
-    
-    if (phase === "done") return "completed";
-    if (phase === "error") return "error";
-    if (activeIndex === -1) return "pending";
-    if (stepIndex < activeIndex) return "completed";
-    if (stepIndex === activeIndex) return "active";
-    return "pending";
-  };
-
+const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
   return (
     <div className="flex flex-col gap-2 bg-slate-950/40 p-4 border border-cyan-500/10 rounded-xl my-2">
       <div className="flex items-center justify-between pb-2 border-b border-white/5 mb-1.5">
@@ -611,34 +589,36 @@ const AgenticStepTracker = ({ phase, streamText }) => {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
           </span>
-          Agentic Orchestration State
+          Live Workflow Execution
         </span>
-        <span className="text-[10px] font-mono text-slate-500 uppercase">Multi-Step Loop</span>
+        <span className="text-[10px] font-mono text-slate-500 uppercase">Observable Tool Loop</span>
       </div>
-      
-      <div className="space-y-3">
-        {steps.map((step, idx) => {
-          const status = getStepStatus(step.id, idx);
-          
+
+      <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+        {!steps.length && (
+          <div className="text-[11px] text-slate-500">Starting workflow…</div>
+        )}
+        {steps.map((step) => {
+          const status = step.status || "running";
+          const statusColor = status === "completed"
+            ? "text-emerald-300"
+            : status === "failed" || status === "blocked"
+              ? "text-rose-300"
+              : "text-cyan-300";
           return (
-            <div key={step.id} className="flex items-start gap-3 text-left">
+            <div key={step.event_id || `${step.type}-${step.sequence}`} className="flex items-start gap-3 text-left">
               <div className="mt-0.5 flex-shrink-0">
                 {status === "completed" && (
                   <span className="h-4 w-4 rounded-full bg-emerald-500/20 border border-emerald-400/50 inline-flex items-center justify-center text-emerald-400 text-[10px] font-bold">
                     ✓
                   </span>
                 )}
-                {status === "active" && (
+                {status === "running" && (
                   <span className="h-4 w-4 rounded-full bg-cyan-500/20 border border-cyan-400 inline-flex items-center justify-center text-cyan-400 text-[10px] font-bold animate-pulse">
                     ●
                   </span>
                 )}
-                {status === "pending" && (
-                  <span className="h-4 w-4 rounded-full bg-slate-900 border border-white/10 inline-flex items-center justify-center text-slate-600 text-[9px]">
-                    ○
-                  </span>
-                )}
-                {status === "error" && (
+                {(status === "failed" || status === "blocked") && (
                   <span className="h-4 w-4 rounded-full bg-rose-500/20 border border-rose-400 inline-flex items-center justify-center text-rose-400 text-[10px] font-bold">
                     ✗
                   </span>
@@ -647,13 +627,39 @@ const AgenticStepTracker = ({ phase, streamText }) => {
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <span className={`text-xs font-bold ${status === "active" ? "text-cyan-300" : status === "completed" ? "text-slate-300" : "text-slate-500"}`}>
-                    {step.label}
+                  <span className={`text-xs font-bold ${statusColor}`}>
+                    {step.display_message || step.type}
+                  </span>
+                  <span className="text-[9px] uppercase tracking-wider text-slate-600">
+                    {step.tool || step.phase || "workflow"}
                   </span>
                 </div>
-                <p className={`text-[11px] leading-tight ${status === "active" ? "text-slate-300" : "text-slate-500"}`}>
-                  {step.desc}
+                <p className="text-[10px] leading-tight text-slate-500">
+                  {step.result_summary
+                    ? typeof step.result_summary === "object"
+                      ? Object.entries(step.result_summary).map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : value}`).join(" · ")
+                      : step.result_summary
+                    : step.status}
+                  {step.duration_ms != null ? ` · ${step.duration_ms}ms` : ""}
                 </p>
+                {step.type === "approval_required" && step.result_summary?.approval_id && onApproval && (
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      type="button"
+                      className="px-2 py-1 rounded border border-emerald-500/30 text-[10px] text-emerald-300 hover:bg-emerald-500/10"
+                      onClick={() => onApproval("approve", step)}
+                    >
+                      Approve exact action
+                    </button>
+                    <button
+                      type="button"
+                      className="px-2 py-1 rounded border border-rose-500/30 text-[10px] text-rose-300 hover:bg-rose-500/10"
+                      onClick={() => onApproval("reject", step)}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -674,6 +680,7 @@ const IntelligenceChatView = () => {
   const [attachments, setAttachments] = useState([]);
   const [streamText, setStreamText] = useState("");
   const [streamPhase, setStreamPhase] = useState(null);
+  const [agentSteps, setAgentSteps] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [helpOpen, setHelpOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState(null);
@@ -832,6 +839,44 @@ const IntelligenceChatView = () => {
     await loadMessages(selectedSessionId);
   };
 
+  const resolveApproval = async (decision, event) => {
+    const approvalId = event?.result_summary?.approval_id;
+    if (!approvalId || !event?.run_id) return;
+    try {
+      const result = decision === "approve"
+        ? await chatAPI.approveWorkflow(event.run_id, approvalId)
+        : await chatAPI.rejectWorkflow(event.run_id, approvalId);
+      setAgentSteps((previous) => [
+        ...previous,
+        {
+          event_id: `approval-resolution-${Date.now()}`,
+          run_id: event.run_id,
+          type: decision === "approve" ? "approval_granted" : "approval_rejected",
+          phase: "governance",
+          status: decision === "approve" ? "completed" : "blocked",
+          display_message: decision === "approve"
+            ? "Admin approval granted and action executed"
+            : "Admin rejected the action; no mutation executed",
+          result_summary: result?.result || result,
+        },
+      ]);
+      if (selectedSessionId) await loadMessages(selectedSessionId);
+    } catch (error) {
+      console.error("Workflow approval failed", error);
+      setAgentSteps((previous) => [
+        ...previous,
+        {
+          event_id: `approval-error-${Date.now()}`,
+          run_id: event.run_id,
+          type: "approval_error",
+          phase: "governance",
+          status: "failed",
+          display_message: error?.message || "Approval could not be resolved",
+        },
+      ]);
+    }
+  };
+
   const sendMessage = async () => {
     if (!input.trim() || busy) return;
     setBusy(true);
@@ -841,6 +886,7 @@ const IntelligenceChatView = () => {
     abortRef.current = controller;
     const userText = input.trim();
     setInput("");
+    setAgentSteps([]);
 
     // Add optimistic user message to display input immediately
     const optimisticUserMsg = {
@@ -886,6 +932,16 @@ const IntelligenceChatView = () => {
         payload,
         {
           onStatus: ({ phase }) => setStreamPhase(phase),
+          onAgentStep: (event) => {
+            setAgentSteps((previous) => {
+              const next = [...previous];
+              const index = next.findIndex((item) => item.event_id === event.event_id);
+              if (index >= 0) next[index] = event;
+              else next.push(event);
+              return next;
+            });
+            setStreamPhase(event.phase || event.type || null);
+          },
           onChunk: ({ text }) => setStreamText((prev) => prev + text),
           onDone: ({ assistant_message, user_message, session }) => {
             setMessages((prev) => [
@@ -1154,6 +1210,9 @@ const IntelligenceChatView = () => {
                         <div className="whitespace-pre-wrap">{m.content}</div>
                       )}
                     </div>
+                    {m.role === "assistant" && m.workflow_events?.length > 0 && (
+                      <AgenticStepTracker steps={m.workflow_events} onApproval={resolveApproval} />
+                    )}
                     {m.role === "assistant" && m.tool_trace && (
                       <details className="mt-3 text-xs">
                         <summary className="cursor-pointer text-cyan-300 font-semibold hover:text-cyan-200">
@@ -1171,7 +1230,7 @@ const IntelligenceChatView = () => {
                     <div className="text-xs uppercase tracking-[0.12em] text-slate-400 mb-1.5 flex items-center justify-between">
                       <span>assistant</span>
                     </div>
-                    <AgenticStepTracker phase={streamPhase} streamText={streamText} />
+                    <AgenticStepTracker phase={streamPhase} steps={agentSteps} onApproval={resolveApproval} />
                     <div className="text-sm border-t border-white/5 pt-3">
                       <ThinkingMessageContent text={streamText} isBusy={busy} />
                     </div>

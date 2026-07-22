@@ -954,6 +954,7 @@ export const chatAPI = {
       return consumeEventStream(response, {
         chunk: handlers.onChunk,
         status: handlers.onStatus,
+        agent_step: handlers.onAgentStep,
         done: handlers.onDone,
         error: handlers.onError,
       }, signal);
@@ -964,6 +965,18 @@ export const chatAPI = {
       throw error;
     }
   },
+  listWorkflows: (sessionId) =>
+    request(`${API_V1}/chat/sessions/${sessionId}/workflows`),
+  listWorkflowEvents: (runId) =>
+    request(`${API_V1}/chat/workflows/${runId}/events`),
+  approveWorkflow: (runId, approvalId) =>
+    request(`${API_V1}/chat/workflows/${runId}/approvals/${approvalId}/approve`, {
+      method: "POST",
+    }),
+  rejectWorkflow: (runId, approvalId) =>
+    request(`${API_V1}/chat/workflows/${runId}/approvals/${approvalId}/reject`, {
+      method: "POST",
+    }),
 };
 
 /**

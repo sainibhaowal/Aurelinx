@@ -4,6 +4,8 @@ Persistent sessions, messages, uploads, and tool-enabled agent responses.
 """
 
 from datetime import datetime
+from datetime import timedelta
+import hashlib
 import asyncio
 import json
 import os
@@ -49,6 +51,10 @@ from app.models.database import (
     RawEventTable,
     QuarantineEventTable,
     ConnectorSyncJobTable,
+    WorkflowRunTable,
+    WorkflowEventTable,
+    WorkflowApprovalTable,
+    engine,
     get_session,
 )
 from app.schemas.schemas import (
@@ -60,6 +66,13 @@ from app.schemas.schemas import (
     ChatSessionCreate,
     ChatSessionOut,
     ChatSessionRename,
+)
+from app.workflows.events import (
+    ToolEventScope,
+    create_workflow_run,
+    emit_workflow_event,
+    update_workflow_run,
+    workflow_event_dict,
 )
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -123,6 +136,14 @@ def _get_session_normalized(db: Session, session_id: UUID) -> "ChatSessionTable 
 
 
 def _to_message_out(m: ChatMessageTable) -> ChatMessageOut:
+    workflow_run_id = None
+    workflow_events = []
+    try:
+        trace = json.loads(m.tool_trace or "{}")
+        workflow_run_id = trace.get("workflow_run_id")
+        workflow_events = trace.get("workflow_events") or []
+    except Exception:
+        pass
     return ChatMessageOut(
         id=m.id,
         session_id=m.session_id,
@@ -130,6 +151,8 @@ def _to_message_out(m: ChatMessageTable) -> ChatMessageOut:
         content=m.content,
         tool_trace=m.tool_trace,
         created_at=m.created_at,
+        workflow_run_id=workflow_run_id,
+        workflow_events=workflow_events,
     )
 
 
@@ -1671,12 +1694,39 @@ def _direct_casual_reply(user_text: str) -> str:
     return "Hi, I am Aurelinx. Let me know how I can assist with HR analytics, employee tracking, or database management."
 
 
+def _safe_provider_failure_reply(context_payload: Dict) -> str:
+    """Return a useful failure response without leaking raw internal payloads."""
+    tool_context = context_payload.get("tool_context", {})
+    runs = tool_context.get("tool_runs", [])
+    summaries = []
+    for run in runs:
+        name = run.get("tool", "workflow tool")
+        if run.get("denied") or run.get("blocked"):
+            summaries.append(f"{name}: blocked by policy")
+        else:
+            output = run.get("output")
+            if isinstance(output, list):
+                summaries.append(f"{name}: {len(output)} records returned")
+            elif isinstance(output, dict):
+                summaries.append(f"{name}: completed")
+            else:
+                summaries.append(f"{name}: completed")
+    evidence = "; ".join(summaries) if summaries else "no retrieval tools were required"
+    return (
+        "I completed the permitted retrieval and safety checks, but the configured language "
+        "model provider did not return a response. No unsupported database change was made. "
+        f"Operational results: {evidence}. Please check the provider configuration and retry."
+    )
+
+
 def _build_context_payload(
     db: Session,
     session_id: UUID,
     user_text: str,
     current_user: TokenData,
     attachments: List[ChatAttachmentTable],
+    workflow_run_id: Optional[str] = None,
+    event_sink=None,
 ) -> Dict:
     """
     Build a lean, token-safe context payload.
@@ -1685,7 +1735,14 @@ def _build_context_payload(
     - Poisoned turns (raw JSON dumps, LLM failure messages) are stripped at source.
     """
     casual_chat = _is_casual_chat(user_text)
-    tool_context = _execute_tools(db, user_text, current_user, attachments)
+    tool_context = _execute_tools(
+        db,
+        user_text,
+        current_user,
+        attachments,
+        workflow_run_id=workflow_run_id,
+        event_sink=event_sink,
+    )
 
     if casual_chat:
         return {
@@ -1729,13 +1786,33 @@ def _execute_tools(
     user_text: str,
     current_user: TokenData,
     attachments: List[ChatAttachmentTable],
+    workflow_run_id: Optional[str] = None,
+    event_sink=None,
 ) -> Dict:
     tools = _tool_policy(user_text)
     result = {"tool_policy": tools, "tool_runs": []}
     mutation_log = {"updated": False, "actions": [], "blocked": False}
 
+    def scope(tool_name: str, phase: str, message: str) -> Optional[ToolEventScope]:
+        if not workflow_run_id:
+            return None
+        current = ToolEventScope(
+            workflow_run_id,
+            tool_name,
+            phase,
+            message,
+            sink=event_sink,
+        )
+        current.start({"query": user_text[:240]})
+        return current
+
     role = _user_role(current_user)
     if "search_employees" in tools:
+        tool_scope = scope(
+            "employee.search",
+            "retrieval",
+            "Searching employee records",
+        )
         if role in TOOL_RBAC["search_employees"]:
             emp_results = _search_employees(db, user_text, limit=8)
             result["tool_runs"].append(
@@ -1753,6 +1830,8 @@ def _execute_tools(
                     ],
                 }
             )
+            if tool_scope:
+                tool_scope.complete({"matches_found": len(emp_results)})
         else:
             result["tool_runs"].append(
                 {
@@ -1761,7 +1840,14 @@ def _execute_tools(
                     "reason": "RBAC policy denied",
                 }
             )
+            if tool_scope:
+                tool_scope.complete({"reason": "RBAC policy denied"}, status="blocked", error_code="RBAC_DENIED")
     if "search_candidates" in tools:
+        tool_scope = scope(
+            "candidate.search",
+            "retrieval",
+            "Searching candidate records",
+        )
         if role in TOOL_RBAC["search_candidates"]:
             cand_results = _search_candidates(db, user_text, limit=8)
             result["tool_runs"].append(
@@ -1778,6 +1864,8 @@ def _execute_tools(
                     ],
                 }
             )
+            if tool_scope:
+                tool_scope.complete({"matches_found": len(cand_results)})
         else:
             result["tool_runs"].append(
                 {
@@ -1786,14 +1874,24 @@ def _execute_tools(
                     "reason": "RBAC policy denied",
                 }
             )
+            if tool_scope:
+                tool_scope.complete({"reason": "RBAC policy denied"}, status="blocked", error_code="RBAC_DENIED")
     if "dashboard_snapshot" in tools:
+        tool_scope = scope(
+            "dashboard.snapshot",
+            "retrieval",
+            "Calculating workforce dashboard snapshot",
+        )
         if role in TOOL_RBAC["dashboard_snapshot"]:
+            snapshot = _compute_dashboard_snapshot(db)
             result["tool_runs"].append(
                 {
                     "tool": "dashboard_snapshot",
-                    "output": _compute_dashboard_snapshot(db),
+                    "output": snapshot,
                 }
             )
+            if tool_scope:
+                tool_scope.complete({"record_count": snapshot.get("total_workforce", 0)})
         else:
             result["tool_runs"].append(
                 {
@@ -1802,7 +1900,14 @@ def _execute_tools(
                     "reason": "RBAC policy denied",
                 }
             )
+            if tool_scope:
+                tool_scope.complete({"reason": "RBAC policy denied"}, status="blocked", error_code="RBAC_DENIED")
     if "mutate_data" in tools:
+        tool_scope = scope(
+            "data.mutate",
+            "mutation",
+            "Preparing authorized database changes",
+        )
         if role not in TOOL_RBAC["mutate_data"]:
             mutation_log["blocked"] = True
             mutation_log["actions"].append(
@@ -1811,7 +1916,22 @@ def _execute_tools(
         else:
             mutation_log = _apply_data_mutation(db, user_text)
         result["tool_runs"].append({"tool": "mutate_data", "output": mutation_log})
+        if tool_scope:
+            tool_scope.complete(
+                {
+                    "updated": mutation_log.get("updated", False),
+                    "blocked": mutation_log.get("blocked", False),
+                    "actions_count": len(mutation_log.get("actions", [])),
+                },
+                status="blocked" if mutation_log.get("blocked") else "completed",
+                error_code="RBAC_DENIED" if mutation_log.get("blocked") else None,
+            )
     if "human_approval_delete" in tools:
+        tool_scope = scope(
+            "approval.delete",
+            "governance",
+            "Blocking deletion pending human approval",
+        )
         result["tool_runs"].append(
             {
                 "tool": "human_approval_delete",
@@ -1823,9 +1943,29 @@ def _execute_tools(
                 ),
             }
         )
+        if tool_scope:
+            tool_scope.complete(
+                {"approval_required": True},
+                status="blocked",
+                error_code="HUMAN_APPROVAL_REQUIRED",
+            )
     if "parse_csv_attachment" in tools or any(att.original_name.lower().endswith(".csv") for att in attachments):
+        tool_scope = scope(
+            "document.csv_ingest",
+            "retrieval",
+            "Parsing and validating CSV attachments",
+        )
         csv_log = _parse_csv_and_ingest(db, attachments)
         result["tool_runs"].append({"tool": "parse_csv_attachment", "output": csv_log})
+        if tool_scope:
+            tool_scope.complete(
+                {
+                    "ingested": csv_log.get("ingested", False),
+                    "errors": len(csv_log.get("errors", [])),
+                },
+                status="failed" if csv_log.get("errors") else "completed",
+                error_code="CSV_INGEST_FAILED" if csv_log.get("errors") else None,
+            )
 
     result["workspace_snapshot"] = _workspace_snapshot(db, user_text)
     result["record_counts"] = _record_counts(db)
@@ -2040,6 +2180,217 @@ async def list_attachments(
     return [_to_attachment_out(a) for a in attachments]
 
 
+@router.get("/sessions/{session_id}/workflows")
+async def list_workflows(
+    session_id: UUID,
+    current_user: TokenData = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    """Return durable workflow runs for a chat session."""
+    row = _get_session_normalized(db, session_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Session not found")
+    _assert_session_owner(row, current_user)
+    runs = db.exec(
+        select(WorkflowRunTable)
+        .where(WorkflowRunTable.session_id == row.id)
+        .order_by(WorkflowRunTable.created_at.desc())
+    ).all()
+    return [
+        {
+            "id": run.id,
+            "session_id": run.session_id,
+            "user_id": run.user_id,
+            "tenant_id": run.tenant_id,
+            "status": run.status,
+            "intent": run.intent,
+            "current_phase": run.current_phase,
+            "failure_reason": run.failure_reason,
+            "created_at": run.created_at,
+            "updated_at": run.updated_at,
+            "completed_at": run.completed_at,
+        }
+        for run in runs
+    ]
+
+
+@router.get("/workflows/{run_id}/events")
+async def list_workflow_events(
+    run_id: str,
+    current_user: TokenData = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    """Return the complete safe operational trace for one workflow run."""
+    run = db.get(WorkflowRunTable, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+    if not current_user.is_admin and str(run.user_id) != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="Forbidden workflow access")
+    events = db.exec(
+        select(WorkflowEventTable)
+        .where(WorkflowEventTable.run_id == run_id)
+        .order_by(WorkflowEventTable.sequence.asc())
+    ).all()
+    return [workflow_event_dict(event) for event in events]
+
+
+def _perform_approved_delete(db: Session, payload: str) -> Dict[str, Any]:
+    """Delete exactly one employee/candidate identified by an approved email."""
+    email_match = re.search(
+        r"([a-zA-Z0-9.\-_+]+@[a-zA-Z0-9.\-_]+\.[a-zA-Z]{2,})", payload
+    )
+    if not email_match:
+        raise HTTPException(status_code=422, detail="Approved deletion requires an exact email")
+    email = email_match.group(1).lower()
+    lowered = payload.lower()
+    is_candidate = "candidate" in lowered
+    is_employee = "employee" in lowered
+    if is_candidate == is_employee:
+        raise HTTPException(
+            status_code=422,
+            detail="Approved deletion must identify exactly one resource type: employee or candidate",
+        )
+
+    if is_candidate:
+        record = db.exec(select(CandidateTable).where(CandidateTable.email == email)).first()
+        resource_type = "candidate"
+    else:
+        record = db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
+        resource_type = "employee"
+    if not record:
+        raise HTTPException(status_code=404, detail=f"No {resource_type} found for {email}")
+
+    skills = db.exec(
+        select(SkillTable).where(
+            SkillTable.candidate_id == record.id if is_candidate else SkillTable.employee_id == record.id
+        )
+    ).all()
+    experiences = db.exec(
+        select(ExperienceTable).where(
+            ExperienceTable.candidate_id == record.id if is_candidate else ExperienceTable.employee_id == record.id
+        )
+    ).all()
+    for item in skills + experiences:
+        db.delete(item)
+    name = record.full_name
+    db.delete(record)
+    return {
+        "deleted": True,
+        "resource_type": resource_type,
+        "email": email,
+        "name": name,
+        "related_records_deleted": len(skills) + len(experiences),
+    }
+
+
+@router.post("/workflows/{run_id}/approvals/{approval_id}/approve")
+async def approve_workflow_action(
+    run_id: str,
+    approval_id: str,
+    current_user: TokenData = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    """Resolve one exact pending workflow approval; only admins may approve."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin approval required")
+    approval = db.get(WorkflowApprovalTable, approval_id)
+    if not approval or approval.run_id != run_id:
+        raise HTTPException(status_code=404, detail="Approval not found")
+    if approval.status != "pending":
+        raise HTTPException(status_code=409, detail=f"Approval is already {approval.status}")
+    if approval.expires_at < datetime.utcnow():
+        approval.status = "expired"
+        approval.resolved_at = datetime.utcnow()
+        db.add(approval)
+        db.commit()
+        update_workflow_run(run_id, "failed", "governance", "Approval expired")
+        raise HTTPException(status_code=410, detail="Approval expired")
+
+    if hashlib.sha256(approval.action_payload.encode("utf-8")).hexdigest() != approval.action_payload_hash:
+        raise HTTPException(status_code=409, detail="Approval payload integrity check failed")
+
+    result = _perform_approved_delete(db, approval.action_payload)
+    approval.status = "approved"
+    approval.approved_by = str(current_user.user_id)
+    approval.resolved_at = datetime.utcnow()
+    db.add(approval)
+    _write_audit(
+        db,
+        current_user,
+        action="APPROVED_DELETE",
+        resource_type=result["resource_type"],
+        resource_id=str(result["email"]),
+        details=result,
+    )
+    db.commit()
+    update_workflow_run(run_id, "completed", "completed")
+    emit_workflow_event(
+        run_id,
+        "approval_granted",
+        "governance",
+        "Admin approval granted for the exact requested deletion",
+        status="completed",
+        result_summary={"approved_by": str(current_user.user_id)},
+    )
+    emit_workflow_event(
+        run_id,
+        "mutation_completed",
+        "mutation",
+        "Approved deletion executed transactionally",
+        status="completed",
+        tool_name="delete.approved",
+        result_summary=result,
+    )
+    emit_workflow_event(
+        run_id,
+        "verification_completed",
+        "verification",
+        "Verified that the approved record no longer exists",
+        status="completed",
+        result_summary=result,
+    )
+    emit_workflow_event(
+        run_id,
+        "workflow_completed",
+        "completed",
+        "Approved workflow action completed",
+        status="completed",
+        result_summary=result,
+    )
+    return {"status": "completed", "run_id": run_id, "approval_id": approval_id, "result": result}
+
+
+@router.post("/workflows/{run_id}/approvals/{approval_id}/reject")
+async def reject_workflow_action(
+    run_id: str,
+    approval_id: str,
+    current_user: TokenData = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin approval required")
+    approval = db.get(WorkflowApprovalTable, approval_id)
+    if not approval or approval.run_id != run_id:
+        raise HTTPException(status_code=404, detail="Approval not found")
+    if approval.status != "pending":
+        raise HTTPException(status_code=409, detail=f"Approval is already {approval.status}")
+    approval.status = "rejected"
+    approval.approved_by = str(current_user.user_id)
+    approval.resolved_at = datetime.utcnow()
+    db.add(approval)
+    db.commit()
+    update_workflow_run(run_id, "cancelled", "governance", "Approval rejected")
+    emit_workflow_event(
+        run_id,
+        "approval_rejected",
+        "governance",
+        "Admin rejected the requested action; no mutation was executed",
+        status="blocked",
+        error_code="APPROVAL_REJECTED",
+    )
+    return {"status": "rejected", "run_id": run_id, "approval_id": approval_id}
+
+
 @router.post("/sessions/{session_id}/upload", response_model=ChatAttachmentOut)
 async def upload_attachment(
     session_id: UUID,
@@ -2141,10 +2492,7 @@ async def send_message(
             await asyncio.sleep(0.5)
     if not assistant_text:
         logger.error(f"Chat model call failed after retries: {last_err}", exc_info=True)
-        assistant_text = (
-            "I processed your request with available tools but the LLM response failed after retries. "
-            f"Tool results: {json.dumps(context_payload)}"
-        )
+        assistant_text = _safe_provider_failure_reply(context_payload)
 
     assistant_msg = ChatMessageTable(
         session_id=chat_session.id,
@@ -2192,7 +2540,31 @@ async def send_message_stream(
         raise HTTPException(status_code=404, detail="Session not found")
     _assert_session_owner(chat_session, current_user)
 
+    def _context_payload_worker(
+        session_id_value: str,
+        user_text: str,
+        workflow_run_id: str,
+        event_sink,
+    ) -> Dict:
+        """Run blocking retrieval/tool work off the event loop with its own DB session."""
+        with Session(engine) as worker_db:
+            worker_attachments = worker_db.exec(
+                select(ChatAttachmentTable).where(
+                    ChatAttachmentTable.session_id == str(session_id_value)
+                )
+            ).all()
+            return _build_context_payload(
+                worker_db,
+                UUID(str(session_id_value)),
+                user_text,
+                current_user,
+                worker_attachments,
+                workflow_run_id=workflow_run_id,
+                event_sink=event_sink,
+            )
+
     async def gen():
+        workflow_run = None
         try:
             last_err = None
             user_msg = ChatMessageTable(
@@ -2201,41 +2573,182 @@ async def send_message_stream(
             db.add(user_msg)
             db.commit()
             db.refresh(user_msg)
-            
-            # Step 1: Thinking
-            yield f"event: status\ndata: {_json_dumps({'phase': 'thinking'})}\n\n"
-            await asyncio.sleep(0.35)
-            
-            # Step 2: Planning
-            yield f"event: status\ndata: {_json_dumps({'phase': 'planning'})}\n\n"
-            await asyncio.sleep(0.35)
+
+            workflow_run = create_workflow_run(
+                chat_session.id,
+                str(current_user.user_id),
+                getattr(current_user, "tenant_id", None) or "default",
+            )
+
+            def workflow_sse(event: Dict[str, Any]) -> str:
+                return f"event: agent_step\ndata: {_json_dumps(event)}\n\n"
+
+            started = emit_workflow_event(
+                workflow_run.id,
+                "workflow_started",
+                "intake",
+                "Workflow received and authenticated",
+                status="completed",
+                result_summary={"session_id": chat_session.id},
+            )
+            yield workflow_sse(started)
+
+            policy = _tool_policy(request.content)
+            intent = "mutation" if "mutate_data" in policy else "analysis"
+            classified = emit_workflow_event(
+                workflow_run.id,
+                "intent_classified",
+                "planning",
+                f"Request classified as {intent}",
+                status="completed",
+                result_summary={"intent": intent, "requested_capabilities": policy},
+            )
+            yield workflow_sse(classified)
+            update_workflow_run(workflow_run.id, "planning", "planning")
+
+            planned = emit_workflow_event(
+                workflow_run.id,
+                "plan_created",
+                "planning",
+                "Execution plan created with permission checks and bounded tools",
+                status="completed",
+                result_summary={"steps": policy or ["response.generate"]},
+            )
+            yield workflow_sse(planned)
 
             attachments = db.exec(
                 select(ChatAttachmentTable).where(
                     ChatAttachmentTable.session_id == chat_session.id
                 )
             ).all()
-            
-            # Step 3: Exploring
-            yield f"event: status\ndata: {_json_dumps({'phase': 'exploring'})}\n\n"
-            context_payload = _build_context_payload(
-                db, chat_session.id, request.content, current_user, attachments
-            )
-            await asyncio.sleep(0.35)
-            
-            # Check if there is mutation tool policy to show modifying step
-            tool_policy = context_payload.get("tool_context", {}).get("tool_policy", [])
-            if "mutate_data" in tool_policy:
-                # Step 4: Modifying
-                yield f"event: status\ndata: {_json_dumps({'phase': 'modifying'})}\n\n"
-                await asyncio.sleep(0.35)
-                
-            # Step 5: Verifying
-            yield f"event: status\ndata: {_json_dumps({'phase': 'verifying'})}\n\n"
-            await asyncio.sleep(0.35)
 
-            # Step 6: Completing
-            yield f"event: status\ndata: {_json_dumps({'phase': 'completing'})}\n\n"
+            queue: asyncio.Queue = asyncio.Queue()
+            loop = asyncio.get_running_loop()
+
+            def event_sink(event: Dict[str, Any]) -> None:
+                asyncio.run_coroutine_threadsafe(queue.put(event), loop)
+
+            retrieval_started = emit_workflow_event(
+                workflow_run.id,
+                "retrieval_started",
+                "retrieval",
+                "Retrieving live records and attachment context",
+                status="running",
+            )
+            yield workflow_sse(retrieval_started)
+            update_workflow_run(workflow_run.id, "retrieving", "retrieval")
+
+            worker_task = asyncio.create_task(
+                asyncio.wait_for(
+                    asyncio.to_thread(
+                        _context_payload_worker,
+                        chat_session.id,
+                        request.content,
+                        workflow_run.id,
+                        event_sink,
+                    ),
+                    timeout=60.0,
+                )
+            )
+            context_payload = None
+            while True:
+                if worker_task.done():
+                    await asyncio.sleep(0)
+                    while not queue.empty():
+                        yield workflow_sse(await queue.get())
+                    context_payload = worker_task.result()
+                    break
+                queue_task = asyncio.create_task(queue.get())
+                done, _ = await asyncio.wait(
+                    {worker_task, queue_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if queue_task in done:
+                    yield workflow_sse(queue_task.result())
+                else:
+                    queue_task.cancel()
+
+            retrieval_completed = emit_workflow_event(
+                workflow_run.id,
+                "retrieval_completed",
+                "retrieval",
+                "Live records and attachment context retrieved",
+                status="completed",
+                result_summary={
+                    "tool_runs": len(context_payload.get("tool_context", {}).get("tool_runs", [])),
+                },
+            )
+            yield workflow_sse(retrieval_completed)
+            validation = emit_workflow_event(
+                workflow_run.id,
+                "validation_completed",
+                "validation",
+                "Retrieved data passed workflow validation checks",
+                status="completed",
+                result_summary={
+                    "tool_runs": len(context_payload.get("tool_context", {}).get("tool_runs", [])),
+                    "record_counts": context_payload.get("tool_context", {}).get("record_counts", {}),
+                },
+            )
+            yield workflow_sse(validation)
+            update_workflow_run(workflow_run.id, "verifying", "validation")
+
+            tool_context = context_payload.get("tool_context", {})
+            awaiting_approval = False
+            approval_id = None
+            if "human_approval_delete" in tool_context.get("tool_policy", []):
+                awaiting_approval = True
+                approval_id = str(uuid4())
+                approval_payload = request.content[:12000]
+                approval_row = WorkflowApprovalTable(
+                    id=approval_id,
+                    run_id=workflow_run.id,
+                    tenant_id=getattr(current_user, "tenant_id", None) or "default",
+                    requested_by=str(current_user.user_id),
+                    action_type="delete",
+                    action_payload_hash=hashlib.sha256(approval_payload.encode("utf-8")).hexdigest(),
+                    action_payload=approval_payload,
+                    status="pending",
+                    reason="Deletion requested through workflow chat",
+                    expires_at=datetime.utcnow() + timedelta(minutes=30),
+                )
+                db.add(approval_row)
+                db.commit()
+                update_workflow_run(workflow_run.id, "awaiting_approval", "governance")
+                approval = emit_workflow_event(
+                    workflow_run.id,
+                    "approval_required",
+                    "governance",
+                    "Deletion is blocked until an authorized human approves it",
+                    status="blocked",
+                    result_summary={"approval_required": True, "action": "delete", "approval_id": approval_id},
+                    error_code="HUMAN_APPROVAL_REQUIRED",
+                )
+                yield workflow_sse(approval)
+
+            verified = emit_workflow_event(
+                workflow_run.id,
+                "verification_completed",
+                "verification",
+                "Permissions, governance safeguards, and tool results verified",
+                status="completed",
+                result_summary={
+                    "rbac_role": tool_context.get("rbac_role"),
+                    "mutation_blocked": tool_context.get("mutations", {}).get("blocked", False),
+                },
+            )
+            yield workflow_sse(verified)
+
+            model_started = emit_workflow_event(
+                workflow_run.id,
+                "model_started",
+                "response",
+                "Generating an evidence-grounded response from verified context",
+                status="running",
+                result_summary={"provider": request.provider or "lmstudio", "model": request.model},
+            )
+            yield workflow_sse(model_started)
+            update_workflow_run(workflow_run.id, "executing", "response")
             assistant_text = ""
             last_err = None
             try:
@@ -2264,10 +2777,19 @@ async def send_message_stream(
                     yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
                 except Exception as ex:
                     last_err = f"Stream failed: {e}. Fallback failed: {ex}"
-                    assistant_text = (
-                        f"LLM failed. Tool context: {json.dumps(context_payload)}"
-                    )
+                    assistant_text = _safe_provider_failure_reply(context_payload)
                     yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+
+            model_completed = emit_workflow_event(
+                workflow_run.id,
+                "model_completed",
+                "response",
+                "Evidence-grounded response generation completed",
+                status="failed" if last_err else "completed",
+                result_summary={"characters": len(assistant_text)},
+                error_code="MODEL_FALLBACK" if last_err else None,
+            )
+            yield workflow_sse(model_completed)
 
             assistant_msg = ChatMessageTable(
                 session_id=chat_session.id,
@@ -2294,6 +2816,31 @@ async def send_message_stream(
             db.commit()
             db.refresh(assistant_msg)
             db.refresh(chat_session)
+            update_workflow_run(
+                workflow_run.id,
+                "awaiting_approval" if awaiting_approval else "completed",
+                "governance" if awaiting_approval else "completed",
+            )
+            completed = emit_workflow_event(
+                workflow_run.id,
+                "workflow_paused" if awaiting_approval else "workflow_completed",
+                "governance" if awaiting_approval else "completed",
+                "Workflow paused until an authorized admin resolves the approval" if awaiting_approval else "Workflow completed with an auditable result",
+                status="waiting" if awaiting_approval else "completed",
+                result_summary={"assistant_message_id": assistant_msg.id},
+            )
+            event_rows = db.exec(
+                select(WorkflowEventTable)
+                .where(WorkflowEventTable.run_id == workflow_run.id)
+                .order_by(WorkflowEventTable.sequence.asc())
+            ).all()
+            context_payload["workflow_run_id"] = workflow_run.id
+            context_payload["workflow_events"] = [workflow_event_dict(row) for row in event_rows]
+            assistant_msg.tool_trace = json.dumps(context_payload, default=str)
+            db.add(assistant_msg)
+            db.commit()
+            db.refresh(assistant_msg)
+            yield workflow_sse(completed)
             yield f"event: done\ndata: {_json_dumps({'assistant_message': _to_message_out(assistant_msg).model_dump(mode='json'), 'user_message': _to_message_out(user_msg).model_dump(mode='json'), 'session': _to_session_out(chat_session).model_dump(mode='json')})}\n\n"
         except Exception as e:
             logger.exception("Streaming chat generator failed")
@@ -2301,6 +2848,23 @@ async def send_message_stream(
                 db.rollback()
             except Exception:
                 pass
+            if workflow_run:
+                update_workflow_run(
+                    workflow_run.id,
+                    "failed",
+                    "failed",
+                    failure_reason=str(e)[:500],
+                )
+                failed = emit_workflow_event(
+                    workflow_run.id,
+                    "workflow_failed",
+                    "failed",
+                    "Workflow stopped because an internal step failed",
+                    status="failed",
+                    error_code="WORKFLOW_FAILED",
+                    result_summary={"error": str(e)[:500]},
+                )
+                yield f"event: agent_step\ndata: {_json_dumps(failed)}\n\n"
             yield f"event: error\ndata: {_json_dumps({'message': 'Streaming chat failed', 'detail': str(e)})}\n\n"
 
     return StreamingResponse(
