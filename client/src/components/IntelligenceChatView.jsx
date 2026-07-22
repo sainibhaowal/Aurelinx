@@ -607,18 +607,15 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
   const toggle = (id) => setExpanded((previous) => ({ ...previous, [id]: !previous[id] }));
 
   return (
-    <div className="flex flex-col gap-3 bg-slate-950/60 p-4 border border-cyan-500/15 rounded-xl my-3 shadow-inner shadow-black/20">
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
+    <div className="flex flex-col gap-2 my-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-white/10">
         <div>
-          <div className="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
+          <div className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
             <span className={`h-2.5 w-2.5 rounded-full ${running ? "bg-cyan-400 animate-pulse" : failed ? "bg-rose-400" : "bg-emerald-400"}`} />
             {running ? "Live workflow execution" : failed ? "Workflow ended with a problem" : "Workflow execution trace"}
           </div>
-          <div className="mt-1 text-[10px] text-slate-500">
-            Every visible row is one streamed internal event. Safe inputs and outputs are shown below.
-          </div>
         </div>
-        <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500 uppercase">
+        <div className="flex items-center gap-2 text-[9px] font-mono text-slate-500 uppercase">
           <span>{steps.length} events</span>
           <span>·</span>
           <span>{toolCalls} calls</span>
@@ -627,14 +624,14 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
       </div>
 
       {!steps.length && (
-        <div className="rounded-lg border border-cyan-500/10 bg-cyan-500/5 p-3 text-xs text-slate-400">
+        <div className="py-2 text-xs text-slate-500">
           Waiting for the first workflow event…
         </div>
       )}
 
       {steps.length > 0 && toolCalls === 0 && (
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-400">
-          No database or retrieval tool was called for this request. Greetings and other casual messages use the response step only.
+        <div className="py-1 text-[10px] text-slate-500">
+          No workspace tool was required; this turn is using conversation context and the response model.
         </div>
       )}
 
@@ -667,7 +664,7 @@ const AgenticStepTracker = ({ phase, steps = [], onApproval }) => {
                 </span>
               </div>
 
-              <div className="flex-1 min-w-0 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2">
+              <div className="flex-1 min-w-0 border-b border-white/5 px-1 pb-2 pt-1">
                 <button type="button" onClick={() => hasDetails && toggle(id)} className={`w-full text-left ${hasDetails ? "cursor-pointer" : "cursor-default"}`}>
                   <div className="flex items-start justify-between gap-3">
                     <span className={`text-xs font-bold ${statusColor}`}>
