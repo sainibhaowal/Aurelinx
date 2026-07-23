@@ -1401,7 +1401,7 @@ async def _llm_stream_response(
                 continue
             history_messages.append({"role": role, "content": content[:300]})
 
-    if provider in ["openai", "lmstudio", "groq", "opencode"]:
+    if provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
         messages = [{"role": "system", "content": system}]
         messages.extend(history_messages[-6:])
         messages.append({"role": "user", "content": user_content})
@@ -1440,7 +1440,7 @@ async def _llm_stream_response(
         ) as resp:
             resp.raise_for_status()
 
-            if provider in ["openai", "lmstudio", "groq", "opencode"]:
+            if provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
                 async for line in resp.aiter_lines():
                     if line.startswith("data:"):
                         data_str = line[5:].strip()
@@ -1701,7 +1701,7 @@ async def _llm_response(
         # Only keep clean conversational turns (cap at 300 chars per turn to stay token-safe)
         history_messages.append({"role": role, "content": content[:300]})
 
-    if provider in ["openai", "lmstudio", "groq", "opencode"]:
+    if provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
         messages = [{"role": "system", "content": system}]
         messages.extend(history_messages[-6:])  # last 3 turns max
         messages.append({"role": "user", "content": user_content})
@@ -1735,7 +1735,7 @@ async def _llm_response(
         resp = await client.post(endpoint, json=payload, headers=headers)
         resp.raise_for_status()
         data = resp.json()
-        if provider in ["openai", "lmstudio", "groq", "opencode"]:
+        if provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
             return _sanitize_llm_response(
                 data["choices"][0]["message"]["content"], user_text
             )
@@ -2890,6 +2890,21 @@ async def _stream_antigravity_agent_loop(
             },
             error_code=_provider_error_code(exc),
         )
+        try:
+            fallback_text = await _llm_response(
+                provider=resolved_provider or "lmstudio",
+                api_key=resolved_api_key or request.api_key,
+                base_url=request.base_url,
+                model=request.model,
+                user_text=request.content,
+                context_payload={},
+            )
+            if fallback_text and "Provider adapter" not in fallback_text:
+                assistant_text = fallback_text
+                stream_error = None
+                assistant_text += "\n\n*(Note: Agent tools were unavailable via this provider. Proceed with a different provider for full agent features.)*"
+        except Exception:
+            pass
 
     # A write must always be followed by a read-back, even if the model forgot
     # to request the verification callable itself.
