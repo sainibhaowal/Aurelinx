@@ -62,6 +62,7 @@ services:
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       PYTHONPATH: /app
       CHAT_UPLOAD_ROOT: ${CHAT_UPLOAD_ROOT:-/app/data/chat}
+      ANTIGRAVITY_STATE_DIR: ${ANTIGRAVITY_STATE_DIR:-/app/data/antigravity}
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,6 +74,7 @@ services:
       - "${API_PORT:-5100}:5000"
     volumes:
       - chat_uploads:/app/data/chat
+      - antigravity_state:/app/data/antigravity
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5000/health || exit 1"]
       interval: 15s
@@ -165,5 +167,6 @@ volumes:
   redis_data:
   qdrant_data:
   chat_uploads:
+  antigravity_state:
   caddy_data:
   caddy_config:

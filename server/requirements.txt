@@ -1,5 +1,6 @@
 fastapi==0.115.0
-uvicorn==0.30.0
+# Google Antigravity 0.1.7 requires uvicorn >=0.46.
+uvicorn>=0.46,<1.0
 pydantic==2.9.2
 pydantic-settings==2.6.0
 python-dotenv==1.0.1
@@ -48,4 +49,5 @@ redis==5.0.8
 # openai==1.52.0
 # anthropic==0.31.0
 
-
+# Native Google Antigravity agent runtime (includes the platform harness binary)
+google-antigravity==0.1.7

@@ -1035,106 +1035,17 @@ const IntelligenceChatView = () => {
       }
 
       console.error(e);
-
-      if (e?.status === 404 || /404/.test(String(e?.message || ""))) {
-        const created = await chatAPI.createSession("New Workflow Session");
-        setSessions((prev) => [
-          created,
-          ...prev.filter((s) => s.id !== created.id),
-        ]);
-        setSelectedSessionId(created.id);
-        sessionId = created.id;
-        try {
-          const cfgRaw = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
-          const cfg = cfgRaw ? JSON.parse(cfgRaw) : {};
-          const provider = cfg.activeProvider || "lmstudio";
-          const providerCfg = cfg[provider] || {};
-          const model =
-            providerCfg.selectedModel || cfg.lmstudio?.selectedModel || null;
-          const baseUrl =
-            providerCfg.endpoint ||
-            providerCfg.base_url ||
-            (provider === "lmstudio"
-              ? "http://127.0.0.1:1234/v1"
-              : provider === "opencode"
-                ? "https://opencode.ai/zen/v1"
-                : null);
-          const fallback = await chatAPI.sendMessage(sessionId, {
-            content: userText,
-            provider,
-            api_key: providerCfg.key || null,
-            base_url: baseUrl,
-            model,
-          });
-          setMessages((prev) => [
-            ...prev,
-            fallback.user_message,
-            fallback.assistant_message,
-          ]);
-          setSessions((prev) =>
-            prev.map((s) =>
-              s.id === fallback.session.id ? fallback.session : s,
-            ),
-          );
-          setStreamPhase("done");
-          setStreamText("");
-          setInput("");
-          return;
-        } catch (retryError) {
-          console.error(retryError);
-        }
-      }
-
-      try {
-        const cfgRaw = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
-        const cfg = cfgRaw ? JSON.parse(cfgRaw) : {};
-        const provider = cfg.activeProvider || "lmstudio";
-        const providerCfg = cfg[provider] || {};
-        const model =
-          providerCfg.selectedModel || cfg.lmstudio?.selectedModel || null;
-        const baseUrl =
-          providerCfg.endpoint ||
-          providerCfg.base_url ||
-          (provider === "lmstudio"
-            ? "http://127.0.0.1:1234/v1"
-            : provider === "opencode"
-              ? "https://opencode.ai/zen/v1"
-              : null);
-        const fallback = await chatAPI.sendMessage(sessionId, {
-          content: userText,
-          provider,
-          api_key: providerCfg.key || null,
-          base_url: baseUrl,
-          model,
-        });
-        setMessages((prev) => [
-          ...prev,
-          fallback.user_message,
-          fallback.assistant_message,
-        ]);
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === fallback.session.id ? fallback.session : s,
-          ),
-        );
-        setStreamPhase("done");
-        setStreamText("");
-        setInput("");
-      } catch (fallbackError) {
-        console.error(fallbackError);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `error-${Date.now()}`,
-            role: "assistant",
-            content:
-              "I could not generate a response. Check provider configuration and backend logs.",
-            tool_trace: null,
-            created_at: new Date().toISOString(),
-          },
-        ]);
-        setStreamPhase("error");
-      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: e?.message || "The Antigravity workflow could not complete. Check provider configuration and backend logs.",
+          tool_trace: null,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+      setStreamPhase("error");
     } finally {
       setBusy(false);
       abortRef.current = null;

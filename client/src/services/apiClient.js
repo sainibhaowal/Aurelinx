@@ -191,7 +191,11 @@ async function consumeEventStream(response, handlers = {}, signal = null) {
           // A proxy or browser read can contain several SSE frames at once.
           // Yield after every workflow event and answer chunk so React paints
           // token-by-token instead of committing a whole buffered response.
-          if (eventName === "agent_step" || eventName === "chunk") {
+          if (
+            eventName === "agent_step" ||
+            eventName === "model_reasoning_delta" ||
+            eventName === "chunk"
+          ) {
             await yieldForPaint();
           }
         }

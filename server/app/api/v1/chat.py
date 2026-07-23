@@ -2471,6 +2471,484 @@ def _execute_tools(
     return result
 
 
+def _antigravity_tool_name(value: Any) -> str:
+    """Normalize SDK callable names into the durable Aurelinx tool names."""
+    raw = getattr(value, "value", value)
+    name = str(raw).strip()
+    if name.startswith("BuiltinTools."):
+        name = name.rsplit(".", 1)[-1]
+    return {
+        "employee_search": "employee.search",
+        "candidate_search": "candidate.search",
+        "database_overview": "database.overview",
+        "dashboard_snapshot": "dashboard.snapshot",
+        "workspace_snapshot": "workspace.snapshot",
+        "document_csv_ingest": "document.csv_ingest",
+        "mutate_data": "data.mutate",
+        "verify_mutation": "data.verify",
+    }.get(name, name.replace("_", "."))
+
+
+async def _stream_antigravity_agent_loop(
+    db: Session,
+    chat_session: ChatSessionTable,
+    user_msg: ChatMessageTable,
+    workflow_run: WorkflowRunTable,
+    request: ChatMessageCreate,
+    current_user: TokenData,
+):
+    """Stream one safe, native Google Antigravity agent turn.
+
+    Antigravity owns model planning, tool selection, tool execution dispatch,
+    continuation, and provider streaming. Aurelinx owns the authenticated tool
+    implementations, governance, persistence, and the browser event contract.
+    """
+    from app.agents.antigravity_runtime import stream_agent_turn
+
+    events: List[Dict[str, Any]] = []
+    tool_transcript: List[Dict[str, Any]] = []
+    assistant_text = ""
+    stream_error: Optional[Exception] = None
+    reasoning_event_id: Optional[str] = None
+    reasoning_characters = 0
+    response_started = False
+
+    def emit(
+        event_type: str,
+        phase: str,
+        message: str,
+        *,
+        status: str = "running",
+        tool_name: Optional[str] = None,
+        safe_input: Any = None,
+        result_summary: Any = None,
+        error_code: Optional[str] = None,
+        duration_ms: Optional[int] = None,
+    ) -> str:
+        event = emit_workflow_event(
+            workflow_run.id,
+            event_type,
+            phase,
+            message,
+            status=status,
+            tool_name=tool_name,
+            safe_input=safe_input,
+            result_summary=result_summary,
+            error_code=error_code,
+            duration_ms=duration_ms,
+        )
+        events.append(event)
+        return f"event: agent_step\ndata: {_json_dumps(event)}\n\n"
+
+    def close_reasoning() -> Optional[str]:
+        nonlocal reasoning_event_id, reasoning_characters
+        if not reasoning_event_id:
+            return None
+        frame = emit(
+            "model_reasoning",
+            "execution",
+            "Execution model finished provider-reported reasoning",
+            status="completed",
+            result_summary={
+                "characters": reasoning_characters,
+                "runtime": "google-antigravity",
+            },
+        )
+        reasoning_event_id = None
+        reasoning_characters = 0
+        return frame
+
+    yield emit(
+        "workflow_started",
+        "intake",
+        "Workflow received and authenticated by the Google Antigravity runtime",
+        status="completed",
+        result_summary={
+            "session_id": chat_session.id,
+            "runtime": "google-antigravity",
+            "controller": "native-agent-loop",
+        },
+    )
+
+    attachments = db.exec(
+        select(ChatAttachmentTable).where(
+            ChatAttachmentTable.session_id == str(chat_session.id)
+        )
+    ).all()
+    history_rows = db.exec(
+        select(ChatMessageTable)
+        .where(ChatMessageTable.session_id == str(chat_session.id))
+        .order_by(ChatMessageTable.created_at.desc())
+        .limit(8)
+    ).all()
+    history = [
+        {"role": row.role, "content": (row.content or "")[:800]}
+        for row in reversed(history_rows)
+        if (row.content or "").strip()
+    ]
+
+    # Deletion is a governance operation, not an ordinary model tool. Pause it
+    # before the runtime receives a chance to select any mutation callable.
+    if any(word in request.content.lower() for word in ("delete", "remove", "purge", "clear")):
+        approval_id = str(uuid4())
+        approval_payload = request.content[:12000]
+        db.add(
+            WorkflowApprovalTable(
+                id=approval_id,
+                run_id=workflow_run.id,
+                tenant_id=getattr(current_user, "tenant_id", None) or "default",
+                requested_by=str(current_user.user_id),
+                action_type="delete",
+                action_payload_hash=hashlib.sha256(approval_payload.encode("utf-8")).hexdigest(),
+                action_payload=approval_payload,
+                status="pending",
+                reason="Deletion requested through workflow chat",
+                expires_at=datetime.utcnow() + timedelta(minutes=30),
+            )
+        )
+        db.commit()
+        update_workflow_run(workflow_run.id, "awaiting_approval", "governance")
+        yield emit(
+            "approval_required",
+            "governance",
+            "Deletion is blocked until an authorized human approves the exact request",
+            status="blocked",
+            result_summary={
+                "approval_required": True,
+                "action": "delete",
+                "approval_id": approval_id,
+            },
+            error_code="HUMAN_APPROVAL_REQUIRED",
+        )
+        assistant_text = (
+            "I paused this deletion request. An authorized administrator must approve "
+            "the exact action before any record can be removed."
+        )
+        context_payload = {
+            "agent_runtime": "google-antigravity",
+            "request_plan": {"mode": "approval_required"},
+            "tool_context": {"tool_runs": [], "rbac_role": _user_role(current_user)},
+            "session_history": history,
+            "workflow_run_id": workflow_run.id,
+            "workflow_events": events,
+        }
+        assistant_msg = ChatMessageTable(
+            session_id=chat_session.id,
+            role="assistant",
+            content=assistant_text,
+            tool_trace=json.dumps(context_payload, default=str),
+        )
+        db.add(assistant_msg)
+        chat_session.updated_at = datetime.utcnow()
+        db.add(chat_session)
+        db.commit()
+        db.refresh(assistant_msg)
+        db.refresh(chat_session)
+        paused = emit(
+            "workflow_paused",
+            "governance",
+            "Workflow paused for authorized human approval",
+            status="waiting",
+            result_summary={"assistant_message_id": assistant_msg.id},
+        )
+        context_payload["workflow_events"] = events
+        assistant_msg.tool_trace = json.dumps(context_payload, default=str)
+        db.add(assistant_msg)
+        db.commit()
+        db.refresh(assistant_msg)
+        yield paused
+        yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+        yield f"event: done\ndata: {_json_dumps({'assistant_message': _to_message_out(assistant_msg).model_dump(mode='json'), 'user_message': _to_message_out(user_msg).model_dump(mode='json'), 'session': _to_session_out(chat_session).model_dump(mode='json')})}\n\n"
+        return
+
+    update_workflow_run(workflow_run.id, "executing", "agent")
+    yield emit(
+        "agent_started",
+        "execution",
+        "Google Antigravity started a native agent turn",
+        status="running",
+        result_summary={
+            "provider": request.provider or "lmstudio",
+            "model": request.model or "provider_default",
+            "tools_are_runtime_selected": True,
+            "built_in_tools": False,
+        },
+    )
+
+    prompt = (
+        "Handle the current Aurelinx workflow request using the available verified "
+        "application tools. Use a tool when facts must come from Aurelinx data. "
+        "After tool results, continue until you can give one clear final answer. "
+        "Do not describe private reasoning; only provide concise operational updates "
+        "and the final answer.\n\n"
+        f"Current user request:\n{request.content}\n\n"
+        f"Recent Aurelinx conversation context:\n{json.dumps(history[-8:], default=str)}"
+    )
+    has_attachments = bool(attachments)
+    try:
+        async for runtime_event in stream_agent_turn(
+            prompt=prompt,
+            user_text=request.content,
+            current_user=current_user,
+            session_id=str(chat_session.id),
+            provider=request.provider or "lmstudio",
+            api_key=request.api_key,
+            base_url=request.base_url,
+            model=request.model,
+            has_attachments=has_attachments,
+        ):
+            if runtime_event.kind == "thought":
+                thought = runtime_event.value
+                delta = str(getattr(thought, "text", "") or "")
+                if not reasoning_event_id:
+                    frame = emit(
+                        "model_reasoning",
+                        "execution",
+                        "Execution model started provider-reported reasoning",
+                        status="running",
+                        result_summary={
+                            "provider": request.provider or "lmstudio",
+                            "model": request.model or "provider_default",
+                            "runtime": "google-antigravity",
+                            "characters": 0,
+                        },
+                    )
+                    reasoning_event_id = events[-1]["event_id"]
+                    yield frame
+                reasoning_characters += len(delta)
+                yield (
+                    "event: model_reasoning_delta\n"
+                    f"data: {_json_dumps({'event_id': reasoning_event_id, 'phase': 'execution', 'delta_characters': len(delta), 'characters': reasoning_characters})}\n\n"
+                )
+                continue
+
+            if runtime_event.kind == "text":
+                reasoning_frame = close_reasoning()
+                if reasoning_frame:
+                    yield reasoning_frame
+                text_delta = str(getattr(runtime_event.value, "text", "") or "")
+                if text_delta:
+                    if not response_started:
+                        response_started = True
+                        yield emit(
+                            "final_response_started",
+                            "response",
+                            "Streaming the final answer from the live Antigravity result",
+                            status="running",
+                            result_summary={
+                                "content_status": "streaming",
+                                "tool_calls": len(tool_transcript),
+                            },
+                        )
+                    assistant_text += text_delta
+                    yield f"event: chunk\ndata: {_json_dumps({'text': text_delta})}\n\n"
+                continue
+
+            if runtime_event.kind == "tool_call":
+                reasoning_frame = close_reasoning()
+                if reasoning_frame:
+                    yield reasoning_frame
+                call = runtime_event.value
+                tool_name = _antigravity_tool_name(getattr(call, "name", "unknown"))
+                arguments = getattr(call, "args", {}) or {}
+                safe_input = {"arguments": safe_summary(arguments)}
+                tool_transcript.append(
+                    {"tool": tool_name, "arguments": safe_summary(arguments), "result": None}
+                )
+                yield emit(
+                    "tool_call",
+                    "execution" if tool_name.startswith("data.") else "retrieval",
+                    f"The Antigravity agent requested {_agent_tool_label(tool_name)}.",
+                    status="running",
+                    tool_name=tool_name,
+                    safe_input=safe_input,
+                )
+                continue
+
+            if runtime_event.kind == "tool_result":
+                result_event = runtime_event.value or {}
+                tool_name = _antigravity_tool_name(result_event.get("tool", "unknown"))
+                result = result_event.get("result") or {}
+                safe_result = safe_summary(result)
+                for item in reversed(tool_transcript):
+                    if item["tool"] == tool_name and item.get("result") is None:
+                        item["result"] = safe_result
+                        break
+                yield emit(
+                    "tool_result",
+                    "execution" if tool_name.startswith("data.") else "retrieval",
+                    _agent_tool_result_message(tool_name, result),
+                    status="blocked" if result.get("blocked") else "completed",
+                    tool_name=tool_name,
+                    result_summary=safe_result,
+                    error_code="TOOL_BLOCKED" if result.get("blocked") else None,
+                )
+                continue
+
+            if runtime_event.kind == "finished":
+                reasoning_frame = close_reasoning()
+                if reasoning_frame:
+                    yield reasoning_frame
+                continue
+    except Exception as exc:
+        stream_error = exc
+        reasoning_frame = close_reasoning()
+        if reasoning_frame:
+            yield reasoning_frame
+        yield emit(
+            "agent_failed",
+            "execution",
+            "Google Antigravity could not complete the provider turn",
+            status="failed",
+            result_summary={"reason": _provider_error_label(exc)},
+            error_code=_provider_error_code(exc),
+        )
+
+    # A write must always be followed by a read-back, even if the model forgot
+    # to request the verification callable itself.
+    mutation_item = next(
+        (item for item in reversed(tool_transcript) if item["tool"] == "data.mutate"),
+        None,
+    )
+    has_verification = any(item["tool"] == "data.verify" for item in tool_transcript)
+    mutation_result = (mutation_item or {}).get("result") or {}
+    if mutation_item and not has_verification and isinstance(mutation_result, dict):
+        yield emit(
+            "tool_call",
+            "verification",
+            "Reading back the committed mutation before finalizing",
+            status="running",
+            tool_name="data.verify",
+            safe_input={"arguments": {}},
+        )
+        verified_result = await asyncio.to_thread(
+            _execute_agent_tool,
+            "data.verify",
+            {},
+            request.content,
+            current_user,
+            str(chat_session.id),
+            mutation_result,
+        )
+        safe_verified = safe_summary(verified_result)
+        tool_transcript.append({"tool": "data.verify", "arguments": {}, "result": safe_verified})
+        yield emit(
+            "tool_result",
+            "verification",
+            _agent_tool_result_message("data.verify", verified_result),
+            status="blocked" if verified_result.get("blocked") else "completed",
+            tool_name="data.verify",
+            result_summary=safe_verified,
+            error_code="MUTATION_READBACK_FAILED"
+            if not (verified_result.get("result") or {}).get("verified")
+            else None,
+        )
+
+    assistant_text = _sanitize_llm_response(assistant_text, request.content)
+    had_streamed_text = bool(assistant_text)
+    if not assistant_text:
+        assistant_text = (
+            "The agent completed the permitted workflow steps, but the configured "
+            "model did not return a final answer. Please retry the request."
+        )
+
+    if not response_started:
+        response_started = True
+        yield emit(
+            "final_response_started",
+            "response",
+            "Writing the final answer from the live Antigravity workflow result",
+            status="running",
+            result_summary={"content_status": "streaming", "tool_calls": len(tool_transcript)},
+        )
+
+    context_payload = {
+        "agent_runtime": "google-antigravity",
+        "request_plan": {"mode": "antigravity_agent", "needs_live_data": bool(tool_transcript)},
+        "tool_context": {
+            "tool_policy": sorted({item["tool"] for item in tool_transcript}),
+            "tool_runs": [
+                {"tool": item["tool"], "output": item.get("result")}
+                for item in tool_transcript
+            ],
+            "rbac_role": _user_role(current_user),
+            "attachments_available": has_attachments,
+        },
+        "session_history": history,
+        "agent_loop": tool_transcript,
+        "workflow_run_id": workflow_run.id,
+    }
+    # Native Text chunks have already been forwarded above. This event marks
+    # the semantic boundary without replaying the answer a second time.
+    final_event = emit(
+        "final_response_completed",
+        "response",
+        "Final answer stream failed" if stream_error else "Final answer stream completed",
+        status="failed" if stream_error else "completed",
+        result_summary={
+            "characters": len(assistant_text),
+            "tool_calls": len(tool_transcript),
+            "runtime": "google-antigravity",
+            **({"reason": _provider_error_label(stream_error)} if stream_error else {}),
+        },
+        error_code=_provider_error_code(stream_error) if stream_error else None,
+    )
+    yield final_event
+
+    assistant_msg = ChatMessageTable(
+        session_id=chat_session.id,
+        role="assistant",
+        content=assistant_text,
+        tool_trace=json.dumps(context_payload, default=str),
+    )
+    db.add(assistant_msg)
+    chat_session.updated_at = datetime.utcnow()
+    db.add(chat_session)
+    _write_audit(
+        db,
+        current_user,
+        action="CHAT_MESSAGE_ANTIGRAVITY",
+        resource_type="chat_session",
+        resource_id=chat_session.id,
+        details={
+            "runtime": "google-antigravity",
+            "tool_calls": len(tool_transcript),
+            "provider": request.provider or "lmstudio",
+            "model": request.model,
+            "failed": bool(stream_error),
+        },
+    )
+    db.commit()
+    db.refresh(assistant_msg)
+    db.refresh(chat_session)
+    final_status = "failed" if stream_error else "completed"
+    update_workflow_run(
+        workflow_run.id,
+        final_status,
+        "failed" if stream_error else "completed",
+        _provider_error_label(stream_error) if stream_error else None,
+    )
+    completed = emit(
+        "workflow_failed" if stream_error else "workflow_completed",
+        "failed" if stream_error else "completed",
+        "Workflow stopped after the Antigravity provider error"
+        if stream_error
+        else "Workflow completed with a native Antigravity agent trace",
+        status="failed" if stream_error else "completed",
+        result_summary={"assistant_message_id": assistant_msg.id, "tool_calls": len(tool_transcript)},
+        error_code=_provider_error_code(stream_error) if stream_error else None,
+    )
+    yield completed
+    context_payload["workflow_events"] = events
+    assistant_msg.tool_trace = json.dumps(context_payload, default=str)
+    db.add(assistant_msg)
+    db.commit()
+    db.refresh(assistant_msg)
+    if not had_streamed_text:
+        yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+    yield f"event: done\ndata: {_json_dumps({'assistant_message': _to_message_out(assistant_msg).model_dump(mode='json'), 'user_message': _to_message_out(user_msg).model_dump(mode='json'), 'session': _to_session_out(chat_session).model_dump(mode='json')})}\n\n"
+
+
 async def _stream_true_agent_loop(
     db: Session,
     chat_session: ChatSessionTable,
@@ -3628,10 +4106,10 @@ async def send_message_stream(
                 getattr(current_user, "tenant_id", None) or "default",
             )
 
-            # The live path is an LLM-directed loop. The legacy deterministic
-            # orchestration below remains as a source-compatible fallback, but
-            # normal streaming requests return from the real controller path.
-            async for frame in _stream_true_agent_loop(
+            # The live path is the native Google Antigravity agent loop. The
+            # older controller implementation remains below temporarily for
+            # source compatibility, but is no longer reachable from chat.
+            async for frame in _stream_antigravity_agent_loop(
                 db,
                 chat_session,
                 user_msg,
