@@ -143,6 +143,12 @@ function formatErrorMessage(data, fallback = "Request failed") {
 
 async function consumeEventStream(response, handlers = {}, signal = null) {
   if (!response.ok || !response.body) {
+    if (response.status === 401 && !isAuthEndpoint(response.url)) {
+      localStorage.removeItem("auth_token");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("auth:expired"));
+      }
+    }
     const err = new Error(`Stream request failed: ${response.status}`);
     err.status = response.status;
     err.data = await response.text().catch(() => "");

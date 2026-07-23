@@ -2847,20 +2847,17 @@ async def _stream_antigravity_agent_loop(
     assistant_text = _sanitize_llm_response(assistant_text, request.content)
     had_streamed_text = bool(assistant_text)
     if not assistant_text:
-        assistant_text = (
-            "The agent completed the permitted workflow steps, but the configured "
-            "model did not return a final answer. Please retry the request."
-        )
-
-    if not response_started:
-        response_started = True
-        yield emit(
-            "final_response_started",
-            "response",
-            "Writing the final answer from the live Antigravity workflow result",
-            status="running",
-            result_summary={"content_status": "streaming", "tool_calls": len(tool_transcript)},
-        )
+        if stream_error:
+            assistant_text = (
+                "Google Antigravity could not complete this provider turn: "
+                f"{_provider_error_label(stream_error)}. Check the selected "
+                "provider, model, base URL, and API key, then retry."
+            )
+        else:
+            assistant_text = (
+                "The configured model returned no final answer tokens. Please retry "
+                "the request."
+            )
 
     context_payload = {
         "agent_runtime": "google-antigravity",
@@ -2944,7 +2941,7 @@ async def _stream_antigravity_agent_loop(
     db.add(assistant_msg)
     db.commit()
     db.refresh(assistant_msg)
-    if not had_streamed_text:
+    if not had_streamed_text and not stream_error:
         yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
     yield f"event: done\ndata: {_json_dumps({'assistant_message': _to_message_out(assistant_msg).model_dump(mode='json'), 'user_message': _to_message_out(user_msg).model_dump(mode='json'), 'session': _to_session_out(chat_session).model_dump(mode='json')})}\n\n"
 

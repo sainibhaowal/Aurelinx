@@ -6,14 +6,13 @@ the browser SSE contract. Antigravity supplies the real agent loop and native
 Thought/Text/ToolCall events.
 """
 
-from __future__ import annotations
-
 import asyncio
 import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncIterator, Callable, Dict, Optional
+from urllib.parse import urlparse, urlunparse
 
 from app.core.provider_utils import normalize_local_provider_base
 
@@ -85,18 +84,18 @@ def _make_tools(
         result_buffer.append({"tool": tool_name, "result": result})
         return result
 
-    def employee_search(query: str, limit: int = 8) -> Dict[str, Any]:
+    def employee_search(query: str) -> Dict[str, Any]:
         """Search verified employee records. Read-only."""
         return invoke(
             "employee.search",
-            {"query": str(query)[:12000], "limit": max(1, min(int(limit), 20))},
+            {"query": str(query)[:12000], "limit": 8},
         )
 
-    def candidate_search(query: str, limit: int = 8) -> Dict[str, Any]:
+    def candidate_search(query: str) -> Dict[str, Any]:
         """Search verified candidate records. Read-only."""
         return invoke(
             "candidate.search",
-            {"query": str(query)[:12000], "limit": max(1, min(int(limit), 20))},
+            {"query": str(query)[:12000], "limit": 8},
         )
 
     def database_overview() -> Dict[str, Any]:
@@ -179,8 +178,14 @@ def _config_for_request(
         "tools": tools,
         "policies": policies,
         "workspaces": [],
-        "conversation_id": conversation_id,
-        "session_continuation_mode": types.SessionContinuationMode.CREATE_OR_RESUME,
+        # The Aurelinx UUID is a database/chat identifier, not necessarily an
+        # Antigravity conversation already present in the harness state dir.
+        # Passing it on the first turn makes the local harness try to resume a
+        # nonexistent conversation before the model can emit any event. The
+        # caller supplies recent Aurelinx history in the prompt, so let the
+        # native runtime create its own conversation here.
+        "conversation_id": None,
+        "session_continuation_mode": types.SessionContinuationMode.CREATE_ONLY,
         "save_dir": str(state_dir),
         "app_data_dir": str(state_dir / "app-data"),
     }
@@ -197,6 +202,13 @@ def _config_for_request(
         raise RuntimeError(
             "An OpenAI-compatible base URL is required for Antigravity local mode"
         )
+    # LocalOpenAIConnectionStrategy appends `/v1/chat/completions` itself.
+    # The browser/provider settings use the conventional `/v1` base, so strip
+    # that suffix once to avoid requesting `/v1/v1/chat/completions`.
+    parsed_base = urlparse(resolved_base.rstrip("/"))
+    if parsed_base.path == "/v1" or parsed_base.path.endswith("/v1"):
+        parsed_base = parsed_base._replace(path=parsed_base.path[:-3])
+        resolved_base = urlunparse(parsed_base).rstrip("/")
     return LocalOpenAIAgentConfig(
         base_url=resolved_base,
         env={"OPENAI_API_KEY": api_key or "not-needed"},
@@ -240,8 +252,8 @@ async def stream_agent_turn(
         conversation_id=str(session_id),
     )
 
-    async with _session_lock(str(session_id)):
-        async with Agent(config) as agent:
+    async def run_config(agent_config):
+        async with Agent(agent_config) as agent:
             response = await agent.chat(prompt)
             emitted_tool_results = 0
             async for event in response.chunks:
@@ -285,9 +297,6 @@ async def stream_agent_turn(
                             },
                         )
 
-                # Current SDK versions expose native ToolCall chunks but do not
-                # always expose custom Python ToolResult chunks. The request-
-                # scoped wrappers provide the exact safe result in that case.
                 while emitted_tool_results < len(result_buffer):
                     yield AntigravityRuntimeEvent(
                         "tool_result", result_buffer[emitted_tool_results]
@@ -301,3 +310,7 @@ async def stream_agent_turn(
                 emitted_tool_results += 1
 
             yield AntigravityRuntimeEvent("finished", response.usage_metadata)
+
+    async with _session_lock(str(session_id)):
+        async for event in run_config(config):
+            yield event
