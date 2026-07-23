@@ -2094,8 +2094,22 @@ def _provider_error_code(error: Any) -> str:
     text = str(error or "").lower()
     if "429" in text or "rate limit" in text or "too many requests" in text:
         return "MODEL_RATE_LIMITED"
-    if "401" in text or "403" in text or "unauthorized" in text:
+    if (
+        "401" in text
+        or "403" in text
+        or "unauthorized" in text
+        or "api key" in text
+        or "authentication" in text
+    ):
         return "MODEL_AUTH_FAILED"
+    if "404" in text or "not found" in text:
+        return "MODEL_ENDPOINT_NOT_FOUND"
+    if "400" in text or "bad request" in text or "invalid request" in text:
+        return "MODEL_REQUEST_REJECTED"
+    if "connection refused" in text or "failed to connect" in text:
+        return "MODEL_ENDPOINT_UNREACHABLE"
+    if "not openai-compatible" in text or "base url" in text or "not supported" in text:
+        return "MODEL_CONFIG_INVALID"
     return "MODEL_PROVIDER_FAILED"
 
 
@@ -2104,6 +2118,10 @@ def _provider_error_label(error: Any) -> str:
     return {
         "MODEL_RATE_LIMITED": "provider rate limit (HTTP 429)",
         "MODEL_AUTH_FAILED": "provider authentication/authorization failure",
+        "MODEL_ENDPOINT_NOT_FOUND": "provider endpoint or model was not found (HTTP 404)",
+        "MODEL_REQUEST_REJECTED": "provider rejected the request (HTTP 400)",
+        "MODEL_ENDPOINT_UNREACHABLE": "provider endpoint is unreachable",
+        "MODEL_CONFIG_INVALID": "provider configuration is not supported by the Aurelinx agent",
         "MODEL_PROVIDER_FAILED": "provider request failure",
     }.get(code, "provider request failure")
 
@@ -2671,6 +2689,9 @@ async def _stream_antigravity_agent_loop(
         result_summary={
             "provider": request.provider or "lmstudio",
             "model": request.model or "provider_default",
+            "auth_state": "present" if request.api_key else "missing",
+            "endpoint_source": "request" if request.base_url else "provider default",
+            "model_source": "request" if request.model else "provider default",
             "tools_are_runtime_selected": True,
             "built_in_tools": False,
         },
