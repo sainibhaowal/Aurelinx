@@ -158,6 +158,7 @@ def _config_for_request(
     from google.antigravity.hooks import policy
 
     provider = (provider or "lmstudio").lower()
+    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
     provider_defaults = {
         "openai": ("https://api.openai.com/v1", "gpt-4o-mini"),
         "groq": ("https://api.groq.com/openai/v1", "llama-3.1-70b-versatile"),
@@ -166,10 +167,11 @@ def _config_for_request(
         "ollama": ("http://127.0.0.1:11434/v1", "llama3"),
         "custom": (None, "gpt-4o-mini"),
     }
-    if provider in {"anthropic", "claude"}:
+    if provider in {"claude"}:
         raise RuntimeError(
-            "The Aurelinx native agent requires a Gemini or OpenAI-compatible "
-            "provider; Anthropic is not OpenAI-compatible in this runtime"
+            "Claude/Anthropic uses a different API format and is not supported "
+            "in the native agent runtime. Use OpenAI, Groq, OpenCode, Google, "
+            "LM Studio, or Ollama for agent features."
         )
 
     tool_names = [tool.__name__ for tool in tools]

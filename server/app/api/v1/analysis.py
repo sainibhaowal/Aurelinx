@@ -309,6 +309,7 @@ async def _call_openai_compatible_model(
     model: str = None,
 ) -> str:
     provider = (provider or "openai").lower()
+    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
 
     if provider == "lmstudio":
         endpoint = (
@@ -325,11 +326,23 @@ async def _call_openai_compatible_model(
     elif provider == "groq":
         endpoint = "https://api.groq.com/openai/v1/chat/completions"
         selected_model = model or "llama-3.1-70b-versatile"
-        auth_header = {"Authorization": f"Bearer {api_key}"}
+        auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     elif provider == "openai":
         endpoint = "https://api.openai.com/v1/chat/completions"
         selected_model = model or "gpt-4o-mini"
-        auth_header = {"Authorization": f"Bearer {api_key}"}
+        auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    elif provider == "ollama":
+        endpoint = (
+            f"{(base_url or 'http://127.0.0.1:11434/v1').rstrip('/')}/chat/completions"
+        )
+        selected_model = model or "llama3"
+        auth_header = {}
+    elif provider == "custom":
+        if not base_url:
+            return "Custom provider requires a base URL."
+        endpoint = f"{base_url.rstrip('/')}/chat/completions"
+        selected_model = model or "gpt-4o-mini"
+        auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     else:
         # Keep non-openai-compatible providers graceful until dedicated adapters are added.
         return (
@@ -378,6 +391,7 @@ async def _call_copilot_model(
     model: str = None,
 ) -> str:
     provider = (provider or "lmstudio").lower()
+    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
     if provider == "lmstudio":
         endpoint = (
             f"{normalize_local_provider_base(base_url).rstrip('/')}/chat/completions"
@@ -387,27 +401,40 @@ async def _call_copilot_model(
     elif provider == "groq":
         endpoint = "https://api.groq.com/openai/v1/chat/completions"
         selected_model = model or "llama-3.1-70b-versatile"
-        auth_header = {"Authorization": f"Bearer {api_key}"}
+        auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     elif provider == "openai":
         endpoint = "https://api.openai.com/v1/chat/completions"
         selected_model = model or "gpt-4o-mini"
-        auth_header = {"Authorization": f"Bearer {api_key}"}
+        auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     elif provider == "claude":
         endpoint = "https://api.anthropic.com/v1/messages"
         selected_model = model or "claude-3-5-sonnet-20241022"
-        auth_header = {
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        }
+        auth_header = {"Content-Type": "application/json", "anthropic-version": "2023-06-01"}
+        if api_key:
+            auth_header["x-api-key"] = api_key
     elif provider == "gemini":
-        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model or 'gemini-1.5-pro'}:generateContent?key={api_key}"
+        if not api_key:
+            raise ValueError("Gemini requires an API key")
         selected_model = model or "gemini-1.5-pro"
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{selected_model}:generateContent?key={api_key}"
         auth_header = {}
     elif provider == "opencode":
         endpoint = (
             f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/chat/completions"
         )
         selected_model = model or "gpt-5.5"
+        auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    elif provider == "ollama":
+        endpoint = (
+            f"{(base_url or 'http://127.0.0.1:11434/v1').rstrip('/')}/chat/completions"
+        )
+        selected_model = model or "llama3"
+        auth_header = {}
+    elif provider == "custom":
+        if not base_url:
+            raise ValueError("Custom provider requires a base URL")
+        endpoint = f"{base_url.rstrip('/')}/chat/completions"
+        selected_model = model or "gpt-4o-mini"
         auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     else:
         raise ValueError(f"Copilot provider adapter is not configured for '{provider}'")
@@ -424,7 +451,7 @@ async def _call_copilot_model(
         f"Workspace context (JSON):\n{json.dumps(context, default=str)}\n\n"
         "Return a concise executive answer with Markdown sections for headline, answer, evidence, recommendations, actions, and warnings."
     )
-    if provider in ["openai", "lmstudio", "groq"]:
+    if provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
         payload = {
             "model": selected_model,
             "temperature": 0.2,
@@ -451,7 +478,7 @@ async def _call_copilot_model(
         resp = await client.post(endpoint, json=payload, headers=headers)
         resp.raise_for_status()
         data = resp.json()
-        if provider in ["openai", "lmstudio", "groq"]:
+        if provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
             return data["choices"][0]["message"]["content"].strip()
         if provider == "claude":
             text_blocks = [

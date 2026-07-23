@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from app.core.config import settings
 from app.core.logging_config import get_logger
 from app.core.data_policy import filter_real_records
 from app.core.provider_utils import (
@@ -1239,6 +1240,7 @@ async def _llm_stream_response(
     user_content_override: Optional[str] = None,
 ):
     provider = (provider or "lmstudio").lower()
+    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
     casual_chat = _is_casual_chat(user_text)
 
     if provider == "lmstudio":
@@ -1258,28 +1260,43 @@ async def _llm_stream_response(
     elif provider == "openai":
         endpoint = "https://api.openai.com/v1/chat/completions"
         model_name = model or "gpt-4o-mini"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
     elif provider == "groq":
         endpoint = "https://api.groq.com/openai/v1/chat/completions"
         model_name = model or "llama-3.1-70b-versatile"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
     elif provider == "claude":
         endpoint = "https://api.anthropic.com/v1/messages"
         model_name = model or "claude-3-5-sonnet-20241022"
-        headers = {
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        }
+        headers = {"Content-Type": "application/json", "anthropic-version": "2023-06-01"}
+        if api_key:
+            headers["x-api-key"] = api_key
     elif provider == "gemini":
-        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model or 'gemini-1.5-pro'}:streamGenerateContent?key={api_key}"
+        model_name = model or "gemini-1.5-pro"
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:streamGenerateContent?key={api_key}" if api_key else None
+        if not endpoint:
+            yield "Gemini requires an API key."
+            return
         headers = {"Content-Type": "application/json"}
+    elif provider == "ollama":
+        endpoint = (
+            f"{(base_url or 'http://127.0.0.1:11434/v1').rstrip('/')}/chat/completions"
+        )
+        model_name = model or "llama3"
+        headers = {"Content-Type": "application/json"}
+    elif provider == "custom":
+        endpoint = f"{base_url.rstrip('/')}/chat/completions" if base_url else None
+        if not endpoint:
+            yield "Custom provider requires a base URL."
+            return
+        model_name = model or "gpt-4o-mini"
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
     else:
         yield f"Provider stream adapter for {provider} not supported."
         return
@@ -1527,6 +1544,7 @@ async def _llm_response(
     temperature_override: Optional[float] = None,
 ) -> str:
     provider = (provider or "lmstudio").lower()
+    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
 
     if provider == "lmstudio":
         endpoint = (
@@ -1545,28 +1563,41 @@ async def _llm_response(
     elif provider == "openai":
         endpoint = "https://api.openai.com/v1/chat/completions"
         model_name = model or "gpt-4o-mini"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
     elif provider == "groq":
         endpoint = "https://api.groq.com/openai/v1/chat/completions"
         model_name = model or "llama-3.1-70b-versatile"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
     elif provider == "claude":
         endpoint = "https://api.anthropic.com/v1/messages"
         model_name = model or "claude-3-5-sonnet-20241022"
-        headers = {
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        }
+        headers = {"Content-Type": "application/json", "anthropic-version": "2023-06-01"}
+        if api_key:
+            headers["x-api-key"] = api_key
     elif provider == "gemini":
-        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model or 'gemini-1.5-pro'}:generateContent?key={api_key}"
+        model_name = model or "gemini-1.5-pro"
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}" if api_key else None
+        if not endpoint:
+            return "Gemini requires an API key."
         headers = {"Content-Type": "application/json"}
+    elif provider == "ollama":
+        endpoint = (
+            f"{(base_url or 'http://127.0.0.1:11434/v1').rstrip('/')}/chat/completions"
+        )
+        model_name = model or "llama3"
+        headers = {"Content-Type": "application/json"}
+    elif provider == "custom":
+        endpoint = f"{base_url.rstrip('/')}/chat/completions" if base_url else None
+        if not endpoint:
+            return "Custom provider requires a base URL."
+        model_name = model or "gpt-4o-mini"
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
     else:
         return "Provider adapter for this chat request is not configured. Switch to LM Studio/OpenAI."
 
@@ -2727,6 +2758,17 @@ async def _stream_antigravity_agent_loop(
         f"Recent Aurelinx conversation context:\n{json.dumps(history[-8:], default=str)}"
     )
     has_attachments = bool(attachments)
+    resolved_provider = (request.provider or "lmstudio").lower()
+    resolved_provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(resolved_provider, resolved_provider)
+    resolved_api_key = request.api_key
+    if not resolved_api_key:
+        resolved_api_key = {
+            "openai": settings.OPENAI_API_KEY,
+            "groq": settings.GROQ_API_KEY,
+            "claude": settings.CLAUDE_API_KEY,
+            "gemini": settings.OPENAI_API_KEY,
+            "opencode": settings.OPENAI_API_KEY,
+        }.get(resolved_provider)
     try:
         async for runtime_event in stream_agent_turn(
             prompt=prompt,
@@ -2734,7 +2776,7 @@ async def _stream_antigravity_agent_loop(
             current_user=current_user,
             session_id=str(chat_session.id),
             provider=request.provider or "lmstudio",
-            api_key=request.api_key,
+            api_key=resolved_api_key,
             base_url=request.base_url,
             model=request.model,
             has_attachments=has_attachments,
@@ -4049,13 +4091,22 @@ async def send_message(
         db, chat_session.id, request.content, current_user, attachments
     )
     tool_context = context_payload.get("tool_context", {})
+    resolved_provider = (request.provider or "lmstudio").lower()
+    resolved_provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(resolved_provider, resolved_provider)
+    resolved_api_key = request.api_key
+    if not resolved_api_key:
+        resolved_api_key = {
+            "openai": settings.OPENAI_API_KEY,
+            "groq": settings.GROQ_API_KEY,
+            "claude": settings.CLAUDE_API_KEY,
+        }.get(resolved_provider)
     assistant_text = ""
     last_err = None
     for _ in range(3):
         try:
             assistant_text = await _llm_response(
                 provider=request.provider or "lmstudio",
-                api_key=request.api_key,
+                api_key=resolved_api_key,
                 base_url=request.base_url,
                 model=request.model,
                 user_text=request.content,
@@ -4586,16 +4637,7 @@ async def ping_provider(req: ProviderPingRequest):
     import httpx
 
     provider = req.provider.lower()
-    # The UI uses product-facing family names. Keep the health check aligned
-    # with the native runtime instead of reporting a misleading connection
-    # state for Google/Gemini.
-    if provider == "google":
-        provider = "gemini"
-    if provider in {"anthropic", "claude"}:
-        return {
-            "status": "unsupported",
-            "message": "Anthropic is not supported by the native OpenAI/Gemini agent bridge. Use Google, OpenAI, Groq, OpenCode, LM Studio, Ollama, or an OpenAI-compatible endpoint.",
-        }
+    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
     api_key = req.api_key or ""
     base_url = req.base_url or ""
     model = req.model or ""
@@ -4628,10 +4670,9 @@ async def ping_provider(req: ProviderPingRequest):
         elif provider == "openai":
             endpoint = "https://api.openai.com/v1/chat/completions"
             model_name = model or "gpt-4o-mini"
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-            }
+            headers = {"Content-Type": "application/json"}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
             payload = {
                 "model": model_name,
                 "max_tokens": 1,
@@ -4640,10 +4681,9 @@ async def ping_provider(req: ProviderPingRequest):
         elif provider == "groq":
             endpoint = "https://api.groq.com/openai/v1/chat/completions"
             model_name = model or "llama-3.1-70b-versatile"
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-            }
+            headers = {"Content-Type": "application/json"}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
             payload = {
                 "model": model_name,
                 "max_tokens": 1,
@@ -4652,22 +4692,49 @@ async def ping_provider(req: ProviderPingRequest):
         elif provider == "claude":
             endpoint = "https://api.anthropic.com/v1/messages"
             model_name = model or "claude-3-5-sonnet-20241022"
-            headers = {
-                "Content-Type": "application/json",
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-            }
+            headers = {"Content-Type": "application/json", "anthropic-version": "2023-06-01"}
+            if api_key:
+                headers["x-api-key"] = api_key
             payload = {
                 "model": model_name,
                 "max_tokens": 1,
                 "messages": [{"role": "user", "content": "ping"}],
             }
         elif provider == "gemini":
-            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model or 'gemini-1.5-pro'}:generateContent?key={api_key}"
+            model_name = model or "gemini-1.5-pro"
+            if not api_key:
+                return {"status": "error", "message": "Gemini requires an API key."}
+            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
             headers = {"Content-Type": "application/json"}
             payload = {
                 "contents": [{"parts": [{"text": "ping"}]}],
                 "generationConfig": {"maxOutputTokens": 1},
+            }
+        elif provider == "ollama":
+            endpoint = (
+                f"{base_url.rstrip('/')}/chat/completions"
+                if base_url
+                else "http://127.0.0.1:11434/v1/chat/completions"
+            )
+            model_name = model or "llama3"
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "model": model_name,
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "ping"}],
+            }
+        elif provider == "custom":
+            if not base_url:
+                return {"status": "error", "message": "Custom provider requires a base URL."}
+            endpoint = f"{base_url.rstrip('/')}/chat/completions"
+            model_name = model or "gpt-4o-mini"
+            headers = {"Content-Type": "application/json"}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+            payload = {
+                "model": model_name,
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "ping"}],
             }
         else:
             return {
@@ -4724,14 +4791,7 @@ async def discover_provider_models(req: ProviderDiscoverRequest):
     import httpx
 
     provider = req.provider.lower()
-    if provider == "google":
-        provider = "gemini"
-    if provider in {"anthropic", "claude"}:
-        return {
-            "status": "unsupported",
-            "message": "Anthropic is not supported by the native agent bridge.",
-            "models": [],
-        }
+    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
     api_key = req.api_key or ""
     base_url = req.base_url or ""
 
