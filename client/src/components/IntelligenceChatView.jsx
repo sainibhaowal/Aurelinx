@@ -510,11 +510,15 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
 const naturalStepDetail = (step) => {
   const summary = step.result_summary;
   if (step.type === "model_reasoning") {
-    const streamed = summary?.characters ? ` · ${summary.characters} reasoning characters streamed` : "";
+    const streamed = summary?.characters ? ` · ${summary.characters} reasoning characters received` : "";
     if (step.status === "running") {
-      return `${step.phase === "response" ? "Answer" : "Execution"} model is reasoning (provider reported${streamed})`;
+      return `Aurelinx is receiving a reasoning signal${streamed}`;
     }
-    return `${step.phase === "response" ? "Answer" : "Execution"} model finished provider-reported reasoning${streamed}`;
+    return `Aurelinx received a reasoning signal${streamed}`;
+  }
+  if (step.type === "agent_started") return "Aurelinx agent is working on your request.";
+  if (step.type === "agent_failed") {
+    return `Aurelinx could not complete this request${summary?.reason ? `: ${summary.reason}` : "."}`;
   }
   if (step.type === "controller_call") {
     if (step.status === "failed") return `The controller could not complete this turn: ${summary?.reason || "the provider did not respond"}.`;
@@ -525,11 +529,22 @@ const naturalStepDetail = (step) => {
   }
   if (step.type === "tool_call") {
     const args = step.safe_input?.arguments;
-    if (args?.query) return `Searching with the request: “${args.query}”`;
-    return "The internal tool received its bounded input.";
+    const labels = {
+      "employee.search": "employee records",
+      "candidate.search": "candidate records",
+      "database.overview": "database totals",
+      "dashboard.snapshot": "workforce analytics",
+      "workspace.snapshot": "workspace records",
+      "document.csv_ingest": "the attached CSV",
+      "data.mutate": "the requested data change",
+      "data.verify": "the saved record",
+    };
+    const target = labels[step.tool] || step.tool?.replaceAll(".", " ") || "the requested data";
+    if (args?.query) return `Aurelinx is searching ${target} for “${args.query}”`;
+    return `Aurelinx is using ${target}`;
   }
   if (step.type === "tool_result") {
-    return step.display_message || "The internal tool returned a verified operational result.";
+    return step.display_message || "Aurelinx received a verified result.";
   }
   if (step.type === "agent_decision") {
     if (summary?.answer_preview) return `Answer: ${summary.answer_preview}`;
@@ -538,7 +553,7 @@ const naturalStepDetail = (step) => {
     if (summary?.answer_preview) return `Answer prepared: ${summary.answer_preview}`;
   }
   if (step.type === "final_response_started") {
-    return summary?.content_status || "The answer is being written from the observed workflow results.";
+    return "Aurelinx is streaming the answer";
   }
   if (step.type === "final_response_completed") {
     return step.status === "failed"
@@ -551,7 +566,7 @@ const naturalStepDetail = (step) => {
       : "The observed results passed the workflow and permission checks.";
   }
   if (step.type === "workflow_started") return "Aurelinx accepted the request and opened a protected workflow.";
-  if (step.type === "workflow_completed") return "Everything completed and the result was saved to the conversation.";
+  if (step.type === "workflow_completed") return "Aurelinx completed the request and saved the result.";
   if (step.type === "tool_result" && step.error_code) return `The step was stopped by policy: ${step.error_code}.`;
   return step.display_message || "Workflow activity recorded.";
 };
@@ -576,13 +591,14 @@ const expandedEventDetails = (step) => {
   if (step.safe_input != null) details.input = step.safe_input;
   if (step.result_summary != null) details.result = step.result_summary;
   if (step.type === "model_reasoning") {
-    details.note = "Provider reasoning text is private; this event exposes only live timing and character-count telemetry.";
+    details.note = "Private reasoning text is not displayed; this event exposes live timing and character-count telemetry.";
   }
   return Object.fromEntries(Object.entries(details).filter(([, value]) => value !== undefined));
 };
 
 const AgenticStepTracker = ({ steps = [], onApproval }) => {
   const [expandedId, setExpandedId] = useState(null);
+  const [expandedAll, setExpandedAll] = useState(false);
   const meaningfulSteps = useMemo(() => {
     const visible = steps.filter((step) => {
       if (step.tool === "conversation.context") return false;
@@ -617,6 +633,25 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
   return (
     <div className="flex flex-col gap-3 my-2">
 
+      {!!meaningfulSteps.length && (
+        <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-2">
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Aurelinx activity
+            </span>
+            <span className="text-[10px] text-slate-600">{meaningfulSteps.length} events</span>
+          </div>
+          <button
+            type="button"
+            className="text-[9px] uppercase tracking-wider text-cyan-500/70 hover:text-cyan-300"
+            onClick={() => setExpandedAll((current) => !current)}
+          >
+            {expandedAll ? "Collapse details" : "Expand details"}
+          </button>
+        </div>
+      )}
+
       {!meaningfulSteps.length && (
         <div className="py-2 text-xs text-slate-500">
           Waiting for the model event…
@@ -636,6 +671,7 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
                 ? "text-amber-300"
                 : "text-cyan-300";
           const message = naturalStepDetail(step);
+          const isExpanded = expandedAll || expandedId === id;
           return (
             <div key={id} className="relative flex items-start gap-3 text-left">
               {index < meaningfulSteps.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-cyan-500/15" />}
@@ -677,12 +713,12 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
                   type="button"
                   className="mt-1 text-[9px] uppercase tracking-wider text-cyan-500/70 hover:text-cyan-300"
                   onClick={() => setExpandedId((current) => current === id ? null : id)}
-                  aria-expanded={expandedId === id}
+                  aria-expanded={isExpanded}
                 >
-                  {expandedId === id ? "Hide details" : "Show details"}
+                  {isExpanded ? "Hide details" : "Show details"}
                 </button>
 
-                {expandedId === id && (
+                {isExpanded && (
                   <pre className="mt-2 max-h-64 overflow-auto rounded-lg border border-cyan-500/15 bg-slate-950/60 p-2 text-left text-[10px] leading-relaxed text-slate-400 whitespace-pre-wrap break-words">
                     {JSON.stringify(expandedEventDetails(step), null, 2)}
                   </pre>
@@ -1040,7 +1076,7 @@ const IntelligenceChatView = () => {
         {
           id: `error-${Date.now()}`,
           role: "assistant",
-          content: e?.message || "The Antigravity workflow could not complete. Check provider configuration and backend logs.",
+          content: e?.message || "Aurelinx could not complete the request. Check the provider configuration and try again.",
           tool_trace: null,
           created_at: new Date().toISOString(),
         },
@@ -1187,6 +1223,12 @@ const IntelligenceChatView = () => {
                       <div className="mt-2 pt-2">
                         <AgenticStepTracker phase={streamPhase} steps={agentSteps} onApproval={resolveApproval} />
                       </div>
+                      {streamText && (
+                        <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-cyan-400/70">
+                          <span>Live answer</span>
+                          <span>{streamText.length} characters received</span>
+                        </div>
+                      )}
                       <div className="text-sm">
                         <ThinkingMessageContent text={streamText} isBusy={busy} />
                       </div>
