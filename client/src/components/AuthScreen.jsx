@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
 import AurelinxLogo from "./AurelinxLogo";
 import { useAuth } from "../contexts/AuthContext";
+import { API_BASE_URL } from "../services/apiBase";
 
 const initialRegisterState = {
   firstName: "",
@@ -98,7 +99,7 @@ const AuthScreen = () => {
   }, []);
 
   const handleOAuth = (provider) => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+    const apiBase = API_BASE_URL;
     window.location.href = `${apiBase}/api/v1/auth/${provider}/login`;
   };
 

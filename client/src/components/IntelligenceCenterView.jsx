@@ -17,6 +17,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { UserManualButton } from "./UserManual";
+import { API_BASE_URL } from "../services/apiBase";
 
 // Curated 2D positions for skill nodes in Dijkstra SVG graph
 const SKILL_GRAPH_COORDS = {
@@ -156,7 +157,7 @@ const apiCall = async (url, method = "GET", body = null) => {
   const config = { method, headers };
   if (body) config.body = JSON.stringify(body);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+  const API_BASE = API_BASE_URL;
   const response = await fetch(`${API_BASE}/api/v1/intelligence${url}`, config);
   if (!response.ok) {
     const errorText = await response.text();
@@ -489,7 +490,7 @@ const IntelligenceCenterView = () => {
   async function fetchCareerEmployees() {
     try {
       const API_BASE =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+        API_BASE_URL;
       const token = localStorage.getItem("auth_token") || "";
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await fetch(`${API_BASE}/api/v1/employees`, {

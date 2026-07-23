@@ -3,7 +3,9 @@
  * Handles all backend communication, error handling, and retry logic
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+import { API_BASE_URL } from "./apiBase";
+
+const API_BASE = API_BASE_URL;
 const API_V1 = `${API_BASE}/api/v1`;
 let preferredApiBase = API_BASE;
 

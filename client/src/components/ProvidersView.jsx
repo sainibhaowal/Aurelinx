@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import Toast from "./Toast";
 import { UserManualButton } from "./UserManual";
+import { API_BASE_URL } from "../services/apiBase";
 
 const LLM_FAMILIES = [
   {
@@ -319,7 +320,7 @@ const ProvidersView = () => {
     setLoadingTokens(true);
     try {
       const apiBase =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+        API_BASE_URL;
       const response = await fetch(`${apiBase}/api/v1/integrations/tokens`, {
         headers: getAuthHeaders(),
       });
@@ -342,7 +343,7 @@ const ProvidersView = () => {
     setLoadingLogs(true);
     try {
       const apiBase =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+        API_BASE_URL;
       const response = await fetch(
         `${apiBase}/api/v1/integrations/logs?limit=20`,
         {
@@ -368,7 +369,7 @@ const ProvidersView = () => {
     setLoadingEvents(true);
     try {
       const apiBase =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+        API_BASE_URL;
       const response = await fetch(
         `${apiBase}/api/v1/integrations/events?limit=20`,
         {
@@ -390,7 +391,7 @@ const ProvidersView = () => {
     if (!newTokenName.trim()) return;
     try {
       const apiBase =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+        API_BASE_URL;
       const response = await fetch(
         `${apiBase}/api/v1/integrations/token?name=${encodeURIComponent(newTokenName)}`,
         {
@@ -415,7 +416,7 @@ const ProvidersView = () => {
   const handleRevokeToken = async (tokenId) => {
     try {
       const apiBase =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+        API_BASE_URL;
       const response = await fetch(
         `${apiBase}/api/v1/integrations/token/${tokenId}`,
         {
@@ -437,7 +438,7 @@ const ProvidersView = () => {
     setSimulatingWebhook(type);
     try {
       const apiBase =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+        API_BASE_URL;
       const activeToken =
         generatedKey || (tokens.length > 0 ? tokens[0].api_key : null);
       if (!activeToken) {
@@ -545,7 +546,7 @@ const ProvidersView = () => {
       const loadDefaultEmail = async () => {
         try {
           const apiBase =
-            process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+        API_BASE_URL;
           const token = localStorage.getItem("auth_token") || "";
           const headers = token ? { Authorization: `Bearer ${token}` } : {};
           const response = await fetch(`${apiBase}/api/v1/employees?limit=5`, {
@@ -597,7 +598,7 @@ const ProvidersView = () => {
         base_url: currentUrl,
       };
       const apiBase =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+        API_BASE_URL;
       const response = await fetch(
         `${apiBase}/api/v1/chat/providers/discover`,
         {
@@ -685,7 +686,7 @@ const ProvidersView = () => {
 
     try {
       const apiBase =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100";
+        API_BASE_URL;
       const response = await fetch(`${apiBase}/api/v1/chat/providers/ping`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1524,13 +1525,13 @@ const ProvidersView = () => {
 
                               <div className="space-y-2 mt-auto">
                                 <div className="p-2 bg-black/60 rounded-lg text-[9px] font-mono text-slate-300 select-all truncate">
-                                  {`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100"}/api/v1/integrations/jira`}
+                                  {`${API_BASE_URL}/api/v1/integrations/jira`}
                                 </div>
                                 <div className="flex gap-2">
                                   <button
                                     onClick={() => {
                                       navigator.clipboard.writeText(
-                                        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100"}/api/v1/integrations/jira`,
+                                        `${API_BASE_URL}/api/v1/integrations/jira`,
                                       );
                                       showToast(
                                         "Jira Ingestion Endpoint copied!",
@@ -1584,13 +1585,13 @@ const ProvidersView = () => {
 
                               <div className="space-y-2 mt-auto">
                                 <div className="p-2 bg-black/60 rounded-lg text-[9px] font-mono text-slate-300 select-all truncate">
-                                  {`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100"}/api/v1/integrations/slack`}
+                                  {`${API_BASE_URL}/api/v1/integrations/slack`}
                                 </div>
                                 <div className="flex gap-2">
                                   <button
                                     onClick={() => {
                                       navigator.clipboard.writeText(
-                                        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100"}/api/v1/integrations/slack`,
+                                        `${API_BASE_URL}/api/v1/integrations/slack`,
                                       );
                                       showToast(
                                         "Slack Ingestion Endpoint copied!",
@@ -1646,13 +1647,13 @@ const ProvidersView = () => {
 
                               <div className="space-y-2 mt-auto">
                                 <div className="p-2 bg-black/60 rounded-lg text-[9px] font-mono text-slate-300 select-all truncate">
-                                  {`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100"}/api/v1/integrations/workday`}
+                                  {`${API_BASE_URL}/api/v1/integrations/workday`}
                                 </div>
                                 <div className="flex gap-2">
                                   <button
                                     onClick={() => {
                                       navigator.clipboard.writeText(
-                                        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100"}/api/v1/integrations/workday`,
+                                        `${API_BASE_URL}/api/v1/integrations/workday`,
                                       );
                                       showToast(
                                         "Workday Ingestion Endpoint copied!",
@@ -1843,7 +1844,7 @@ const ProvidersView = () => {
 
 const aurelinx = new AurelinxSDK({
   apiKey: "${generatedKey || "aur_your_secure_ingestion_api_token"}",
-  endpoint: "${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100"}/api/v1"
+  endpoint: "${API_BASE_URL}/api/v1",
 });
 
 // 1. Ingest Workday HRIS directories automatically
