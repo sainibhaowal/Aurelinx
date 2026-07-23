@@ -2497,11 +2497,12 @@ async def _stream_antigravity_agent_loop(
     request: ChatMessageCreate,
     current_user: TokenData,
 ):
-    """Stream one safe, native Google Antigravity agent turn.
+    """Stream one safe, native Aurelinx agent turn.
 
-    Antigravity owns model planning, tool selection, tool execution dispatch,
-    continuation, and provider streaming. Aurelinx owns the authenticated tool
-    implementations, governance, persistence, and the browser event contract.
+    The native agent runtime owns model planning, tool selection, tool execution
+    dispatch, continuation, and provider streaming. Aurelinx owns the
+    authenticated tool implementations, governance, persistence, and browser
+    event contract.
     """
     from app.agents.antigravity_runtime import stream_agent_turn
 
@@ -2547,11 +2548,11 @@ async def _stream_antigravity_agent_loop(
         frame = emit(
             "model_reasoning",
             "execution",
-            "Execution model finished provider-reported reasoning",
+            "Aurelinx received the reasoning signal",
             status="completed",
             result_summary={
                 "characters": reasoning_characters,
-                "runtime": "google-antigravity",
+                "runtime": "aurelinx-agent",
             },
         )
         reasoning_event_id = None
@@ -2561,11 +2562,11 @@ async def _stream_antigravity_agent_loop(
     yield emit(
         "workflow_started",
         "intake",
-        "Workflow received and authenticated by the Google Antigravity runtime",
+        "Aurelinx received and authenticated the request",
         status="completed",
         result_summary={
             "session_id": chat_session.id,
-            "runtime": "google-antigravity",
+            "runtime": "aurelinx-agent",
             "controller": "native-agent-loop",
         },
     )
@@ -2625,7 +2626,7 @@ async def _stream_antigravity_agent_loop(
             "the exact action before any record can be removed."
         )
         context_payload = {
-            "agent_runtime": "google-antigravity",
+            "agent_runtime": "aurelinx-agent",
             "request_plan": {"mode": "approval_required"},
             "tool_context": {"tool_runs": [], "rbac_role": _user_role(current_user)},
             "session_history": history,
@@ -2665,7 +2666,7 @@ async def _stream_antigravity_agent_loop(
     yield emit(
         "agent_started",
         "execution",
-        "Google Antigravity started a native agent turn",
+        "Aurelinx agent is working on your request",
         status="running",
         result_summary={
             "provider": request.provider or "lmstudio",
@@ -2704,12 +2705,12 @@ async def _stream_antigravity_agent_loop(
                     frame = emit(
                         "model_reasoning",
                         "execution",
-                        "Execution model started provider-reported reasoning",
+                        "Aurelinx agent is reasoning",
                         status="running",
                         result_summary={
                             "provider": request.provider or "lmstudio",
                             "model": request.model or "provider_default",
-                            "runtime": "google-antigravity",
+                            "runtime": "aurelinx-agent",
                             "characters": 0,
                         },
                     )
@@ -2733,7 +2734,7 @@ async def _stream_antigravity_agent_loop(
                         yield emit(
                             "final_response_started",
                             "response",
-                            "Streaming the final answer from the live Antigravity result",
+                            "Aurelinx is streaming the answer",
                             status="running",
                             result_summary={
                                 "content_status": "streaming",
@@ -2758,7 +2759,7 @@ async def _stream_antigravity_agent_loop(
                 yield emit(
                     "tool_call",
                     "execution" if tool_name.startswith("data.") else "retrieval",
-                    f"The Antigravity agent requested {_agent_tool_label(tool_name)}.",
+                    f"Aurelinx is using {_agent_tool_label(tool_name)}.",
                     status="running",
                     tool_name=tool_name,
                     safe_input=safe_input,
@@ -2798,7 +2799,7 @@ async def _stream_antigravity_agent_loop(
         yield emit(
             "agent_failed",
             "execution",
-            "Google Antigravity could not complete the provider turn",
+            "Aurelinx could not complete the provider turn",
             status="failed",
             result_summary={"reason": _provider_error_label(exc)},
             error_code=_provider_error_code(exc),
@@ -2849,7 +2850,7 @@ async def _stream_antigravity_agent_loop(
     if not assistant_text:
         if stream_error:
             assistant_text = (
-                "Google Antigravity could not complete this provider turn: "
+                "Aurelinx could not complete this provider turn: "
                 f"{_provider_error_label(stream_error)}. Check the selected "
                 "provider, model, base URL, and API key, then retry."
             )
@@ -2860,8 +2861,8 @@ async def _stream_antigravity_agent_loop(
             )
 
     context_payload = {
-        "agent_runtime": "google-antigravity",
-        "request_plan": {"mode": "antigravity_agent", "needs_live_data": bool(tool_transcript)},
+            "agent_runtime": "aurelinx-agent",
+        "request_plan": {"mode": "aurelinx_agent", "needs_live_data": bool(tool_transcript)},
         "tool_context": {
             "tool_policy": sorted({item["tool"] for item in tool_transcript}),
             "tool_runs": [
@@ -2885,7 +2886,7 @@ async def _stream_antigravity_agent_loop(
         result_summary={
             "characters": len(assistant_text),
             "tool_calls": len(tool_transcript),
-            "runtime": "google-antigravity",
+            "runtime": "aurelinx-agent",
             **({"reason": _provider_error_label(stream_error)} if stream_error else {}),
         },
         error_code=_provider_error_code(stream_error) if stream_error else None,
@@ -2904,11 +2905,11 @@ async def _stream_antigravity_agent_loop(
     _write_audit(
         db,
         current_user,
-        action="CHAT_MESSAGE_ANTIGRAVITY",
+        action="CHAT_MESSAGE_AGENT",
         resource_type="chat_session",
         resource_id=chat_session.id,
         details={
-            "runtime": "google-antigravity",
+            "runtime": "aurelinx-agent",
             "tool_calls": len(tool_transcript),
             "provider": request.provider or "lmstudio",
             "model": request.model,
@@ -2928,9 +2929,9 @@ async def _stream_antigravity_agent_loop(
     completed = emit(
         "workflow_failed" if stream_error else "workflow_completed",
         "failed" if stream_error else "completed",
-        "Workflow stopped after the Antigravity provider error"
+        "Aurelinx stopped after the provider error"
         if stream_error
-        else "Workflow completed with a native Antigravity agent trace",
+        else "Aurelinx completed the request with a native agent trace",
         status="failed" if stream_error else "completed",
         result_summary={"assistant_message_id": assistant_msg.id, "tool_calls": len(tool_transcript)},
         error_code=_provider_error_code(stream_error) if stream_error else None,
@@ -4103,7 +4104,7 @@ async def send_message_stream(
                 getattr(current_user, "tenant_id", None) or "default",
             )
 
-            # The live path is the native Google Antigravity agent loop. The
+            # The live path is Aurelinx's native agent loop. The
             # older controller implementation remains below temporarily for
             # source compatibility, but is no longer reachable from chat.
             async for frame in _stream_antigravity_agent_loop(
