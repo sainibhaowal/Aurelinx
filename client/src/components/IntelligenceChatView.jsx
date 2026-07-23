@@ -564,7 +564,25 @@ const workflowTime = (value) => {
     : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 };
 
+const expandedEventDetails = (step) => {
+  const details = {
+    event: step.type,
+    phase: step.phase,
+    status: step.status,
+    tool: step.tool || undefined,
+    duration_ms: step.duration_ms ?? undefined,
+    message: step.display_message || undefined,
+  };
+  if (step.safe_input != null) details.input = step.safe_input;
+  if (step.result_summary != null) details.result = step.result_summary;
+  if (step.type === "model_reasoning") {
+    details.note = "Provider reasoning text is private; this event exposes only live timing and character-count telemetry.";
+  }
+  return Object.fromEntries(Object.entries(details).filter(([, value]) => value !== undefined));
+};
+
 const AgenticStepTracker = ({ steps = [], onApproval }) => {
+  const [expandedId, setExpandedId] = useState(null);
   const meaningfulSteps = useMemo(() => {
     const visible = steps.filter((step) => {
       if (step.tool === "conversation.context") return false;
@@ -654,6 +672,21 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
                     ) : null;
                   })()}
                 </div>
+
+                <button
+                  type="button"
+                  className="mt-1 text-[9px] uppercase tracking-wider text-cyan-500/70 hover:text-cyan-300"
+                  onClick={() => setExpandedId((current) => current === id ? null : id)}
+                  aria-expanded={expandedId === id}
+                >
+                  {expandedId === id ? "Hide details" : "Show details"}
+                </button>
+
+                {expandedId === id && (
+                  <pre className="mt-2 max-h-64 overflow-auto rounded-lg border border-cyan-500/15 bg-slate-950/60 p-2 text-left text-[10px] leading-relaxed text-slate-400 whitespace-pre-wrap break-words">
+                    {JSON.stringify(expandedEventDetails(step), null, 2)}
+                  </pre>
+                )}
 
                 {step.type === "approval_required" && step.result_summary?.approval_id && onApproval && (
                   <div className="flex gap-2 mt-3">

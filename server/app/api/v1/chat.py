@@ -1298,6 +1298,7 @@ async def _llm_stream_response(
         "- If evidence is missing, say that it is not verified and explain which live query or source is needed. Never fill gaps with plausible names, numbers, or actions.\n"
         "- Clearly distinguish what was found, what was inferred, and what is only a recommendation.\n"
         "- Never claim a mutation, deletion, search, or external action happened unless the tool result explicitly confirms it.\n"
+        "- For database.overview, distinguish primary employee/candidate records from supporting skills/experience rows; report the requested category explicitly.\n"
         "- Be natural, direct, and executive in tone.\n"
         "- If asked about employees, present the data in a clean formatted table or list.\n"
         "- If deletion is requested, firmly state it requires human approval and cannot be automated."
@@ -1585,6 +1586,7 @@ async def _llm_response(
         "- If evidence is missing, say that it is not verified and explain which live query or source is needed. Never fill gaps with plausible names, numbers, or actions.\n"
         "- Clearly distinguish what was found, what was inferred, and what is only a recommendation.\n"
         "- Never claim a mutation, deletion, search, or external action happened unless the tool result explicitly confirms it.\n"
+        "- For database.overview, distinguish primary employee/candidate records from supporting skills/experience rows; report the requested category explicitly.\n"
         "- Be natural, direct, and executive in tone.\n"
         "- If asked about employees, present the data in a clean formatted table or list.\n"
         "- If deletion is requested, firmly state it requires human approval and cannot be automated."
@@ -1859,8 +1861,12 @@ def _agent_tool_result_message(tool_name: str, result: Dict[str, Any]) -> str:
         )
     if tool_name == "database.overview":
         counts = result.get("record_counts") or {}
-        total = sum(value for value in counts.values() if isinstance(value, int))
-        return f"I verified the database overview: {total} total records across {len(counts)} sections."
+        primary_total = result.get("primary_record_total")
+        all_rows_total = result.get("all_table_rows_total")
+        return (
+            f"I verified the database overview: {primary_total} primary employee/candidate records; "
+            f"{all_rows_total} total rows including supporting skills and experience tables."
+        )
     if tool_name == "dashboard.snapshot":
         return "I calculated the current workforce analytics snapshot."
     if tool_name == "workspace.snapshot":
@@ -2027,9 +2033,17 @@ def _execute_agent_tool(
                 ],
             }
         if tool_name == "database.overview":
+            record_counts = _record_counts(db)
+            primary_record_counts = {
+                "employees": record_counts.get("employees", 0),
+                "candidates": record_counts.get("candidates", 0),
+            }
             return {
                 "tool": tool_name,
-                "record_counts": _record_counts(db),
+                "record_counts": record_counts,
+                "primary_record_counts": primary_record_counts,
+                "primary_record_total": sum(primary_record_counts.values()),
+                "all_table_rows_total": sum(record_counts.values()),
                 "sections": [
                     "employees",
                     "candidates",
