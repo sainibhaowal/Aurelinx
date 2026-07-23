@@ -13,7 +13,6 @@ import {
   Square,
   PanelRightClose,
   PanelRightOpen,
-  Brain,
   Info,
 } from "lucide-react";
 import { UserManualButton } from "./UserManual";
@@ -464,21 +463,9 @@ const CompactMarkdownRenderer = ({ children }) => (
   </ReactMarkdown>
 );
 
-// ── Premium Collapsible inline Thinking / Reasoning Box for DeepSeek-style models ──
+// Provider reasoning is represented by model_reasoning workflow events. The
+// private reasoning text itself is never rendered as an assistant answer.
 const ThinkingMessageContent = ({ text, children, isBusy }) => {
-  const [isOpen, setIsOpen] = useState(true);
-  const [elapsed, setElapsed] = useState(0);
-
-  // Hook to count thinking time dynamically while busy
-  useEffect(() => {
-    if (!isBusy) return;
-    setElapsed(0);
-    const timer = setInterval(() => {
-      setElapsed((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [isBusy]);
-
   const rawText = useMemo(() => {
     if (text) return text;
     if (typeof children === "string") return children;
@@ -507,89 +494,33 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
     };
   }, [rawText]);
 
-  // Determine if active thinking is occurring
-  const isThinkingActive = isBusy && parsed.content === "";
-
-  // The live activity timeline owns controller progress. Do not render a
-  // second fake cognitive card while the controller is making its decision.
-  if (isBusy && !rawText) return null;
-
-  // Only render if we actually have model thoughts (past or current) or are currently thinking
-  if (!parsed.thinking && !isThinkingActive) {
-    if (parsed.content) {
-      return (
-        <div className="mt-2 min-w-0 w-full overflow-hidden pt-2">
-          <MarkdownRenderer>{parsed.content}</MarkdownRenderer>
-        </div>
-      );
-    }
-    return null;
-  }
+  // A streamed <think> block is telemetry, not answer content. The live
+  // timeline shows whether the provider entered/exited reasoning, so do not
+  // create a second fake reasoning card here.
+  const visibleContent = parsed.thinking ? parsed.content : rawText;
+  if (!visibleContent || (isBusy && parsed.thinking && !parsed.content)) return null;
 
   return (
-    <div className="flex flex-col gap-2.5 w-full text-left my-1.5">
-      {/* Premium Collapsible Thinking Header */}
-      <div className="flex flex-col">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors w-fit font-medium cursor-pointer py-1"
-        >
-          <span className="flex items-center gap-1.5">
-            <Brain
-              size={12}
-              className={
-                isThinkingActive
-                  ? "text-cyan-400 animate-pulse"
-                  : "text-slate-500"
-              }
-            />
-            {isThinkingActive ? (
-              <span>Thinking... {elapsed > 0 ? `(${elapsed}s)` : ""}</span>
-            ) : (
-              <span>Thought for {elapsed > 0 ? `${elapsed}s` : "trace"}</span>
-            )}
-          </span>
-          <span className="text-[10px] text-slate-500 font-mono transition-transform duration-200">
-            {isOpen ? "▼" : "▶"}
-          </span>
-        </button>
-
-        {/* Collapsible Model Cognitive Reasoning Block */}
-        {isOpen && (
-          <div className="mt-2 pl-3 border-l border-cyan-500/25 flex flex-col gap-2.5 relative ml-1.5">
-            <div className="flex gap-2.5 items-start bg-slate-900/30 p-2.5 rounded-lg border border-white/5 font-sans italic select-text w-full">
-              <div className="flex-1 max-h-48 overflow-y-auto custom-scrollbar">
-                {parsed.thinking.trim() ? (
-                  <CompactMarkdownRenderer>
-                    {parsed.thinking.trim()}
-                  </CompactMarkdownRenderer>
-                ) : (
-                  <div className="flex items-center gap-1.5 font-mono text-[7px] text-slate-500">
-                    <span className="inline-block h-2 w-2 rounded-full border border-cyan-500/30 border-t-cyan-400 animate-spin" />
-                    <span>Analyzing cognitive pathways...</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {parsed.content && (
-        <div className="mt-2 min-w-0 w-full overflow-hidden border-t border-white/5 pt-2">
-          <MarkdownRenderer>{parsed.content}</MarkdownRenderer>
-        </div>
-      )}
+    <div className="mt-2 min-w-0 w-full overflow-hidden pt-2">
+      <MarkdownRenderer>{visibleContent}</MarkdownRenderer>
     </div>
   );
 };
 
 const naturalStepDetail = (step) => {
   const summary = step.result_summary;
+  if (step.type === "model_reasoning") {
+    if (step.status === "running") {
+      return `${step.phase === "response" ? "Answer" : "Execution"} model is reasoning (provider reported)`;
+    }
+    return `${step.phase === "response" ? "Answer" : "Execution"} model finished provider-reported reasoning`;
+  }
   if (step.type === "controller_call") {
     if (step.status === "failed") return `The controller could not complete this turn: ${summary?.reason || "the provider did not respond"}.`;
     if (summary?.progress) return summary.progress;
-    return "Aurelinx is evaluating the request and choosing the next safe step.";
+    return step.status === "running"
+      ? "Execution model is being called to choose the next safe step."
+      : "Execution model returned a safe progress update.";
   }
   if (step.type === "tool_call") {
     const args = step.safe_input?.arguments;
@@ -640,6 +571,7 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
     });
     const output = [];
     const controllerIndexes = new Map();
+    const reasoningIndexes = new Map();
     visible.forEach((step) => {
       if (step.type === "controller_call") {
         const iteration = step.result_summary?.iteration;
@@ -650,6 +582,15 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
         }
         controllerIndexes.set(key, output.length);
       }
+      if (step.type === "model_reasoning") {
+        const iteration = step.result_summary?.iteration;
+        const key = `${step.phase || "model"}-${iteration == null ? "final" : iteration}`;
+        if (step.status === "completed" && reasoningIndexes.has(key)) {
+          output[reasoningIndexes.get(key)] = step;
+          return;
+        }
+        reasoningIndexes.set(key, output.length);
+      }
       output.push(step);
     });
     return output;
@@ -659,7 +600,7 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
 
       {!meaningfulSteps.length && (
         <div className="py-2 text-xs text-slate-500">
-          Thinking…
+          Waiting for the model event…
         </div>
       )}
 
@@ -675,9 +616,7 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
               : status === "waiting"
                 ? "text-amber-300"
                 : "text-cyan-300";
-          const message = step.type === "controller_call" && status === "running"
-            ? "Thinking…"
-            : naturalStepDetail(step);
+          const message = naturalStepDetail(step);
           return (
             <div key={id} className="relative flex items-start gap-3 text-left">
               {index < meaningfulSteps.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-cyan-500/15" />}
@@ -702,10 +641,17 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
                       {workflowTime(step.created_at)}
                     </span>
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-x-2 text-[10px] text-slate-500">
-                    <span>{naturalStepDetail(step)}</span>
-                    {step.duration_ms != null && <><span>·</span><span>{step.duration_ms}ms</span></>}
-                  </div>
+                  {(() => {
+                    const detail = naturalStepDetail(step);
+                    const showDetail = detail && detail !== message;
+                    return (showDetail || step.duration_ms != null) ? (
+                      <div className="mt-1 flex flex-wrap gap-x-2 text-[10px] text-slate-500">
+                        {showDetail && <span>{detail}</span>}
+                        {showDetail && step.duration_ms != null && <span>·</span>}
+                        {step.duration_ms != null && <span>{step.duration_ms}ms</span>}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
 
                 {step.type === "approval_required" && step.result_summary?.approval_id && onApproval && (

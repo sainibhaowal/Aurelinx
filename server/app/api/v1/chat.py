@@ -1234,6 +1234,8 @@ async def _llm_stream_response(
     model: str,
     user_text: str,
     context_payload: Dict,
+    system_override: Optional[str] = None,
+    temperature_override: Optional[float] = None,
 ):
     provider = (provider or "lmstudio").lower()
     casual_chat = _is_casual_chat(user_text)
@@ -1281,7 +1283,7 @@ async def _llm_stream_response(
         yield f"Provider stream adapter for {provider} not supported."
         return
 
-    system = (
+    default_system = (
         "You are Aurelinx, the authoritative AI intelligence of the Aurelinx Management OS — "
         "an executive-grade HR platform.\n"
         "You have live access to the HR employee directory, candidates database, analytics, "
@@ -1298,6 +1300,12 @@ async def _llm_stream_response(
         "- Be natural, direct, and executive in tone.\n"
         "- If asked about employees, present the data in a clean formatted table or list.\n"
         "- If deletion is requested, firmly state it requires human approval and cannot be automated."
+    )
+    system = system_override or default_system
+    response_temperature = (
+        temperature_override
+        if temperature_override is not None
+        else (0.7 if casual_chat else 0.3)
     )
 
     tool_ctx = context_payload.get("tool_context", {})
@@ -1374,7 +1382,7 @@ async def _llm_stream_response(
         payload = {
             "model": model_name,
             "max_tokens": 1024,
-            "temperature": 0.7 if casual_chat else 0.3,
+            "temperature": response_temperature,
             "messages": messages,
             "stream": True,
         }
@@ -1384,7 +1392,7 @@ async def _llm_stream_response(
         payload = {
             "model": model_name,
             "max_tokens": 1024,
-            "temperature": 0.7 if casual_chat else 0.3,
+            "temperature": response_temperature,
             "system": system,
             "messages": messages,
             "stream": True,
@@ -1394,7 +1402,7 @@ async def _llm_stream_response(
         payload = {
             "contents": [{"parts": [{"text": full_prompt}]}],
             "generationConfig": {
-                "temperature": 0.7 if casual_chat else 0.3,
+                "temperature": response_temperature,
                 "maxOutputTokens": 1024,
             },
         }
@@ -1417,14 +1425,18 @@ async def _llm_stream_response(
                             delta = chunk.get("choices", [{}])[0].get("delta", {})
 
                             content = delta.get("content")
-                            reasoning = delta.get("reasoning_content")
+                            reasoning = (
+                                delta.get("reasoning_content")
+                                or delta.get("reasoning")
+                                or delta.get("thinking")
+                            )
 
                             if reasoning:
                                 if not in_thinking:
                                     yield "<think>"
                                     in_thinking = True
                                 yield reasoning
-                            elif content:
+                            if content:
                                 if in_thinking:
                                     yield "</think>"
                                     in_thinking = False
@@ -1440,8 +1452,17 @@ async def _llm_stream_response(
                             chunk = json.loads(data_str)
                             if chunk.get("type") == "content_block_delta":
                                 delta = chunk.get("delta", {})
+                                reasoning = delta.get("thinking", "") or delta.get("reasoning", "")
                                 text = delta.get("text", "")
+                                if reasoning:
+                                    if not in_thinking:
+                                        yield "<think>"
+                                        in_thinking = True
+                                    yield reasoning
                                 if text:
+                                    if in_thinking:
+                                        yield "</think>"
+                                        in_thinking = False
                                     yield text
                         except Exception:
                             continue
@@ -1452,14 +1473,25 @@ async def _llm_stream_response(
                     chunk_str = chunk_bytes.decode("utf-8", errors="ignore")
                     try:
                         obj = json.loads(chunk_str.strip())
-                        text = (
+                        parts = (
                             obj.get("candidates", [{}])[0]
                             .get("content", {})
-                            .get("parts", [{}])[0]
-                            .get("text", "")
+                            .get("parts", [])
                         )
-                        if text:
-                            yield text
+                        for part in parts:
+                            text = part.get("text", "")
+                            if not text:
+                                continue
+                            if part.get("thought"):
+                                if not in_thinking:
+                                    yield "<think>"
+                                    in_thinking = True
+                                yield text
+                            else:
+                                if in_thinking:
+                                    yield "</think>"
+                                    in_thinking = False
+                                yield text
                     except Exception:
                         import re
 
@@ -1951,11 +1983,17 @@ def _execute_agent_tool(
 
 def _sanitize_llm_response(text: str, user_text: str) -> str:
     """
-    Ensure raw generated markdown text is passed directly to allow comprehensive markdown styling.
+    Keep provider-private reasoning markers out of the user-visible answer.
+
+    Reasoning is tracked as workflow telemetry when a provider exposes it, but it
+    is not part of the assistant message. This also cleans older/local models
+    that put their reasoning in <think>...</think> inside the content channel.
     """
     if not text:
         return ""
-    return text.strip()
+    visible = re.sub(r"<think>.*?</think>", "", text, flags=re.IGNORECASE | re.DOTALL)
+    visible = visible.replace("<think>", "").replace("</think>", "")
+    return visible.strip()
 
 
 def _direct_casual_reply(user_text: str) -> str:
@@ -2443,7 +2481,7 @@ async def _stream_true_agent_loop(
             workflow_run.id,
             "controller_call",
             "planning",
-            f"Controller model turn {iteration} started",
+            f"Execution model turn {iteration} started",
             status="running",
             result_summary={
                 "iteration": iteration,
@@ -2463,20 +2501,75 @@ async def _stream_true_agent_loop(
             bool(db.exec(select(ChatAttachmentTable).where(ChatAttachmentTable.session_id == str(chat_session.id))).all()),
         )
         try:
-            raw_decision = await _llm_response(
+            # The controller is a real model turn. Stream it so reasoning
+            # telemetry is emitted only when the provider actually sends
+            # reasoning tokens; do not manufacture a generic Thinking event.
+            raw_decision = ""
+            reasoning_active = False
+            reasoning_event_chars = 0
+            controller_context = {
+                "request_plan": {"mode": "agent_controller", "needs_live_data": False},
+                "tool_context": {
+                    "tool_runs": [],
+                    "rbac_role": "admin" if current_user.is_admin else "member",
+                },
+                "session_history": history,
+            }
+            async for token in _llm_stream_response(
                 provider=request.provider or "lmstudio",
                 api_key=request.api_key,
                 base_url=request.base_url,
                 model=request.model,
                 user_text=planner_prompt,
-                context_payload={
-                    "request_plan": {"mode": "agent_controller", "needs_live_data": False},
-                    "tool_context": {"tool_runs": [], "rbac_role": "admin" if current_user.is_admin else "member"},
-                    "session_history": history,
-                },
+                context_payload=controller_context,
                 system_override=controller_system,
                 temperature_override=0.0,
-            )
+            ):
+                if token == "<think>":
+                    if not reasoning_active:
+                        reasoning_active = True
+                        yield emit(
+                            "model_reasoning",
+                            "planning",
+                            "The execution model started provider-reported reasoning",
+                            status="running",
+                            result_summary={
+                                "iteration": iteration,
+                                "provider": request.provider or "lmstudio",
+                                "model": request.model or "provider_default",
+                            },
+                        )
+                    continue
+                if token == "</think>":
+                    if reasoning_active:
+                        reasoning_active = False
+                        yield emit(
+                            "model_reasoning",
+                            "planning",
+                            "The execution model finished provider-reported reasoning",
+                            status="completed",
+                            result_summary={
+                                "iteration": iteration,
+                                "characters": reasoning_event_chars,
+                            },
+                        )
+                    continue
+                if reasoning_active:
+                    reasoning_event_chars += len(token or "")
+                else:
+                    raw_decision += token or ""
+
+            if reasoning_active:
+                yield emit(
+                    "model_reasoning",
+                    "planning",
+                    "The execution model finished provider-reported reasoning",
+                    status="completed",
+                    result_summary={
+                        "iteration": iteration,
+                        "characters": reasoning_event_chars,
+                    },
+                )
         except Exception as exc:
             controller_error = str(exc)
             controller_failed = emit_workflow_event(
@@ -2534,7 +2627,7 @@ async def _stream_true_agent_loop(
             workflow_run.id,
             "controller_call",
             "planning",
-            "Controller turn returned a safe progress update",
+            "Execution model returned a safe progress update",
             status="completed",
             result_summary={
                 "iteration": iteration,
@@ -2608,8 +2701,11 @@ async def _stream_true_agent_loop(
                 # Conversation-only turns can use the controller's answer directly.
                 # This avoids a needless second provider request (and avoids making
                 # a free/rate-limited provider fail after a valid controller call).
-                controller_answer = decision.get("answer", "") or (
-                    decision.get("message", "") if not tool_transcript else ""
+                controller_answer = _sanitize_llm_response(
+                    decision.get("answer", "") or (
+                        decision.get("message", "") if not tool_transcript else ""
+                    ),
+                    request.content,
                 )
                 break
 
@@ -2621,7 +2717,7 @@ async def _stream_true_agent_loop(
         yield emit(
             "tool_call",
             "execution" if tool_name.startswith("data.") else "retrieval",
-            f"I’m checking {_agent_tool_label(tool_name)} now.",
+            f"The execution model requested {_agent_tool_label(tool_name)}.",
             status="running",
             tool_name=tool_name,
             safe_input={"arguments": arguments},
@@ -2719,6 +2815,8 @@ async def _stream_true_agent_loop(
             assistant_text = controller_answer
             yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
         else:
+            reasoning_active = False
+            reasoning_event_chars = 0
             async for token in _llm_stream_response(
                 provider=request.provider or "lmstudio",
                 api_key=request.api_key,
@@ -2727,12 +2825,53 @@ async def _stream_true_agent_loop(
                 user_text=request.content,
                 context_payload=context_payload,
             ):
+                if token == "<think>":
+                    if not reasoning_active:
+                        reasoning_active = True
+                        yield emit(
+                            "model_reasoning",
+                            "response",
+                            "The answer model started provider-reported reasoning",
+                            status="running",
+                            result_summary={
+                                "provider": request.provider or "lmstudio",
+                                "model": request.model or "provider_default",
+                            },
+                        )
+                    continue
+                if token == "</think>":
+                    if reasoning_active:
+                        reasoning_active = False
+                        yield emit(
+                            "model_reasoning",
+                            "response",
+                            "The answer model finished provider-reported reasoning",
+                            status="completed",
+                            result_summary={"characters": reasoning_event_chars},
+                        )
+                    continue
+                if reasoning_active:
+                    reasoning_event_chars += len(token or "")
+                    continue
                 assistant_text += token
                 yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
+            if reasoning_active:
+                yield emit(
+                    "model_reasoning",
+                    "response",
+                    "The answer model finished provider-reported reasoning",
+                    status="completed",
+                    result_summary={"characters": reasoning_event_chars},
+                )
     except Exception as exc:
         last_err = str(exc)
         assistant_text = _safe_provider_failure_reply(context_payload, exc)
         yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+
+    # Some local models place reasoning markers in the content channel rather
+    # than exposing a separate reasoning field. Normalize before persistence so
+    # a historical reload cannot resurrect private reasoning in the transcript.
+    assistant_text = _sanitize_llm_response(assistant_text, request.content)
 
     model_completed = emit_workflow_event(
         workflow_run.id,
