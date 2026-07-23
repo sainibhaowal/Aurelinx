@@ -157,6 +157,21 @@ def _config_for_request(
     from google.antigravity import types
     from google.antigravity.hooks import policy
 
+    provider = (provider or "lmstudio").lower()
+    provider_defaults = {
+        "openai": ("https://api.openai.com/v1", "gpt-4o-mini"),
+        "groq": ("https://api.groq.com/openai/v1", "llama-3.1-70b-versatile"),
+        "opencode": ("https://opencode.ai/zen/v1", "gpt-5.5"),
+        "lmstudio": ("http://127.0.0.1:1234/v1", "liquid/lfm2.5-1.2b"),
+        "ollama": ("http://127.0.0.1:11434/v1", "llama3"),
+        "custom": (None, "gpt-4o-mini"),
+    }
+    if provider in {"anthropic", "claude"}:
+        raise RuntimeError(
+            "The Aurelinx native agent requires a Gemini or OpenAI-compatible "
+            "provider; Anthropic is not OpenAI-compatible in this runtime"
+        )
+
     tool_names = [tool.__name__ for tool in tools]
     policies = [policy.deny_all(), *[policy.allow(name) for name in tool_names]]
     capabilities = types.CapabilitiesConfig(
@@ -165,7 +180,12 @@ def _config_for_request(
     )
     state_dir = _state_directory()
     common = {
-        "model": model or ("gemini-2.0-flash" if provider == "gemini" else "default"),
+        "model": model
+        or (
+            "gemini-2.0-flash"
+            if provider in {"gemini", "google", "google-gemini"}
+            else provider_defaults.get(provider, (None, "gpt-4o-mini"))[1]
+        ),
         "system_instructions": (
             "You are the Aurelinx workflow agent. Use only the supplied Aurelinx "
             "application tools. Built-in filesystem, shell, web, and subagent "
@@ -195,8 +215,14 @@ def _config_for_request(
             raise RuntimeError("A Gemini API key is required for Antigravity Gemini mode")
         return LocalAgentConfig(api_key=api_key, **common)
 
+    if provider in {"openai", "groq", "opencode"} and not api_key:
+        raise RuntimeError(f"An API key is required for the {provider} provider")
+
+    configured_base = base_url or os.getenv("OPENAI_BASE_URL")
+    if not configured_base:
+        configured_base = provider_defaults.get(provider, (None, None))[0]
     resolved_base = normalize_local_provider_base(
-        base_url or os.getenv("OPENAI_BASE_URL") or ""
+        configured_base or ""
     )
     if not resolved_base:
         raise RuntimeError(

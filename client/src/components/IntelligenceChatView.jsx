@@ -985,16 +985,22 @@ const IntelligenceChatView = () => {
       const cfg = cfgRaw ? JSON.parse(cfgRaw) : {};
       const provider = cfg.activeProvider || "lmstudio";
       const providerCfg = cfg[provider] || {};
-      const model =
-        providerCfg.selectedModel || cfg.lmstudio?.selectedModel || null;
+      const providerDefaults = {
+        anthropic: { baseUrl: "https://api.anthropic.com/v1", model: "claude-3-5-sonnet-20241022" },
+        custom: { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
+        google: { baseUrl: "https://generativelanguage.googleapis.com", model: "gemini-1.5-flash" },
+        groq: { baseUrl: "https://api.groq.com/openai/v1", model: "llama-3.1-70b-versatile" },
+        lmstudio: { baseUrl: "http://127.0.0.1:1234/v1", model: "liquid/lfm2.5-1.2b" },
+        ollama: { baseUrl: "http://127.0.0.1:11434/v1", model: "llama3" },
+        openai: { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
+        opencode: { baseUrl: "https://opencode.ai/zen/v1", model: "gpt-5.5" },
+      };
+      const defaults = providerDefaults[provider] || providerDefaults.lmstudio;
+      const model = providerCfg.selectedModel || defaults.model;
       const baseUrl =
         providerCfg.endpoint ||
         providerCfg.base_url ||
-        (provider === "lmstudio"
-          ? "http://127.0.0.1:1234/v1"
-          : provider === "opencode"
-            ? "https://opencode.ai/zen/v1"
-            : null);
+        defaults.baseUrl;
       const payload = {
         content: userText,
         provider,
