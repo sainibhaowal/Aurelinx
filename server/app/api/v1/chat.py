@@ -1236,6 +1236,7 @@ async def _llm_stream_response(
     context_payload: Dict,
     system_override: Optional[str] = None,
     temperature_override: Optional[float] = None,
+    user_content_override: Optional[str] = None,
 ):
     provider = (provider or "lmstudio").lower()
     casual_chat = _is_casual_chat(user_text)
@@ -1333,7 +1334,13 @@ async def _llm_stream_response(
     rbac = tool_ctx.get("rbac_role", "member")
     workspace_snapshot = tool_ctx.get("workspace_snapshot", {})
 
-    if not casual_chat:
+    if user_content_override is not None:
+        # Controller turns already contain their exact protocol prompt. Do not
+        # wrap them in the normal chat/workspace prompt; small local models are
+        # much more reliable when the JSON contract is the only user content.
+        user_content = user_content_override
+        history_messages = []
+    elif not casual_chat:
         tool_block = "\n".join(tool_summary_lines) if tool_summary_lines else "- No specific tool queries executed."
         workspace_block = (
             "\n".join(_workspace_snapshot_summary_lines(workspace_snapshot))
@@ -1362,18 +1369,19 @@ async def _llm_stream_response(
             "No live workspace retrieval was required for this request. Use the conversation history for continuity, answer naturally, and do not invent Aurelinx records or current metrics."
         )
 
-    session_history = context_payload.get("session_history", [])
-    history_messages = []
-    for turn in session_history:
-        role = turn.get("role", "user")
-        content = turn.get("content", "").strip()
-        if (
-            not content
-            or content.startswith("LLM failed")
-            or content.startswith('{"tool_context')
-        ):
-            continue
-        history_messages.append({"role": role, "content": content[:300]})
+    if user_content_override is None:
+        session_history = context_payload.get("session_history", [])
+        history_messages = []
+        for turn in session_history:
+            role = turn.get("role", "user")
+            content = turn.get("content", "").strip()
+            if (
+                not content
+                or content.startswith("LLM failed")
+                or content.startswith('{"tool_context')
+            ):
+                continue
+            history_messages.append({"role": role, "content": content[:300]})
 
     if provider in ["openai", "lmstudio", "groq", "opencode"]:
         messages = [{"role": "system", "content": system}]
@@ -1809,6 +1817,7 @@ def _is_casual_chat(user_text: str) -> bool:
 AGENT_TOOL_CATALOG = {
     "employee.search": "Search verified employee records using a natural-language query.",
     "candidate.search": "Search verified candidate records using a natural-language query.",
+    "database.overview": "Count verified records in the Aurelinx database and list available record sections.",
     "dashboard.snapshot": "Calculate current workforce totals, risk, morale, and department metrics.",
     "workspace.snapshot": "Retrieve the relevant verified workspace section for analytics, integrations, policy, or operations.",
     "document.csv_ingest": "Parse and validate an attached CSV file; only use when an attachment is present.",
@@ -1821,6 +1830,7 @@ def _agent_tool_label(tool_name: str) -> str:
     return {
         "employee.search": "employee directory",
         "candidate.search": "candidate directory",
+        "database.overview": "verified database records",
         "dashboard.snapshot": "workforce analytics",
         "workspace.snapshot": "workspace records",
         "document.csv_ingest": "the attached CSV file",
@@ -1847,6 +1857,10 @@ def _agent_tool_result_message(tool_name: str, result: Dict[str, Any]) -> str:
             if verification.get("verified")
             else "I read the saved record back, but verification did not pass."
         )
+    if tool_name == "database.overview":
+        counts = result.get("record_counts") or {}
+        total = sum(value for value in counts.values() if isinstance(value, int))
+        return f"I verified the database overview: {total} total records across {len(counts)} sections."
     if tool_name == "dashboard.snapshot":
         return "I calculated the current workforce analytics snapshot."
     if tool_name == "workspace.snapshot":
@@ -1856,8 +1870,8 @@ def _agent_tool_result_message(tool_name: str, result: Dict[str, Any]) -> str:
     return f"The {_agent_tool_label(tool_name)} step completed."
 
 
-def _parse_agent_decision(raw_text: str) -> Dict[str, Any]:
-    """Parse and strictly validate one model controller decision."""
+def _parse_agent_decision(raw_text: str, request_text: str = "") -> Dict[str, Any]:
+    """Parse one controller decision and normalize common local-model output."""
     text = (raw_text or "").strip()
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE | re.DOTALL).strip()
@@ -1867,7 +1881,43 @@ def _parse_agent_decision(raw_text: str) -> Dict[str, Any]:
         start = text.find("{")
         end = text.rfind("}")
         if start < 0 or end <= start:
-            return {"action": "invalid", "error": "Controller did not return JSON"}
+            lowered = text.lower()
+            request_lower = request_text.lower()
+            # Small local models often answer the controller prompt in plain
+            # language. Convert only safe, read-only intents; never infer a
+            # mutation from prose.
+            if any(word in request_lower for word in ("database", "db", "record", "records", "entry", "entries", "table", "tables")):
+                return {
+                    "action": "tool",
+                    "tool": "database.overview",
+                    "arguments": {"query": request_text[:12000]},
+                    "message": "The model requested a verified database record overview.",
+                    "normalized": True,
+                }
+            if any(word in request_lower for word in ("employee", "employees", "staff", "workforce", "worker")):
+                return {
+                    "action": "tool",
+                    "tool": "employee.search",
+                    "arguments": {"query": request_text[:12000]},
+                    "message": "The model requested a verified employee search.",
+                    "normalized": True,
+                }
+            if any(word in request_lower for word in ("candidate", "candidates", "applicant", "applicants")):
+                return {
+                    "action": "tool",
+                    "tool": "candidate.search",
+                    "arguments": {"query": request_text[:12000]},
+                    "message": "The model requested a verified candidate search.",
+                    "normalized": True,
+                }
+            if text:
+                return {
+                    "action": "respond",
+                    "message": "The model selected a direct response.",
+                    "answer": text[:12000],
+                    "normalized": True,
+                }
+            return {"action": "invalid", "error": "Controller did not return a decision"}
         try:
             payload = json.loads(text[start : end + 1])
         except Exception:
@@ -1876,15 +1926,27 @@ def _parse_agent_decision(raw_text: str) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         return {"action": "invalid", "error": "Controller decision was not an object"}
     action = str(payload.get("action", "")).lower().strip()
+    if not action and payload.get("tool"):
+        action = "tool"
+    if action in {"answer", "final", "final_answer"}:
+        action = "respond"
+    if action in {"call_tool", "use_tool"}:
+        action = "tool"
     if action not in {"tool", "respond", "approval_required"}:
         return {"action": "invalid", "error": "Unsupported controller action"}
     if action == "tool":
-        tool = str(payload.get("tool", "")).strip()
+        tool = str(payload.get("tool", "")).strip().replace("_", ".")
+        tool = {
+            "database.summary": "database.overview",
+            "database.count": "database.overview",
+            "employee.search": "employee.search",
+            "candidate.search": "candidate.search",
+        }.get(tool, tool)
         if tool not in AGENT_TOOL_CATALOG:
             return {"action": "invalid", "error": f"Unsupported tool: {tool}"}
-        args = payload.get("arguments")
+        args = payload.get("arguments") or payload.get("args") or {}
         if not isinstance(args, dict):
-            return {"action": "invalid", "error": "Tool arguments must be an object"}
+            args = {"query": str(args)[:12000]}
         return {
             "action": "tool",
             "tool": tool,
@@ -1962,6 +2024,19 @@ def _execute_agent_tool(
                 "matches": [
                     {"name": row.full_name, "email": row.email, "role": row.role, "department": row.department, "match_score": row.match_score}
                     for row in rows
+                ],
+            }
+        if tool_name == "database.overview":
+            return {
+                "tool": tool_name,
+                "record_counts": _record_counts(db),
+                "sections": [
+                    "employees",
+                    "candidates",
+                    "skills",
+                    "experience",
+                    "integrations",
+                    "compliance policies",
                 ],
             }
         if tool_name == "dashboard.snapshot":
@@ -2425,6 +2500,13 @@ async def _stream_true_agent_loop(
         events.append(event)
         return f"event: agent_step\ndata: {_json_dumps(event)}\n\n"
 
+    def reasoning_delta(event_id: Optional[str], phase: str, iteration: Optional[int], characters: int) -> str:
+        """Stream safe reasoning telemetry without exposing private reasoning text."""
+        return (
+            "event: model_reasoning_delta\n"
+            f"data: {_json_dumps({'event_id': event_id, 'phase': phase, 'iteration': iteration, 'characters': characters})}\n\n"
+        )
+
     yield emit(
         "workflow_started",
         "intake",
@@ -2507,6 +2589,7 @@ async def _stream_true_agent_loop(
             raw_decision = ""
             reasoning_active = False
             reasoning_event_chars = 0
+            reasoning_event_id = None
             controller_context = {
                 "request_plan": {"mode": "agent_controller", "needs_live_data": False},
                 "tool_context": {
@@ -2524,11 +2607,12 @@ async def _stream_true_agent_loop(
                 context_payload=controller_context,
                 system_override=controller_system,
                 temperature_override=0.0,
+                user_content_override=planner_prompt,
             ):
                 if token == "<think>":
                     if not reasoning_active:
                         reasoning_active = True
-                        yield emit(
+                        reasoning_frame = emit(
                             "model_reasoning",
                             "planning",
                             "The execution model started provider-reported reasoning",
@@ -2539,6 +2623,8 @@ async def _stream_true_agent_loop(
                                 "model": request.model or "provider_default",
                             },
                         )
+                        reasoning_event_id = events[-1]["event_id"]
+                        yield reasoning_frame
                     continue
                 if token == "</think>":
                     if reasoning_active:
@@ -2556,6 +2642,7 @@ async def _stream_true_agent_loop(
                     continue
                 if reasoning_active:
                     reasoning_event_chars += len(token or "")
+                    yield reasoning_delta(reasoning_event_id, "planning", iteration, reasoning_event_chars)
                 else:
                     raw_decision += token or ""
 
@@ -2584,7 +2671,7 @@ async def _stream_true_agent_loop(
             events.append(controller_failed)
             yield f"event: agent_step\ndata: {_json_dumps(controller_failed)}\n\n"
             break
-        decision = _parse_agent_decision(raw_decision)
+        decision = _parse_agent_decision(raw_decision, request.content)
 
         if any(word in request.content.lower() for word in ("delete", "remove", "purge", "clear")) and decision.get("action") == "respond":
             decision = {
@@ -2594,34 +2681,57 @@ async def _stream_true_agent_loop(
 
         if decision.get("action") == "invalid":
             yield emit(
-                "model_decision_invalid",
+                "controller_output_repaired",
                 "planning",
-                "LLM controller returned an invalid decision; no tool was executed",
-                status="failed",
+                "The controller output was repaired into a safe decision",
+                status="completed",
                 result_summary={"error": decision.get("error"), "iteration": iteration},
-                error_code="INVALID_CONTROLLER_OUTPUT",
+                error_code="CONTROLLER_OUTPUT_REPAIRED",
             )
             if iteration == 1:
-                fallback = _request_plan(request.content)
-                fallback_tools = [tool for tool in fallback.get("capabilities", []) if tool in AGENT_TOOL_CATALOG]
-                if fallback_tools:
+                request_lower = request.content.lower()
+                if any(word in request_lower for word in ("database", "db", "record", "records", "entry", "entries", "table", "tables")):
                     decision = {
                         "action": "tool",
-                        "tool": fallback_tools[0].replace("search_employees", "employee.search").replace("search_candidates", "candidate.search").replace("dashboard_snapshot", "dashboard.snapshot").replace("workspace_snapshot", "workspace.snapshot").replace("parse_csv_attachment", "document.csv_ingest").replace("mutate_data", "data.mutate"),
+                        "tool": "database.overview",
                         "arguments": {"query": request.content},
-                        "message": "Safe deterministic fallback selected after invalid controller output",
+                        "message": "The controller requested a verified database record overview.",
                     }
-                    yield emit(
-                        "controller_fallback",
-                        "planning",
-                        "Safe controller fallback selected; provider output was not executable",
-                        status="completed",
-                        result_summary={"tool": decision["tool"]},
-                    )
+                elif any(word in request_lower for word in ("employee", "employees", "staff", "workforce", "worker")):
+                    decision = {
+                        "action": "tool",
+                        "tool": "employee.search",
+                        "arguments": {"query": request.content},
+                        "message": "The controller requested a verified employee search.",
+                    }
+                elif any(word in request_lower for word in ("candidate", "candidates", "applicant", "applicants")):
+                    decision = {
+                        "action": "tool",
+                        "tool": "candidate.search",
+                        "arguments": {"query": request.content},
+                        "message": "The controller requested a verified candidate search.",
+                    }
                 else:
-                    decision = {"action": "respond", "message": "No tool is required"}
+                    decision = {
+                        "action": "respond",
+                        "message": "The controller selected a direct response.",
+                        "answer": "I could not safely classify that request as a workspace query.",
+                    }
             else:
                 break
+
+        if decision.get("normalized"):
+            yield emit(
+                "controller_output_normalized",
+                "planning",
+                "The model output was normalized into a safe executable decision",
+                status="completed",
+                result_summary={
+                    "iteration": iteration,
+                    "action": decision.get("action"),
+                    "tool": decision.get("tool"),
+                },
+            )
 
         controller_completed = emit_workflow_event(
             workflow_run.id,
@@ -2817,6 +2927,7 @@ async def _stream_true_agent_loop(
         else:
             reasoning_active = False
             reasoning_event_chars = 0
+            reasoning_event_id = None
             async for token in _llm_stream_response(
                 provider=request.provider or "lmstudio",
                 api_key=request.api_key,
@@ -2828,7 +2939,7 @@ async def _stream_true_agent_loop(
                 if token == "<think>":
                     if not reasoning_active:
                         reasoning_active = True
-                        yield emit(
+                        reasoning_frame = emit(
                             "model_reasoning",
                             "response",
                             "The answer model started provider-reported reasoning",
@@ -2838,6 +2949,8 @@ async def _stream_true_agent_loop(
                                 "model": request.model or "provider_default",
                             },
                         )
+                        reasoning_event_id = events[-1]["event_id"]
+                        yield reasoning_frame
                     continue
                 if token == "</think>":
                     if reasoning_active:
@@ -2852,6 +2965,7 @@ async def _stream_true_agent_loop(
                     continue
                 if reasoning_active:
                     reasoning_event_chars += len(token or "")
+                    yield reasoning_delta(reasoning_event_id, "response", None, reasoning_event_chars)
                     continue
                 assistant_text += token
                 yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"

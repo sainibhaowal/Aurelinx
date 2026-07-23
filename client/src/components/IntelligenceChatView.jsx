@@ -510,10 +510,11 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
 const naturalStepDetail = (step) => {
   const summary = step.result_summary;
   if (step.type === "model_reasoning") {
+    const streamed = summary?.characters ? ` · ${summary.characters} reasoning characters streamed` : "";
     if (step.status === "running") {
-      return `${step.phase === "response" ? "Answer" : "Execution"} model is reasoning (provider reported)`;
+      return `${step.phase === "response" ? "Answer" : "Execution"} model is reasoning (provider reported${streamed})`;
     }
-    return `${step.phase === "response" ? "Answer" : "Execution"} model finished provider-reported reasoning`;
+    return `${step.phase === "response" ? "Answer" : "Execution"} model finished provider-reported reasoning${streamed}`;
   }
   if (step.type === "controller_call") {
     if (step.status === "failed") return `The controller could not complete this turn: ${summary?.reason || "the provider did not respond"}.`;
@@ -946,6 +947,20 @@ const IntelligenceChatView = () => {
               return next;
             });
             setStreamPhase(event.phase || event.type || null);
+          },
+          onReasoningDelta: (event) => {
+            if (!event?.event_id) return;
+            setAgentSteps((previous) => previous.map((item) => (
+              item.event_id === event.event_id
+                ? {
+                    ...item,
+                    result_summary: {
+                      ...(item.result_summary || {}),
+                      characters: event.characters,
+                    },
+                  }
+                : item
+            )));
           },
           onChunk: ({ text }) => setStreamText((prev) => prev + text),
           onDone: ({ assistant_message, user_message, session }) => {

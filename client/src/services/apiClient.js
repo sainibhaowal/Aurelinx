@@ -187,9 +187,9 @@ async function consumeEventStream(response, handlers = {}, signal = null) {
         if (typeof handler === "function") {
           handler(data, eventName);
           // A proxy or browser read can contain several SSE frames at once.
-          // Yield after each operational event so React paints a real timeline
-          // row-by-row instead of committing the whole checklist together.
-          if (eventName === "agent_step") {
+          // Yield after every workflow event and answer chunk so React paints
+          // token-by-token instead of committing a whole buffered response.
+          if (eventName === "agent_step" || eventName === "chunk") {
             await yieldForPaint();
           }
         }
@@ -969,6 +969,7 @@ export const chatAPI = {
         chunk: handlers.onChunk,
         status: handlers.onStatus,
         agent_step: handlers.onAgentStep,
+        model_reasoning_delta: handlers.onReasoningDelta,
         done: handlers.onDone,
         error: handlers.onError,
       }, signal);
