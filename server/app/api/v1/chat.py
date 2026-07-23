@@ -2121,9 +2121,29 @@ def _provider_error_label(error: Any) -> str:
         "MODEL_ENDPOINT_NOT_FOUND": "provider endpoint or model was not found (HTTP 404)",
         "MODEL_REQUEST_REJECTED": "provider rejected the request (HTTP 400)",
         "MODEL_ENDPOINT_UNREACHABLE": "provider endpoint is unreachable",
-        "MODEL_CONFIG_INVALID": "provider configuration is not supported by the Aurelinx agent",
+        "MODEL_CONFIG_INVALID": "provider configuration is not supported by the native agent",
         "MODEL_PROVIDER_FAILED": "provider request failure",
     }.get(code, "provider request failure")
+
+
+def _provider_error_detail(error: Any) -> str:
+    """Return a safe, actionable diagnostic without exposing provider payloads."""
+    text = str(error or "").lower()
+    if "api key" in text or "authentication" in text or "unauthorized" in text:
+        return "No usable API key was supplied, or the provider rejected the configured key."
+    if "not openai-compatible" in text or "not supported" in text:
+        return "Choose Gemini or an OpenAI-compatible provider; this native bridge does not accept Anthropic directly."
+    if "404" in text or "not found" in text:
+        return "The configured endpoint or model was not found. Check the provider base URL and selected model."
+    if "401" in text or "403" in text:
+        return "The provider rejected the request credentials. Check the API key and provider account permissions."
+    if "429" in text or "rate limit" in text or "too many requests" in text:
+        return "The provider rate limit was reached. Wait briefly or switch providers."
+    if "connection refused" in text or "failed to connect" in text or "connecterror" in text:
+        return "The configured local provider is unreachable. Start the provider and verify its base URL."
+    if "400" in text or "bad request" in text or "invalid request" in text:
+        return "The provider rejected the request. Check the model name and compatibility of the endpoint."
+    return "The provider did not return a successful response. Check its status and retry."
 
 
 def _visible_answer_preview(text: str, limit: int = 1200) -> str:
@@ -2566,7 +2586,7 @@ async def _stream_antigravity_agent_loop(
         frame = emit(
             "model_reasoning",
             "execution",
-            "Aurelinx received the reasoning signal",
+            "Reasoning signal received",
             status="completed",
             result_summary={
                 "characters": reasoning_characters,
@@ -2580,7 +2600,7 @@ async def _stream_antigravity_agent_loop(
     yield emit(
         "workflow_started",
         "intake",
-        "Aurelinx received and authenticated the request",
+        "Request accepted",
         status="completed",
         result_summary={
             "session_id": chat_session.id,
@@ -2684,7 +2704,7 @@ async def _stream_antigravity_agent_loop(
     yield emit(
         "agent_started",
         "execution",
-        "Aurelinx agent is working on your request",
+        "Working on your request",
         status="running",
         result_summary={
             "provider": request.provider or "lmstudio",
@@ -2726,7 +2746,7 @@ async def _stream_antigravity_agent_loop(
                     frame = emit(
                         "model_reasoning",
                         "execution",
-                        "Aurelinx agent is reasoning",
+                        "Thinking",
                         status="running",
                         result_summary={
                             "provider": request.provider or "lmstudio",
@@ -2755,7 +2775,7 @@ async def _stream_antigravity_agent_loop(
                         yield emit(
                             "final_response_started",
                             "response",
-                            "Aurelinx is streaming the answer",
+                            "Writing answer",
                             status="running",
                             result_summary={
                                 "content_status": "streaming",
@@ -2780,7 +2800,7 @@ async def _stream_antigravity_agent_loop(
                 yield emit(
                     "tool_call",
                     "execution" if tool_name.startswith("data.") else "retrieval",
-                    f"Aurelinx is using {_agent_tool_label(tool_name)}.",
+                    f"Using {_agent_tool_label(tool_name)}.",
                     status="running",
                     tool_name=tool_name,
                     safe_input=safe_input,
@@ -2820,9 +2840,12 @@ async def _stream_antigravity_agent_loop(
         yield emit(
             "agent_failed",
             "execution",
-            "Aurelinx could not complete the provider turn",
+            "Provider turn failed",
             status="failed",
-            result_summary={"reason": _provider_error_label(exc)},
+            result_summary={
+                "reason": _provider_error_label(exc),
+                "details": _provider_error_detail(exc),
+            },
             error_code=_provider_error_code(exc),
         )
 
@@ -2871,7 +2894,7 @@ async def _stream_antigravity_agent_loop(
     if not assistant_text:
         if stream_error:
             assistant_text = (
-                "Aurelinx could not complete this provider turn: "
+                "The provider turn could not complete: "
                 f"{_provider_error_label(stream_error)}. Check the selected "
                 "provider, model, base URL, and API key, then retry."
             )
@@ -2908,7 +2931,14 @@ async def _stream_antigravity_agent_loop(
             "characters": len(assistant_text),
             "tool_calls": len(tool_transcript),
             "runtime": "aurelinx-agent",
-            **({"reason": _provider_error_label(stream_error)} if stream_error else {}),
+            **(
+                {
+                    "reason": _provider_error_label(stream_error),
+                    "details": _provider_error_detail(stream_error),
+                }
+                if stream_error
+                else {}
+            ),
         },
         error_code=_provider_error_code(stream_error) if stream_error else None,
     )
@@ -2950,9 +2980,9 @@ async def _stream_antigravity_agent_loop(
     completed = emit(
         "workflow_failed" if stream_error else "workflow_completed",
         "failed" if stream_error else "completed",
-        "Aurelinx stopped after the provider error"
+        "Request stopped"
         if stream_error
-        else "Aurelinx completed the request with a native agent trace",
+        else "Completed",
         status="failed" if stream_error else "completed",
         result_summary={"assistant_message_id": assistant_msg.id, "tool_calls": len(tool_transcript)},
         error_code=_provider_error_code(stream_error) if stream_error else None,
@@ -4556,6 +4586,16 @@ async def ping_provider(req: ProviderPingRequest):
     import httpx
 
     provider = req.provider.lower()
+    # The UI uses product-facing family names. Keep the health check aligned
+    # with the native runtime instead of reporting a misleading connection
+    # state for Google/Gemini.
+    if provider == "google":
+        provider = "gemini"
+    if provider in {"anthropic", "claude"}:
+        return {
+            "status": "unsupported",
+            "message": "Anthropic is not supported by the native OpenAI/Gemini agent bridge. Use Google, OpenAI, Groq, OpenCode, LM Studio, Ollama, or an OpenAI-compatible endpoint.",
+        }
     api_key = req.api_key or ""
     base_url = req.base_url or ""
     model = req.model or ""
@@ -4684,6 +4724,14 @@ async def discover_provider_models(req: ProviderDiscoverRequest):
     import httpx
 
     provider = req.provider.lower()
+    if provider == "google":
+        provider = "gemini"
+    if provider in {"anthropic", "claude"}:
+        return {
+            "status": "unsupported",
+            "message": "Anthropic is not supported by the native agent bridge.",
+            "models": [],
+        }
     api_key = req.api_key or ""
     base_url = req.base_url or ""
 

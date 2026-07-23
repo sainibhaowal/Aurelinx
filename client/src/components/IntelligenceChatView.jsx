@@ -512,13 +512,13 @@ const naturalStepDetail = (step) => {
   if (step.type === "model_reasoning") {
     const streamed = summary?.characters ? ` · ${summary.characters} reasoning characters received` : "";
     if (step.status === "running") {
-      return `Aurelinx is receiving a reasoning signal${streamed}`;
+      return `Thinking${streamed}`;
     }
-    return `Aurelinx received a reasoning signal${streamed}`;
+    return `Thinking complete${streamed}`;
   }
-  if (step.type === "agent_started") return "Aurelinx agent is working on your request.";
+  if (step.type === "agent_started") return "Working on your request";
   if (step.type === "agent_failed") {
-    return `Aurelinx could not complete this request${summary?.reason ? `: ${summary.reason}` : "."}`;
+    return `Provider turn failed${summary?.reason ? `: ${summary.reason}` : ""}${summary?.details ? ` — ${summary.details}` : ""}`;
   }
   if (step.type === "controller_call") {
     if (step.status === "failed") return `The controller could not complete this turn: ${summary?.reason || "the provider did not respond"}.`;
@@ -540,11 +540,11 @@ const naturalStepDetail = (step) => {
       "data.verify": "the saved record",
     };
     const target = labels[step.tool] || step.tool?.replaceAll(".", " ") || "the requested data";
-    if (args?.query) return `Aurelinx is searching ${target} for “${args.query}”`;
-    return `Aurelinx is using ${target}`;
+    if (args?.query) return `Searching ${target} for “${args.query}”`;
+    return `Using ${target}`;
   }
   if (step.type === "tool_result") {
-    return step.display_message || "Aurelinx received a verified result.";
+    return step.display_message || "Verified result received";
   }
   if (step.type === "agent_decision") {
     if (summary?.answer_preview) return `Answer: ${summary.answer_preview}`;
@@ -553,11 +553,11 @@ const naturalStepDetail = (step) => {
     if (summary?.answer_preview) return `Answer prepared: ${summary.answer_preview}`;
   }
   if (step.type === "final_response_started") {
-    return "Aurelinx is streaming the answer";
+    return "Writing answer";
   }
   if (step.type === "final_response_completed") {
     return step.status === "failed"
-      ? `The answer provider did not finish: ${summary?.reason || "provider request failure"}.`
+      ? `Provider turn failed: ${summary?.reason || "provider request failure"}${summary?.details ? ` — ${summary.details}` : ""}`
       : summary?.answer_preview || "The final answer is ready.";
   }
   if (step.type === "validation_completed") {
@@ -565,8 +565,8 @@ const naturalStepDetail = (step) => {
       ? `Validation stopped: ${summary?.reason || "the workflow could not be validated"}.`
       : "The observed results passed the workflow and permission checks.";
   }
-  if (step.type === "workflow_started") return "Aurelinx accepted the request and opened a protected workflow.";
-  if (step.type === "workflow_completed") return "Aurelinx completed the request and saved the result.";
+  if (step.type === "workflow_started") return "Request accepted";
+  if (step.type === "workflow_completed") return "Completed";
   if (step.type === "tool_result" && step.error_code) return `The step was stopped by policy: ${step.error_code}.`;
   return step.display_message || "Workflow activity recorded.";
 };
@@ -602,7 +602,17 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
   const meaningfulSteps = useMemo(() => {
     const visible = steps.filter((step) => {
       if (step.tool === "conversation.context") return false;
-      return !["workflow_started", "validation_completed", "workflow_completed"].includes(step.type);
+      if ([
+        "workflow_started",
+        "agent_started",
+        "validation_completed",
+        "workflow_completed",
+        "final_response_completed",
+      ].includes(step.type)) return false;
+      // agent_failed carries the actionable provider diagnosis. Do not show
+      // the second generic workflow_failed lifecycle event as a duplicate.
+      if (step.type === "workflow_failed" && steps.some((item) => item.type === "agent_failed")) return false;
+      return true;
     });
     const output = [];
     const controllerIndexes = new Map();
@@ -638,7 +648,7 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
             <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-              Aurelinx activity
+              Activity
             </span>
             <span className="text-[10px] text-slate-600">{meaningfulSteps.length} events</span>
           </div>
@@ -1082,7 +1092,7 @@ const IntelligenceChatView = () => {
         {
           id: `error-${Date.now()}`,
           role: "assistant",
-          content: e?.message || "Aurelinx could not complete the request. Check the provider configuration and try again.",
+          content: e?.message || "The request could not be completed. Check the provider configuration and try again.",
           tool_trace: null,
           created_at: new Date().toISOString(),
         },
