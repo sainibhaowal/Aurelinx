@@ -1313,7 +1313,7 @@ const IntelligenceChatView = () => {
           </div>
         )}
 
-        <div className="flex flex-col flex-1 min-h-0 pb-1">
+        <div className="flex flex-col flex-1 min-h-0 justify-between">
           {sessions.length === 0 ? (
             <div className="flex flex-col items-center justify-center flex-1 text-center p-8 bg-white/[0.01] border border-white/5 rounded-2xl backdrop-blur-md my-auto max-w-xl mx-auto py-16">
               <Bot size={40} className="text-cyan-400 mb-4 animate-pulse" />
@@ -1332,7 +1332,7 @@ const IntelligenceChatView = () => {
               </button>
             </div>
           ) : (
-            <>
+            <div className="flex flex-col h-full min-h-0 justify-between">
               <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1 pb-2">
                 {messages.map((m) => (
                   <div
@@ -1386,13 +1386,7 @@ const IntelligenceChatView = () => {
                 <div ref={chatEndRef} />
               </div>
 
-              <div className="mt-auto pt-2 border-t border-white/5 pb-1">
-                <div className="text-xs text-slate-400 mb-1 flex items-center justify-between">
-                  <span>Attachments:</span>
-                  {attachments.length > 0 && (
-                    <span className="text-[10px] text-slate-500">{attachments.length} attached</span>
-                  )}
-                </div>
+              <div className="pt-2 border-t border-white/5 pb-0 flex-shrink-0">
                 {attachments.length > 0 && (
                   <div className="mb-2 flex flex-wrap gap-2">
                     {attachments.map((a) => (
@@ -1489,7 +1483,7 @@ const IntelligenceChatView = () => {
                 </div>
 
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
