@@ -317,7 +317,7 @@ const App = () => {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
-      transition: { staggerChildren: 0.03, delayChildren: 0.1 },
+      transition: { duration: 0.2 },
     },
   };
 
@@ -342,7 +342,7 @@ const App = () => {
     content = <AuthScreen />;
   } else {
     content = (
-      <div className="flex h-screen bg-[#030712] text-slate-100 relative overflow-hidden selection:bg-cyan-500/30 antialiased">
+      <div className="flex flex-col h-screen w-screen bg-[#030712] text-slate-100 relative overflow-hidden selection:bg-cyan-500/30 antialiased">
       {/* AMBIENT MESH LIGHT FLARES */}
       <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-cyan-600/15 blur-[120px] pointer-events-none z-0" />
       <div className="absolute top-1/2 -right-40 h-96 w-96 rounded-full bg-emerald-600/10 blur-[140px] pointer-events-none z-0" />
@@ -358,7 +358,7 @@ const App = () => {
         onClose={() => setToast((p) => ({ ...p, visible: false }))}
       />
 
-      <div className="relative z-20 flex w-full h-full p-0 gap-1.5 md:gap-2 overflow-hidden">
+      <div className="relative z-20 flex flex-1 w-full min-h-0 p-0 gap-1.5 md:gap-2 overflow-hidden">
         <motion.aside
           initial={false}
           animate={{ width: isSidebarCollapsed ? 64 : 220 }}
