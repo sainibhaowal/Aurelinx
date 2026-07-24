@@ -494,7 +494,7 @@ const App = () => {
                 initial="hidden"
                 animate="visible"
                 exit="hidden"
-                className="h-full min-h-0"
+                className="h-full min-h-0 flex flex-col"
               >
                 {activeTab === "dashboard" && (
                   <>
@@ -771,7 +771,7 @@ const App = () => {
                 {activeTab === "analytics" && <AnalyticsView />}
                 {activeTab === "scout" && <TalentScoutView />}
                 {activeTab === "intelligence" && (
-                  <div className="h-full min-h-0">
+                  <div className="h-full min-h-0 flex flex-col">
                     <IntelligenceChatView />
                   </div>
                 )}
