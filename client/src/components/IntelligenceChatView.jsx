@@ -1313,7 +1313,7 @@ const IntelligenceChatView = () => {
           </div>
         )}
 
-        <div className="flex flex-col flex-1 min-h-0">
+        <div className="flex flex-col flex-1 min-h-0 pb-1">
           {sessions.length === 0 ? (
             <div className="flex flex-col items-center justify-center flex-1 text-center p-8 bg-white/[0.01] border border-white/5 rounded-2xl backdrop-blur-md my-auto max-w-xl mx-auto py-16">
               <Bot size={40} className="text-cyan-400 mb-4 animate-pulse" />
@@ -1333,7 +1333,7 @@ const IntelligenceChatView = () => {
             </div>
           ) : (
             <>
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1 pb-2">
                 {messages.map((m) => (
                   <div
                     key={m.id}
@@ -1386,38 +1386,42 @@ const IntelligenceChatView = () => {
                 <div ref={chatEndRef} />
               </div>
 
-              <div className="mt-auto pt-3 border-t border-white/5">
-                <div className="text-xs text-slate-400 mb-2">Attachments:</div>
-                <div className="mb-2 flex flex-wrap gap-2">
-                  {attachments.length === 0 && (
-                    <span className="text-xs text-slate-500">none</span>
+              <div className="mt-auto pt-2 border-t border-white/5 pb-1">
+                <div className="text-xs text-slate-400 mb-1 flex items-center justify-between">
+                  <span>Attachments:</span>
+                  {attachments.length > 0 && (
+                    <span className="text-[10px] text-slate-500">{attachments.length} attached</span>
                   )}
-                  {attachments.map((a) => (
-                    <span
-                      key={a.id}
-                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-white/10 bg-white/5"
-                    >
-                      {a.original_name}
-                      <span
-                        className={`ml-1 px-1.5 py-0.5 rounded text-[10px] uppercase ${
-                          a.parsing_status === "parsed"
-                            ? "bg-emerald-500/20 text-emerald-300"
-                            : a.parsing_status === "failed"
-                              ? "bg-rose-500/20 text-rose-300"
-                              : "bg-amber-500/20 text-amber-300"
-                        }`}
-                      >
-                        {a.parsing_status}
-                      </span>
-                      <button
-                        onClick={() => removeAttachment(a.id)}
-                        className="text-rose-300 hover:text-rose-200"
-                      >
-                        <X size={11} />
-                      </button>
-                    </span>
-                  ))}
                 </div>
+                {attachments.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {attachments.map((a) => (
+                      <span
+                        key={a.id}
+                        className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-white/10 bg-white/5"
+                      >
+                        {a.original_name}
+                        <span
+                          className={`ml-1 px-1.5 py-0.5 rounded text-[10px] uppercase ${
+                            a.parsing_status === "parsed"
+                              ? "bg-emerald-500/20 text-emerald-300"
+                              : a.parsing_status === "failed"
+                                ? "bg-rose-500/20 text-rose-300"
+                                : "bg-amber-500/20 text-amber-300"
+                          }`}
+                        >
+                          {a.parsing_status}
+                        </span>
+                        <button
+                          onClick={() => removeAttachment(a.id)}
+                          className="text-rose-300 hover:text-rose-200"
+                        >
+                          <X size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="relative z-10">
                   {/* Pulsing glow background when AI is streaming */}
                   {busy && (
