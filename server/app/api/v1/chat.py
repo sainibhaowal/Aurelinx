@@ -2758,11 +2758,26 @@ async def _stream_antigravity_agent_loop(
     # executed eagerly. Results are both injected into the prompt AND emitted
     # as synthetic tool_call/tool_result events so the UI shows tool cards.
     if needs_eager_tools:
-        context_payload = await asyncio.to_thread(
-            lambda: _build_context_payload(db, chat_session.id, request.content, current_user, attachments, workflow_run.id),
-        )
+        def _worker():
+            with Session(engine) as worker_db:
+                worker_attachments = worker_db.exec(
+                    select(ChatAttachmentTable).where(
+                        ChatAttachmentTable.session_id == str(chat_session.id)
+                    )
+                ).all()
+                return _build_context_payload(
+                    worker_db,
+                    chat_session.id,
+                    request.content,
+                    current_user,
+                    worker_attachments,
+                    workflow_run_id=workflow_run.id,
+                )
+        context_payload = await asyncio.to_thread(_worker)
         tool_runs = (context_payload or {}).get("tool_context", {}).get("tool_runs", []) or []
         for run in tool_runs:
+            if run.get("tool", "").startswith("conversation_"):
+                continue
             tool_name = run.get("tool", "unknown")
             agent_tool_name = {
                 "search_employees": "employee.search",
