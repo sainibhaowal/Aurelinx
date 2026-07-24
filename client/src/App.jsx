@@ -358,7 +358,7 @@ const App = () => {
         onClose={() => setToast((p) => ({ ...p, visible: false }))}
       />
 
-      <div className="relative z-20 flex w-full h-full p-1.5 md:p-2 gap-1.5 md:gap-2">
+      <div className="relative z-20 flex w-full h-full p-0 gap-1.5 md:gap-2 overflow-hidden">
         <motion.aside
           initial={false}
           animate={{ width: isSidebarCollapsed ? 64 : 220 }}
