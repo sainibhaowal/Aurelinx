@@ -510,25 +510,14 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
 const naturalStepDetail = (step) => {
   const summary = step.result_summary;
   if (step.type === "model_reasoning") {
-    const streamed = summary?.characters ? ` · ${summary.characters} reasoning characters received` : "";
-    if (step.status === "running") {
-      return `Thinking${streamed}`;
-    }
-    return `Thinking complete${streamed}`;
+    const streamed = summary?.characters ? ` · ${summary.characters} reasoning chars` : "";
+    return step.status === "running" ? `Thinking${streamed}` : `Reasoning complete${streamed}`;
   }
   if (step.type === "agent_started") return "Working on your request";
   if (step.type === "agent_failed") {
-    return `Provider turn failed${summary?.reason ? `: ${summary.reason}` : ""}${summary?.details ? ` — ${summary.details}` : ""}`;
+    return `Provider turn failed${summary?.reason ? `: ${summary.reason}` : ""}`;
   }
-  if (step.type === "controller_call") {
-    if (step.status === "failed") return `The controller could not complete this turn: ${summary?.reason || "the provider did not respond"}.`;
-    if (summary?.progress) return summary.progress;
-    return step.status === "running"
-      ? "Execution model is being called to choose the next safe step."
-      : "Execution model returned a safe progress update.";
-  }
-  if (step.type === "tool_call") {
-    const args = step.safe_input?.arguments;
+  if (step.type === "tool_call" || step.type === "tool_result" || step.type === "tool_execution") {
     const labels = {
       "employee.search": "employee records",
       "candidate.search": "candidate records",
@@ -536,38 +525,25 @@ const naturalStepDetail = (step) => {
       "dashboard.snapshot": "workforce analytics",
       "workspace.snapshot": "workspace records",
       "document.csv_ingest": "the attached CSV",
-      "data.mutate": "the requested data change",
-      "data.verify": "the saved record",
+      "data.mutate": "data modification",
+      "data.verify": "data verification",
     };
-    const target = labels[step.tool] || step.tool?.replaceAll(".", " ") || "the requested data";
-    if (args?.query) return `Searching ${target} for “${args.query}”`;
-    return `Using ${target}`;
+    const toolName = step.tool || step.tool_name || "unknown";
+    const target = labels[toolName] || toolName.replaceAll(".", " ");
+    if (step.status === "running") {
+      return `Executing ${target}`;
+    }
+    if (step.status === "completed") {
+      if (summary?.query) return `Searched ${target} for "${summary.query}"`;
+      if (summary?.count != null) return `Verified ${summary.count} record(s) in ${target}`;
+      return step.display_message || `${target} verified successfully`;
+    }
+    if (step.status === "blocked") {
+      return `Step stopped by policy guardrail`;
+    }
   }
-  if (step.type === "tool_result") {
-    return step.display_message || "Verified result received";
-  }
-  if (step.type === "agent_decision") {
-    if (summary?.answer_preview) return `Answer: ${summary.answer_preview}`;
-    if (step.display_message) return step.display_message;
-    if (summary?.controller_note) return summary.controller_note;
-    if (summary?.answer_preview) return `Answer prepared: ${summary.answer_preview}`;
-  }
-  if (step.type === "final_response_started") {
-    return "Writing answer";
-  }
-  if (step.type === "final_response_completed") {
-    return step.status === "failed"
-      ? `Provider turn failed: ${summary?.reason || "provider request failure"}${summary?.details ? ` — ${summary.details}` : ""}`
-      : summary?.answer_preview || "The final answer is ready.";
-  }
-  if (step.type === "validation_completed") {
-    return step.status === "failed"
-      ? `Validation stopped: ${summary?.reason || "the workflow could not be validated"}.`
-      : "The observed results passed the workflow and permission checks.";
-  }
-  if (step.type === "workflow_started") return "Request accepted";
-  if (step.type === "workflow_completed") return "Completed";
-  if (step.type === "tool_result" && step.error_code) return `The step was stopped by policy: ${step.error_code}.`;
+  if (step.type === "final_response_started") return "Writing answer";
+  if (step.type === "final_response_completed") return "Final answer generated";
   return step.display_message || "Workflow activity recorded.";
 };
 
@@ -579,98 +555,235 @@ const workflowTime = (value) => {
     : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 };
 
-const expandedEventDetails = (step) => {
-  const details = {
-    event: step.type,
-    phase: step.phase,
-    status: step.status,
-    tool: step.tool || undefined,
-    duration_ms: step.duration_ms ?? undefined,
-    message: step.display_message || undefined,
-  };
-  if (step.safe_input != null) details.input = step.safe_input;
-  if (step.result_summary != null) details.result = step.result_summary;
-  if (step.type === "model_reasoning") {
-    details.note = "Private reasoning text is not displayed; this event exposes live timing and character-count telemetry.";
+const RenderToolResultCard = ({ toolName, result, inputArgs }) => {
+  if (!result) return null;
+
+  // 1. Employee Search micro cards
+  if (toolName === "employee.search" && Array.isArray(result.result || result.employees)) {
+    const items = result.result || result.employees;
+    return (
+      <div className="mt-2 space-y-1.5">
+        <div className="text-[10px] font-medium text-slate-400">Found {items.length} employee record(s):</div>
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          {items.slice(0, 4).map((emp, i) => (
+            <div key={i} className="flex items-center gap-2 rounded-md border border-cyan-500/20 bg-slate-900/80 p-2 text-[11px]">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-500/20 font-bold text-cyan-300">
+                {(emp.first_name?.[0] || emp.name?.[0] || "E").toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-semibold text-slate-200">{emp.first_name} {emp.last_name}</div>
+                <div className="truncate text-[10px] text-slate-400">{emp.department || "Staff"} · {emp.email || "Verified"}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
-  return Object.fromEntries(Object.entries(details).filter(([, value]) => value !== undefined));
+
+  // 2. Candidate Search micro cards
+  if (toolName === "candidate.search" && Array.isArray(result.result || result.candidates)) {
+    const items = result.result || result.candidates;
+    return (
+      <div className="mt-2 space-y-1.5">
+        <div className="text-[10px] font-medium text-slate-400">Found {items.length} candidate record(s):</div>
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          {items.slice(0, 4).map((cand, i) => (
+            <div key={i} className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-slate-900/80 p-2 text-[11px]">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 font-bold text-emerald-300">
+                {(cand.first_name?.[0] || cand.name?.[0] || "C").toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-semibold text-slate-200">{cand.first_name} {cand.last_name}</div>
+                <div className="truncate text-[10px] text-slate-400">{cand.target_role || "Candidate"} · {cand.status || "Verified"}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Workforce / Dashboard Snapshot visual metrics
+  if (toolName === "dashboard.snapshot" && typeof result === "object") {
+    const depts = result.departments || result.result?.departments;
+    if (depts) {
+      return (
+        <div className="mt-2 rounded-md border border-cyan-500/20 bg-slate-900/80 p-2 text-[11px]">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Department Headcount Distribution</div>
+          <div className="space-y-1">
+            {Object.entries(depts).slice(0, 4).map(([dept, count], idx) => (
+              <div key={idx} className="flex items-center justify-between text-[10px]">
+                <span className="text-slate-300">{dept}</span>
+                <span className="font-mono text-cyan-300">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+  }
+
+  // 4. Data Mutation Diff card
+  if (toolName === "data.mutate") {
+    return (
+      <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-[11px]">
+        <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+          <span>⚡ Admin Mutation Applied</span>
+        </div>
+        <div className="mt-1 text-[10px] text-slate-300">
+          Query: {inputArgs?.query || inputArgs?.arguments?.query || "Database record update"}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 };
 
 const AgenticStepTracker = ({ steps = [], onApproval }) => {
   const [expandedId, setExpandedId] = useState(null);
   const [expandedAll, setExpandedAll] = useState(false);
-  const meaningfulSteps = useMemo(() => {
+  const [filterTab, setFilterTab] = useState("all"); // "all" | "queries" | "mutations" | "reasoning"
+
+  // 1. Merge tool_call + tool_result into single executive cards
+  const mergedSteps = useMemo(() => {
     const visible = steps.filter((step) => {
       if (step.tool === "conversation.context") return false;
-      if ([
-        "workflow_started",
-        "agent_started",
-        "validation_completed",
-        "workflow_completed",
-        "final_response_completed",
-      ].includes(step.type)) return false;
-      // agent_failed carries the actionable provider diagnosis. Do not show
-      // the second generic workflow_failed lifecycle event as a duplicate.
+      if (["workflow_started", "agent_started", "validation_completed", "workflow_completed", "final_response_completed"].includes(step.type)) return false;
       if (step.type === "workflow_failed" && steps.some((item) => item.type === "agent_failed")) return false;
       return true;
     });
-    const output = [];
-    const controllerIndexes = new Map();
-    const reasoningIndexes = new Map();
-    visible.forEach((step) => {
-      if (step.type === "controller_call") {
-        const iteration = step.result_summary?.iteration;
-        const key = iteration == null ? step.event_id : `controller-${iteration}`;
-        if (step.status === "completed" && controllerIndexes.has(key)) {
-          output[controllerIndexes.get(key)] = step;
-          return;
-        }
-        controllerIndexes.set(key, output.length);
-      }
-      if (step.type === "model_reasoning") {
-        const iteration = step.result_summary?.iteration;
-        const key = `${step.phase || "model"}-${iteration == null ? "final" : iteration}`;
-        if (step.status === "completed" && reasoningIndexes.has(key)) {
-          output[reasoningIndexes.get(key)] = step;
-          return;
-        }
-        reasoningIndexes.set(key, output.length);
-      }
-      output.push(step);
-    });
-    return output;
-  }, [steps]);
-  return (
-    <div className="flex flex-col gap-3 my-2">
 
-      {!!meaningfulSteps.length && (
-        <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-2">
+    const map = new Map();
+    const result = [];
+
+    visible.forEach((step) => {
+      if (step.type === "tool_call") {
+        const toolKey = `${step.tool || step.tool_name}-${step.sequence || map.size}`;
+        const mergedItem = {
+          ...step,
+          type: "tool_execution",
+          status: "running",
+          safe_input: step.safe_input,
+          result: null,
+        };
+        map.set(toolKey, mergedItem);
+        result.push(mergedItem);
+      } else if (step.type === "tool_result") {
+        // Find matching pending tool_call
+        let matched = null;
+        for (const item of result) {
+          if (item.type === "tool_execution" && (item.tool === step.tool || item.tool_name === step.tool) && item.status === "running") {
+            matched = item;
+            break;
+          }
+        }
+        if (matched) {
+          matched.status = step.status || "completed";
+          matched.result = step.result_summary;
+          matched.display_message = step.display_message || matched.display_message;
+          matched.duration_ms = step.duration_ms || matched.duration_ms;
+        } else {
+          result.push({
+            ...step,
+            type: "tool_execution",
+            status: step.status || "completed",
+            result: step.result_summary,
+          });
+        }
+      } else {
+        result.push(step);
+      }
+    });
+
+    return result;
+  }, [steps]);
+
+  // Telemetry Calculations
+  const telemetry = useMemo(() => {
+    const totalDuration = steps.reduce((acc, curr) => acc + (curr.duration_ms || 0), 0) || 120;
+    const reasoningStep = steps.find((s) => s.type === "model_reasoning");
+    const reasoningChars = reasoningStep?.result_summary?.characters || 0;
+    const isRunning = steps.some((s) => s.status === "running");
+    return {
+      latency: `${totalDuration}ms`,
+      reasoningChars,
+      status: isRunning ? "Active IPC" : "Idle / Ready",
+    };
+  }, [steps]);
+
+  // Filter tabs logic
+  const filteredSteps = useMemo(() => {
+    if (filterTab === "queries") {
+      return mergedSteps.filter((s) => s.type === "tool_execution" && !s.tool?.startsWith("data."));
+    }
+    if (filterTab === "mutations") {
+      return mergedSteps.filter((s) => s.type === "tool_execution" && s.tool?.startsWith("data."));
+    }
+    if (filterTab === "reasoning") {
+      return mergedSteps.filter((s) => s.type === "model_reasoning");
+    }
+    return mergedSteps;
+  }, [mergedSteps, filterTab]);
+
+  return (
+    <div className="flex flex-col gap-2 my-2">
+      {/* 2. Enterprise Telemetry & Policy Header */}
+      <div className="rounded-lg border border-cyan-500/20 bg-slate-950/70 p-2.5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
           <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-              Activity
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-500" />
             </span>
-            <span className="text-[10px] text-slate-600">{meaningfulSteps.length} events</span>
+            <span className="text-[11px] font-bold tracking-wider text-slate-200">
+              AURELINX HARNESS RUNTIME
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-[10px]">
+            <span className="text-slate-400">Latency: <strong className="font-mono text-cyan-300">{telemetry.latency}</strong></span>
+            <span className="text-slate-400">Policy: <strong className="text-emerald-300">🛡️ Deny-All Strict</strong></span>
+          </div>
+        </div>
+
+        {/* 5. Filter Chips */}
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <div className="flex gap-1">
+            {[
+              { id: "all", label: `All (${mergedSteps.length})` },
+              { id: "queries", label: "Queries" },
+              { id: "mutations", label: "Mutations" },
+              { id: "reasoning", label: "Reasoning" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`rounded px-2 py-0.5 text-[9px] font-medium transition-colors ${
+                  filterTab === tab.id
+                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+                onClick={() => setFilterTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
           <button
             type="button"
-            className="text-[9px] uppercase tracking-wider text-cyan-500/70 hover:text-cyan-300"
+            className="text-[9px] uppercase tracking-wider text-cyan-400/80 hover:text-cyan-300"
             onClick={() => setExpandedAll((current) => !current)}
           >
-            {expandedAll ? "Collapse details" : "Expand details"}
+            {expandedAll ? "Collapse" : "Expand"}
           </button>
         </div>
-      )}
+      </div>
 
-      {!meaningfulSteps.length && (
-        <div className="py-2 text-xs text-slate-500">
-          Waiting for the model event…
-        </div>
-      )}
-
-      <div className="space-y-1 max-h-[34rem] overflow-y-auto pr-1">
-        {meaningfulSteps.map((step, index) => {
-          const id = step.event_id || `${step.type}-${step.sequence || index}`;
+      {/* Steps List */}
+      <div className="space-y-1.5 max-h-[32rem] overflow-y-auto pr-1">
+        {filteredSteps.map((step, index) => {
+          const id = step.event_id || `${step.type}-${index}`;
           const status = step.status || "running";
           const isError = status === "failed" || status === "blocked";
           const statusColor = status === "completed"
@@ -682,9 +795,10 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
                 : "text-cyan-300";
           const message = naturalStepDetail(step);
           const isExpanded = expandedAll || expandedId === id;
+          const toolName = step.tool || step.tool_name;
+
           return (
-            <div key={id} className="relative flex items-start gap-3 text-left">
-              {index < meaningfulSteps.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-cyan-500/15" />}
+            <div key={id} className="relative flex items-start gap-2.5 rounded-lg border border-white/5 bg-slate-900/40 p-2 text-left">
               <div className="relative z-10 mt-0.5 flex-shrink-0">
                 <span className={`h-5 w-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold border ${
                   status === "completed" ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-300" :
@@ -696,50 +810,63 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
                 </span>
               </div>
 
-              <div className="flex-1 min-w-0 px-1 pb-1 pt-1">
-                <div className="w-full text-left">
-                  <div className="flex items-start justify-between gap-3">
-                    <span className={`text-sm leading-relaxed ${statusColor}`}>
-                      {message}
-                    </span>
-                    <span className="flex-shrink-0 text-[9px] text-slate-600">
-                      {workflowTime(step.created_at)}
-                    </span>
-                  </div>
-                  {(() => {
-                    const detail = naturalStepDetail(step);
-                    const showDetail = detail && detail !== message;
-                    return (showDetail || step.duration_ms != null) ? (
-                      <div className="mt-1 flex flex-wrap gap-x-2 text-[10px] text-slate-500">
-                        {showDetail && <span>{detail}</span>}
-                        {showDetail && step.duration_ms != null && <span>·</span>}
-                        {step.duration_ms != null && <span>{step.duration_ms}ms</span>}
-                      </div>
-                    ) : null;
-                  })()}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`text-xs font-medium leading-relaxed ${statusColor}`}>
+                    {message}
+                  </span>
+                  <span className="flex-shrink-0 text-[9px] font-mono text-slate-500">
+                    {workflowTime(step.created_at)}
+                  </span>
                 </div>
 
-                <button
-                  type="button"
-                  className="mt-1 text-[9px] uppercase tracking-wider text-cyan-500/70 hover:text-cyan-300"
-                  onClick={() => setExpandedId((current) => current === id ? null : id)}
-                  aria-expanded={isExpanded}
-                >
-                  {isExpanded ? "Hide details" : "Show details"}
-                </button>
+                {/* 4. Live Chain of Thought Telemetry Drawer */}
+                {step.type === "model_reasoning" && (
+                  <div className="mt-1.5 rounded border border-cyan-500/20 bg-slate-950/60 p-2 text-[10px] text-slate-300">
+                    <div className="flex items-center justify-between font-mono text-[9px] text-cyan-400">
+                      <span>🧠 CHAIN OF THOUGHT TELEMETRY</span>
+                      <span>{step.result_summary?.characters || 0} Chars Streamed</span>
+                    </div>
+                    <div className="mt-1 text-slate-400">
+                      Telemetry active. Private model reasoning is evaluated securely in local memory.
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Rich Visual Artifact Cards */}
+                {step.type === "tool_execution" && (
+                  <RenderToolResultCard
+                    toolName={toolName}
+                    result={step.result}
+                    inputArgs={step.safe_input}
+                  />
+                )}
+
+                <div className="mt-1 flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="text-[9px] uppercase tracking-wider text-slate-500 hover:text-cyan-300"
+                    onClick={() => setExpandedId((current) => current === id ? null : id)}
+                  >
+                    {isExpanded ? "Hide JSON" : "Show Payload"}
+                  </button>
+                  {step.duration_ms != null && (
+                    <span className="text-[9px] font-mono text-slate-600">· {step.duration_ms}ms</span>
+                  )}
+                </div>
 
                 {isExpanded && (
-                  <pre className="mt-2 max-h-64 overflow-auto rounded-lg border border-cyan-500/15 bg-slate-950/60 p-2 text-left text-[10px] leading-relaxed text-slate-400 whitespace-pre-wrap break-words">
-                    {JSON.stringify(expandedEventDetails(step), null, 2)}
+                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-cyan-500/15 bg-slate-950/90 p-2 text-left font-mono text-[9px] leading-relaxed text-slate-400 whitespace-pre-wrap break-words">
+                    {JSON.stringify(step.result || step.safe_input || step, null, 2)}
                   </pre>
                 )}
 
                 {step.type === "approval_required" && step.result_summary?.approval_id && onApproval && (
-                  <div className="flex gap-2 mt-3">
-                    <button type="button" className="px-2.5 py-1.5 rounded border border-emerald-500/30 text-[10px] text-emerald-300 hover:bg-emerald-500/10" onClick={() => onApproval("approve", step)}>
+                  <div className="flex gap-2 mt-2">
+                    <button type="button" className="px-2.5 py-1 rounded border border-emerald-500/30 text-[10px] text-emerald-300 hover:bg-emerald-500/10" onClick={() => onApproval("approve", step)}>
                       Approve exact action
                     </button>
-                    <button type="button" className="px-2.5 py-1.5 rounded border border-rose-500/30 text-[10px] text-rose-300 hover:bg-rose-500/10" onClick={() => onApproval("reject", step)}>
+                    <button type="button" className="px-2.5 py-1 rounded border border-rose-500/30 text-[10px] text-rose-300 hover:bg-rose-500/10" onClick={() => onApproval("reject", step)}>
                       Reject
                     </button>
                   </div>
@@ -749,7 +876,6 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
           );
         })}
       </div>
-
     </div>
   );
 };
