@@ -485,7 +485,7 @@ const App = () => {
           </div>
         </motion.aside>
 
-        <main className="flex-1 h-[calc(100vh-0.75rem)] md:h-[calc(100vh-1rem)] overflow-y-auto p-3 md:p-5 lg:p-6 relative z-10 custom-scrollbar">
+        <main className="flex-1 h-full min-h-0 overflow-y-auto p-3 md:p-5 lg:p-6 relative z-10 custom-scrollbar">
           <Suspense fallback={<LoadingScreen label={`Loading ${activeTab}`} />}>
             <AnimatePresence mode="wait">
               <motion.div
