@@ -1239,7 +1239,7 @@ const IntelligenceChatView = () => {
   };
 
   return (
-    <div className="relative w-full h-full min-h-0 flex flex-col">
+    <div className="relative w-full min-h-0 flex flex-col" style={{height: '100dvh', maxHeight: '100dvh'}}>
       <div
         className={`premium-card p-4 flex flex-col h-full min-h-0 transition-[margin-right] duration-300 ${drawerOpen ? "mr-[356px]" : "mr-[76px]"}`}
       >
