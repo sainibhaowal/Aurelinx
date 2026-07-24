@@ -342,9 +342,14 @@ const App = () => {
     content = <AuthScreen />;
   } else {
     content = (
-      <div className="flex h-screen bg-[#07111f] text-slate-100 relative overflow-hidden selection:bg-primary/30 antialiased">
+      <div className="flex h-screen bg-[#030712] text-slate-100 relative overflow-hidden selection:bg-cyan-500/30 antialiased">
+      {/* AMBIENT MESH LIGHT FLARES */}
+      <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-cyan-600/15 blur-[120px] pointer-events-none z-0" />
+      <div className="absolute top-1/2 -right-40 h-96 w-96 rounded-full bg-emerald-600/10 blur-[140px] pointer-events-none z-0" />
+      <div className="absolute -bottom-40 left-1/3 h-96 w-96 rounded-full bg-blue-600/10 blur-[130px] pointer-events-none z-0" />
+
       {/* DOTTED GRID BACKGROUND */}
-      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none z-0" />
+      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none z-0" />
 
       <Toast
         isVisible={toast.visible}
@@ -353,14 +358,12 @@ const App = () => {
         onClose={() => setToast((p) => ({ ...p, visible: false }))}
       />
 
-
-
       <div className="relative z-20 flex w-full h-full p-1.5 md:p-2 gap-1.5 md:gap-2">
         <motion.aside
           initial={false}
           animate={{ width: isSidebarCollapsed ? 64 : 220 }}
           transition={{ duration: 0.3, ease: "circOut" }}
-          className="bg-[#0f1f33]/85 border border-white/10 flex flex-col h-full relative overflow-hidden shadow-2xl rounded-2xl"
+          className="bg-slate-950/65 backdrop-blur-2xl border border-white/10 flex flex-col h-full relative overflow-hidden shadow-2xl rounded-2xl"
         >
           <div
             data-tauri-drag-region
