@@ -168,12 +168,6 @@ def _config_for_request(
         "custom": (None, "gpt-4o-mini"),
     }
 
-    # Providers without native tools parameter support get eager context
-    # injection via Aurelinx's old tool pipeline (pre-executed, injected into
-    # the prompt). The antigravity agent still runs for thought/text events.
-    if provider in {"claude", "opencode", "custom"}:
-        tools = []
-
     tool_names = [tool.__name__ for tool in tools]
     policies = [policy.deny_all(), *[policy.allow(name) for name in tool_names]]
     capabilities = types.CapabilitiesConfig(
