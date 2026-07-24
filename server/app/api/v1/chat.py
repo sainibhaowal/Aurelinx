@@ -2748,18 +2748,34 @@ async def _stream_antigravity_agent_loop(
         },
     )
 
+    has_attachments = bool(attachments)
+    resolved_provider = (request.provider or "lmstudio").lower()
+    resolved_provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(resolved_provider, resolved_provider)
+
+    # Providers without tool-calling support get eager context injection.
+    if resolved_provider in {"opencode", "custom"}:
+        context_payload = await asyncio.to_thread(
+            lambda: _build_context_payload(db, chat_session.id, request.content, current_user, attachments, workflow_run.id),
+        )
+        context_block = (
+            "\n\nAurelinx workspace context (pre-computed for this request):\n"
+            f"{json.dumps(context_payload or {}, default=str, indent=2)}"
+        )
+    else:
+        context_block = (
+            "\n\nUse a tool when facts must come from Aurelinx data."
+        )
+
     prompt = (
         "Handle the current Aurelinx workflow request using the available verified "
-        "application tools. Use a tool when facts must come from Aurelinx data. "
-        "After tool results, continue until you can give one clear final answer. "
+        "application tools."
+        f"{context_block}"
+        " After tool results, continue until you can give one clear final answer. "
         "Do not describe private reasoning; only provide concise operational updates "
         "and the final answer.\n\n"
         f"Current user request:\n{request.content}\n\n"
         f"Recent Aurelinx conversation context:\n{json.dumps(history[-8:], default=str)}"
     )
-    has_attachments = bool(attachments)
-    resolved_provider = (request.provider or "lmstudio").lower()
-    resolved_provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(resolved_provider, resolved_provider)
     resolved_api_key = request.api_key
     if not resolved_api_key:
         resolved_api_key = {
@@ -4221,52 +4237,7 @@ async def send_message_stream(
                 getattr(current_user, "tenant_id", None) or "default",
             )
 
-            # Some providers don't support the agent runtime's tool-calling
-            # payload format. Route them through direct streaming instead.
-            raw_provider = (request.provider or "lmstudio").lower()
-            raw_provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(raw_provider, raw_provider)
-            if raw_provider in {"opencode", "custom"}:
-                yield f"event: agent_step\ndata: {_json_dumps(emit_workflow_event(workflow_run.id, 'workflow_started', 'intake', 'Request accepted', status='completed', result_summary={'session_id': chat_session.id, 'runtime': 'direct-stream'}))}\n\n"
-                update_workflow_run(workflow_run.id, "executing", "response")
-                yield f"event: agent_step\ndata: {_json_dumps(emit_workflow_event(workflow_run.id, 'model_started', 'response', 'Generating response', status='running', result_summary={'provider': request.provider, 'model': request.model}))}\n\n"
-                assistant_text = ""
-                try:
-                    async for token in _llm_stream_response(
-                        provider=request.provider or "lmstudio",
-                        api_key=request.api_key,
-                        base_url=request.base_url,
-                        model=request.model,
-                        user_text=request.content,
-                        context_payload={},
-                    ):
-                        assistant_text += token
-                        yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
-                except Exception:
-                    try:
-                        assistant_text = await _llm_response(
-                            provider=request.provider or "lmstudio",
-                            api_key=request.api_key,
-                            base_url=request.base_url,
-                            model=request.model,
-                            user_text=request.content,
-                            context_payload={},
-                        )
-                        yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
-                    except Exception:
-                        assistant_text = "The provider returned an error. Check your provider configuration and try again."
-                        yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
-                assistant_msg = ChatMessageTable(session_id=chat_session.id, role="assistant", content=assistant_text)
-                db.add(assistant_msg)
-                chat_session.updated_at = datetime.utcnow()
-                db.add(chat_session)
-                db.commit()
-                db.refresh(assistant_msg)
-                db.refresh(chat_session)
-                yield f"event: agent_step\ndata: {_json_dumps(emit_workflow_event(workflow_run.id, 'workflow_completed', 'completed', 'Completed', status='completed', result_summary={'assistant_message_id': assistant_msg.id}))}\n\n"
-                yield f"event: done\ndata: {_json_dumps({'assistant_message': _to_message_out(assistant_msg).model_dump(mode='json'), 'user_message': _to_message_out(user_msg).model_dump(mode='json'), 'session': _to_session_out(chat_session).model_dump(mode='json')})}\n\n"
-                return
-
-            # The live path is Aurelinx's native agent loop.
+            # The native antigravity agent loop handles all providers.
             async for frame in _stream_antigravity_agent_loop(
                 db,
                 chat_session,

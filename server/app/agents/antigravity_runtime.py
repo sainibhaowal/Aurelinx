@@ -220,6 +220,9 @@ def _config_for_request(
     if provider in {"openai", "groq", "opencode"} and not api_key:
         raise RuntimeError(f"An API key is required for the {provider} provider")
 
+    if provider in {"opencode", "custom"}:
+        tools = []
+
     configured_base = base_url or os.getenv("OPENAI_BASE_URL")
     if not configured_base:
         configured_base = provider_defaults.get(provider, (None, None))[0]
