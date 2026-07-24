@@ -270,9 +270,9 @@ async def stream_agent_turn(
 
     async def run_config(agent_config):
         async with Agent(agent_config) as agent:
-            response = await agent.chat(prompt)
+            await agent.conversation.send(prompt)
             emitted_tool_results = 0
-            async for event in response.chunks:
+            async for event in agent.conversation.receive_chunks():
                 if isinstance(event, types.Thought):
                     yield AntigravityRuntimeEvent("thought", event)
                 elif isinstance(event, types.Text):
@@ -280,10 +280,6 @@ async def stream_agent_turn(
                 elif isinstance(event, types.ToolCall):
                     yield AntigravityRuntimeEvent("tool_call", event)
                 elif isinstance(event, types.ToolResult):
-                    # Successful custom tools are recorded by the request-
-                    # scoped wrapper. If the wrapper raised before recording,
-                    # the SDK can expose only this native error result; surface
-                    # that one failure instead of silently losing the tool step.
                     native_name = str(getattr(event.name, "value", event.name))
                     native_name = {
                         "employee_search": "employee.search",
@@ -325,7 +321,7 @@ async def stream_agent_turn(
                 )
                 emitted_tool_results += 1
 
-            yield AntigravityRuntimeEvent("finished", response.usage_metadata)
+            yield AntigravityRuntimeEvent("finished", agent.conversation.total_usage)
 
     async with _session_lock(str(session_id)):
         async for event in run_config(config):
