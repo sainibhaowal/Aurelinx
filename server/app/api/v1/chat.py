@@ -2751,76 +2751,9 @@ async def _stream_antigravity_agent_loop(
     has_attachments = bool(attachments)
     resolved_provider = (request.provider or "lmstudio").lower()
     resolved_provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(resolved_provider, resolved_provider)
-    eager_tool_providers = {"claude", "opencode", "custom"}
-    needs_eager_tools = resolved_provider in eager_tool_providers
-
-    # Providers without native tools parameter get the old tool pipeline
-    # executed eagerly. Results are both injected into the prompt AND emitted
-    # as synthetic tool_call/tool_result events so the UI shows tool cards.
-    if needs_eager_tools:
-        def _worker():
-            with Session(engine) as worker_db:
-                worker_attachments = worker_db.exec(
-                    select(ChatAttachmentTable).where(
-                        ChatAttachmentTable.session_id == str(chat_session.id)
-                    )
-                ).all()
-                return _build_context_payload(
-                    worker_db,
-                    chat_session.id,
-                    request.content,
-                    current_user,
-                    worker_attachments,
-                    workflow_run_id=workflow_run.id,
-                )
-        context_payload = await asyncio.to_thread(_worker)
-        tool_runs = (context_payload or {}).get("tool_context", {}).get("tool_runs", []) or []
-        for run in tool_runs:
-            if run.get("tool", "").startswith("conversation_"):
-                continue
-            tool_name = run.get("tool", "unknown")
-            agent_tool_name = {
-                "search_employees": "employee.search",
-                "search_candidates": "candidate.search",
-                "dashboard_snapshot": "dashboard.snapshot",
-                "parse_csv_attachment": "document.csv_ingest",
-                "mutate_data": "data.mutate",
-                "workspace_snapshot": "workspace.snapshot",
-            }.get(tool_name, tool_name.replace("_", "."))
-            safe_input = {"arguments": {"query": run.get("query", "")[:200]}}
-            tool_transcript.append(
-                {"tool": agent_tool_name, "arguments": safe_input, "result": None}
-            )
-            yield emit(
-                "tool_call",
-                "execution" if agent_tool_name.startswith("data.") else "retrieval",
-                f"Using {_agent_tool_label(agent_tool_name)}.",
-                status="running",
-                tool_name=agent_tool_name,
-                safe_input=safe_input,
-            )
-            output = run.get("output") or {}
-            blocked = run.get("denied", False) or output.get("blocked", False)
-            tool_transcript[-1]["result"] = safe_summary(output)
-            yield emit(
-                "tool_result",
-                "execution" if agent_tool_name.startswith("data.") else "retrieval",
-                _agent_tool_result_message(agent_tool_name, output),
-                status="blocked" if blocked else "completed",
-                tool_name=agent_tool_name,
-                result_summary=safe_summary(output),
-                error_code="TOOL_BLOCKED" if blocked else None,
-            )
-
-    if needs_eager_tools:
-        context_block = (
-            "\n\nAurelinx workspace context (pre-computed for this request):\n"
-            f"{json.dumps(context_payload or {}, default=str, indent=2)}"
-        )
-    else:
-        context_block = (
-            "\n\nUse a tool when facts must come from Aurelinx data."
-        )
+    context_block = (
+        "\n\nUse a tool when facts must come from Aurelinx data."
+    )
 
     prompt = (
         "Handle the current Aurelinx workflow request using the available verified "
@@ -4241,6 +4174,126 @@ async def send_message(
     )
 
 
+async def _eager_tool_stream(
+    db: Session,
+    chat_session: ChatSessionTable,
+    user_msg: ChatMessageTable,
+    workflow_run: WorkflowRunTable,
+    request: ChatMessageCreate,
+    current_user: TokenData,
+):
+    """Stream one turn for providers without native tool-calling support.
+    Runs the old tool pipeline eagerly, emits synthetic tool events, then
+    streams the model response directly — no antigravity agent dependency.
+    """
+    resolved_provider = (request.provider or "lmstudio").lower()
+    resolved_provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(resolved_provider, resolved_provider)
+    resolved_api_key = request.api_key
+    if not resolved_api_key:
+        resolved_api_key = {
+            "openai": settings.OPENAI_API_KEY,
+            "groq": settings.GROQ_API_KEY,
+            "claude": settings.CLAUDE_API_KEY,
+            "gemini": settings.OPENAI_API_KEY,
+            "opencode": settings.OPENAI_API_KEY,
+        }.get(resolved_provider)
+
+    events = []
+    def emit(
+        event_type: str, phase: str, message: str, *,
+        status: str = "running", tool_name: str = None,
+        safe_input: Any = None, result_summary: Any = None,
+        error_code: str = None,
+    ) -> str:
+        event = emit_workflow_event(
+            workflow_run.id, event_type, phase, message,
+            status=status, tool_name=tool_name,
+            safe_input=safe_input, result_summary=result_summary,
+            error_code=error_code,
+        )
+        events.append(event)
+        return f"event: agent_step\ndata: {_json_dumps(event)}\n\n"
+
+    yield emit("workflow_started", "intake", "Request accepted", status="completed", result_summary={"session_id": chat_session.id, "runtime": "eager-tool-stream"})
+    update_workflow_run(workflow_run.id, "planning", "intake")
+    yield emit("agent_started", "execution", "Working on your request", status="running", result_summary={"provider": request.provider, "model": request.model, "tools_are_eager": True})
+
+    def _worker():
+        with Session(engine) as worker_db:
+            worker_attachments = worker_db.exec(
+                select(ChatAttachmentTable).where(
+                    ChatAttachmentTable.session_id == str(chat_session.id)
+                )
+            ).all()
+            return _build_context_payload(
+                worker_db, chat_session.id, request.content, current_user,
+                worker_attachments, workflow_run_id=workflow_run.id,
+            )
+    context_payload = await asyncio.to_thread(_worker)
+    tool_runs = (context_payload or {}).get("tool_context", {}).get("tool_runs", []) or []
+    for run in tool_runs:
+        tool_name = run.get("tool", "unknown")
+        if tool_name.startswith("conversation_"):
+            continue
+        agent_tool_name = {
+            "search_employees": "employee.search",
+            "search_candidates": "candidate.search",
+            "dashboard_snapshot": "dashboard.snapshot",
+            "parse_csv_attachment": "document.csv_ingest",
+            "mutate_data": "data.mutate",
+            "workspace_snapshot": "workspace.snapshot",
+        }.get(tool_name, tool_name.replace("_", "."))
+        safe_input = {"arguments": {"query": request.content[:200]}}
+        yield emit("tool_call", "execution" if agent_tool_name.startswith("data.") else "retrieval", f"Using {_agent_tool_label(agent_tool_name)}.", status="running", tool_name=agent_tool_name, safe_input=safe_input)
+        output = run.get("output") or {}
+        blocked = run.get("denied", False) or output.get("blocked", False)
+        yield emit("tool_result", "execution" if agent_tool_name.startswith("data.") else "retrieval", _agent_tool_result_message(agent_tool_name, output), status="blocked" if blocked else "completed", tool_name=agent_tool_name, result_summary=safe_summary(output), error_code="TOOL_BLOCKED" if blocked else None)
+
+    update_workflow_run(workflow_run.id, "executing", "response")
+    yield emit("final_response_started", "response", "Writing answer", status="running", result_summary={"content_status": "streaming", "tool_calls": sum(1 for r in tool_runs if not r.get("tool", "").startswith("conversation_"))})
+
+    assistant_text = ""
+    try:
+        async for token in _llm_stream_response(
+            provider=request.provider or "lmstudio",
+            api_key=resolved_api_key,
+            base_url=request.base_url,
+            model=request.model,
+            user_text=request.content,
+            context_payload=context_payload or {},
+        ):
+            assistant_text += token
+            yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
+    except Exception:
+        try:
+            assistant_text = await _llm_response(
+                provider=request.provider or "lmstudio",
+                api_key=resolved_api_key,
+                base_url=request.base_url,
+                model=request.model,
+                user_text=request.content,
+                context_payload=context_payload or {},
+            )
+            yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+        except Exception:
+            assistant_text = "The provider returned an error. Check your provider configuration and try again."
+            yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+
+    assistant_msg = ChatMessageTable(
+        session_id=chat_session.id, role="assistant", content=assistant_text,
+        tool_trace=json.dumps(context_payload or {}, default=str),
+    )
+    db.add(assistant_msg)
+    chat_session.updated_at = datetime.utcnow()
+    db.add(chat_session)
+    db.commit()
+    db.refresh(assistant_msg)
+    db.refresh(chat_session)
+    update_workflow_run(workflow_run.id, "completed", "completed")
+    yield emit("workflow_completed", "completed", "Completed", status="completed", result_summary={"assistant_message_id": assistant_msg.id, "tool_calls": sum(1 for r in tool_runs if not r.get("tool", "").startswith("conversation_"))})
+    yield f"event: done\ndata: {_json_dumps({'assistant_message': _to_message_out(assistant_msg).model_dump(mode='json'), 'user_message': _to_message_out(user_msg).model_dump(mode='json'), 'session': _to_session_out(chat_session).model_dump(mode='json')})}\n\n"
+
+
 @router.post("/sessions/{session_id}/message/stream")
 async def send_message_stream(
     session_id: UUID,
@@ -4293,7 +4346,17 @@ async def send_message_stream(
                 getattr(current_user, "tenant_id", None) or "default",
             )
 
-            # The native antigravity agent loop handles all providers.
+            raw_provider = (request.provider or "lmstudio").lower()
+            raw_provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(raw_provider, raw_provider)
+            eager_tool_providers = {"claude", "opencode", "custom"}
+
+            if raw_provider in eager_tool_providers:
+                async for frame in _eager_tool_stream(
+                    db, chat_session, user_msg, workflow_run, request, current_user,
+                ):
+                    yield frame
+                return
+
             async for frame in _stream_antigravity_agent_loop(
                 db,
                 chat_session,
