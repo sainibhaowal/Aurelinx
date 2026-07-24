@@ -2751,12 +2751,53 @@ async def _stream_antigravity_agent_loop(
     has_attachments = bool(attachments)
     resolved_provider = (request.provider or "lmstudio").lower()
     resolved_provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(resolved_provider, resolved_provider)
+    eager_tool_providers = {"claude", "opencode", "custom"}
+    needs_eager_tools = resolved_provider in eager_tool_providers
 
-    # Providers without tool-calling support get eager context injection.
-    if resolved_provider in {"opencode", "custom"}:
+    # Providers without native tools parameter get the old tool pipeline
+    # executed eagerly. Results are both injected into the prompt AND emitted
+    # as synthetic tool_call/tool_result events so the UI shows tool cards.
+    if needs_eager_tools:
         context_payload = await asyncio.to_thread(
             lambda: _build_context_payload(db, chat_session.id, request.content, current_user, attachments, workflow_run.id),
         )
+        tool_runs = (context_payload or {}).get("tool_context", {}).get("tool_runs", []) or []
+        for run in tool_runs:
+            tool_name = run.get("tool", "unknown")
+            agent_tool_name = {
+                "search_employees": "employee.search",
+                "search_candidates": "candidate.search",
+                "dashboard_snapshot": "dashboard.snapshot",
+                "parse_csv_attachment": "document.csv_ingest",
+                "mutate_data": "data.mutate",
+                "workspace_snapshot": "workspace.snapshot",
+            }.get(tool_name, tool_name.replace("_", "."))
+            safe_input = {"arguments": {"query": run.get("query", "")[:200]}}
+            tool_transcript.append(
+                {"tool": agent_tool_name, "arguments": safe_input, "result": None}
+            )
+            yield emit(
+                "tool_call",
+                "execution" if agent_tool_name.startswith("data.") else "retrieval",
+                f"Using {_agent_tool_label(agent_tool_name)}.",
+                status="running",
+                tool_name=agent_tool_name,
+                safe_input=safe_input,
+            )
+            output = run.get("output") or {}
+            blocked = run.get("denied", False) or output.get("blocked", False)
+            tool_transcript[-1]["result"] = safe_summary(output)
+            yield emit(
+                "tool_result",
+                "execution" if agent_tool_name.startswith("data.") else "retrieval",
+                _agent_tool_result_message(agent_tool_name, output),
+                status="blocked" if blocked else "completed",
+                tool_name=agent_tool_name,
+                result_summary=safe_summary(output),
+                error_code="TOOL_BLOCKED" if blocked else None,
+            )
+
+    if needs_eager_tools:
         context_block = (
             "\n\nAurelinx workspace context (pre-computed for this request):\n"
             f"{json.dumps(context_payload or {}, default=str, indent=2)}"

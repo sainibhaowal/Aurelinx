@@ -167,12 +167,12 @@ def _config_for_request(
         "ollama": ("http://127.0.0.1:11434/v1", "llama3"),
         "custom": (None, "gpt-4o-mini"),
     }
-    if provider in {"claude"}:
-        raise RuntimeError(
-            "Claude/Anthropic uses a different API format and is not supported "
-            "in the native agent runtime. Use OpenAI, Groq, OpenCode, Google, "
-            "LM Studio, or Ollama for agent features."
-        )
+
+    # Providers without native tools parameter support get eager context
+    # injection via Aurelinx's old tool pipeline (pre-executed, injected into
+    # the prompt). The antigravity agent still runs for thought/text events.
+    if provider in {"claude", "opencode", "custom"}:
+        tools = []
 
     tool_names = [tool.__name__ for tool in tools]
     policies = [policy.deny_all(), *[policy.allow(name) for name in tool_names]]
@@ -200,12 +200,6 @@ def _config_for_request(
         "tools": tools,
         "policies": policies,
         "workspaces": [],
-        # The Aurelinx UUID is a database/chat identifier, not necessarily an
-        # Antigravity conversation already present in the harness state dir.
-        # Passing it on the first turn makes the local harness try to resume a
-        # nonexistent conversation before the model can emit any event. The
-        # caller supplies recent Aurelinx history in the prompt, so let the
-        # native runtime create its own conversation here.
         "conversation_id": None,
         "session_continuation_mode": types.SessionContinuationMode.CREATE_ONLY,
         "save_dir": str(state_dir),
@@ -219,9 +213,6 @@ def _config_for_request(
 
     if provider in {"openai", "groq", "opencode"} and not api_key:
         raise RuntimeError(f"An API key is required for the {provider} provider")
-
-    if provider in {"opencode", "custom"}:
-        tools = []
 
     configured_base = base_url or os.getenv("OPENAI_BASE_URL")
     if not configured_base:
