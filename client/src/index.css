@@ -12,12 +12,14 @@
 
 @layer base {
   html {
+    height: 100%;
     scroll-behavior: smooth;
     text-rendering: optimizeSpeed;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
   body {
+    height: 100%;
     @apply bg-[#07111f] text-slate-100 antialiased overflow-x-hidden selection:bg-primary/30;
     font-family: "Manrope", system-ui, sans-serif;
     color-scheme: dark;
