@@ -1239,7 +1239,7 @@ const IntelligenceChatView = () => {
   };
 
   return (
-    <div className="relative w-full h-full min-h-0">
+    <div className="relative w-full h-full min-h-0 flex flex-col">
       <div
         className={`premium-card p-4 flex flex-col h-full min-h-0 transition-[margin-right] duration-300 ${drawerOpen ? "mr-[356px]" : "mr-[76px]"}`}
       >
@@ -1313,7 +1313,7 @@ const IntelligenceChatView = () => {
           </div>
         )}
 
-        <div className="flex flex-col flex-1 min-h-0 justify-between">
+        <div className="flex flex-col flex-1 min-h-0">
           {sessions.length === 0 ? (
             <div className="flex flex-col items-center justify-center flex-1 text-center p-8 bg-white/[0.01] border border-white/5 rounded-2xl backdrop-blur-md my-auto max-w-xl mx-auto py-16">
               <Bot size={40} className="text-cyan-400 mb-4 animate-pulse" />
@@ -1331,8 +1331,7 @@ const IntelligenceChatView = () => {
                 Start New Session
               </button>
             </div>
-          ) : (
-            <div className="flex flex-col h-full min-h-0 justify-between">
+          ) : <div className="flex flex-col h-full min-h-0">
               <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1 pb-2">
                 {messages.map((m) => (
                   <div
