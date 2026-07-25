@@ -342,7 +342,7 @@ const App = () => {
     content = <AuthScreen />;
   } else {
     content = (
-      <div className="flex flex-col h-screen w-screen bg-[#030712] text-slate-100 relative overflow-hidden selection:bg-cyan-500/30 antialiased">
+      <div className="flex h-screen bg-[#030712] text-slate-100 relative overflow-hidden selection:bg-cyan-500/30 antialiased">
       {/* AMBIENT MESH LIGHT FLARES */}
       <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-cyan-600/15 blur-[120px] pointer-events-none z-0" />
       <div className="absolute top-1/2 -right-40 h-96 w-96 rounded-full bg-emerald-600/10 blur-[140px] pointer-events-none z-0" />
@@ -358,7 +358,7 @@ const App = () => {
         onClose={() => setToast((p) => ({ ...p, visible: false }))}
       />
 
-      <div className="relative z-20 flex flex-1 w-full min-h-0 p-0 gap-1.5 md:gap-2 overflow-hidden">
+      <div className="relative z-20 flex w-full h-full p-1.5 md:p-2 gap-1.5 md:gap-2">
         <motion.aside
           initial={false}
           animate={{ width: isSidebarCollapsed ? 64 : 220 }}
@@ -485,7 +485,7 @@ const App = () => {
           </div>
         </motion.aside>
 
-        <main className={`flex-1 h-full min-h-0 relative z-10 custom-scrollbar ${activeTab === "intelligence" ? "p-0 overflow-hidden" : "p-3 md:p-5 lg:p-6 overflow-y-auto"}`}>
+        <main className="flex-1 h-full min-h-0 relative z-10 custom-scrollbar p-3 md:p-5 lg:p-6 overflow-y-auto">
           <Suspense fallback={<LoadingScreen label={`Loading ${activeTab}`} />}>
             <AnimatePresence mode="wait">
               <motion.div
