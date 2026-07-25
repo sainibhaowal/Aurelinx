@@ -344,7 +344,7 @@ const App = () => {
     content = <AuthScreen />;
   } else {
     content = (
-      <div className="flex h-full min-h-0 w-full bg-[#030712] text-slate-100 relative overflow-hidden selection:bg-cyan-500/30 antialiased">
+      <div className="absolute inset-0 flex min-h-0 w-full bg-[#030712] text-slate-100 overflow-hidden selection:bg-cyan-500/30 antialiased">
         {/* AMBIENT MESH LIGHT FLARES */}
         <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-cyan-600/15 blur-[120px] pointer-events-none z-0" />
         <div className="absolute top-1/2 -right-40 h-96 w-96 rounded-full bg-emerald-600/10 blur-[140px] pointer-events-none z-0" />
@@ -360,7 +360,7 @@ const App = () => {
           onClose={() => setToast((p) => ({ ...p, visible: false }))}
         />
 
-        <div className="relative z-20 flex flex-1 h-full w-full min-h-0 p-0 gap-1.5 md:gap-2 overflow-hidden">
+        <div className="absolute inset-0 z-20 flex w-full min-h-0 p-0 gap-1.5 md:gap-2 overflow-hidden">
           <motion.aside
             initial={false}
             animate={{ width: isSidebarCollapsed ? 64 : 220 }}
@@ -496,7 +496,7 @@ const App = () => {
                   initial="hidden"
                   animate="visible"
                   exit="hidden"
-                  className="h-full min-h-0 flex flex-col"
+                  className="relative h-full min-h-0 flex flex-col"
                 >
                   {activeTab === "dashboard" && (
                     <>
@@ -773,7 +773,7 @@ const App = () => {
                   {activeTab === "analytics" && <AnalyticsView />}
                   {activeTab === "scout" && <TalentScoutView />}
                   {activeTab === "intelligence" && (
-                    <div className="flex flex-1 min-h-0 flex-col">
+                    <div className="absolute inset-0 flex min-h-0 flex-col">
                       <IntelligenceChatView />
                     </div>
                   )}
