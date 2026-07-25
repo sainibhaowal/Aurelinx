@@ -897,7 +897,7 @@ const IntelligenceChatView = () => {
   const [renameTarget, setRenameTarget] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const abortRef = useRef(null);
-  const chatEndRef = useRef(null);
+  const messagesScrollRef = useRef(null);
 
   const selectedSession = useMemo(
     () => sessions.find((s) => s.id === selectedSessionId) || null,
@@ -935,7 +935,13 @@ const IntelligenceChatView = () => {
   }, [selectedSessionId]);
 
   const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const messagesContainer = messagesScrollRef.current;
+    if (!messagesContainer) return;
+
+    messagesContainer.scrollTo({
+      top: messagesContainer.scrollHeight,
+      behavior: "smooth",
+    });
   };
 
   useEffect(() => {
@@ -1239,7 +1245,7 @@ const IntelligenceChatView = () => {
   };
 
   return (
-    <div className="relative flex w-full flex-1 min-h-0 flex-col overflow-hidden">
+    <div className="absolute inset-0 flex min-h-0 w-full flex-col overflow-hidden">
       <div
         className={`premium-card p-4 flex flex-1 flex-col min-h-0 pb-0 transition-[margin-right] duration-300 ${drawerOpen ? "mr-[356px]" : "mr-[76px]"}`}
       >
@@ -1332,7 +1338,10 @@ const IntelligenceChatView = () => {
               </button>
             </div>
           ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
+            <div
+              ref={messagesScrollRef}
+              className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1"
+            >
               {messages.map((m) => (
                 <div
                   key={m.id}
@@ -1382,7 +1391,7 @@ const IntelligenceChatView = () => {
                   and update data.
                 </div>
               )}
-              <div ref={chatEndRef} />
+              <div />
             </div>
           )}
 
