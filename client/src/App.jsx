@@ -288,9 +288,9 @@ const App = () => {
       return;
     }
 
-    loadEmployees().catch(() => {});
-    loadCandidates().catch(() => {});
-    loadAnalyticsSnapshot().catch(() => {});
+    loadEmployees().catch(() => { });
+    loadCandidates().catch(() => { });
+    loadAnalyticsSnapshot().catch(() => { });
   }, [route, authLoading, isAuthenticated]);
 
   useEffect(() => {
@@ -342,622 +342,622 @@ const App = () => {
     content = <AuthScreen />;
   } else {
     content = (
-      <div className="flex h-screen bg-[#030712] text-slate-100 relative overflow-hidden selection:bg-cyan-500/30 antialiased">
-      {/* AMBIENT MESH LIGHT FLARES */}
-      <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-cyan-600/15 blur-[120px] pointer-events-none z-0" />
-      <div className="absolute top-1/2 -right-40 h-96 w-96 rounded-full bg-emerald-600/10 blur-[140px] pointer-events-none z-0" />
-      <div className="absolute -bottom-40 left-1/3 h-96 w-96 rounded-full bg-blue-600/10 blur-[130px] pointer-events-none z-0" />
+      <div className="flex h-screen w-screen bg-[#030712] text-slate-100 relative overflow-hidden selection:bg-cyan-500/30 antialiased">
+        {/* AMBIENT MESH LIGHT FLARES */}
+        <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-cyan-600/15 blur-[120px] pointer-events-none z-0" />
+        <div className="absolute top-1/2 -right-40 h-96 w-96 rounded-full bg-emerald-600/10 blur-[140px] pointer-events-none z-0" />
+        <div className="absolute -bottom-40 left-1/3 h-96 w-96 rounded-full bg-blue-600/10 blur-[130px] pointer-events-none z-0" />
 
-      {/* DOTTED GRID BACKGROUND */}
-      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none z-0" />
+        {/* DOTTED GRID BACKGROUND */}
+        <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none z-0" />
 
-      <Toast
-        isVisible={toast.visible}
-        message={toast.message}
-        type={toast.type}
-        onClose={() => setToast((p) => ({ ...p, visible: false }))}
-      />
+        <Toast
+          isVisible={toast.visible}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast((p) => ({ ...p, visible: false }))}
+        />
 
-      <div className="relative z-20 flex w-full h-full p-1.5 md:p-2 gap-1.5 md:gap-2">
-        <motion.aside
-          initial={false}
-          animate={{ width: isSidebarCollapsed ? 64 : 220 }}
-          transition={{ duration: 0.3, ease: "circOut" }}
-          className="bg-[#0f1f33]/85 border border-white/10 flex flex-col h-full relative overflow-hidden shadow-2xl rounded-2xl"
-        >
-          <div
-            data-tauri-drag-region
-            className={`h-14 px-2 mb-2 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start"} cursor-move`}
+        <div className="relative z-20 flex flex-1 w-full min-h-0 p-0 gap-1.5 md:gap-2 overflow-hidden">
+          <motion.aside
+            initial={false}
+            animate={{ width: isSidebarCollapsed ? 64 : 220 }}
+            transition={{ duration: 0.3, ease: "circOut" }}
+            className="bg-slate-950/65 backdrop-blur-2xl border border-white/10 flex flex-col h-full relative overflow-hidden shadow-2xl rounded-2xl"
           >
-            <AurelinxLogo collapsed={isSidebarCollapsed} size={24} />
-          </div>
-
-          {!isSidebarCollapsed && (
-            <div className="px-3 pb-3">
-              <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">
-                  Signed In
-                </div>
-                <div className="mt-1 text-sm font-bold text-white truncate">
-                  {user?.full_name || "Workspace User"}
-                </div>
-                <div className="text-xs text-slate-400 truncate">
-                  {user?.email || "No email loaded"}
-                </div>
-                <button
-                  onClick={logout}
-                  className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-white/5 text-[11px] font-bold uppercase tracking-[0.15em] text-slate-200 hover:bg-white/10"
-                >
-                  Logout
-                </button>
-              </div>
-            </div>
-          )}
-
-          <nav
-            className={`flex-1 ${isSidebarCollapsed ? "px-1" : "px-2"} space-y-1`}
-          >
-            <SidebarItem
-              icon={<LayoutDashboard size={16} />}
-              label="Dashboard"
-              active={activeTab === "dashboard"}
-              collapsed={isSidebarCollapsed}
-              onClick={() => setActiveTab("dashboard")}
-            />
-            <SidebarItem
-              icon={<Users size={16} />}
-              label="Directory"
-              active={activeTab === "directory"}
-              collapsed={isSidebarCollapsed}
-              onClick={() => setActiveTab("directory")}
-            />
-            <SidebarItem
-              icon={<MessageSquare size={16} />}
-              label="Sentiment"
-              active={activeTab === "sentiment"}
-              collapsed={isSidebarCollapsed}
-              onClick={() => setActiveTab("sentiment")}
-            />
-            <SidebarItem
-              icon={<TrendingUp size={16} />}
-              label="Analytics"
-              active={activeTab === "analytics"}
-              collapsed={isSidebarCollapsed}
-              onClick={() => setActiveTab("analytics")}
-            />
-            <SidebarItem
-              icon={<Search size={16} />}
-              label="Scout"
-              active={activeTab === "scout"}
-              collapsed={isSidebarCollapsed}
-              onClick={() => setActiveTab("scout")}
-            />
-            <SidebarItem
-              icon={<Bot size={16} />}
-              label="Workflow"
-              active={activeTab === "intelligence"}
-              collapsed={isSidebarCollapsed}
-              onClick={() => setActiveTab("intelligence")}
-            />
-            <SidebarItem
-              icon={<Cpu size={16} />}
-              label="Intel Center"
-              active={activeTab === "intel-center"}
-              collapsed={isSidebarCollapsed}
-              onClick={() => setActiveTab("intel-center")}
-            />
-            <SidebarItem
-              icon={<Database size={16} />}
-              label="Data Ops"
-              active={activeTab === "enterprise"}
-              collapsed={isSidebarCollapsed}
-              onClick={() => setActiveTab("enterprise")}
-            />
-          </nav>
-
-          <div className={`${isSidebarCollapsed ? "px-1" : "px-2"} pb-1`}>
-            <SidebarItem
-              icon={<Settings size={16} />}
-              label="Settings"
-              active={activeTab === "providers"}
-              collapsed={isSidebarCollapsed}
-              onClick={() => setActiveTab("providers")}
-            />
-          </div>
-
-          <div className="mt-auto pb-2 text-center select-none pointer-events-none">
-            <span className="text-[10px] text-slate-500 font-mono tracking-wider">
-              {isSidebarCollapsed ? "v1.0.0" : "AURELINX v1.0.0"}
-            </span>
-          </div>
-
-          <div className={`${isSidebarCollapsed ? "px-1" : "px-2"} pb-2`}>
-            <button
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className={`${isSidebarCollapsed ? "h-11 w-11 mx-auto" : "h-10 w-full"} flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-200 hover:bg-white/10 transition-all`}
+            <div
+              data-tauri-drag-region
+              className={`h-14 px-2 mb-2 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start"} cursor-move`}
             >
-              {isSidebarCollapsed ? (
-                <PanelLeftOpen size={18} />
-              ) : (
-                <PanelLeftClose size={18} />
-              )}
-            </button>
-          </div>
-        </motion.aside>
+              <AurelinxLogo collapsed={isSidebarCollapsed} size={24} />
+            </div>
 
-        <main className="flex-1 h-full min-h-0 relative z-10 custom-scrollbar p-3 md:p-5 lg:p-6 overflow-y-auto">
-          <Suspense fallback={<LoadingScreen label={`Loading ${activeTab}`} />}>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-                className="h-full min-h-0 flex flex-col"
+            {!isSidebarCollapsed && (
+              <div className="px-3 pb-3">
+                <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">
+                    Signed In
+                  </div>
+                  <div className="mt-1 text-sm font-bold text-white truncate">
+                    {user?.full_name || "Workspace User"}
+                  </div>
+                  <div className="text-xs text-slate-400 truncate">
+                    {user?.email || "No email loaded"}
+                  </div>
+                  <button
+                    onClick={logout}
+                    className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-white/5 text-[11px] font-bold uppercase tracking-[0.15em] text-slate-200 hover:bg-white/10"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <nav
+              className={`flex-1 ${isSidebarCollapsed ? "px-1" : "px-2"} space-y-1`}
+            >
+              <SidebarItem
+                icon={<LayoutDashboard size={16} />}
+                label="Dashboard"
+                active={activeTab === "dashboard"}
+                collapsed={isSidebarCollapsed}
+                onClick={() => setActiveTab("dashboard")}
+              />
+              <SidebarItem
+                icon={<Users size={16} />}
+                label="Directory"
+                active={activeTab === "directory"}
+                collapsed={isSidebarCollapsed}
+                onClick={() => setActiveTab("directory")}
+              />
+              <SidebarItem
+                icon={<MessageSquare size={16} />}
+                label="Sentiment"
+                active={activeTab === "sentiment"}
+                collapsed={isSidebarCollapsed}
+                onClick={() => setActiveTab("sentiment")}
+              />
+              <SidebarItem
+                icon={<TrendingUp size={16} />}
+                label="Analytics"
+                active={activeTab === "analytics"}
+                collapsed={isSidebarCollapsed}
+                onClick={() => setActiveTab("analytics")}
+              />
+              <SidebarItem
+                icon={<Search size={16} />}
+                label="Scout"
+                active={activeTab === "scout"}
+                collapsed={isSidebarCollapsed}
+                onClick={() => setActiveTab("scout")}
+              />
+              <SidebarItem
+                icon={<Bot size={16} />}
+                label="Workflow"
+                active={activeTab === "intelligence"}
+                collapsed={isSidebarCollapsed}
+                onClick={() => setActiveTab("intelligence")}
+              />
+              <SidebarItem
+                icon={<Cpu size={16} />}
+                label="Intel Center"
+                active={activeTab === "intel-center"}
+                collapsed={isSidebarCollapsed}
+                onClick={() => setActiveTab("intel-center")}
+              />
+              <SidebarItem
+                icon={<Database size={16} />}
+                label="Data Ops"
+                active={activeTab === "enterprise"}
+                collapsed={isSidebarCollapsed}
+                onClick={() => setActiveTab("enterprise")}
+              />
+            </nav>
+
+            <div className={`${isSidebarCollapsed ? "px-1" : "px-2"} pb-1`}>
+              <SidebarItem
+                icon={<Settings size={16} />}
+                label="Settings"
+                active={activeTab === "providers"}
+                collapsed={isSidebarCollapsed}
+                onClick={() => setActiveTab("providers")}
+              />
+            </div>
+
+            <div className="mt-auto pb-2 text-center select-none pointer-events-none">
+              <span className="text-[10px] text-slate-500 font-mono tracking-wider">
+                {isSidebarCollapsed ? "v1.0.0" : "AURELINX v1.0.0"}
+              </span>
+            </div>
+
+            <div className={`${isSidebarCollapsed ? "px-1" : "px-2"} pb-2`}>
+              <button
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className={`${isSidebarCollapsed ? "h-11 w-11 mx-auto" : "h-10 w-full"} flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-200 hover:bg-white/10 transition-all`}
               >
-                {activeTab === "dashboard" && (
-                  <>
-                    <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
-                      <motion.div variants={itemVariants} className="text-left">
-                        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-white">
-                          Executive Dashboard
-                        </h1>
-                        <p className="text-slate-400 text-sm md:text-base leading-relaxed max-w-3xl">
-                          Strategic workforce oversight and operational
-                          intelligence.
-                        </p>
-                      </motion.div>
-                      <motion.div
-                        variants={itemVariants}
-                        className="flex gap-2"
-                      >
-                        <button
-                          onClick={() => {
-                            loadEmployees();
-                            loadAnalyticsSnapshot();
-                          }}
-                          className="px-4 py-2 rounded-lg border border-white/15 hover:bg-white/10 transition-all text-xs font-bold tracking-wide inline-flex items-center gap-2"
+                {isSidebarCollapsed ? (
+                  <PanelLeftOpen size={18} />
+                ) : (
+                  <PanelLeftClose size={18} />
+                )}
+              </button>
+            </div>
+          </motion.aside>
+
+          <main className={`flex-1 h-full min-h-0 relative z-10 custom-scrollbar ${activeTab === "intelligence" ? "p-0 overflow-hidden" : "p-3 md:p-5 lg:p-6 overflow-y-auto"}`}>
+            <Suspense fallback={<LoadingScreen label={`Loading ${activeTab}`} />}>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  className="h-full min-h-0 flex flex-col"
+                >
+                  {activeTab === "dashboard" && (
+                    <>
+                      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+                        <motion.div variants={itemVariants} className="text-left">
+                          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-white">
+                            Executive Dashboard
+                          </h1>
+                          <p className="text-slate-400 text-sm md:text-base leading-relaxed max-w-3xl">
+                            Strategic workforce oversight and operational
+                            intelligence.
+                          </p>
+                        </motion.div>
+                        <motion.div
+                          variants={itemVariants}
+                          className="flex gap-2"
                         >
-                          <RefreshCw size={14} /> Refresh
-                        </button>
-                        <div className="relative">
                           <button
-                            onClick={() => setExportMenuOpen((v) => !v)}
+                            onClick={() => {
+                              loadEmployees();
+                              loadAnalyticsSnapshot();
+                            }}
                             className="px-4 py-2 rounded-lg border border-white/15 hover:bg-white/10 transition-all text-xs font-bold tracking-wide inline-flex items-center gap-2"
                           >
-                            <Download size={14} /> Export{" "}
-                            <ChevronDown size={13} />
+                            <RefreshCw size={14} /> Refresh
                           </button>
-                          {exportMenuOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-white/10 bg-[#0f1f33] shadow-2xl overflow-hidden z-50">
-                              <button
-                                onClick={async () => {
-                                  setExportMenuOpen(false);
-                                  await exportCurrentReport("pdf");
-                                }}
-                                className="w-full px-4 py-3 text-left text-sm hover:bg-white/5 flex items-center gap-2"
-                              >
-                                <FileText size={14} /> Export PDF
-                              </button>
-                              <button
-                                onClick={async () => {
-                                  setExportMenuOpen(false);
-                                  await exportCurrentReport("excel");
-                                }}
-                                className="w-full px-4 py-3 text-left text-sm hover:bg-white/5 flex items-center gap-2"
-                              >
-                                <FileSpreadsheet size={14} /> Export Excel
-                              </button>
-                              <button
-                                onClick={async () => {
-                                  setExportMenuOpen(false);
-                                  await exportCurrentReport("markdown");
-                                }}
-                                className="w-full px-4 py-3 text-left text-sm hover:bg-white/5 flex items-center gap-2"
-                              >
-                                <FileText size={14} /> Export Markdown
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => navigate("/app", "enterprise")}
-                          className="px-4 py-2 rounded-lg border border-cyan-400/20 bg-cyan-500/10 hover:bg-cyan-500/15 transition-all text-xs font-bold tracking-wide inline-flex items-center gap-2 text-cyan-100"
-                        >
-                          <Upload size={14} /> Import Data
-                        </button>
-                      </motion.div>
-                    </header>
+                          <div className="relative">
+                            <button
+                              onClick={() => setExportMenuOpen((v) => !v)}
+                              className="px-4 py-2 rounded-lg border border-white/15 hover:bg-white/10 transition-all text-xs font-bold tracking-wide inline-flex items-center gap-2"
+                            >
+                              <Download size={14} /> Export{" "}
+                              <ChevronDown size={13} />
+                            </button>
+                            {exportMenuOpen && (
+                              <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-white/10 bg-[#0f1f33] shadow-2xl overflow-hidden z-50">
+                                <button
+                                  onClick={async () => {
+                                    setExportMenuOpen(false);
+                                    await exportCurrentReport("pdf");
+                                  }}
+                                  className="w-full px-4 py-3 text-left text-sm hover:bg-white/5 flex items-center gap-2"
+                                >
+                                  <FileText size={14} /> Export PDF
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    setExportMenuOpen(false);
+                                    await exportCurrentReport("excel");
+                                  }}
+                                  className="w-full px-4 py-3 text-left text-sm hover:bg-white/5 flex items-center gap-2"
+                                >
+                                  <FileSpreadsheet size={14} /> Export Excel
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    setExportMenuOpen(false);
+                                    await exportCurrentReport("markdown");
+                                  }}
+                                  className="w-full px-4 py-3 text-left text-sm hover:bg-white/5 flex items-center gap-2"
+                                >
+                                  <FileText size={14} /> Export Markdown
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => navigate("/app", "enterprise")}
+                            className="px-4 py-2 rounded-lg border border-cyan-400/20 bg-cyan-500/10 hover:bg-cyan-500/15 transition-all text-xs font-bold tracking-wide inline-flex items-center gap-2 text-cyan-100"
+                          >
+                            <Upload size={14} /> Import Data
+                          </button>
+                        </motion.div>
+                      </header>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 mb-8">
-                      <motion.div variants={itemVariants}>
-                        <StatCard
-                          title="Workforce"
-                          value={
-                            analyticsLoading ? "—" : analyticsSnapshot.total
-                          }
-                          delta="Enterprise total count"
-                          color="primary"
-                          icon={<Users size={16} />}
-                        />
-                      </motion.div>
-                      <motion.div variants={itemVariants}>
-                        <StatCard
-                          title="Candidates"
-                          value={candidates.length}
-                          delta="Imported candidate pool"
-                          color="accent"
-                          icon={<Search size={16} />}
-                        />
-                      </motion.div>
-                      <motion.div variants={itemVariants}>
-                        <StatCard
-                          title="Risk Cluster"
-                          value={
-                            analyticsLoading ? "—" : analyticsSnapshot.atRisk
-                          }
-                          delta={
-                            analyticsLoading
-                              ? "Loading snapshot"
-                              : `${analyticsSnapshot.atRiskPct}% needs review`
-                          }
-                          color="risk"
-                          icon={<TrendingUp size={16} />}
-                        />
-                      </motion.div>
-                      <motion.div variants={itemVariants}>
-                        <StatCard
-                          title="Avg Morale"
-                          value={
-                            analyticsLoading
-                              ? "—"
-                              : Number(
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 mb-8">
+                        <motion.div variants={itemVariants}>
+                          <StatCard
+                            title="Workforce"
+                            value={
+                              analyticsLoading ? "—" : analyticsSnapshot.total
+                            }
+                            delta="Enterprise total count"
+                            color="primary"
+                            icon={<Users size={16} />}
+                          />
+                        </motion.div>
+                        <motion.div variants={itemVariants}>
+                          <StatCard
+                            title="Candidates"
+                            value={candidates.length}
+                            delta="Imported candidate pool"
+                            color="accent"
+                            icon={<Search size={16} />}
+                          />
+                        </motion.div>
+                        <motion.div variants={itemVariants}>
+                          <StatCard
+                            title="Risk Cluster"
+                            value={
+                              analyticsLoading ? "—" : analyticsSnapshot.atRisk
+                            }
+                            delta={
+                              analyticsLoading
+                                ? "Loading snapshot"
+                                : `${analyticsSnapshot.atRiskPct}% needs review`
+                            }
+                            color="risk"
+                            icon={<TrendingUp size={16} />}
+                          />
+                        </motion.div>
+                        <motion.div variants={itemVariants}>
+                          <StatCard
+                            title="Avg Morale"
+                            value={
+                              analyticsLoading
+                                ? "—"
+                                : Number(
                                   analyticsSnapshot.avgSentiment || 0,
                                 ).toFixed(2)
-                          }
-                          delta="Model snapshot"
-                          color="accent"
-                          icon={<Activity size={16} />}
-                        />
-                      </motion.div>
-                    </div>
+                            }
+                            delta="Model snapshot"
+                            color="accent"
+                            icon={<Activity size={16} />}
+                          />
+                        </motion.div>
+                      </div>
 
-                    <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 mb-8">
-                      {(analyticsSnapshot.topRiskDrivers || []).map(
-                        (driver) => (
-                          <button
-                            key={driver.factor}
-                            onClick={() => openDriverDrilldown(driver.factor)}
-                            className="premium-card p-4 border border-rose-300/20 text-left hover:border-rose-300/50 transition-all"
-                          >
-                            <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400 mb-2">
-                              Top Risk Driver
-                            </div>
-                            <div className="text-sm font-bold text-white mb-1">
-                              {driver.factor}
-                            </div>
-                            <div className="text-2xl font-extrabold text-rose-300">
-                              {driver.count}
-                            </div>
-                          </button>
-                        ),
-                      )}
-                    </section>
-
-                    <section className="pb-10">
-                      <motion.div
-                        variants={itemVariants}
-                        className="flex items-center justify-between mb-4 border-b border-white/5 pb-3"
-                      >
-                        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
-                          Real-Time Talent Stream
-                        </h2>
-                        <button
-                          onClick={() => setActiveTab("directory")}
-                          className="text-xs text-cyan-300 hover:text-cyan-100 transition-all flex items-center gap-1 font-bold uppercase tracking-wide"
-                        >
-                          Full Directory <ChevronRight size={10} />
-                        </button>
-                      </motion.div>
-
-                      <div className="space-y-6">
-                        {employees.length === 0 && candidates.length > 0 && (
-                          <div className="premium-card p-4 border border-cyan-400/20 bg-cyan-500/5 text-cyan-50">
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-200/80 mb-1">
-                              Candidate dataset available
-                            </div>
-                            <div className="text-sm text-cyan-50/90">
-                              {candidates.length} candidate records are loaded.
-                              Open Directory or Talent Scout to browse them.
-                            </div>
-                          </div>
+                      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 mb-8">
+                        {(analyticsSnapshot.topRiskDrivers || []).map(
+                          (driver) => (
+                            <button
+                              key={driver.factor}
+                              onClick={() => openDriverDrilldown(driver.factor)}
+                              className="premium-card p-4 border border-rose-300/20 text-left hover:border-rose-300/50 transition-all"
+                            >
+                              <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400 mb-2">
+                                Top Risk Driver
+                              </div>
+                              <div className="text-sm font-bold text-white mb-1">
+                                {driver.factor}
+                              </div>
+                              <div className="text-2xl font-extrabold text-rose-300">
+                                {driver.count}
+                              </div>
+                            </button>
+                          ),
                         )}
-                        <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">
-                              Employees
-                            </h3>
-                            <span className="text-[10px] text-slate-500">
-                              {employees.length} loaded
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
-                            {loading && employees.length === 0 ? (
-                              Array.from({ length: 4 }).map((_, idx) => (
-                                <div
-                                  key={`employee-skel-${idx}`}
-                                  className="premium-card p-4 min-h-[180px] animate-pulse border border-white/10 bg-white/5"
-                                >
-                                  <div className="h-4 w-24 rounded bg-white/10 mb-3" />
-                                  <div className="h-3 w-40 rounded bg-white/10 mb-6" />
-                                  <div className="h-16 rounded bg-white/10" />
-                                </div>
-                              ))
-                            ) : employees.length > 0 ? (
-                              employees.slice(0, 6).map((emp) => (
-                                <motion.div
-                                  key={emp.id}
-                                  variants={itemVariants}
-                                >
-                                  <TalentCard
-                                    talent={emp}
-                                    onOpenProfile={() =>
-                                      openProfileDetails(emp)
-                                    }
-                                  />
-                                </motion.div>
-                              ))
-                            ) : (
-                              <div className="premium-card p-6 text-slate-300 flex items-center gap-3 md:col-span-3">
-                                <AlertTriangle size={18} /> No employee records
-                                imported yet. Candidate records are loaded
-                                separately below.
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                      </section>
 
-                        <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">
-                              Candidates
-                            </h3>
-                            <span className="text-[10px] text-slate-500">
-                              {candidates.length} loaded
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
-                            {loading && candidates.length === 0 ? (
-                              Array.from({ length: 4 }).map((_, idx) => (
-                                <div
-                                  key={`candidate-skel-${idx}`}
-                                  className="premium-card p-4 min-h-[180px] animate-pulse border border-white/10 bg-white/5"
-                                >
-                                  <div className="h-4 w-24 rounded bg-white/10 mb-3" />
-                                  <div className="h-3 w-40 rounded bg-white/10 mb-6" />
-                                  <div className="h-16 rounded bg-white/10" />
-                                </div>
-                              ))
-                            ) : candidates.length > 0 ? (
-                              candidates.slice(0, 6).map((cand) => (
-                                <motion.div
-                                  key={cand.id}
-                                  variants={itemVariants}
-                                >
-                                  <TalentCard
-                                    talent={cand}
-                                    onOpenProfile={() =>
-                                      openProfileDetails(cand)
-                                    }
-                                  />
-                                </motion.div>
-                              ))
-                            ) : (
-                              <div className="premium-card p-6 text-slate-300 flex items-center gap-3 md:col-span-3">
-                                <AlertTriangle size={18} /> No candidate records
-                                imported yet.
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </section>
-                  </>
-                )}
-                {activeTab === "directory" && (
-                  <DirectoryView onExport={exportCurrentReport} />
-                )}
-                {activeTab === "analytics" && <AnalyticsView />}
-                {activeTab === "scout" && <TalentScoutView />}
-                {activeTab === "intelligence" && (
-                  <div className="flex-1 h-full min-h-0 flex flex-col">
-                    <IntelligenceChatView />
-                  </div>
-                )}
-                {activeTab === "intel-center" && <IntelligenceCenterView />}
-                {activeTab === "sentiment" && <SentimentPulseView />}
-                {activeTab === "enterprise" && <EnterpriseOpsView />}
-                {activeTab === "providers" && <SettingsWorkspaceView />}
-              </motion.div>
-            </AnimatePresence>
-          </Suspense>
-        </main>
-      </div>
+                      <section className="pb-10">
+                        <motion.div
+                          variants={itemVariants}
+                          className="flex items-center justify-between mb-4 border-b border-white/5 pb-3"
+                        >
+                          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
+                            Real-Time Talent Stream
+                          </h2>
+                          <button
+                            onClick={() => setActiveTab("directory")}
+                            className="text-xs text-cyan-300 hover:text-cyan-100 transition-all flex items-center gap-1 font-bold uppercase tracking-wide"
+                          >
+                            Full Directory <ChevronRight size={10} />
+                          </button>
+                        </motion.div>
 
-      <AnimatePresence>
-        {driverModal.open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[260] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() =>
-              setDriverModal({ open: false, factor: "", items: [] })
-            }
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.98 }}
-              className="w-full max-w-3xl premium-card p-6 border border-white/15"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-xl font-extrabold mb-2">
-                {driverModal.factor} - Drilldown
-              </h3>
-              <p className="text-sm text-slate-300 mb-4">
-                Create interventions directly from evidence-backed at-risk
-                profiles.
-              </p>
-              <div className="max-h-[50vh] overflow-auto space-y-2">
-                {driverModal.items.map((item) => (
-                  <div
-                    key={item.employee_id}
-                    className="rounded-lg border border-white/10 bg-white/5 p-3"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-bold">{item.full_name}</div>
-                        <div className="text-xs text-slate-300">
-                          {item.role} | {item.department}
+                        <div className="space-y-6">
+                          {employees.length === 0 && candidates.length > 0 && (
+                            <div className="premium-card p-4 border border-cyan-400/20 bg-cyan-500/5 text-cyan-50">
+                              <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-200/80 mb-1">
+                                Candidate dataset available
+                              </div>
+                              <div className="text-sm text-cyan-50/90">
+                                {candidates.length} candidate records are loaded.
+                                Open Directory or Talent Scout to browse them.
+                              </div>
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <h3 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">
+                                Employees
+                              </h3>
+                              <span className="text-[10px] text-slate-500">
+                                {employees.length} loaded
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+                              {loading && employees.length === 0 ? (
+                                Array.from({ length: 4 }).map((_, idx) => (
+                                  <div
+                                    key={`employee-skel-${idx}`}
+                                    className="premium-card p-4 min-h-[180px] animate-pulse border border-white/10 bg-white/5"
+                                  >
+                                    <div className="h-4 w-24 rounded bg-white/10 mb-3" />
+                                    <div className="h-3 w-40 rounded bg-white/10 mb-6" />
+                                    <div className="h-16 rounded bg-white/10" />
+                                  </div>
+                                ))
+                              ) : employees.length > 0 ? (
+                                employees.slice(0, 6).map((emp) => (
+                                  <motion.div
+                                    key={emp.id}
+                                    variants={itemVariants}
+                                  >
+                                    <TalentCard
+                                      talent={emp}
+                                      onOpenProfile={() =>
+                                        openProfileDetails(emp)
+                                      }
+                                    />
+                                  </motion.div>
+                                ))
+                              ) : (
+                                <div className="premium-card p-6 text-slate-300 flex items-center gap-3 md:col-span-3">
+                                  <AlertTriangle size={18} /> No employee records
+                                  imported yet. Candidate records are loaded
+                                  separately below.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <h3 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">
+                                Candidates
+                              </h3>
+                              <span className="text-[10px] text-slate-500">
+                                {candidates.length} loaded
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+                              {loading && candidates.length === 0 ? (
+                                Array.from({ length: 4 }).map((_, idx) => (
+                                  <div
+                                    key={`candidate-skel-${idx}`}
+                                    className="premium-card p-4 min-h-[180px] animate-pulse border border-white/10 bg-white/5"
+                                  >
+                                    <div className="h-4 w-24 rounded bg-white/10 mb-3" />
+                                    <div className="h-3 w-40 rounded bg-white/10 mb-6" />
+                                    <div className="h-16 rounded bg-white/10" />
+                                  </div>
+                                ))
+                              ) : candidates.length > 0 ? (
+                                candidates.slice(0, 6).map((cand) => (
+                                  <motion.div
+                                    key={cand.id}
+                                    variants={itemVariants}
+                                  >
+                                    <TalentCard
+                                      talent={cand}
+                                      onOpenProfile={() =>
+                                        openProfileDetails(cand)
+                                      }
+                                    />
+                                  </motion.div>
+                                ))
+                              ) : (
+                                <div className="premium-card p-6 text-slate-300 flex items-center gap-3 md:col-span-3">
+                                  <AlertTriangle size={18} /> No candidate records
+                                  imported yet.
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-xs text-rose-300 mt-1">
-                          Risk {(item.risk_probability * 100).toFixed(1)}% |{" "}
-                          {item.evidence}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() =>
-                          createInterventionFromDriver(item, driverModal.factor)
-                        }
-                        className="h-8 px-3 rounded border border-white/15 hover:bg-white/10 text-xs font-bold"
-                      >
-                        Create Action
-                      </button>
+                      </section>
+                    </>
+                  )}
+                  {activeTab === "directory" && (
+                    <DirectoryView onExport={exportCurrentReport} />
+                  )}
+                  {activeTab === "analytics" && <AnalyticsView />}
+                  {activeTab === "scout" && <TalentScoutView />}
+                  {activeTab === "intelligence" && (
+                    <div className="flex-1 h-full min-h-0 flex flex-col">
+                      <IntelligenceChatView />
                     </div>
-                  </div>
-                ))}
-                {!driverModal.items.length && (
-                  <div className="text-sm text-slate-400">
-                    No impacted employees found.
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-        {selectedProfile && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setSelectedProfile(null)}
-          >
+                  )}
+                  {activeTab === "intel-center" && <IntelligenceCenterView />}
+                  {activeTab === "sentiment" && <SentimentPulseView />}
+                  {activeTab === "enterprise" && <EnterpriseOpsView />}
+                  {activeTab === "providers" && <SettingsWorkspaceView />}
+                </motion.div>
+              </AnimatePresence>
+            </Suspense>
+          </main>
+        </div>
+
+        <AnimatePresence>
+          {driverModal.open && (
             <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.98 }}
-              className="w-full max-w-2xl premium-card p-6 md:p-8 border border-white/15"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[260] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() =>
+                setDriverModal({ open: false, factor: "", items: [] })
+              }
             >
-              <h3 className="text-2xl font-extrabold mb-2">
-                {selectedProfile.full_name}
-              </h3>
-              <p className="text-slate-300 mb-6">
-                {selectedProfile.role} - {selectedProfile.department}
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-6">
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
-                    Email
-                  </div>
-                  <div>{selectedProfile.email || "N/A"}</div>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
-                    Retention
-                  </div>
-                  <div>
-                    {selectedProfile.retention_prob
-                      ? `${(selectedProfile.retention_prob * 100).toFixed(1)}%`
-                      : "N/A"}
-                  </div>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
-                    Sentiment
-                  </div>
-                  <div>{selectedProfile.sentiment_score ?? "N/A"}</div>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
-                    Risk
-                  </div>
-                  <div>
-                    {selectedProfile.is_at_risk
-                      ? "High Attrition Risk"
-                      : "Optimal Retention"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">
-                  Skills
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(selectedProfile.skills || [])
-                    .slice(0, 12)
-                    .map((skill, idx) => (
-                      <span
-                        key={`${skill.name}-${idx}`}
-                        className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs"
-                      >
-                        {skill.name} (L{skill.level})
-                      </span>
-                    ))}
-                  {(!selectedProfile.skills ||
-                    selectedProfile.skills.length === 0) && (
-                    <span className="text-slate-400 text-sm">
-                      No skills found.
-                    </span>
+              <motion.div
+                initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                className="w-full max-w-3xl premium-card p-6 border border-white/15"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-xl font-extrabold mb-2">
+                  {driverModal.factor} - Drilldown
+                </h3>
+                <p className="text-sm text-slate-300 mb-4">
+                  Create interventions directly from evidence-backed at-risk
+                  profiles.
+                </p>
+                <div className="max-h-[50vh] overflow-auto space-y-2">
+                  {driverModal.items.map((item) => (
+                    <div
+                      key={item.employee_id}
+                      className="rounded-lg border border-white/10 bg-white/5 p-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-bold">{item.full_name}</div>
+                          <div className="text-xs text-slate-300">
+                            {item.role} | {item.department}
+                          </div>
+                          <div className="text-xs text-rose-300 mt-1">
+                            Risk {(item.risk_probability * 100).toFixed(1)}% |{" "}
+                            {item.evidence}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            createInterventionFromDriver(item, driverModal.factor)
+                          }
+                          className="h-8 px-3 rounded border border-white/15 hover:bg-white/10 text-xs font-bold"
+                        >
+                          Create Action
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {!driverModal.items.length && (
+                    <div className="text-sm text-slate-400">
+                      No impacted employees found.
+                    </div>
                   )}
                 </div>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setSelectedProfile(null)}
-                  className="h-10 px-4 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm"
-                >
-                  Close
-                </button>
-              </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-        {selectedProfileLoading && !selectedProfile && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-          >
-            <div className="w-full max-w-md premium-card p-6 md:p-8 border border-white/15 flex items-center gap-3">
-              <Loader2 className="animate-spin text-cyan-300" size={20} />
-              <div>
-                <div className="font-bold text-white">Loading profile</div>
-                <div className="text-sm text-slate-400">
-                  Fetching skills and experience from Postgres...
+          )}
+          {selectedProfile && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setSelectedProfile(null)}
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                className="w-full max-w-2xl premium-card p-6 md:p-8 border border-white/15"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-2xl font-extrabold mb-2">
+                  {selectedProfile.full_name}
+                </h3>
+                <p className="text-slate-300 mb-6">
+                  {selectedProfile.role} - {selectedProfile.department}
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-6">
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
+                      Email
+                    </div>
+                    <div>{selectedProfile.email || "N/A"}</div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
+                      Retention
+                    </div>
+                    <div>
+                      {selectedProfile.retention_prob
+                        ? `${(selectedProfile.retention_prob * 100).toFixed(1)}%`
+                        : "N/A"}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
+                      Sentiment
+                    </div>
+                    <div>{selectedProfile.sentiment_score ?? "N/A"}</div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
+                      Risk
+                    </div>
+                    <div>
+                      {selectedProfile.is_at_risk
+                        ? "High Attrition Risk"
+                        : "Optimal Retention"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">
+                    Skills
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(selectedProfile.skills || [])
+                      .slice(0, 12)
+                      .map((skill, idx) => (
+                        <span
+                          key={`${skill.name}-${idx}`}
+                          className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs"
+                        >
+                          {skill.name} (L{skill.level})
+                        </span>
+                      ))}
+                    {(!selectedProfile.skills ||
+                      selectedProfile.skills.length === 0) && (
+                        <span className="text-slate-400 text-sm">
+                          No skills found.
+                        </span>
+                      )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setSelectedProfile(null)}
+                    className="h-10 px-4 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm"
+                  >
+                    Close
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+          {selectedProfileLoading && !selectedProfile && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            >
+              <div className="w-full max-w-md premium-card p-6 md:p-8 border border-white/15 flex items-center gap-3">
+                <Loader2 className="animate-spin text-cyan-300" size={20} />
+                <div>
+                  <div className="font-bold text-white">Loading profile</div>
+                  <div className="text-sm text-slate-400">
+                    Fetching skills and experience from Postgres...
+                  </div>
                 </div>
               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     );
   }
 
@@ -981,11 +981,10 @@ const SidebarItem = ({
   <motion.button
     onClick={onClick}
     whileTap={{ scale: 0.98 }}
-    className={`w-full flex items-center transition-all duration-200 group relative ${
-      collapsed
-        ? "h-11 w-11 mx-auto justify-center rounded-xl"
-        : "gap-3 px-3 py-2 rounded-lg"
-    } ${active ? "bg-primary/15 text-primary border border-primary/40 shadow-[0_0_0_1px_rgba(45,212,191,0.35)]" : "text-slate-400 hover:bg-white/8 hover:text-slate-100"}`}
+    className={`w-full flex items-center transition-all duration-200 group relative ${collapsed
+      ? "h-11 w-11 mx-auto justify-center rounded-xl"
+      : "gap-3 px-3 py-2 rounded-lg"
+      } ${active ? "bg-primary/15 text-primary border border-primary/40 shadow-[0_0_0_1px_rgba(45,212,191,0.35)]" : "text-slate-400 hover:bg-white/8 hover:text-slate-100"}`}
   >
     {active && !collapsed && (
       <motion.div
