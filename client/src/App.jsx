@@ -342,7 +342,7 @@ const App = () => {
     content = <AuthScreen />;
   } else {
     content = (
-      <div className="flex flex-col h-dvh w-screen bg-[#030712] text-slate-100 relative overflow-hidden selection:bg-cyan-500/30 antialiased">
+      <div className="flex flex-col h-screen w-screen bg-[#030712] text-slate-100 relative overflow-hidden selection:bg-cyan-500/30 antialiased">
       {/* AMBIENT MESH LIGHT FLARES */}
       <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-cyan-600/15 blur-[120px] pointer-events-none z-0" />
       <div className="absolute top-1/2 -right-40 h-96 w-96 rounded-full bg-emerald-600/10 blur-[140px] pointer-events-none z-0" />
