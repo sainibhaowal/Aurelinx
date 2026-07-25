@@ -1239,9 +1239,9 @@ const IntelligenceChatView = () => {
   };
 
   return (
-    <div className="relative w-full h-full min-h-0 flex flex-col">
+    <div className="relative flex w-full flex-1 min-h-0 flex-col overflow-hidden">
       <div
-        className={`premium-card p-4 flex flex-col h-full min-h-0 transition-[margin-right] duration-300 ${drawerOpen ? "mr-[356px]" : "mr-[76px]"}`}
+        className={`premium-card p-4 flex flex-1 flex-col min-h-0 pb-0 transition-[margin-right] duration-300 ${drawerOpen ? "mr-[356px]" : "mr-[76px]"}`}
       >
         <div className="flex items-center gap-3 mb-3">
           <div className="p-2 rounded-lg bg-primary/20 text-cyan-200">
@@ -1332,7 +1332,7 @@ const IntelligenceChatView = () => {
               </button>
             </div>
           ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1 pb-2">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
               {messages.map((m) => (
                 <div
                   key={m.id}
@@ -1448,7 +1448,6 @@ const IntelligenceChatView = () => {
                       sendMessage();
                     }
                   }}
-                  disabled={!selectedSession}
                 />
 
                 <button
