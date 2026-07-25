@@ -771,7 +771,7 @@ const App = () => {
                 {activeTab === "analytics" && <AnalyticsView />}
                 {activeTab === "scout" && <TalentScoutView />}
                 {activeTab === "intelligence" && (
-                  <div style={{height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column'}}>
+                  <div className="flex-1 h-full min-h-0 flex flex-col">
                     <IntelligenceChatView />
                   </div>
                 )}
