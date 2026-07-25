@@ -42,11 +42,7 @@
 }
 
 @layer components {
-  /* Premium Glass Cards */
-  .premium-card {
-    @apply bg-slate-950/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-6 transition-all duration-300 shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)];
-  }
-
+  /* Premium Glass Cards - defined in index.css */
   .premium-card-hover {
     @apply hover:border-primary/30 hover:bg-slate-950/60 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_-12px_rgba(99,102,241,0.15)] transition-all duration-300;
   }

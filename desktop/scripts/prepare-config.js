@@ -226,10 +226,14 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     #app-frame {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       border: none;
-      display: none;
+      display: block;
+      visibility: hidden;
+      pointer-events: none;
       background: var(--bg-color);
       opacity: 0;
       transition: opacity 0.5s ease;
@@ -540,7 +544,8 @@ const htmlContent = `<!DOCTYPE html>
         gatewayCard.style.opacity = '0';
         setTimeout(() => {
           gatewayCard.style.display = 'none';
-          frame.style.display = 'block';
+          frame.style.visibility = 'visible';
+          frame.style.pointerEvents = 'auto';
           setTimeout(() => {
             frame.style.opacity = '1';
           }, 50);
@@ -587,7 +592,8 @@ const htmlContent = `<!DOCTYPE html>
       document.getElementById('loader').style.display = 'block';
       gatewayCard.style.display = 'block';
       gatewayCard.style.opacity = '1';
-      frame.style.display = 'none';
+      frame.style.visibility = 'hidden';
+      frame.style.pointerEvents = 'none';
       frame.style.opacity = '0';
       frame.src = "about:blank";
       
