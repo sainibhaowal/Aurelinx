@@ -1332,156 +1332,151 @@ const IntelligenceChatView = () => {
               </button>
             </div>
           ) : (
-            <div className="flex flex-col flex-1 min-h-0">
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1 pb-2">
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`min-w-0 ${m.role === "user" ? "ml-16 rounded-2xl p-4 bg-primary/10 border border-primary/30" : "mr-4 py-2"}`}
-                  >
-                    {m.role === "user" && (
-                      <div className="text-[10px] uppercase tracking-[0.12em] text-slate-400 mb-1.5">You</div>
-                    )}
-                    {m.role === "assistant" ? (
-                      <div className="min-w-0">
-                        {m.workflow_events?.length > 0 && (
-                          <div className="mt-2 pt-2">
-                            <AgenticStepTracker steps={m.workflow_events} onApproval={resolveApproval} />
-                          </div>
-                        )}
-                        <ThinkingMessageContent
-                          text={m.content || ""}
-                          isBusy={false}
-                        />
-                      </div>
-                    ) : (
-                      <div className="text-sm whitespace-pre-wrap">{m.content}</div>
-                    )}
-                  </div>
-                ))}
-                {busy && (
-                  <div className="mr-4 py-2">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1 pb-2">
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`min-w-0 ${m.role === "user" ? "ml-16 rounded-2xl p-4 bg-primary/10 border border-primary/30" : "mr-4 py-2"}`}
+                >
+                  {m.role === "user" && (
+                    <div className="text-[10px] uppercase tracking-[0.12em] text-slate-400 mb-1.5">You</div>
+                  )}
+                  {m.role === "assistant" ? (
                     <div className="min-w-0">
-                      <div className="mt-2 pt-2">
-                        <AgenticStepTracker phase={streamPhase} steps={agentSteps} onApproval={resolveApproval} />
-                      </div>
-                      {streamText && (
-                        <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-cyan-400/70">
-                          <span>Live answer</span>
-                          <span>{streamText.length} characters received</span>
+                      {m.workflow_events?.length > 0 && (
+                        <div className="mt-2 pt-2">
+                          <AgenticStepTracker steps={m.workflow_events} onApproval={resolveApproval} />
                         </div>
                       )}
-                      <div className="text-sm">
-                        <ThinkingMessageContent text={streamText} isBusy={busy} />
+                      <ThinkingMessageContent
+                        text={m.content || ""}
+                        isBusy={false}
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-sm whitespace-pre-wrap">{m.content}</div>
+                  )}
+                </div>
+              ))}
+              {busy && (
+                <div className="mr-4 py-2">
+                  <div className="min-w-0">
+                    <div className="mt-2 pt-2">
+                      <AgenticStepTracker phase={streamPhase} steps={agentSteps} onApproval={resolveApproval} />
+                    </div>
+                    {streamText && (
+                      <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-cyan-400/70">
+                        <span>Live answer</span>
+                        <span>{streamText.length} characters received</span>
                       </div>
+                    )}
+                    <div className="text-sm">
+                      <ThinkingMessageContent text={streamText} isBusy={busy} />
                     </div>
                   </div>
-                )}
-                {!messages.length && (
-                  <div className="text-sm text-slate-400">
-                    Start a chat session and ask Aurelinx to search, analyze,
-                    and update data.
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-
-              <div className="pt-2 border-t border-white/5 pb-0 flex-shrink-0">
-                {attachments.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-2">
-                    {attachments.map((a) => (
-                      <span
-                        key={a.id}
-                        className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-white/10 bg-white/5"
-                      >
-                        {a.original_name}
-                        <span
-                          className={`ml-1 px-1.5 py-0.5 rounded text-[10px] uppercase ${
-                            a.parsing_status === "parsed"
-                              ? "bg-emerald-500/20 text-emerald-300"
-                              : a.parsing_status === "failed"
-                                ? "bg-rose-500/20 text-rose-300"
-                                : "bg-amber-500/20 text-amber-300"
-                          }`}
-                        >
-                          {a.parsing_status}
-                        </span>
-                        <button
-                          onClick={() => removeAttachment(a.id)}
-                          className="text-rose-300 hover:text-rose-200"
-                        >
-                          <X size={11} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div className="relative z-10">
-                  {/* Pulsing glow background when AI is streaming */}
-                  {busy && (
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-teal-400/20 via-cyan-500/25 to-indigo-500/20 blur-md -z-10 animate-pulse pointer-events-none" />
-                  )}
-
-                  <div
-                    className={`flex items-center gap-3 px-3 py-2 rounded-2xl bg-[#081220]/95 border transition-all duration-500 ${
-                      busy
-                        ? "border-cyan-400/40 shadow-[0_0_20px_rgba(45,212,191,0.2)]"
-                        : "border-white/10 focus-within:border-primary/50 focus-within:shadow-[0_0_15px_rgba(45,212,191,0.12)]"
-                    }`}
-                  >
-                    {/* Vector Attachment Button */}
-                    <label className="h-9 w-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 flex items-center justify-center cursor-pointer transition-all duration-200 flex-shrink-0">
-                      <Paperclip size={18} />
-                      <input
-                        type="file"
-                        className="hidden"
-                        onChange={uploadFile}
-                      />
-                    </label>
-
-                    {/* Seamless Borderless Input */}
-                    <textarea
-                      className="flex-1 bg-transparent border-0 outline-none focus:ring-0 text-slate-100 placeholder:text-slate-500 text-sm py-2 resize-none h-9 max-h-28 overflow-y-auto leading-relaxed custom-scrollbar"
-                      placeholder="Ask Aurelinx to analyze, search, update employee data, or drive workflows..."
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          sendMessage();
-                        }
-                      }}
-                    />
-
-                    {/* Vector Send / Stop Action Button */}
-                    <button
-                      onClick={busy ? cancelStream : sendMessage}
-                      disabled={!busy && (!input.trim() || !selectedSession)}
-                      className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-300 flex-shrink-0 cursor-pointer ${
-                        busy
-                          ? "bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500/35 hover:scale-105 active:scale-95 shadow-[0_0_12px_rgba(239,68,68,0.2)]"
-                          : "bg-gradient-to-r from-teal-400 to-cyan-400 hover:from-teal-300 hover:to-cyan-300 text-slate-950 hover:scale-105 active:scale-95 shadow-[0_0_15px_rgba(45,212,191,0.25)] disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none"
-                      }`}
-                      title={busy ? "Stop stream" : "Send message"}
-                    >
-                      {busy ? (
-                        <Square
-                          size={13}
-                          fill="currentColor"
-                          className="animate-pulse"
-                        />
-                      ) : (
-                        <Send
-                          size={15}
-                          fill="none"
-                          strokeWidth={2.5}
-                          className="mr-0.5"
-                        />
-                      )}
-                    </button>
-                  </div>
                 </div>
+              )}
+              {!messages.length && (
+                <div className="text-sm text-slate-400">
+                  Start a chat session and ask Aurelinx to search, analyze,
+                  and update data.
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+          )}
 
+          {sessions.length > 0 && (
+            <div className="pt-2 border-t border-white/5 pb-0 flex-shrink-0">
+              {attachments.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {attachments.map((a) => (
+                    <span
+                      key={a.id}
+                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-white/10 bg-white/5"
+                    >
+                      {a.original_name}
+                      <span
+                        className={`ml-1 px-1.5 py-0.5 rounded text-[10px] uppercase ${
+                          a.parsing_status === "parsed"
+                            ? "bg-emerald-500/20 text-emerald-300"
+                            : a.parsing_status === "failed"
+                              ? "bg-rose-500/20 text-rose-300"
+                              : "bg-amber-500/20 text-amber-300"
+                        }`}
+                      >
+                        {a.parsing_status}
+                      </span>
+                      <button
+                        onClick={() => removeAttachment(a.id)}
+                        className="text-rose-300 hover:text-rose-200"
+                      >
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="relative z-10">
+                {busy && (
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-teal-400/20 via-cyan-500/25 to-indigo-500/20 blur-md -z-10 animate-pulse pointer-events-none" />
+                )}
+
+                <div
+                  className={`flex items-center gap-3 px-3 py-2 rounded-2xl bg-[#081220]/95 border transition-all duration-500 ${
+                    busy
+                      ? "border-cyan-400/40 shadow-[0_0_20px_rgba(45,212,191,0.2)]"
+                      : "border-white/10 focus-within:border-primary/50 focus-within:shadow-[0_0_15px_rgba(45,212,191,0.12)]"
+                  }`}
+                >
+                  <label className="h-9 w-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 flex items-center justify-center cursor-pointer transition-all duration-200 flex-shrink-0">
+                    <Paperclip size={18} />
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={uploadFile}
+                    />
+                  </label>
+
+                  <textarea
+                    className="flex-1 bg-transparent border-0 outline-none focus:ring-0 text-slate-100 placeholder:text-slate-500 text-sm py-2 resize-none h-9 max-h-28 overflow-y-auto leading-relaxed custom-scrollbar"
+                    placeholder="Ask Aurelinx to analyze, search, update employee data, or drive workflows..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                      }
+                    }}
+                  />
+
+                  <button
+                    onClick={busy ? cancelStream : sendMessage}
+                    disabled={!busy && (!input.trim() || !selectedSession)}
+                    className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-300 flex-shrink-0 cursor-pointer ${
+                      busy
+                        ? "bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500/35 hover:scale-105 active:scale-95 shadow-[0_0_12px_rgba(239,68,68,0.2)]"
+                        : "bg-gradient-to-r from-teal-400 to-cyan-400 hover:from-teal-300 hover:to-cyan-300 text-slate-950 hover:scale-105 active:scale-95 shadow-[0_0_15px_rgba(45,212,191,0.25)] disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none"
+                    }`}
+                    title={busy ? "Stop stream" : "Send message"}
+                  >
+                    {busy ? (
+                      <Square
+                        size={13}
+                        fill="currentColor"
+                        className="animate-pulse"
+                      />
+                    ) : (
+                      <Send
+                        size={15}
+                        fill="none"
+                        strokeWidth={2.5}
+                        className="mr-0.5"
+                      />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}
