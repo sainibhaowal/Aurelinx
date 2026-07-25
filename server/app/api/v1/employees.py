@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 from uuid import UUID
 from typing import List
+from datetime import datetime
 
 from app.schemas.schemas import (
     EmployeeCreate,
@@ -40,6 +41,8 @@ def get_employee_out(emp: EmployeeTable, session: Session) -> EmployeeOut:
         sentiment_score=emp.sentiment_score,
         is_at_risk=emp.is_at_risk,
         retention_prob=emp.retention_prob,
+        salary=emp.salary,
+        join_date=emp.join_date,
         skills=[
             SkillOut(id=s.id, name=s.name, level=s.level, created_at=s.created_at)
             for s in skills
@@ -122,6 +125,8 @@ async def create_employee(
         department=employee_data.department,
         role=employee_data.role,
         sentiment_score=employee_data.sentiment_score or 0.5,
+        salary=employee_data.salary,
+        join_date=employee_data.join_date or datetime.utcnow(),
     )
 
     session.add(employee)

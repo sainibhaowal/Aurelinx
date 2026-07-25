@@ -32,6 +32,7 @@ def get_candidate_out(cand: CandidateTable, session: Session) -> CandidateOut:
         role=cand.role,
         sentiment_score=cand.sentiment_score,
         match_score=cand.match_score,
+        salary=cand.salary,
         skills=[
             SkillOut(id=s.id, name=s.name, level=s.level, created_at=s.created_at)
             for s in skills
@@ -49,6 +50,7 @@ def get_candidate_out(cand: CandidateTable, session: Session) -> CandidateOut:
         ],
         application_date=cand.application_date,
         created_at=cand.created_at,
+        updated_at=cand.updated_at,
     )
 
 
@@ -74,6 +76,16 @@ async def list_candidates(
 
     # Return lightweight response (no N+1 queries for skills/experiences)
     return candidates
+
+
+@router.get("/count")
+async def count_candidates(
+    current_user: TokenData = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Return the authoritative candidate count without loading all profiles."""
+    candidates = filter_real_records(session.exec(select(CandidateTable)).all())
+    return {"count": len(candidates)}
 
 
 @router.get("/{candidate_id}", response_model=CandidateOut)

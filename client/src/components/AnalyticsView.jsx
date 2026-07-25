@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { PieChart, TrendingUp, Target, Loader2, Radio } from "lucide-react";
 import { UserManualButton } from "./UserManual";
 import { analysisAPI } from "../services/apiClient";
+import { employeesAPI, candidatesAPI, enterpriseAPI } from "../services/apiClient";
 import { useAuth } from "../contexts/AuthContext";
 
 const AnalyticsView = () => {
@@ -21,6 +22,84 @@ const AnalyticsView = () => {
   const [loading, setLoading] = useState(true);
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamError, setStreamError] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [candidateCount, setCandidateCount] = useState(null);
+  const [candidateRecords, setCandidateRecords] = useState([]);
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [riskOnly, setRiskOnly] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState(null);
+  const [trend, setTrend] = useState([]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    let active = true;
+    const allCandidateRows = candidatesAPI.list(0, 10000).then(async (rows) => rows.length === 10000 ? [...rows, ...(await candidatesAPI.list(10000, 10000))] : rows);
+    Promise.all([employeesAPI.list(0, 10000), candidatesAPI.count(), allCandidateRows])
+      .then(([employeeRows, candidateTotal, candidateRows]) => {
+        if (!active) return;
+        setEmployees(employeeRows || []);
+        setCandidateCount(candidateTotal?.count ?? null);
+        setCandidateRecords(candidateRows || []);
+      })
+      .catch((error) => console.error("Analytics context load failed", error));
+    return () => { active = false; };
+  }, [token]);
+
+  useEffect(() => {
+    if (!stats.timestamp) return;
+    const point = { timestamp: stats.timestamp, atRiskPct: stats.atRiskPct, avgSentiment: stats.avgSentiment };
+    setTrend((previous) => {
+      const next = [...previous.filter((item) => item.timestamp !== point.timestamp), point].slice(-24);
+      try { localStorage.setItem("aurelinx_analytics_trend_v1", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, [stats.timestamp]);
+
+  useEffect(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem("aurelinx_analytics_trend_v1") || "[]");
+      if (Array.isArray(cached)) setTrend(cached.slice(-24));
+    } catch {}
+  }, []);
+
+  const visibleEmployees = employees.filter((employee) =>
+    (!departmentFilter || employee.department === departmentFilter) &&
+    (!riskOnly || employee.is_at_risk),
+  );
+  const departments = [...new Set(employees.map((employee) => employee.department).filter(Boolean))].sort();
+  const riskEmployees = visibleEmployees.filter((employee) => employee.is_at_risk).sort((a, b) => Number(a.retention_prob ?? 0.5) - Number(b.retention_prob ?? 0.5));
+  const departmentRows = departments.map((department) => {
+    const rows = visibleEmployees.filter((employee) => employee.department === department);
+    const risk = rows.filter((employee) => employee.is_at_risk).length;
+    const sentiment = rows.length ? rows.reduce((sum, row) => sum + Number(row.sentiment_score || 0), 0) / rows.length : 0;
+    const retention = rows.length ? rows.reduce((sum, row) => sum + Number(row.retention_prob ?? 0.5), 0) / rows.length : 0;
+    return { department, total: rows.length, risk, sentiment, retention };
+  }).filter((row) => row.total > 0);
+  const activeDepartmentRows = selectedDepartment ? departmentRows.filter((row) => row.department === selectedDepartment) : departmentRows;
+  const candidateMatchValues = candidateRecords.map((candidate) => Number(candidate.match_score)).filter((score) => Number.isFinite(score));
+  const candidateAverageMatch = candidateMatchValues.length ? candidateMatchValues.reduce((sum, score) => sum + score, 0) / candidateMatchValues.length : null;
+  const candidateHighMatch = candidateMatchValues.filter((score) => score >= 0.7).length;
+
+  const exportAnalytics = async (format) => {
+    const { generateAurelinxReport } = await import("../utils/reportGenerator");
+    generateAurelinxReport({ employees: visibleEmployees, candidates: [] }, `Analytics export: ${visibleEmployees.length} employees; filters: ${departmentFilter || "all departments"}${riskOnly ? ", at-risk only" : ""}.`, format);
+  };
+
+  const createRiskIntervention = async (employee) => {
+    try {
+      await enterpriseAPI.createIntervention({
+        title: `Review retention risk for ${employee.full_name}`,
+        target_scope: "employee",
+        target_employee_id: employee.id,
+        target_department: employee.department,
+        priority: Number(employee.retention_prob ?? 0.5) < 0.4 ? "high" : "medium",
+        owner_name: "HRBP",
+        expected_impact: "Document a retention conversation and reassess the employee risk signals.",
+      });
+    } catch (error) {
+      console.error("Risk intervention creation failed", error);
+    }
+  };
 
   useEffect(() => {
     if (!token) {
@@ -136,23 +215,39 @@ const AnalyticsView = () => {
         <UserManualButton defaultTab="analytics" className="flex-none mt-2" />
       </header>
 
+      <div className="mb-8 flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+        <label className="flex min-w-[220px] flex-1 flex-col gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+          Department
+          <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="h-10 rounded-lg border border-white/10 bg-slate-950/70 px-3 text-sm normal-case tracking-normal text-slate-200 outline-none">
+            <option value="">All employee departments</option>
+            {departments.map((department) => <option key={department} value={department}>{department}</option>)}
+          </select>
+        </label>
+        <label className="flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/50 px-3 text-xs text-slate-300">
+          <input type="checkbox" checked={riskOnly} onChange={(event) => setRiskOnly(event.target.checked)} /> At-risk only
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {['pdf', 'excel', 'markdown'].map((format) => <button key={format} onClick={() => exportAnalytics(format)} disabled={!visibleEmployees.length} className="h-10 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-bold uppercase text-slate-200 disabled:opacity-40">{format === 'pdf' ? 'PDF' : format === 'excel' ? 'Excel' : 'Markdown'}</button>)}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
         <MetricCard
           title="Total Workforce"
-          value={stats.total}
-          delta="Live SSE stream"
+          value={visibleEmployees.length ? visibleEmployees.length : stats.total}
+          delta={departmentFilter || riskOnly ? "Filtered employee records" : "Live employee records"}
           color="primary"
         />
         <MetricCard
           title="At-Risk Employees"
-          value={stats.atRisk}
-          delta={`${stats.atRiskPct}% of workforce`}
+          value={visibleEmployees.length ? visibleEmployees.filter((employee) => employee.is_at_risk).length : stats.atRisk}
+          delta={`${visibleEmployees.length ? ((visibleEmployees.filter((employee) => employee.is_at_risk).length / visibleEmployees.length) * 100).toFixed(1) : stats.atRiskPct}% of view`}
           color="risk"
         />
         <MetricCard
-          title="Active Departments"
-          value={stats.depts.length}
-          delta="Current org structure"
+          title="Employee Departments"
+          value={departmentRows.length || stats.depts.length}
+          delta="Departments represented by employees"
           color="accent"
         />
       </div>
@@ -167,24 +262,24 @@ const AnalyticsView = () => {
           </div>
 
           <div className="space-y-6">
-            {stats.depts.map((dept) => (
-              <div key={dept.name} className="space-y-2">
+            {(departmentRows.length ? departmentRows : stats.depts.map((dept) => ({ department: dept.name, total: dept.count, risk: 0, sentiment: 0, retention: 0 }))).map((dept) => (
+              <button key={dept.department} onClick={() => setSelectedDepartment(dept.department)} className="block w-full space-y-2 text-left">
                 <div className="flex justify-between text-sm font-bold">
                   <span className="text-white/60 uppercase tracking-widest">
-                    {dept.name}
+                    {dept.department}
                   </span>
-                  <span className="text-white">{dept.count} Members</span>
+                  <span className="text-white">{dept.total} Members · {dept.risk} risk</span>
                 </div>
                 <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{
-                      width: `${stats.total > 0 ? (dept.count / stats.total) * 100 : 0}%`,
+                      width: `${(visibleEmployees.length || stats.total) > 0 ? (dept.total / (visibleEmployees.length || stats.total)) * 100 : 0}%`,
                     }}
                     className="h-full bg-primary"
                   />
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -193,7 +288,7 @@ const AnalyticsView = () => {
           <div className="flex items-center gap-3 mb-8">
             <Target className="text-risk" size={24} />
             <h3 className="text-xl font-bold uppercase tracking-tight">
-              Predictive Risk Vector
+              Current Risk Rate
             </h3>
           </div>
 
@@ -214,10 +309,41 @@ const AnalyticsView = () => {
 
           <div className="mt-8 pt-8 border-t border-white/5 text-sm text-white/50 leading-relaxed text-center uppercase tracking-wide font-bold">
             {stats.topRiskDepartment
-              ? `${stats.topRiskDepartment} currently has the highest risk concentration at ${stats.topRiskDepartmentRatio.toFixed(1)}%.`
+              ? `${stats.topRiskDepartment} currently has the highest recorded risk concentration at ${stats.topRiskDepartmentRatio.toFixed(1)}%. This is a rule-based ratio, not a validated predictive model.`
               : "No department-level risk concentration detected."}
           </div>
         </div>
+      </div>
+
+      <div className="mt-8 grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <section className="premium-card p-5">
+          <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Department drill-down</h3>
+          <div className="space-y-3">
+            {activeDepartmentRows.map((row) => <div key={row.department} className="rounded-lg border border-white/10 bg-white/[0.02] p-3"><div className="flex justify-between text-sm"><span className="font-bold text-white">{row.department}</span><button onClick={() => setSelectedDepartment(null)} className="text-[10px] text-cyan-300">Clear</button></div><div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-slate-400"><span>Employees <strong className="text-slate-200">{row.total}</strong></span><span>Risk <strong className="text-rose-300">{row.risk}</strong></span><span>Sentiment <strong className="text-cyan-200">{row.sentiment.toFixed(2)}</strong></span></div><div className="mt-2 text-[10px] text-slate-400">Average retention: <strong className="text-emerald-200">{(row.retention * 100).toFixed(1)}%</strong></div></div>)}
+          </div>
+        </section>
+        <section className="premium-card p-5">
+          <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Employee risk evidence</h3>
+          <div className="max-h-64 space-y-2 overflow-y-auto">{riskEmployees.slice(0, 25).map((employee) => <div key={employee.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-xs"><div className="min-w-0"><div className="truncate font-bold text-slate-200">{employee.full_name}</div><div className="truncate text-[10px] text-slate-500">{employee.department} · {employee.role}</div></div><div className="shrink-0 text-right text-[10px]"><div className="text-rose-300">Policy flag</div><div className="text-slate-400">Retention {(Number(employee.retention_prob ?? 0.5) * 100).toFixed(0)}%</div><button onClick={() => createRiskIntervention(employee)} className="mt-1 text-cyan-300 hover:text-cyan-100">Create review</button></div></div>)}{!riskEmployees.length && <p className="text-xs text-slate-500">No at-risk employees match the selected filters.</p>}</div>
+        </section>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <section className="premium-card p-5">
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Candidate and hiring context</h3>
+          <p className="text-sm text-slate-300"><strong className="text-cyan-200">{candidateCount ?? "—"}</strong> candidate records are tracked separately from the employee workforce.</p>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-400"><span>Average match <strong className="text-cyan-200">{candidateAverageMatch == null ? "—" : `${(candidateAverageMatch * 100).toFixed(1)}%`}</strong></span><span>High-match (≥70%) <strong className="text-emerald-200">{candidateHighMatch}</strong></span></div>
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">Candidate match scores, candidate sentiment, role, and department belong to Talent Scout and are not included in employee morale or risk totals. Hiring pipeline stages are not available in the current candidate schema, so no stage values are invented.</p>
+        </section>
+        <section className="premium-card p-5">
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Snapshot trend history</h3>
+          <p className="mb-3 text-[10px] text-slate-500">Only snapshots received by this workspace are shown; no historical values are invented.</p>
+          <div className="flex h-16 items-end gap-1">{trend.map((point) => <div key={point.timestamp} title={`${new Date(point.timestamp).toLocaleString()} · risk ${point.atRiskPct}%`} className="min-w-[4px] flex-1 rounded-t bg-rose-400/60" style={{ height: `${Math.max(8, Number(point.atRiskPct || 0) * 4)}%` }} />)}</div>
+        </section>
+      </div>
+
+      <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-[10px] leading-relaxed text-slate-500">
+        <strong className="text-slate-300">Data quality and provenance:</strong> metrics use the authenticated tenant's filtered employee records. Employee values are observed database fields; risk rate, department concentration, and risk level are derived calculations. Import validation, duplicate checks, and quarantine counts are available in Data Ops.
       </div>
     </div>
   );

@@ -67,6 +67,8 @@ const App = () => {
   const SNAPSHOT_CACHE_KEY = "aurelinx_dashboard_snapshot_cache";
   const [employees, setEmployees] = useState([]);
   const [candidates, setCandidates] = useState([]);
+  const [employeeTotal, setEmployeeTotal] = useState(null);
+  const [candidateTotal, setCandidateTotal] = useState(null);
   const [loading, setLoading] = useState(false);
   const defaultWorkspaceTab = "dashboard";
   const [route, setRoute] = useState(() => {
@@ -155,10 +157,10 @@ const App = () => {
 
   const loadEmployees = () => {
     if (employees.length === 0) setLoading(true);
-    return employeesAPI
-      .list(0, 12)
-      .then((data) => {
+    return Promise.all([employeesAPI.list(0, 12), employeesAPI.count()])
+      .then(([data, count]) => {
         setEmployees(data);
+        setEmployeeTotal(Number(count?.count ?? data.length));
         localStorage.setItem(EMPLOYEE_CACHE_KEY, JSON.stringify(data));
         setLoading(false);
         return data;
@@ -174,10 +176,10 @@ const App = () => {
 
   const loadCandidates = () => {
     if (candidates.length === 0) setLoading(true);
-    return candidatesAPI
-      .list(0, 12)
-      .then((data) => {
+    return Promise.all([candidatesAPI.list(0, 12), candidatesAPI.count()])
+      .then(([data, count]) => {
         setCandidates(data);
+        setCandidateTotal(Number(count?.count ?? data.length));
         localStorage.setItem(CANDIDATE_CACHE_KEY, JSON.stringify(data));
         setLoading(false);
         return data;
@@ -245,15 +247,24 @@ const App = () => {
   };
 
   const exportCurrentReport = async (format = "pdf") => {
-    const primaryRecords = employees.length > 0 ? employees : candidates;
-    const atRisk = primaryRecords.filter((e) => e.is_at_risk).length;
-    const ratio =
-      primaryRecords.length > 0
-        ? ((atRisk / primaryRecords.length) * 100).toFixed(1)
-        : "0.0";
-    const summary = `Aurelinx: ${employees.length} employees, ${candidates.length} candidates, Risk ${ratio}%.`;
+    const loadAllRecords = async (listFn) => {
+      const pageSize = 10000;
+      const first = await listFn(0, pageSize);
+      if (!Array.isArray(first) || first.length < pageSize) return first || [];
+      const second = await listFn(pageSize, pageSize);
+      return [...first, ...(second || [])];
+    };
+    const [allEmployees, allCandidates] = await Promise.all([
+      loadAllRecords(employeesAPI.list),
+      loadAllRecords(candidatesAPI.list),
+    ]);
+    const atRisk = allEmployees.filter((e) => e.is_at_risk).length;
+    const ratio = allEmployees.length
+      ? ((atRisk / allEmployees.length) * 100).toFixed(1)
+      : "0.0";
+    const summary = `Aurelinx full database export: ${allEmployees.length} employees, ${allCandidates.length} candidates, ${atRisk} policy risk flags (${ratio}%).`;
     const { generateAurelinxReport } = await import("./utils/reportGenerator");
-    generateAurelinxReport(primaryRecords, summary, format);
+    generateAurelinxReport({ employees: allEmployees, candidates: allCandidates }, summary, format);
     showToast(`Exported ${String(format).toUpperCase()}`, "success");
   };
 
@@ -496,7 +507,7 @@ const App = () => {
                   initial="hidden"
                   animate="visible"
                   exit="hidden"
-                  className="relative h-full min-h-0 flex flex-col"
+                  className={`relative min-h-0 flex flex-col ${activeTab === "intelligence" ? "h-full" : "h-auto"}`}
                 >
                   {activeTab === "dashboard" && (
                     <>
@@ -572,79 +583,100 @@ const App = () => {
                         </motion.div>
                       </header>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 mb-8">
-                        <motion.div variants={itemVariants}>
-                          <StatCard
-                            title="Workforce"
-                            value={
-                              analyticsLoading ? "—" : analyticsSnapshot.total
-                            }
-                            delta="Enterprise total count"
-                            color="primary"
-                            icon={<Users size={16} />}
-                          />
-                        </motion.div>
-                        <motion.div variants={itemVariants}>
-                          <StatCard
-                            title="Candidates"
-                            value={candidates.length}
-                            delta="Imported candidate pool"
-                            color="accent"
-                            icon={<Search size={16} />}
-                          />
-                        </motion.div>
-                        <motion.div variants={itemVariants}>
-                          <StatCard
-                            title="Risk Cluster"
-                            value={
-                              analyticsLoading ? "—" : analyticsSnapshot.atRisk
-                            }
-                            delta={
-                              analyticsLoading
-                                ? "Loading snapshot"
-                                : `${analyticsSnapshot.atRiskPct}% needs review`
-                            }
-                            color="risk"
-                            icon={<TrendingUp size={16} />}
-                          />
-                        </motion.div>
-                        <motion.div variants={itemVariants}>
-                          <StatCard
-                            title="Avg Morale"
-                            value={
-                              analyticsLoading
-                                ? "—"
-                                : Number(
-                                  analyticsSnapshot.avgSentiment || 0,
-                                ).toFixed(2)
-                            }
-                            delta="Model snapshot"
-                            color="accent"
-                            icon={<Activity size={16} />}
-                          />
-                        </motion.div>
-                      </div>
+                      <section className="dashboard-hero mb-10" aria-label="Current workforce snapshot">
+                        <div className="dashboard-hero-copy">
+                          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-cyan-200/80 font-bold">
+                            <span className="dashboard-live-dot" /> Current data snapshot
+                          </div>
+                          <h2 className="mt-3 text-2xl md:text-3xl font-extrabold tracking-tight text-white">
+                            The shape of your organization, at a glance.
+                          </h2>
+                          <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-400">
+                            Workforce and candidate totals are sourced from the authoritative records. Risk and morale are model indicators calculated from employee data.
+                          </p>
+                          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                            <span>Employees <strong className="text-slate-200">{analyticsLoading ? "—" : employeeTotal ?? analyticsSnapshot.total}</strong></span>
+                            <span className="h-1 w-1 rounded-full bg-slate-600" />
+                            <span>Candidates <strong className="text-slate-200">{candidateTotal ?? candidates.length}</strong></span>
+                            <span className="h-1 w-1 rounded-full bg-slate-600" />
+                            <span>Snapshot scope: current records</span>
+                          </div>
+                        </div>
+                        <div className="dashboard-hero-metrics">
+                          <div className="dashboard-metric dashboard-metric-primary">
+                            <div className="dashboard-metric-label"><Users size={14} /> Workforce</div>
+                            <div className="dashboard-metric-value">{analyticsLoading ? "—" : employeeTotal ?? analyticsSnapshot.total}</div>
+                            <div className="dashboard-metric-note">employee records</div>
+                          </div>
+                          <div className="dashboard-metric">
+                            <div className="dashboard-metric-label"><Search size={14} /> Candidates</div>
+                            <div className="dashboard-metric-value">{candidateTotal ?? candidates.length}</div>
+                            <div className="dashboard-metric-note">candidate records</div>
+                          </div>
+                          <div className="dashboard-metric dashboard-metric-risk">
+                            <div className="dashboard-metric-label"><TrendingUp size={14} /> At risk</div>
+                            <div className="dashboard-metric-value">{analyticsLoading ? "—" : analyticsSnapshot.atRisk}</div>
+                            <div className="dashboard-metric-note">{analyticsLoading ? "loading" : `${analyticsSnapshot.atRiskPct}% of workforce`}</div>
+                          </div>
+                          <div className="dashboard-metric">
+                            <div className="dashboard-metric-label"><Activity size={14} /> Avg morale</div>
+                            <div className="dashboard-metric-value">{analyticsLoading ? "—" : Number(analyticsSnapshot.avgSentiment || 0).toFixed(2)}</div>
+                            <div className="dashboard-metric-note">model indicator</div>
+                          </div>
+                        </div>
+                      </section>
 
-                      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 mb-8">
-                        {(analyticsSnapshot.topRiskDrivers || []).map(
-                          (driver) => (
+                      <section className="mb-8">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
+                              Workspace Overview
+                            </h2>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Open each operational area from the same authoritative dataset.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="dashboard-command-grid">
+                          {[
+                            ["analytics", "Analytics", "Distribution, sentiment, and risk trends.", TrendingUp],
+                            ["scout", "Talent Scout", "Candidate search and matching evidence.", Search],
+                            ["intelligence", "Workflows", "Auditable actions and tool execution.", Bot],
+                            ["intel-center", "Intel Center", "Signals, forecasts, and decision context.", Cpu],
+                            ["enterprise", "Data Ops", "Imports, governance, and data quality.", Database],
+                          ].map(([tab, label, description, Icon]) => (
                             <button
-                              key={driver.factor}
-                              onClick={() => openDriverDrilldown(driver.factor)}
-                              className="premium-card p-4 border border-rose-300/20 text-left hover:border-rose-300/50 transition-all"
+                              key={tab}
+                              onClick={() => setActiveTab(tab)}
+                              className="dashboard-command-link"
                             >
-                              <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400 mb-2">
-                                Top Risk Driver
-                              </div>
-                              <div className="text-sm font-bold text-white mb-1">
-                                {driver.factor}
-                              </div>
-                              <div className="text-2xl font-extrabold text-rose-300">
-                                {driver.count}
-                              </div>
+                              <span className="dashboard-command-icon"><Icon size={17} /></span>
+                              <span className="min-w-0"><span className="block text-sm font-bold text-white">{label}</span><span className="mt-1 block text-[11px] leading-relaxed text-slate-400">{description}</span></span>
+                              <ChevronRight size={14} className="ml-auto shrink-0 text-slate-600 transition-transform group-hover:translate-x-1" />
                             </button>
-                          ),
-                        )}
+                          ))}
+                        </div>
+                      </section>
+
+                      <section className="dashboard-insight-grid mb-10">
+                        <div className="dashboard-insight-panel">
+                          <div className="flex items-start justify-between gap-4 mb-6">
+                            <div><div className="dashboard-kicker">Risk composition</div><h2 className="mt-1 text-lg font-extrabold text-white">Where attention is concentrated</h2></div>
+                            <div className="dashboard-risk-ring" style={{"--risk": `${Math.min(100, Number(analyticsSnapshot.atRiskPct || 0))}%`}}><span>{analyticsLoading ? "—" : `${analyticsSnapshot.atRiskPct}%`}</span></div>
+                          </div>
+                          <div className="space-y-4">
+                            {(analyticsSnapshot.topRiskDrivers || []).length ? analyticsSnapshot.topRiskDrivers.map((driver, index, rows) => {
+                              const max = Math.max(...rows.map((item) => Number(item.count || 0)), 1);
+                              return <button key={driver.factor} onClick={() => openDriverDrilldown(driver.factor)} className="dashboard-risk-row group"><span className="dashboard-risk-rank">0{index + 1}</span><span className="min-w-0 flex-1 text-left"><span className="block text-sm font-semibold text-slate-200 group-hover:text-white">{driver.factor}</span><span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-rose-400 to-orange-300" style={{width: `${(Number(driver.count || 0) / max) * 100}%`}} /></span></span><strong className="text-sm text-rose-300">{driver.count}</strong></button>;
+                            }) : <div className="text-sm text-slate-500">No risk-driver data in the current snapshot.</div>}
+                          </div>
+                        </div>
+                        <div className="dashboard-insight-panel dashboard-morale-panel">
+                          <div className="dashboard-kicker">Workforce health</div>
+                          <h2 className="mt-1 text-lg font-extrabold text-white">Morale signal</h2>
+                          <div className="dashboard-morale-visual"><div className="dashboard-morale-gauge" style={{"--morale": `${Math.max(0, Math.min(100, Number(analyticsSnapshot.avgSentiment || 0) * 100))}%`}}><span>{analyticsLoading ? "—" : Number(analyticsSnapshot.avgSentiment || 0).toFixed(2)}</span></div><div><div className="text-sm font-semibold text-slate-200">Current model indicator</div><p className="mt-1 text-xs leading-relaxed text-slate-500">This is an observed snapshot, not a historical trend. Open Sentiment for department and time-based analysis.</p></div></div>
+                          <button onClick={() => setActiveTab("sentiment")} className="dashboard-text-action">Open sentiment intelligence <ChevronRight size={14} /></button>
+                        </div>
                       </section>
 
                       <section className="pb-10">

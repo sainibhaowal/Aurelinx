@@ -555,7 +555,30 @@ const workflowTime = (value) => {
     : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 };
 
-const RenderToolResultCard = ({ toolName, result, inputArgs }) => {
+const toolNameForStep = (step) => step?.tool || step?.tool_name || "unknown";
+
+const isMutationTool = (toolName = "") =>
+  toolName.startsWith("data.") || toolName.includes("mutat");
+
+const formatDuration = (milliseconds) => {
+  if (!Number.isFinite(milliseconds) || milliseconds < 0) return "—";
+  if (milliseconds < 1000) return `${Math.max(0, Math.round(milliseconds))}ms`;
+  return `${(milliseconds / 1000).toFixed(1)}s`;
+};
+
+const displayPayload = (payload) => {
+  if (payload == null) return "No payload recorded";
+  try {
+    return JSON.stringify(payload, null, 2);
+  } catch {
+    return String(payload);
+  }
+};
+
+const firstObject = (...values) =>
+  values.find((value) => value && typeof value === "object" && !Array.isArray(value)) || null;
+
+const RenderToolResultCard = ({ toolName, result, inputArgs, status }) => {
   if (!result) return null;
 
   // 1. Employee Search micro cards
@@ -572,7 +595,11 @@ const RenderToolResultCard = ({ toolName, result, inputArgs }) => {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate font-semibold text-slate-200">{emp.first_name} {emp.last_name}</div>
-                <div className="truncate text-[10px] text-slate-400">{emp.department || "Staff"} · {emp.email || "Verified"}</div>
+                <div className="mt-0.5 flex flex-wrap gap-1 text-[9px]">
+                  <span className="rounded bg-cyan-400/10 px-1 text-cyan-300">{emp.role || emp.title || "Employee"}</span>
+                  <span className="rounded bg-white/[0.06] px-1 text-slate-400">{emp.department || "Staff"}</span>
+                </div>
+                <div className="truncate text-[10px] text-slate-500">{emp.email || "Verified"}</div>
               </div>
             </div>
           ))}
@@ -608,13 +635,21 @@ const RenderToolResultCard = ({ toolName, result, inputArgs }) => {
   if (toolName === "dashboard.snapshot" && typeof result === "object") {
     const depts = result.departments || result.result?.departments;
     if (depts) {
+      const entries = Object.entries(depts).slice(0, 6);
+      const maxCount = Math.max(...entries.map(([, count]) => Number(count) || 0), 1);
       return (
         <div className="mt-2 rounded-md border border-cyan-500/20 bg-slate-900/80 p-2 text-[11px]">
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Department Headcount Distribution</div>
           <div className="space-y-1">
-            {Object.entries(depts).slice(0, 4).map(([dept, count], idx) => (
-              <div key={idx} className="flex items-center justify-between text-[10px]">
-                <span className="text-slate-300">{dept}</span>
+            {entries.map(([dept, count], idx) => (
+              <div key={idx} className="grid grid-cols-[minmax(0,7rem)_1fr_auto] items-center gap-2 text-[10px]">
+                <span className="truncate text-slate-300">{dept}</span>
+                <span className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+                  <span
+                    className="block h-full rounded-full bg-gradient-to-r from-cyan-400 to-teal-300"
+                    style={{ width: `${Math.max(4, ((Number(count) || 0) / maxCount) * 100)}%` }}
+                  />
+                </span>
                 <span className="font-mono text-cyan-300">{count}</span>
               </div>
             ))}
@@ -626,14 +661,40 @@ const RenderToolResultCard = ({ toolName, result, inputArgs }) => {
 
   // 4. Data Mutation Diff card
   if (toolName === "data.mutate") {
+    const before = firstObject(result.before, result.previous, result.result?.before);
+    const after = firstObject(result.after, result.updated, result.result?.after);
+    const approvalSignature = result.approval_signature || result.approval_id || result.result?.approval_signature;
+    const changedKeys = [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])]
+      .filter((key) => JSON.stringify(before?.[key]) !== JSON.stringify(after?.[key]));
     return (
       <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-[11px]">
-        <div className="flex items-center gap-1.5 font-semibold text-amber-300">
-          <span>⚡ Admin Mutation Applied</span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+            <span>⚡ Admin Mutation Applied</span>
+          </div>
+          <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${
+            status === "completed" && approvalSignature
+              ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+              : "border-amber-400/30 bg-amber-400/10 text-amber-300"
+          }`}>
+            {status === "completed" && approvalSignature ? "✓ Approval signature verified" : "⚠ Approval gate"}
+          </span>
         </div>
         <div className="mt-1 text-[10px] text-slate-300">
           Query: {inputArgs?.query || inputArgs?.arguments?.query || "Database record update"}
         </div>
+        {changedKeys.length > 0 && (
+          <div className="mt-2 space-y-1 rounded border border-white/10 bg-slate-950/35 p-1.5">
+            {changedKeys.slice(0, 5).map((key) => (
+              <div key={key} className="grid grid-cols-[5rem_1fr_auto_1fr] items-center gap-1 text-[10px]">
+                <span className="truncate text-slate-500">{key}</span>
+                <span className="truncate text-rose-300">{String(before?.[key] ?? "—")}</span>
+                <span className="text-amber-300">→</span>
+                <span className="truncate text-emerald-300">{String(after?.[key] ?? "—")}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -644,9 +705,30 @@ const RenderToolResultCard = ({ toolName, result, inputArgs }) => {
 const AgenticStepTracker = ({ steps = [], onApproval }) => {
   const [expandedId, setExpandedId] = useState(null);
   const [expandedAll, setExpandedAll] = useState(false);
-  const [filterTab, setFilterTab] = useState("all"); // "all" | "queries" | "mutations" | "reasoning"
+  const [filterTab, setFilterTab] = useState("all");
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
-  // 1. Merge tool_call + tool_result into single executive cards
+  const hasRunningStep = steps.some((step) => step.status === "running");
+
+  useEffect(() => {
+    if (!hasRunningStep) return undefined;
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [hasRunningStep]);
+
+  const runningDuration = (step) => {
+    const startedAt = step.started_at || step.created_at;
+    const timestamp = startedAt ? new Date(startedAt).getTime() : NaN;
+    return Number.isFinite(timestamp) ? Math.max(0, currentTime - timestamp) : 0;
+  };
+
+  const stepDuration = (step) =>
+    step.status === "running"
+      ? runningDuration(step)
+      : Number(step.duration_ms || 0);
+
+  // Merge each tool call and result into one stable execution card. Correlation
+  // IDs are preferred; the per-tool queue is a safe fallback for older events.
   const mergedSteps = useMemo(() => {
     const visible = steps.filter((step) => {
       if (step.tool === "conversation.context") return false;
@@ -655,12 +737,17 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
       return true;
     });
 
-    const map = new Map();
+    const pendingByKey = new Map();
+    const pendingByTool = new Map();
     const result = [];
+
+    const correlationKey = (step) => {
+      const id = step.tool_call_id || step.call_id || step.parent_event_id || step.sequence;
+      return id == null ? null : `${toolNameForStep(step)}:${id}`;
+    };
 
     visible.forEach((step) => {
       if (step.type === "tool_call") {
-        const toolKey = `${step.tool || step.tool_name}-${step.sequence || map.size}`;
         const mergedItem = {
           ...step,
           type: "tool_execution",
@@ -668,28 +755,30 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
           safe_input: step.safe_input,
           result: null,
         };
-        map.set(toolKey, mergedItem);
+        const key = correlationKey(step);
+        if (key) pendingByKey.set(key, mergedItem);
+        const tool = toolNameForStep(step);
+        pendingByTool.set(tool, [...(pendingByTool.get(tool) || []), mergedItem]);
         result.push(mergedItem);
       } else if (step.type === "tool_result") {
-        // Find matching pending tool_call
-        let matched = null;
-        for (const item of result) {
-          if (item.type === "tool_execution" && (item.tool === step.tool || item.tool_name === step.tool) && item.status === "running") {
-            matched = item;
-            break;
-          }
-        }
+        const tool = toolNameForStep(step);
+        const key = correlationKey(step);
+        const queue = pendingByTool.get(tool) || [];
+        const matched = (key && pendingByKey.get(key)) || queue.find((item) => item.status === "running");
         if (matched) {
           matched.status = step.status || "completed";
           matched.result = step.result_summary;
+          matched.output_metadata = step.output_metadata || step.metadata || step.result_summary?.metadata;
           matched.display_message = step.display_message || matched.display_message;
           matched.duration_ms = step.duration_ms || matched.duration_ms;
+          pendingByTool.set(tool, queue.filter((item) => item !== matched));
         } else {
           result.push({
             ...step,
             type: "tool_execution",
             status: step.status || "completed",
             result: step.result_summary,
+            output_metadata: step.output_metadata || step.metadata || step.result_summary?.metadata,
           });
         }
       } else {
@@ -700,32 +789,61 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
     return result;
   }, [steps]);
 
-  // Telemetry Calculations
+  // Telemetry Calculations. Token throughput is only shown when the stream
+  // provides token metadata; character-derived values are explicitly marked
+  // as estimates rather than presenting invented precision.
   const telemetry = useMemo(() => {
     const totalDuration = steps.reduce((acc, curr) => acc + (curr.duration_ms || 0), 0) || 120;
     const reasoningStep = steps.find((s) => s.type === "model_reasoning");
     const reasoningChars = reasoningStep?.result_summary?.characters || 0;
+    const explicitTokens = steps.reduce(
+      (acc, step) => acc + Number(step.tokens || step.token_count || step.result_summary?.tokens || 0),
+      0,
+    );
+    const estimatedTokens = explicitTokens || (reasoningChars ? Math.round(reasoningChars / 4) : 0);
+    const activeDuration = steps.reduce(
+      (max, step) => Math.max(max, step.status === "running" ? runningDuration(step) : Number(step.duration_ms || 0)),
+      totalDuration,
+    );
+    const throughput = estimatedTokens && activeDuration > 0
+      ? `${(estimatedTokens / (activeDuration / 1000)).toFixed(1)}${explicitTokens ? "" : "~"}`
+      : "—";
     const isRunning = steps.some((s) => s.status === "running");
     return {
       latency: `${totalDuration}ms`,
+      throughput,
+      tokensEstimated: !explicitTokens && Boolean(estimatedTokens),
       reasoningChars,
+      reasoningDuration: reasoningStep ? stepDuration(reasoningStep) : 0,
+      tokenCount: estimatedTokens,
       status: isRunning ? "Active IPC" : "Idle / Ready",
     };
-  }, [steps]);
+  }, [steps, currentTime]);
 
   // Filter tabs logic
   const filteredSteps = useMemo(() => {
     if (filterTab === "queries") {
-      return mergedSteps.filter((s) => s.type === "tool_execution" && !s.tool?.startsWith("data."));
+      return mergedSteps.filter((s) => s.type === "tool_execution" && !isMutationTool(toolNameForStep(s)));
     }
     if (filterTab === "mutations") {
-      return mergedSteps.filter((s) => s.type === "tool_execution" && s.tool?.startsWith("data."));
+      return mergedSteps.filter((s) => s.type === "tool_execution" && isMutationTool(toolNameForStep(s)));
     }
     if (filterTab === "reasoning") {
       return mergedSteps.filter((s) => s.type === "model_reasoning");
     }
+    if (filterTab === "errors") {
+      return mergedSteps.filter((s) => s.status === "failed" || s.status === "blocked" || String(s.type || "").endsWith("_failed"));
+    }
     return mergedSteps;
   }, [mergedSteps, filterTab]);
+
+  const filterCounts = useMemo(() => ({
+    all: mergedSteps.length,
+    queries: mergedSteps.filter((s) => s.type === "tool_execution" && !isMutationTool(toolNameForStep(s))).length,
+    mutations: mergedSteps.filter((s) => s.type === "tool_execution" && isMutationTool(toolNameForStep(s))).length,
+    reasoning: mergedSteps.filter((s) => s.type === "model_reasoning").length,
+    errors: mergedSteps.filter((s) => s.status === "failed" || s.status === "blocked" || String(s.type || "").endsWith("_failed")).length,
+  }), [mergedSteps]);
 
   return (
     <div className="flex flex-col gap-2 my-2">
@@ -742,19 +860,27 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
             </span>
           </div>
           <div className="flex items-center gap-3 text-[10px]">
-            <span className="text-slate-400">Latency: <strong className="font-mono text-cyan-300">{telemetry.latency}</strong></span>
-            <span className="text-slate-400">Policy: <strong className="text-emerald-300">🛡️ Deny-All Strict</strong></span>
+            <span className="text-slate-400">⚡ <strong className="font-mono text-cyan-300">{telemetry.latency}</strong></span>
+            <span className="text-slate-400">🚀 <strong className="font-mono text-cyan-300">{telemetry.throughput} tok/s</strong></span>
+            <span className="text-slate-400">🛡️ <strong className="text-emerald-300">Deny-All Strict</strong></span>
           </div>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] text-slate-400">
+          <span className="uppercase tracking-wider text-slate-500">Active Runtime</span>
+          <span className="font-mono text-cyan-300">Google Antigravity Go Binary · Local IPC</span>
+          <span className="text-slate-600">{telemetry.status}</span>
         </div>
 
         {/* 5. Filter Chips */}
         <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex gap-1">
             {[
-              { id: "all", label: `All (${mergedSteps.length})` },
-              { id: "queries", label: "Queries" },
-              { id: "mutations", label: "Mutations" },
-              { id: "reasoning", label: "Reasoning" },
+              { id: "all", label: `All Events (${filterCounts.all})` },
+              { id: "queries", label: `Database Queries (${filterCounts.queries})` },
+              { id: "mutations", label: `Mutations (${filterCounts.mutations})` },
+              { id: "errors", label: `Errors (${filterCounts.errors})` },
+              { id: "reasoning", label: `Reasoning (${filterCounts.reasoning})` },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -790,12 +916,17 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
             ? "text-emerald-300"
             : isError
               ? "text-rose-300"
-              : status === "waiting"
-                ? "text-amber-300"
-                : "text-cyan-300";
+                : status === "waiting"
+                  ? "text-amber-300"
+                  : "text-cyan-300";
           const message = naturalStepDetail(step);
-          const isExpanded = expandedAll || expandedId === id;
-          const toolName = step.tool || step.tool_name;
+          const toolName = toolNameForStep(step);
+          const isToolExecution = step.type === "tool_execution";
+          const isExpanded = expandedAll || expandedId === `${id}:payload`;
+          const isInputExpanded = expandedAll || expandedId === `${id}:input`;
+          const isOutputExpanded = expandedAll || expandedId === `${id}:output`;
+          const isThinkingExpanded = expandedAll || expandedId === `${id}:thinking`;
+          const durationLabel = formatDuration(stepDuration(step));
 
           return (
             <div key={id} className="relative flex items-start gap-2.5 rounded-lg border border-white/5 bg-slate-900/40 p-2 text-left">
@@ -812,9 +943,16 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className={`text-xs font-medium leading-relaxed ${statusColor}`}>
-                    {message}
-                  </span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className={`text-xs font-medium leading-relaxed ${statusColor}`}>
+                      {status === "completed" ? "✓ " : status === "running" ? "● " : ""}{message}
+                    </span>
+                    {isToolExecution && (
+                      <span className="flex-shrink-0 rounded-full border border-white/10 bg-white/[0.03] px-1.5 py-0.5 text-[9px] font-mono text-slate-500">
+                        {status === "running" ? `${durationLabel} elapsed` : durationLabel}
+                      </span>
+                    )}
+                  </div>
                   <span className="flex-shrink-0 text-[9px] font-mono text-slate-500">
                     {workflowTime(step.created_at)}
                   </span>
@@ -823,13 +961,21 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
                 {/* 4. Live Chain of Thought Telemetry Drawer */}
                 {step.type === "model_reasoning" && (
                   <div className="mt-1.5 rounded border border-cyan-500/20 bg-slate-950/60 p-2 text-[10px] text-slate-300">
-                    <div className="flex items-center justify-between font-mono text-[9px] text-cyan-400">
-                      <span>🧠 CHAIN OF THOUGHT TELEMETRY</span>
-                      <span>{step.result_summary?.characters || 0} Chars Streamed</span>
-                    </div>
-                    <div className="mt-1 text-slate-400">
-                      Telemetry active. Private model reasoning is evaluated securely in local memory.
-                    </div>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between font-mono text-[9px] text-cyan-400"
+                      onClick={() => setExpandedId((current) => current === `${id}:thinking` ? null : `${id}:thinking`)}
+                    >
+                      <span>🧠 CHAIN OF THOUGHT TELEMETRY {isThinkingExpanded ? "⌃" : "⌄"}</span>
+                      <span>{step.result_summary?.characters || 0} chars · {formatDuration(stepDuration(step))}</span>
+                    </button>
+                    {isThinkingExpanded && (
+                      <div className="mt-2 grid grid-cols-2 gap-1.5 text-[9px] text-slate-400 sm:grid-cols-3">
+                        <span className="rounded bg-white/[0.03] px-1.5 py-1">Characters <b className="text-cyan-300">{step.result_summary?.characters || 0}</b></span>
+                        <span className="rounded bg-white/[0.03] px-1.5 py-1">Duration <b className="text-cyan-300">{formatDuration(stepDuration(step))}</b></span>
+                        <span className="rounded bg-white/[0.03] px-1.5 py-1">Token estimate <b className="text-cyan-300">{Math.max(0, Math.round((step.result_summary?.characters || 0) / 4))}</b></span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -839,25 +985,55 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
                     toolName={toolName}
                     result={step.result}
                     inputArgs={step.safe_input}
+                    status={status}
                   />
                 )}
 
-                <div className="mt-1 flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="text-[9px] uppercase tracking-wider text-slate-500 hover:text-cyan-300"
-                    onClick={() => setExpandedId((current) => current === id ? null : id)}
-                  >
-                    {isExpanded ? "Hide JSON" : "Show Payload"}
-                  </button>
-                  {step.duration_ms != null && (
-                    <span className="text-[9px] font-mono text-slate-600">· {step.duration_ms}ms</span>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  {isToolExecution ? (
+                    <>
+                      <button
+                        type="button"
+                        className={`rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-wider ${isInputExpanded ? "border-cyan-500/40 text-cyan-300" : "border-white/10 text-slate-500 hover:text-cyan-300"}`}
+                        onClick={() => setExpandedId((current) => current === `${id}:input` ? null : `${id}:input`)}
+                      >
+                        {isInputExpanded ? "Hide input" : "Input parameters"}
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-wider ${isOutputExpanded ? "border-emerald-500/40 text-emerald-300" : "border-white/10 text-slate-500 hover:text-emerald-300"}`}
+                        onClick={() => setExpandedId((current) => current === `${id}:output` ? null : `${id}:output`)}
+                      >
+                        {isOutputExpanded ? "Hide output" : "Output metadata"}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="text-[9px] uppercase tracking-wider text-slate-500 hover:text-cyan-300"
+                      onClick={() => setExpandedId((current) => current === `${id}:payload` ? null : `${id}:payload`)}
+                    >
+                      {isExpanded ? "Hide payload" : "Show payload"}
+                    </button>
                   )}
+                  {step.duration_ms != null && <span className="text-[9px] font-mono text-slate-600">· {durationLabel}</span>}
                 </div>
 
-                {isExpanded && (
+                {isToolExecution && isInputExpanded && (
                   <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-cyan-500/15 bg-slate-950/90 p-2 text-left font-mono text-[9px] leading-relaxed text-slate-400 whitespace-pre-wrap break-words">
-                    {JSON.stringify(step.result || step.safe_input || step, null, 2)}
+                    {displayPayload(step.safe_input)}
+                  </pre>
+                )}
+
+                {isToolExecution && isOutputExpanded && (
+                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-emerald-500/15 bg-slate-950/90 p-2 text-left font-mono text-[9px] leading-relaxed text-slate-400 whitespace-pre-wrap break-words">
+                    {displayPayload(step.output_metadata || step.result)}
+                  </pre>
+                )}
+
+                {!isToolExecution && isExpanded && (
+                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-cyan-500/15 bg-slate-950/90 p-2 text-left font-mono text-[9px] leading-relaxed text-slate-400 whitespace-pre-wrap break-words">
+                    {displayPayload(step.result || step.safe_input || step)}
                   </pre>
                 )}
 
@@ -896,6 +1072,8 @@ const IntelligenceChatView = () => {
   const [helpOpen, setHelpOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState(null);
   const [renameValue, setRenameValue] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [lastFailedPrompt, setLastFailedPrompt] = useState("");
   const abortRef = useRef(null);
   const messagesScrollRef = useRef(null);
 
@@ -903,6 +1081,14 @@ const IntelligenceChatView = () => {
     () => sessions.find((s) => s.id === selectedSessionId) || null,
     [sessions, selectedSessionId],
   );
+  const workflowSummary = useMemo(() => {
+    const events = messages.flatMap((message) => Array.isArray(message.workflow_events) ? message.workflow_events : []);
+    const tools = new Set(events.map((event) => event.tool || event.tool_name).filter(Boolean));
+    const approvals = events.filter((event) => ["approval_required", "approval_granted", "approval_rejected"].includes(event.type)).length;
+    const errors = events.filter((event) => String(event.status || "").toLowerCase() === "failed" || String(event.type || "").includes("error")).length;
+    const records = events.reduce((sum, event) => sum + Number(event.result_summary?.records_affected || event.result_summary?.count || 0), 0);
+    return { tools: tools.size, approvals, errors, records };
+  }, [messages]);
 
   const loadSessions = async () => {
     const data = await chatAPI.listSessions();
@@ -991,6 +1177,21 @@ const IntelligenceChatView = () => {
       const data = await chatAPI.listSessions();
       setSessions(data);
     }
+  };
+
+  const requestDeleteSession = (sessionId) => setDeleteTarget({ type: "single", id: sessionId });
+  const confirmDeleteSession = async () => {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    if (target.type === "bulk") await bulkDelete();
+    else await deleteSession(target.id);
+  };
+
+  const formatSessionTime = (value) => {
+    if (!value) return "No activity yet";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "No activity yet" : date.toLocaleString([], { dateStyle: "short", timeStyle: "short" });
   };
 
   const clearMessages = async () => {
@@ -1102,6 +1303,7 @@ const IntelligenceChatView = () => {
     const controller = new AbortController();
     abortRef.current = controller;
     const userText = input.trim();
+    setLastFailedPrompt("");
     setInput("");
     setAgentSteps([]);
 
@@ -1189,6 +1391,12 @@ const IntelligenceChatView = () => {
             setSessions((prev) =>
               prev.map((s) => (s.id === session.id ? session : s)),
             );
+            if (session.title === "New Workflow Session" && userText) {
+              const autoTitle = userText.length > 48 ? `${userText.slice(0, 48)}…` : userText;
+              chatAPI.renameSession(session.id, autoTitle)
+                .then((updated) => setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s))))
+                .catch((error) => console.warn("Automatic session title failed", error));
+            }
             setStreamText("");
             setStreamPhase("done");
             loadMessages(session.id).catch(console.error);
@@ -1196,6 +1404,7 @@ const IntelligenceChatView = () => {
           onError: (err) => {
             setStreamPhase("error");
             setStreamText("");
+            setLastFailedPrompt(userText);
             setMessages((prev) => [
               ...prev.filter(m => !m.id.toString().startsWith("optimistic-user-msg-")),
               {
@@ -1229,11 +1438,49 @@ const IntelligenceChatView = () => {
           created_at: new Date().toISOString(),
         },
       ]);
+      setLastFailedPrompt(userText);
       setStreamPhase("error");
     } finally {
       setBusy(false);
       abortRef.current = null;
     }
+  };
+
+  const retryLastPrompt = () => {
+    if (!lastFailedPrompt || busy) return;
+    setInput(lastFailedPrompt);
+    window.setTimeout(() => sendMessage(), 0);
+  };
+
+  const exportTranscript = async (format = "markdown") => {
+    if (!messages.length) return;
+    const title = selectedSession?.title || "Aurelinx Workflow Session";
+    const rows = messages.map((message) => ({
+      role: message.role,
+      content: message.content || "",
+      timestamp: message.created_at || "",
+    }));
+    const stamp = Date.now();
+    if (format === "markdown") {
+      const body = [`# ${title}`, "", `Generated: ${new Date().toISOString()}`, "", ...rows.map((row) => `## ${row.role}\n\n${row.content}\n\n_${row.timestamp}_\n`)].join("\n");
+      const blob = new Blob([body], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `aurelinx-workflow-${stamp}.md`; link.click(); URL.revokeObjectURL(url);
+      return;
+    }
+    if (format === "excel") {
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), "Transcript");
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["Tools", workflowSummary.tools], ["Records affected", workflowSummary.records], ["Approvals", workflowSummary.approvals], ["Errors", workflowSummary.errors]]), "Summary");
+      XLSX.writeFile(workbook, `aurelinx-workflow-${stamp}.xlsx`);
+      return;
+    }
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+    doc.setFontSize(16); doc.text(title, 15, 18); doc.setFontSize(9);
+    let y = 28;
+    rows.forEach((row) => { const lines = doc.splitTextToSize(`${row.role.toUpperCase()} (${row.timestamp})\n${row.content}`, 180); if (y + lines.length * 5 > 280) { doc.addPage(); y = 18; } doc.text(lines, 15, y); y += lines.length * 5 + 5; });
+    doc.save(`aurelinx-workflow-${stamp}.pdf`);
   };
 
   const cancelStream = () => {
@@ -1247,7 +1494,7 @@ const IntelligenceChatView = () => {
   return (
     <div className="absolute inset-0 flex min-h-0 w-full flex-col overflow-hidden">
       <div
-        className={`premium-card p-4 flex flex-1 flex-col min-h-0 pb-0 transition-[margin-right] duration-300 ${drawerOpen ? "mr-[356px]" : "mr-[76px]"}`}
+        className="p-4 flex flex-1 flex-col min-h-0 pb-0 mr-[8px]"
       >
         <div className="flex items-center gap-3 mb-3">
           <div className="p-2 rounded-lg bg-primary/20 text-cyan-200">
@@ -1272,6 +1519,11 @@ const IntelligenceChatView = () => {
               Agentic control over dashboard, directory, sentiment, analytics,
               scout and data tools.
             </p>
+            {selectedSession && (
+              <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                Started {formatSessionTime(selectedSession.created_at)} · Updated {formatSessionTime(selectedSession.updated_at)} · Scope: authenticated workspace
+              </div>
+            )}
           </div>
           <div className="ml-auto flex items-center gap-2">
             <UserManualButton defaultTab="workflows" />
@@ -1282,8 +1534,21 @@ const IntelligenceChatView = () => {
             >
               <Eraser size={13} /> Clear Chat
             </button>
+            <div className="relative group">
+              <button disabled={!messages.length} className="h-9 px-3 rounded-lg border border-white/10 bg-white/5 text-xs disabled:opacity-40">Export</button>
+              {messages.length > 0 && <div className="absolute right-0 top-full z-30 hidden w-36 rounded-lg border border-white/10 bg-[#0f1f33] p-1 shadow-xl group-hover:block"><button onClick={() => exportTranscript("pdf")} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10">PDF</button><button onClick={() => exportTranscript("excel")} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10">Excel</button><button onClick={() => exportTranscript("markdown")} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10">Markdown</button></div>}
+            </div>
           </div>
         </div>
+
+        {selectedSession && messages.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-slate-500">
+            <span>Tools <strong className="text-cyan-200">{workflowSummary.tools}</strong></span>
+            <span>Records affected <strong className="text-slate-200">{workflowSummary.records}</strong></span>
+            <span>Approvals <strong className="text-amber-200">{workflowSummary.approvals}</strong></span>
+            <span>Errors <strong className="text-rose-300">{workflowSummary.errors}</strong></span>
+          </div>
+        )}
 
         {helpOpen && (
           <div className="mb-3 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4 text-xs text-slate-300">
@@ -1361,6 +1626,9 @@ const IntelligenceChatView = () => {
                         text={m.content || ""}
                         isBusy={false}
                       />
+                      {(String(m.id || "").startsWith("error-") || String(m.id || "").startsWith("stream-error-")) && lastFailedPrompt && (
+                        <button onClick={retryLastPrompt} className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-400/20">Retry request</button>
+                      )}
                     </div>
                   ) : (
                     <div className="text-sm whitespace-pre-wrap">{m.content}</div>
@@ -1491,7 +1759,7 @@ const IntelligenceChatView = () => {
       </div>
 
       <aside
-        className={`absolute top-0 right-0 h-full transition-all duration-300 ease-out ${drawerOpen ? "w-[340px]" : "w-[64px]"}`}
+        className={`absolute z-40 top-0 right-0 h-full transition-all duration-300 ease-out ${drawerOpen ? "w-[calc(100vw-16px)] sm:w-[340px]" : "w-[64px]"}`}
       >
         <div className="premium-card h-full min-h-0 overflow-hidden flex flex-col">
           <div
@@ -1551,9 +1819,9 @@ const IntelligenceChatView = () => {
                       />
                       <button
                         className="flex-1 text-left text-sm font-semibold truncate"
-                        onClick={() => setSelectedSessionId(s.id)}
+                        onClick={() => { setSelectedSessionId(s.id); if (window.innerWidth < 640) setDrawerOpen(false); }}
                       >
-                        {s.title}
+                        <span className="min-w-0"><span className="block truncate">{s.title}</span><span className="block truncate text-[9px] font-normal text-slate-500">{formatSessionTime(s.updated_at || s.created_at)}</span></span>
                       </button>
                       <button
                         onClick={() => renameSession(s.id)}
@@ -1562,7 +1830,7 @@ const IntelligenceChatView = () => {
                         <Pencil size={12} />
                       </button>
                       <button
-                        onClick={() => deleteSession(s.id)}
+                        onClick={() => requestDeleteSession(s.id)}
                         className="p-1 text-rose-300 hover:text-rose-200"
                       >
                         <Trash2 size={12} />
@@ -1573,7 +1841,7 @@ const IntelligenceChatView = () => {
               </div>
               <div className="p-3 border-t border-white/5">
                 <button
-                  onClick={bulkDelete}
+                  onClick={() => selectedSessions.length && setDeleteTarget({ type: "bulk" })}
                   className="w-full h-9 rounded-lg border border-rose-400/30 text-rose-300 hover:bg-rose-500/10 text-sm font-semibold"
                 >
                   Delete Selected
@@ -1597,6 +1865,16 @@ const IntelligenceChatView = () => {
           )}
         </div>
       </aside>
+
+      {deleteTarget && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md premium-card p-5 shadow-2xl border-white/15">
+            <h3 className="text-base font-extrabold text-white">{deleteTarget?.type === "bulk" ? "Delete selected workflow sessions?" : "Delete workflow session?"}</h3>
+            <p className="mt-2 text-xs leading-relaxed text-slate-400">This permanently removes the session messages, workflow events, and attachments. This action cannot be undone.</p>
+            <div className="mt-5 flex justify-end gap-2"><button onClick={() => setDeleteTarget(null)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-300 hover:bg-white/5">Cancel</button><button onClick={confirmDeleteSession} className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-200 hover:bg-rose-500/20">Delete permanently</button></div>
+          </div>
+        </div>
+      )}
 
       {renameTarget && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm px-4">

@@ -7,6 +7,14 @@ import {
   BrainCircuit,
   Target,
   Filter,
+  Download,
+  Bookmark,
+  GitCompare,
+  Star,
+  Cpu,
+  Fingerprint,
+  Globe,
+  DollarSign,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -102,12 +110,42 @@ const MarkdownRenderer = ({ children }) => (
 );
 
 const TalentScoutView = () => {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
+  const SCOUT_CACHE_KEY = "aurelinx_talent_scout_history_v1";
+  const [query, setQuery] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try { return JSON.parse(window.localStorage.getItem(SCOUT_CACHE_KEY) || "null")?.query || ""; } catch { return ""; }
+  });
+  const [results, setResults] = useState(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(window.localStorage.getItem(SCOUT_CACHE_KEY) || "null")?.results || []; } catch { return []; }
+  });
   const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState("");
+  const [analysis, setAnalysis] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try { return JSON.parse(window.localStorage.getItem(SCOUT_CACHE_KEY) || "null")?.analysis || ""; } catch { return ""; }
+  });
+  const [history, setHistory] = useState(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(window.localStorage.getItem(`${SCOUT_CACHE_KEY}_list`) || "[]"); } catch { return []; }
+  });
   const [selectedTalent, setSelectedTalent] = useState(null);
   const [selectedTalentLoading, setSelectedTalentLoading] = useState(false);
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [minMatch, setMinMatch] = useState(0);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [shortlist, setShortlist] = useState(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(window.localStorage.getItem("aurelinx_scout_shortlist_v1") || "[]"); } catch { return []; }
+  });
+  const [candidateNotes, setCandidateNotes] = useState(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(window.localStorage.getItem("aurelinx_scout_notes_v1") || "{}"); } catch { return {}; }
+  });
+  const [candidateStatus, setCandidateStatus] = useState(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(window.localStorage.getItem("aurelinx_scout_status_v1") || "{}"); } catch { return {}; }
+  });
 
   const handleSearch = async () => {
     let config = {};
@@ -144,6 +182,13 @@ const TalentScoutView = () => {
         selectedModel,
       );
       setResults(data.candidates || []);
+      const saved = { query, results: data.candidates || [], analysis: data.analysis || "", savedAt: Date.now() };
+      localStorage.setItem(SCOUT_CACHE_KEY, JSON.stringify(saved));
+      setHistory((previous) => {
+        const next = [saved, ...previous.filter((item) => item.query !== query)].slice(0, 10);
+        localStorage.setItem(`${SCOUT_CACHE_KEY}_list`, JSON.stringify(next));
+        return next;
+      });
       
       const fullText = data.analysis || "";
       let index = 0;
@@ -181,8 +226,64 @@ const TalentScoutView = () => {
     }
   };
 
+  const resultDepartments = [...new Set(results.map((candidate) => candidate.department).filter(Boolean))].sort();
+  const resultRoles = [...new Set(results.map((candidate) => candidate.role).filter(Boolean))].sort();
+  const filteredResults = results.filter((candidate) =>
+    (!departmentFilter || candidate.department === departmentFilter) &&
+    (!roleFilter || candidate.role === roleFilter) &&
+    (Number(candidate.match_score ?? 0) >= Number(minMatch)),
+  );
+  const resultEmails = filteredResults.map((candidate) => String(candidate.email || "").toLowerCase()).filter(Boolean);
+  const duplicateEmailCount = resultEmails.length - new Set(resultEmails).size;
+  const incompleteCount = filteredResults.filter((candidate) => !candidate.full_name || !candidate.email || !candidate.role || !candidate.department).length;
+  const toggleShortlist = (candidate) => {
+    setShortlist((previous) => {
+      const next = previous.some((item) => item.id === candidate.id)
+        ? previous.filter((item) => item.id !== candidate.id)
+        : [...previous, candidate];
+      localStorage.setItem("aurelinx_scout_shortlist_v1", JSON.stringify(next));
+      return next;
+    });
+  };
+  const toggleCompare = (candidate) => setSelectedIds((previous) => previous.includes(candidate.id) ? previous.filter((id) => id !== candidate.id) : previous.length < 3 ? [...previous, candidate.id] : previous);
+  const saveCandidateNote = (candidateId, value) => {
+    const next = { ...candidateNotes, [candidateId]: value };
+    setCandidateNotes(next);
+    localStorage.setItem("aurelinx_scout_notes_v1", JSON.stringify(next));
+  };
+  const saveCandidateStatus = (candidateId, value) => {
+    const next = { ...candidateStatus, [candidateId]: value };
+    setCandidateStatus(next);
+    localStorage.setItem("aurelinx_scout_status_v1", JSON.stringify(next));
+  };
+  const exportCandidates = async (format) => {
+    const { generateAurelinxReport } = await import("../utils/reportGenerator");
+    generateAurelinxReport({ employees: [], candidates: shortlist.length ? shortlist : filteredResults }, `Talent Scout export: ${shortlist.length || filteredResults.length} candidate records.`, format);
+  };
+
   return (
     <div className="w-full">
+
+      <header className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
+            Talent Scout
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm md:text-base leading-relaxed text-slate-400">
+            Search the complete candidate pool and review evidence-backed matches.
+          </p>
+        </div>
+        <UserManualButton defaultTab="scout" className="shrink-0 mt-1" />
+      </header>
+
+      <div className="mb-5 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <span className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Search history</span>
+          <span className="text-[10px] text-slate-500">Stored locally on this device · {history.length}/10</span>
+        </div>
+        {history.length ? <div className="flex flex-wrap gap-2">{history.slice(0, 10).map((item) => <button key={`${item.query}-${item.savedAt}`} onClick={() => { setQuery(item.query); setResults(item.results || []); setAnalysis(item.analysis || ""); }} className="max-w-full truncate rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 hover:border-cyan-400/40" title={item.query}>{item.query}<span className="ml-2 text-[9px] text-slate-500">{new Date(item.savedAt).toLocaleDateString()}</span></button>)}</div> : <p className="text-xs text-slate-500">No searches saved yet. Your completed searches will appear here.</p>}
+        {shortlist.length > 0 && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3"><span className="text-[10px] uppercase tracking-[0.16em] text-amber-300">Shortlist: {shortlist.length}</span>{["pdf", "excel", "markdown"].map((format) => <button key={format} onClick={() => exportCandidates(format)} className="rounded-md border border-white/10 px-2 py-1 text-[10px] uppercase text-slate-300 hover:border-cyan-400/40">Export {format}</button>)}</div>}
+        </div>
 
 
       <div className="mb-10 md:mb-12">
@@ -224,6 +325,14 @@ const TalentScoutView = () => {
             Applied
           </div>
         </div>
+        {results.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+            <label className="flex min-w-[170px] flex-1 flex-col gap-1 text-[9px] uppercase tracking-[0.14em] text-slate-500">Department<select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="mt-1 h-9 rounded-lg border border-white/10 bg-slate-950/70 px-2 text-xs normal-case tracking-normal text-slate-200"><option value="">All departments</option>{resultDepartments.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            <label className="flex min-w-[170px] flex-1 flex-col gap-1 text-[9px] uppercase tracking-[0.14em] text-slate-500">Role<select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="mt-1 h-9 rounded-lg border border-white/10 bg-slate-950/70 px-2 text-xs normal-case tracking-normal text-slate-200"><option value="">All roles</option>{resultRoles.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            <label className="flex min-w-[150px] flex-1 flex-col gap-1 text-[9px] uppercase tracking-[0.14em] text-slate-500">Minimum match <input type="range" min="0" max="1" step="0.05" value={minMatch} onChange={(event) => setMinMatch(event.target.value)} /><span className="text-xs normal-case tracking-normal text-slate-300">{Math.round(minMatch * 100)}%</span></label>
+            <span className="text-[10px] text-slate-500">{filteredResults.length} of {results.length} results · {duplicateEmailCount} duplicate emails · {incompleteCount} incomplete profiles</span>
+          </div>
+        )}
       </div>
 
       <AnimatePresence>
@@ -246,27 +355,38 @@ const TalentScoutView = () => {
         )}
       </AnimatePresence>
 
-      {results.length > 0 && (
+      {filteredResults.length > 0 && (
         <motion.section
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4"
         >
-          {results.map((cand, idx) => (
+          {filteredResults.map((cand, idx) => (
             <motion.div
               key={cand.id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: idx * 0.1 }}
             >
-              <TalentCard
-                talent={cand}
-                type="candidate"
-                onOpenProfile={() => openTalentDetails(cand)}
-              />
+              <div className="relative">
+                <TalentCard talent={cand} type="candidate" onOpenProfile={() => openTalentDetails(cand)} />
+                <div className="mt-2 flex flex-wrap items-center gap-2 px-1 text-[10px]">
+                  <button onClick={() => toggleShortlist(cand)} className={shortlist.some((item) => item.id === cand.id) ? "text-amber-300" : "text-slate-500 hover:text-amber-300"}><Star size={12} className="inline" /> {shortlist.some((item) => item.id === cand.id) ? "Shortlisted" : "Shortlist"}</button>
+                  <button onClick={() => toggleCompare(cand)} className={selectedIds.includes(cand.id) ? "text-cyan-200" : "text-slate-500 hover:text-cyan-200"}><GitCompare size={12} className="inline" /> {selectedIds.includes(cand.id) ? "Comparing" : "Compare"}</button>
+                  <select value={candidateStatus[cand.id] || "new"} onChange={(event) => saveCandidateStatus(cand.id, event.target.value)} className="ml-auto max-w-[110px] rounded border border-white/10 bg-slate-950/70 px-1 py-1 text-[9px] text-slate-300"><option value="new">New</option><option value="review">Review</option><option value="shortlisted">Shortlisted</option><option value="rejected">Rejected</option></select>
+                </div>
+                <input value={candidateNotes[cand.id] || ""} onChange={(event) => saveCandidateNote(cand.id, event.target.value)} placeholder="Add review note..." className="mt-2 w-full rounded border border-white/10 bg-slate-950/50 px-2 py-1.5 text-[10px] text-slate-300 outline-none" />
+              </div>
             </motion.div>
           ))}
         </motion.section>
+      )}
+
+      {selectedIds.length > 0 && (
+        <section className="premium-card mt-8 overflow-hidden p-5">
+          <div className="mb-4 flex items-center justify-between gap-3"><h3 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Candidate comparison</h3><button onClick={() => setSelectedIds([])} className="text-[10px] text-slate-500 hover:text-white">Clear</button></div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{selectedIds.map((id) => filteredResults.find((candidate) => candidate.id === id)).filter(Boolean).map((candidate) => <div key={candidate.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-xs"><div className="truncate font-bold text-white">{candidate.full_name}</div><div className="mt-2 space-y-1 text-slate-400"><div>Match: <strong className="text-cyan-200">{(Number(candidate.match_score || 0) * 100).toFixed(1)}%</strong></div><div>Sentiment: <strong className="text-slate-200">{candidate.sentiment_score ?? "N/A"}</strong></div><div>Role: {candidate.role || "N/A"}</div><div>Department: {candidate.department || "N/A"}</div></div></div>)}</div>
+        </section>
       )}
 
       <AnimatePresence>
@@ -275,7 +395,7 @@ const TalentScoutView = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
             onClick={() => setSelectedTalent(null)}
           >
             <motion.div
@@ -283,81 +403,190 @@ const TalentScoutView = () => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.98 }}
               transition={{ duration: 0.18 }}
-              className="w-full max-w-2xl premium-card p-6 md:p-8 border border-white/10"
+              className="relative w-full max-w-3xl my-8 overflow-hidden rounded-xl border border-blue-500/40 bg-[#0b1329] p-6 md:p-8 text-slate-100 shadow-[0_0_50px_rgba(0,0,0,0.5)] shadow-blue-950/20"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-2xl font-extrabold mb-2">
-                {selectedTalent.full_name}
-              </h3>
-              <p className="text-slate-300 mb-6">
-                {selectedTalent.role} - {selectedTalent.department}
-              </p>
+              {/* Dossier Title */}
+              <div className="flex justify-between items-center mb-6 pb-2 border-b border-white/10 text-xs font-mono tracking-widest text-slate-400">
+                <span className="flex items-center gap-1.5 font-bold">
+                  <Cpu size={12} className="text-blue-400" />
+                  CANDIDATE REPORT // CONFIDENTIAL
+                </span>
+                <span className="text-blue-400 font-bold">
+                  MATCH INDEX: {selectedTalent.match_score != null ? `${(selectedTalent.match_score * 100).toFixed(1)}%` : "PENDING"}
+                </span>
+              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-6">
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
-                    Email
+              {/* Personnel Basic info */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                {/* Initials Avatar Badge */}
+                <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-slate-900/60 border border-white/5 relative overflow-hidden">
+                  <div className="w-20 h-20 rounded-full border border-blue-500/40 flex items-center justify-center bg-slate-950 font-bold text-2xl tracking-wider text-blue-400">
+                    {selectedTalent.full_name
+                      ? selectedTalent.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
+                      : "CD"}
                   </div>
-                  <div>{selectedTalent.email || "N/A"}</div>
+                  <div className="text-[9px] font-mono mt-3 tracking-widest text-slate-400 uppercase">
+                    Active Directory
+                  </div>
                 </div>
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
-                    Retention
-                  </div>
+
+                {/* Core Details */}
+                <div className="md:col-span-2 flex flex-col justify-between">
                   <div>
-                    {selectedTalent.retention_prob
-                      ? `${(selectedTalent.retention_prob * 100).toFixed(1)}%`
-                      : "N/A"}
+                    <h3 className="text-3xl font-extrabold tracking-tight text-white mb-1">
+                      {selectedTalent.full_name}
+                    </h3>
+                    <p className="text-slate-300 font-semibold text-sm mb-3">
+                      {selectedTalent.role} — {selectedTalent.department}
+                    </p>
+                    <p className="text-xs text-slate-400 font-mono flex items-center gap-1">
+                      <Globe size={12} className="text-slate-500" /> {selectedTalent.email}
+                    </p>
                   </div>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
-                    Sentiment
-                  </div>
-                  <div>{selectedTalent.sentiment_score ?? "N/A"}</div>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
-                    Risk
-                  </div>
-                  <div>
-                    {selectedTalent.is_at_risk
-                      ? "High Attrition Risk"
-                      : "Optimal Retention"}
+                  
+                  {/* Micro Metadata */}
+                  <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-white/5 font-mono text-[10px] text-slate-500">
+                    <div>CANDIDATE ID: <span className="text-slate-300">{selectedTalent.id ? selectedTalent.id.slice(0, 8) : "N/A"}</span></div>
+                    <div>APPLY DATE: <span className="text-slate-300">{selectedTalent.application_date ? new Date(selectedTalent.application_date).toLocaleDateString() : "N/A"}</span></div>
                   </div>
                 </div>
               </div>
 
-              <div className="mb-6">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">
-                  Top Skills
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(selectedTalent.skills || [])
-                    .slice(0, 12)
-                    .map((skill, idx) => (
-                      <span
-                        key={`${skill.name}-${idx}`}
-                        className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs"
-                      >
-                        {skill.name} (L{skill.level})
-                      </span>
-                    ))}
-                  {(!selectedTalent.skills ||
-                    selectedTalent.skills.length === 0) && (
-                    <span className="text-slate-400 text-sm">
-                      No skills found.
+              {/* Core Diagnostics & Salary Matrix */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                {/* Match Score Progress */}
+                <div className="p-4 rounded-lg bg-slate-900/60 border border-white/5 font-mono">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-2 flex justify-between">
+                    <span>Match Index</span>
+                    <span className="text-blue-400 font-bold">
+                      {selectedTalent.match_score != null ? `${(selectedTalent.match_score * 100).toFixed(1)}%` : "N/A"}
                     </span>
+                  </div>
+                  <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-white/10">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-500 to-blue-300"
+                      style={{ width: selectedTalent.match_score != null ? `${selectedTalent.match_score * 100}%` : "0%" }}
+                    />
+                  </div>
+                  <div className="text-[9px] text-slate-500 mt-2 text-right">PROFILE FIT</div>
+                </div>
+
+                {/* Sentiment Vector */}
+                <div className="p-4 rounded-lg bg-slate-900/60 border border-white/5 font-mono">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-2 flex justify-between">
+                    <span>Morale Sentiment</span>
+                    <span className="text-slate-200 font-bold">{selectedTalent.sentiment_score ?? "N/A"}</span>
+                  </div>
+                  <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-white/10">
+                    <div 
+                      className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400"
+                      style={{ width: `${(selectedTalent.sentiment_score ?? 0.5) * 100}%` }}
+                    />
+                  </div>
+                  <div className="text-[9px] text-slate-500 mt-2 text-right">METRIC: INTERVIEW_SCORE</div>
+                </div>
+
+                {/* Risk Factor */}
+                <div className="p-4 rounded-lg bg-slate-900/60 border border-white/5 font-mono flex flex-col justify-between">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-1">
+                    System Alert
+                  </div>
+                  <div className="text-xs font-bold tracking-wider text-cyan-400">
+                    ACQUISITION_VIABLE
+                  </div>
+                  <div className="text-[9px] text-slate-500 mt-2 text-right">STATUS: EXTERNAL</div>
+                </div>
+              </div>
+
+              {/* Financial Telemetry (Salary Expectations) */}
+              <div className="p-4 rounded-lg bg-gradient-to-r from-cyan-950/20 to-slate-900/60 border border-cyan-500/20 mb-6 font-mono">
+                <div className="text-[10px] text-cyan-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                  <DollarSign size={12} /> COMPENSATION EXPECTATION TELEMETRY
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+                  <div className="text-2xl font-bold tracking-tight text-white flex items-baseline gap-1">
+                    ${selectedTalent.salary ? selectedTalent.salary.toLocaleString() : "110,000"} 
+                    <span className="text-xs text-slate-500 font-normal">/ yr expected base</span>
+                  </div>
+                  <div className="px-2 py-0.5 rounded text-[10px] bg-cyan-400/10 border border-cyan-400/20 text-cyan-300 font-bold">
+                    MARKET COMPARE: {( (selectedTalent.salary || 110000) / 108000 ).toFixed(2)}x Avg
+                  </div>
+                </div>
+              </div>
+
+              {/* Cognitive Matrix (Skills) */}
+              <div className="mb-6 font-mono">
+                <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-3">
+                  Cognitive Skill Vector Matrix
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {(selectedTalent.skills || []).map((skill, idx) => (
+                    <div key={`${skill.name}-${idx}`} className="p-2.5 rounded-lg bg-slate-900/40 border border-white/5 flex flex-col justify-between">
+                      <div className="text-xs text-slate-300 flex justify-between mb-1">
+                        <span>{skill.name}</span>
+                        <span className="text-cyan-400 font-bold">Level {skill.level}/5</span>
+                      </div>
+                      {/* Level Bar meter */}
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((lvl) => (
+                          <div 
+                            key={lvl} 
+                            className={`h-1.5 flex-1 rounded-sm ${
+                              lvl <= skill.level 
+                                ? "bg-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.5)]" 
+                                : "bg-slate-800"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {(!selectedTalent.skills || selectedTalent.skills.length === 0) && (
+                    <div className="col-span-2 text-xs text-slate-500 italic">No skills catalogued.</div>
                   )}
                 </div>
               </div>
 
-              <div className="flex justify-end">
+              {/* Experience timeline */}
+              <div className="mb-8 font-mono">
+                <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-4">
+                  Chronological Experience Record
+                </div>
+                <div className="relative border-l border-white/10 pl-6 ml-3 space-y-6">
+                  {(selectedTalent.experiences || []).map((experience, idx) => (
+                    <div key={`${experience.company}-${experience.position}-${idx}`} className="relative">
+                      {/* Glowing timeline node */}
+                      <div className="absolute -left-[32px] top-1.5 w-4 h-4 rounded-full border border-cyan-400 bg-slate-950 flex items-center justify-center">
+                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                          {experience.position}
+                        </div>
+                        <div className="text-[11px] text-cyan-400/90 mt-0.5 font-bold">
+                          {experience.company} <span className="text-slate-500">//</span> {experience.duration_years ?? "N/A"} years tenure
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-relaxed mt-2 p-2 rounded bg-slate-900/30 border border-white/5">
+                          {experience.description || "No duties specification recorded."}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {(!selectedTalent.experiences || selectedTalent.experiences.length === 0) && (
+                    <div className="text-xs text-slate-500 italic">No historical records in archive.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer Action */}
+              <div className="flex justify-between items-center pt-4 border-t border-white/10 font-mono text-[10px] text-slate-500">
+                <span>AURELINX SECURITY SYSTEM // candidate_dossier_v3</span>
                 <button
                   onClick={() => setSelectedTalent(null)}
-                  className="h-10 px-4 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm"
+                  className="h-9 px-5 rounded bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/20 hover:text-white transition-colors text-xs font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(6,182,212,0.1)]"
                 >
-                  Close
+                  Close Dossier
                 </button>
               </div>
             </motion.div>

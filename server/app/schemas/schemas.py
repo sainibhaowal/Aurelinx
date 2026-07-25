@@ -128,6 +128,8 @@ class EmployeeCreate(BaseModel):
     department: str = Field(..., min_length=1, max_length=100)
     role: str = Field(..., min_length=1, max_length=100)
     sentiment_score: Optional[float] = Field(default=0.5, ge=0.0, le=1.0)
+    salary: Optional[int] = None
+    join_date: Optional[datetime] = None
     skills: Optional[List[SkillCreate]] = []
     experiences: Optional[List[ExperienceCreate]] = []
 
@@ -140,6 +142,8 @@ class EmployeeUpdate(BaseModel):
     role: Optional[str] = None
     sentiment_score: Optional[float] = Field(None, ge=0.0, le=1.0)
     is_at_risk: Optional[bool] = None
+    salary: Optional[int] = None
+    join_date: Optional[datetime] = None
 
 
 class EmployeeOut(BaseModel):
@@ -153,6 +157,8 @@ class EmployeeOut(BaseModel):
     sentiment_score: float
     is_at_risk: bool
     retention_prob: Optional[float]
+    salary: Optional[int] = None
+    join_date: Optional[datetime] = None
     skills: List[SkillOut] = []
     experiences: List[ExperienceOut] = []
     created_at: datetime
@@ -170,6 +176,8 @@ class EmployeeListOut(BaseModel):
     sentiment_score: float
     is_at_risk: bool
     retention_prob: Optional[float]
+    salary: Optional[int] = None
+    join_date: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -184,6 +192,7 @@ class CandidateCreate(BaseModel):
     email: EmailStr
     department: str = Field(..., min_length=1, max_length=100)
     role: str = Field(..., min_length=1, max_length=100)
+    salary: Optional[int] = None
     skills: Optional[List[SkillCreate]] = []
     experiences: Optional[List[ExperienceCreate]] = []
 
@@ -198,6 +207,7 @@ class CandidateOut(BaseModel):
     role: str
     sentiment_score: float
     match_score: Optional[float]
+    salary: Optional[int] = None
     skills: List[SkillOut] = []
     experiences: List[ExperienceOut] = []
     application_date: datetime
@@ -214,6 +224,7 @@ class CandidateListOut(BaseModel):
     role: str
     sentiment_score: float
     match_score: Optional[float]
+    salary: Optional[int] = None
     application_date: datetime
     created_at: datetime
 

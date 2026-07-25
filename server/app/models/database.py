@@ -135,6 +135,7 @@ class EmployeeTable(SQLModel, table=True):
     sentiment_score: float = Field(default=0.5, ge=0.0, le=1.0)
     is_at_risk: bool = Field(default=False, index=True)
     retention_prob: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    salary: Optional[int] = Field(default=None)
     join_date: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -156,6 +157,7 @@ class CandidateTable(SQLModel, table=True):
     sentiment_score: float = Field(default=0.5, ge=0.0, le=1.0)
     application_date: datetime = Field(default_factory=datetime.utcnow)
     match_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    salary: Optional[int] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -529,6 +531,7 @@ class CanonicalEmployeeTable(SQLModel, table=True):
     sentiment_score: float = Field(default=0.5, ge=0.0, le=1.0)
     retention_prob: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     is_at_risk: bool = Field(default=False, index=True)
+    salary: Optional[int] = Field(default=None)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
@@ -549,6 +552,7 @@ class CanonicalCandidateTable(SQLModel, table=True):
     department: str = Field(index=True)
     role: str = Field(index=True)
     match_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    salary: Optional[int] = Field(default=None)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
@@ -838,6 +842,16 @@ def _ensure_runtime_schema_compat():
             )
 
         enterprise_column_plan = {
+            "employeetable": [("salary", "INTEGER DEFAULT NULL")],
+            "candidatetable": [("salary", "INTEGER DEFAULT NULL")],
+            "canonical_employees": [
+                ("tenant_id", "VARCHAR(64) DEFAULT 'default'"),
+                ("salary", "INTEGER DEFAULT NULL"),
+            ],
+            "canonical_candidates": [
+                ("tenant_id", "VARCHAR(64) DEFAULT 'default'"),
+                ("salary", "INTEGER DEFAULT NULL"),
+            ],
             "integration_connections": [
                 ("tenant_id", "VARCHAR(64) DEFAULT 'default'"),
                 ("sync_interval_minutes", "INTEGER DEFAULT 60"),
@@ -853,8 +867,6 @@ def _ensure_runtime_schema_compat():
             "data_contracts": [("tenant_id", "VARCHAR(64) DEFAULT 'default'")],
             "raw_events": [("tenant_id", "VARCHAR(64) DEFAULT 'default'")],
             "quarantine_events": [("tenant_id", "VARCHAR(64) DEFAULT 'default'")],
-            "canonical_employees": [("tenant_id", "VARCHAR(64) DEFAULT 'default'")],
-            "canonical_candidates": [("tenant_id", "VARCHAR(64) DEFAULT 'default'")],
             "gold_metric_snapshots": [("tenant_id", "VARCHAR(64) DEFAULT 'default'")],
             "ml_model_registry": [("tenant_id", "VARCHAR(64) DEFAULT 'default'")],
             "compliance_policies": [("tenant_id", "VARCHAR(64) DEFAULT 'default'")],

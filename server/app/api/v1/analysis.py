@@ -235,9 +235,9 @@ def _build_sentiment_metrics(
 
     current = {
         "Organizational Morale": round(avg_sentiment, 4),
-        "Talent Density": round(talent_density, 4),
+        "Department Concentration Balance": round(talent_density, 4),
         "Burnout Risk": round(burnout_risk, 4),
-        "Leadership Trust": round(leadership_trust, 4),
+        "Retention-Sentiment Index": round(leadership_trust, 4),
     }
 
     metrics: List[SentimentMetric] = []
@@ -644,12 +644,13 @@ async def get_sentiment_report(
                 total_employees=0,
                 at_risk_count=0,
                 at_risk_percentage=0.0,
+                avg_sentiment=0.0,
                 metrics=[],
                 recommendations=["No employees found matching criteria"],
             )
 
         at_risk_count = len([e for e in employees if e.is_at_risk])
-        sum([e.sentiment_score for e in employees]) / len(employees)
+        avg_sentiment = sum([e.sentiment_score for e in employees]) / len(employees)
         metrics, _ = _build_sentiment_metrics(employees)
         risk_pct = (at_risk_count / len(employees) * 100) if employees else 0.0
 
@@ -657,6 +658,7 @@ async def get_sentiment_report(
             total_employees=len(employees),
             at_risk_count=at_risk_count,
             at_risk_percentage=risk_pct,
+            avg_sentiment=round(avg_sentiment, 3),
             metrics=metrics,
             recommendations=[
                 (
