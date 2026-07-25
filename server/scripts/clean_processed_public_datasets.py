@@ -1,0 +1,325 @@
+"""Create a deterministic, referentially consistent processed dataset bundle.
+
+The original public bundle was generated from a small identity pool and then
+expanded to thousands of rows.  This tool keeps every source row, but gives
+each employee/candidate row a unique identity and rewires its related skills
+and experience rows to that identity.
+
+It intentionally does not modify the raw source datasets.  Raw HR/OECD/O*NET
+files contain repeated observations by design.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import re
+from collections import defaultdict
+from pathlib import Path
+
+
+PROCESSED_FILES = (
+    "employees_public.csv",
+    "candidates_public.csv",
+    "employee_skills_public.csv",
+    "candidate_skills_public.csv",
+    "employee_experience_public.csv",
+    "candidate_experience_public.csv",
+)
+
+MIDDLE_NAMES = (
+    "Avery", "Bailey", "Blake", "Cameron", "Casey", "Charlie", "Dakota", "Drew",
+    "Elliot", "Emerson", "Finley", "Hayden", "Jamie", "Jordan", "Kai", "Kendall",
+    "Lane", "Logan", "Marley", "Morgan", "Parker", "Payton", "Reese", "Riley",
+    "River", "Robin", "Rowan", "Sawyer", "Shannon", "Skyler", "Taylor", "Teagan",
+    "Alexis", "Andrea", "Angel", "Arden", "Ari", "Aspen", "Aubrey", "Blair",
+    "Briar", "Brooklyn", "Charlie", "Darian", "Ellis", "Frankie", "Gray", "Harley",
+    "Jules", "Justice", "Leslie", "Micah", "Nico", "Noel", "Oakley", "Phoenix",
+    "Quincy", "Remy", "Sage", "Sam", "Shiloh", "Spencer", "Tatum", "Winter",
+    "Adrian", "Alex", "Amari", "Carter", "Dylan", "Eden", "Jesse", "Kai",
+    "Milan", "Navy", "Reagan", "Rio", "Sasha", "Toby", "Wren", "Zion",
+    "Alana", "Amir", "Anika", "Brandon", "Brielle", "Damon", "Elena", "Elias",
+    "Gianna", "Hugo", "Imani", "Jonah", "Leila", "Mateo", "Nadia", "Nolan",
+    "Priya", "Sienna", "Tristan", "Valerie", "Vivian", "Zara", "Zayne", "Maya",
+)
+
+CANDIDATE_DEPARTMENT_LABELS = {
+    "technical": "Technical",
+    "support": "Support",
+    "IT": "IT",
+    "product_mng": "Product Management",
+    "RandD": "Research & Development",
+    "hr": "Human Resources",
+    "accounting": "Accounting",
+    "management": "Management",
+    "marketing": "Marketing",
+    "sales": "Sales",
+}
+
+EXTRA_FIRST_NAMES = (
+    "Aaron", "Adam", "Adrian", "Aiden", "Alana", "Albert", "Alexandra", "Alice",
+    "Andrew", "Anna", "Anthony", "Arthur", "Audrey", "Austin", "Bella", "Beatrice",
+    "Brandon", "Brian", "Brianna", "Caleb", "Camila", "Carlos", "Caroline", "Catherine",
+    "Charles", "Charlotte", "Chloe", "Christian", "Claire", "Colin", "Connor", "Cooper",
+    "Daisy", "Damian", "David", "Delilah", "Derek", "Diana", "Dominic", "Dylan",
+    "Edward", "Eleanor", "Elena", "Eliana", "Elizabeth", "Eric", "Erin", "Eva",
+    "Faith", "Felix", "Fiona", "Gabriel", "Gemma", "George", "Gianna", "Gavin",
+    "Grace", "Hailey", "Hannah", "Hazel", "Henry", "Ibrahim", "Ian", "Iris",
+    "Isaac", "Isla", "Jack", "Jackson", "Jacob", "Jasmine", "Jason", "Javier",
+    "Jenna", "Jeremiah", "Jessica", "Joel", "John", "Jonathan", "Joseph", "Julia",
+    "Julian", "Justin", "Katherine", "Kevin", "Kiara", "Kimberly", "Leo", "Leon",
+    "Lillian", "Lily", "Logan", "Lucy", "Luke", "Madeline", "Madison", "Marcus",
+    "Maria", "Mark", "Martin", "Matthew", "Max", "Megan", "Melanie", "Michael",
+    "Michelle", "Miguel", "Natalie", "Nathan", "Nicholas", "Nicole", "Nina", "Oliver",
+    "Owen", "Paige", "Patrick", "Paul", "Peter", "Rachel", "Rebecca", "Richard",
+    "Robert", "Rose", "Ryan", "Samuel", "Sarah", "Sebastian", "Serena", "Sofia",
+    "Stephen", "Steven", "Stella", "Thomas", "Timothy", "Travis", "Trevor", "Valentina",
+    "Victoria", "Vincent", "Wesley", "William", "Wyatt", "Xavier", "Yara", "Zoe",
+)
+
+EXTRA_LAST_NAMES = (
+    "Adams", "Alexander", "Allen", "Anderson", "Andrews", "Armstrong", "Arnold", "Atkinson",
+    "Austin", "Baker", "Barber", "Barnes", "Barton", "Bates", "Becker", "Bell",
+    "Bennett", "Benson", "Bishop", "Black", "Blair", "Boone", "Bowen", "Boyd",
+    "Bradley", "Brady", "Branch", "Briggs", "Bright", "Brock", "Brooks", "Bryant",
+    "Buckley", "Burke", "Burns", "Butler", "Byrd", "Campbell", "Carpenter", "Carr",
+    "Carroll", "Carter", "Case", "Chambers", "Chapman", "Chase", "Chen", "Clark",
+    "Clarke", "Clayton", "Cole", "Coleman", "Collins", "Conley", "Conner", "Conway",
+    "Cook", "Cooper", "Cortez", "Cox", "Craig", "Crawford", "Crosby", "Cunningham",
+    "Curtis", "Dalton", "Daniels", "Daugherty", "Davenport", "Davidson", "Davis", "Dawson",
+    "Dean", "Delaney", "Dennis", "Diaz", "Dixon", "Douglas", "Doyle", "Drake",
+    "Duncan", "Dunn", "Eaton", "Edwards", "Elliott", "Ellis", "Erickson", "Erwin",
+    "Farley", "Farmer", "Ferguson", "Finch", "Fisher", "Fleming", "Fletcher", "Flynn",
+    "Ford", "Foster", "Fowler", "Fox", "Francis", "Franklin", "Frazier", "Freeman",
+    "French", "Friedman", "Frost", "Garcia", "Gardner", "Garner", "Garrison", "Gates",
+    "Gibbs", "Gibson", "Gilbert", "Gill", "Gillespie", "Glover", "Goff", "Golden",
+    "Gomez", "Gonzalez", "Goodman", "Goodwin", "Gordon", "Graham", "Grant", "Graves",
+    "Gray", "Green", "Greene", "Gregory", "Griffin", "Griffith", "Gross", "Guerrero",
+    "Guthrie", "Hahn", "Hale", "Hall", "Hamilton", "Hammond", "Hampton", "Hancock",
+    "Haney", "Hansen", "Hardin", "Harding", "Harper", "Harrington", "Harris", "Harrison",
+    "Hart", "Hartman", "Harvey", "Hawkins", "Hayes", "Haynes", "Hendricks", "Hendrix",
+    "Herman", "Hernandez", "Herrera", "Hess", "Hester", "Hewitt", "Hickman", "Hicks",
+    "Higgins", "Hill", "Hines", "Hinton", "Hobbs", "Hodges", "Hoffman", "Holcomb",
+    "Holder", "Holland", "Holloway", "Holmes", "Holt", "Hooper", "Hopkins", "Hopper",
+    "Horn", "Horne", "Horton", "House", "Houston", "Howard", "Howe", "Howell",
+    "Hubbard", "Huber", "Hudson", "Huff", "Huffman", "Hughes", "Hull", "Humphrey",
+    "Hunt", "Hunter", "Hurley", "Hurst", "Ingram", "Irwin", "Jackson", "Jacobs",
+    "James", "Jarvis", "Jefferson", "Jenkins", "Jennings", "Jensen", "Jimenez", "Johns",
+    "Johnson", "Johnston", "Jones", "Jordan", "Joseph", "Joyce", "Kane", "Kaufman",
+    "Keith", "Keller", "Kelley", "Kelly", "Kemp", "Kennedy", "Kent", "Kerr",
+    "Kidd", "Kim", "King", "Kirby", "Kirk", "Klein", "Kline", "Knapp",
+    "Knight", "Knox", "Koch", "Kramer", "Lamb", "Lambert", "Lancaster", "Landry",
+    "Lane", "Lang", "Lara", "Larson", "Lawrence", "Lawson", "Leach", "LeBlanc",
+    "Lee", "Leonard", "Lester", "Levine", "Levy", "Lewis", "Lindsey", "Little",
+    "Livingston", "Lloyd", "Logan", "Long", "Lopez", "Lott", "Love", "Lowe",
+    "Lucas", "Luna", "Lynch", "Lyons", "Madden", "Maddox", "Maldonado", "Malone",
+    "Mann", "Manning", "Marks", "Marsh", "Marshall", "Martin", "Martinez", "Mason",
+    "Massey", "Mata", "Matthews", "Maxwell", "May", "Mayer", "Maynard", "McBride",
+    "McCarthy", "McClain", "McConnell", "McCormick", "McCoy", "McCray", "McDaniel", "McDonald",
+    "McDowell", "McGee", "McGrath", "McGuire", "McIntyre", "McKay", "McKenzie", "McKinney",
+    "McLean", "McMillan", "McNeil", "Meadows", "Mejia", "Melton", "Mendoza", "Mercado",
+    "Meyer", "Meyers", "Miller", "Mills", "Miranda", "Mitchell", "Molina", "Monroe",
+    "Montgomery", "Moody", "Moon", "Moore", "Morales", "Moran", "Moreno", "Morgan",
+    "Morris", "Morrison", "Morrow", "Morse", "Morton", "Moses", "Mosley", "Moss",
+    "Moyer", "Mueller", "Mullen", "Mullins", "Munoz", "Murray", "Myers", "Nash",
+    "Navarro", "Neal", "Nelson", "Newman", "Newton", "Nichols", "Nicholson", "Nielsen",
+    "Noble", "Nolan", "Norman", "Norris", "Norton", "Novak", "Nunez", "O'Neal",
+    "Ochoa", "Odom", "Oliver", "Olsen", "Olson", "O'Neal", "Ortega", "Osborn",
+    "Osborne", "Owen", "Owens", "Pace", "Page", "Palmer", "Park", "Parker",
+    "Parks", "Parrish", "Parsons", "Patton", "Paul", "Payne", "Pearson", "Peck",
+    "Pena", "Pennington", "Perez", "Perkins", "Perry", "Peters", "Peterson", "Phelps",
+    "Phillips", "Pierce", "Pittman", "Pitts", "Pollard", "Pope", "Porter", "Potter",
+    "Powell", "Powers", "Pratt", "Preston", "Price", "Prince", "Pruitt", "Puckett",
+    "Quinn", "Ramirez", "Ramos", "Randall", "Randolph", "Rasmussen", "Ray", "Raymond",
+    "Reed", "Reese", "Reeves", "Reid", "Reilly", "Reyes", "Reynolds", "Rhodes",
+    "Rice", "Rich", "Richard", "Richards", "Richardson", "Riddle", "Riggs", "Riley",
+    "Rios", "Rivera", "Roach", "Robbins", "Roberson", "Roberts", "Robertson", "Robinson",
+    "Rodgers", "Rodriguez", "Rogers", "Roman", "Romero", "Rooney", "Rose", "Ross",
+    "Roth", "Rowe", "Rowland", "Roy", "Ruiz", "Russell", "Russo", "Ryan",
+    "Salazar", "Sampson", "Sanchez", "Sanders", "Sandoval", "Sanford", "Santiago", "Sargent",
+    "Saunders", "Savage", "Sawyer", "Schmidt", "Schneider", "Schroeder", "Schultz", "Schwartz",
+    "Scott", "Sears", "Sellers", "Serrano", "Sexton", "Shaffer", "Shah", "Sharp",
+    "Shaw", "Shelton", "Shepard", "Shepherd", "Sherman", "Shields", "Short", "Silva",
+    "Simmons", "Simon", "Simpson", "Sims", "Singleton", "Skinner", "Slater", "Sloan",
+    "Small", "Smith", "Snider", "Snow", "Snyder", "Solis", "Solomon", "Sosa",
+    "Soto", "Sparks", "Spears", "Spencer", "Stafford", "Stanley", "Stanton", "Stark",
+    "Steele", "Stein", "Stephens", "Stevens", "Stewart", "Stokes", "Stone", "Strickland",
+    "Strong", "Stuart", "Suarez", "Sullivan", "Summers", "Sutton", "Swanson", "Sweeney",
+    "Tanner", "Tate", "Taylor", "Terrell", "Thomas", "Thompson", "Thornton", "Todd",
+    "Torres", "Townsend", "Travis", "Trujillo", "Tucker", "Turner", "Tyler", "Underwood",
+    "Valdez", "Valentine", "Valenzuela", "Vance", "Vang", "Vargas", "Vasquez", "Vaughan",
+    "Vega", "Velasquez", "Velez", "Villarreal", "Vincent", "Wade", "Wagner", "Walker",
+    "Wall", "Wallace", "Waller", "Walsh", "Walter", "Walters", "Walton", "Ward",
+    "Warner", "Warren", "Washington", "Waters", "Watkins", "Watson", "Watts", "Weaver",
+    "Webb", "Weber", "Webster", "Weeks", "Weiss", "Welch", "Wells", "West",
+    "Wheeler", "Whitaker", "White", "Whitney", "Wilcox", "Wiley", "Wilkerson", "Wilkinson",
+    "Williams", "Williamson", "Willis", "Wilson", "Winters", "Wise", "Witt", "Wolf",
+    "Wolfe", "Wong", "Wood", "Woodard", "Woods", "Woodward", "Wooten", "Workman",
+    "Wright", "Wyatt", "Yates", "York", "Young", "Zamora", "Zavala", "Zimmerman",
+)
+
+
+def read_csv(path: Path) -> list[dict[str, str]]:
+    with path.open(newline="", encoding="utf-8-sig") as handle:
+        return list(csv.DictReader(handle))
+
+
+def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        raise ValueError(f"Cannot write an empty dataset: {path}")
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.casefold()).strip("-")
+
+
+def identity_stream(first_names: list[str], last_names: list[str]):
+    """Yield unique three-part names with a unique first/last pair."""
+    pair_index = 0
+    for last in last_names:
+        for first in first_names:
+            middle = MIDDLE_NAMES[pair_index % len(MIDDLE_NAMES)]
+            yield f"{first} {middle} {last}"
+            pair_index += 1
+
+
+def grouped(rows: list[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
+    result: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for row in rows:
+        result[row["email"]].append(row)
+    return result
+
+
+def validate_bundle(bundle: dict[str, list[dict[str, str]]]) -> dict[str, int]:
+    employees = bundle["employees_public.csv"]
+    candidates = bundle["candidates_public.csv"]
+    employee_emails = {row["email"] for row in employees}
+    candidate_emails = {row["email"] for row in candidates}
+    all_names = [row["full_name"] for row in employees + candidates]
+    all_emails = [row["email"] for row in employees + candidates]
+    email_re = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*@public\.local$")
+
+    if len(all_names) != len(set(all_names)):
+        raise ValueError("Duplicate full_name remains in the cleaned bundle")
+    if len(all_emails) != len(set(all_emails)):
+        raise ValueError("Duplicate email remains in the cleaned bundle")
+    if any(not email_re.fullmatch(email) for email in all_emails):
+        raise ValueError("Invalid email remains in the cleaned bundle")
+
+    checks = {
+        "employee_skills_public.csv": employee_emails,
+        "employee_experience_public.csv": employee_emails,
+        "candidate_skills_public.csv": candidate_emails,
+        "candidate_experience_public.csv": candidate_emails,
+    }
+    duplicate_keys = 0
+    for filename, allowed in checks.items():
+        rows = bundle[filename]
+        if any(row["email"] not in allowed for row in rows):
+            raise ValueError(f"{filename} contains an unknown parent email")
+        if "skills" in filename:
+            keys = [(row["email"], row["skill_name"]) for row in rows]
+        else:
+            keys = [tuple(row.values()) for row in rows]
+        duplicate_keys += len(keys) - len(set(keys))
+    if duplicate_keys:
+        raise ValueError(f"Duplicate child records remain: {duplicate_keys}")
+
+    return {
+        "employees": len(employees),
+        "candidates": len(candidates),
+        "employee_skills": len(bundle["employee_skills_public.csv"]),
+        "candidate_skills": len(bundle["candidate_skills_public.csv"]),
+        "employee_experience": len(bundle["employee_experience_public.csv"]),
+        "candidate_experience": len(bundle["candidate_experience_public.csv"]),
+        "unique_names": len(set(all_names)),
+        "unique_emails": len(set(all_emails)),
+    }
+
+
+def clean(input_dir: Path, output_dir: Path) -> dict[str, int]:
+    source = {filename: read_csv(input_dir / filename) for filename in PROCESSED_FILES}
+    employees = source["employees_public.csv"]
+    candidates = source["candidates_public.csv"]
+
+    first_names = sorted(
+        {row["full_name"].split()[0] for row in employees + candidates}
+        | set(EXTRA_FIRST_NAMES)
+        | set(MIDDLE_NAMES)
+    )
+    last_names = sorted(
+        {row["full_name"].split()[-1] for row in employees + candidates}
+        | set(EXTRA_LAST_NAMES)
+        | set(MIDDLE_NAMES)
+    )
+    identities = identity_stream(first_names, last_names)
+
+    employee_email_map: dict[str, str] = {}
+    used_names: set[str] = set()
+    for index, row in enumerate(employees, start=1):
+        name = next(name for name in identities if name not in used_names)
+        used_names.add(name)
+        first, middle, last = name.split()
+        email = f"{slug(first)}.{slug(middle)}.{slug(last)}.emp{index:05d}@public.local"
+        employee_email_map[row["email"]] = email
+        row["full_name"] = name
+        row["email"] = email
+
+    candidate_groups = grouped(candidates)
+    candidate_email_map: dict[tuple[str, int], str] = {}
+    for old_email, rows in candidate_groups.items():
+        for occurrence, row in enumerate(rows):
+            name = next(name for name in identities if name not in used_names)
+            used_names.add(name)
+            first, middle, last = name.split()
+            # The global row index is used for stable, collision-free email IDs.
+            sequence = len(candidate_email_map) + 1
+            email = f"{slug(first)}.{slug(middle)}.{slug(last)}.cand{sequence:05d}@public.local"
+            candidate_email_map[(old_email, occurrence)] = email
+            row["full_name"] = name
+            row["email"] = email
+            row["department"] = CANDIDATE_DEPARTMENT_LABELS.get(row["department"], row["department"])
+
+    for row in source["employee_skills_public.csv"] + source["employee_experience_public.csv"]:
+        row["email"] = employee_email_map[row["email"]]
+
+    candidate_experience_groups = grouped(source["candidate_experience_public.csv"])
+    for old_email, rows in candidate_experience_groups.items():
+        for occurrence, row in enumerate(rows):
+            row["email"] = candidate_email_map[(old_email, occurrence)]
+
+    candidate_skill_groups = grouped(source["candidate_skills_public.csv"])
+    for old_email, rows in candidate_skill_groups.items():
+        if len(rows) % len(candidate_groups[old_email]) != 0:
+            raise ValueError(f"Candidate skill rows do not divide evenly for {old_email}")
+        skills_per_candidate = len(rows) // len(candidate_groups[old_email])
+        for occurrence, row in enumerate(rows):
+            row["email"] = candidate_email_map[(old_email, occurrence // skills_per_candidate)]
+
+    stats = validate_bundle(source)
+    for filename in PROCESSED_FILES:
+        write_csv(output_dir / filename, source[filename])
+    (output_dir / "CLEANING_MANIFEST.json").write_text(
+        json.dumps({"source": str(input_dir), "stats": stats}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return stats
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", type=Path, default=Path("Docs/datasets/processed"))
+    parser.add_argument("--output", type=Path, default=Path("Docs/datasets/processed_clean"))
+    args = parser.parse_args()
+    stats = clean(args.input, args.output)
+    print(json.dumps(stats, indent=2))
+
+
+if __name__ == "__main__":
+    main()

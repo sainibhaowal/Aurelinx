@@ -33,7 +33,7 @@ const TalentCard = ({ talent, onOpenProfile }) => {
 
         {/* Content Area */}
         <div className="flex-1 min-w-0 flex flex-col h-full">
-          <div className="flex items-start justify-between gap-3 mb-1.5">
+          <div className="flex items-start justify-between gap-2 mb-1.5 min-w-0">
             <div className="min-w-0 flex-1">
               <h3
                 className="text-sm md:text-base font-extrabold text-white tracking-tight leading-snug truncate mb-1"
@@ -65,6 +65,10 @@ const TalentCard = ({ talent, onOpenProfile }) => {
             </Badge>
           </div>
 
+          <div className="mt-1 max-w-full truncate text-[10px] text-slate-500" title={talent.email || ""}>
+            {talent.email || "Verified profile"}
+          </div>
+
           {/* Skill Tag Pills */}
           <div className="flex flex-wrap gap-1.5 my-2.5">
             {talent.skills?.slice(0, 3).map((skill, i) => (
@@ -81,8 +85,8 @@ const TalentCard = ({ talent, onOpenProfile }) => {
           </div>
 
           {/* Footer Metrics */}
-          <div className="flex items-center justify-between pt-3 border-t border-white/5 mt-auto gap-3">
-            <div className="flex gap-4 sm:gap-5">
+          <div className="flex flex-wrap items-end justify-between pt-3 border-t border-white/5 mt-auto gap-3 min-w-0">
+            <div className="flex gap-3 sm:gap-5 min-w-0">
               <div className="space-y-0.5">
                 <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-slate-500">
                   Sentiment
@@ -110,8 +114,10 @@ const TalentCard = ({ talent, onOpenProfile }) => {
               variant="secondary"
               size="sm"
               icon={<ExternalLink size={12} />}
-              className="w-8 h-8 p-0 rounded-lg hover:bg-indigo-600/20 hover:border-indigo-500/40 shrink-0"
-            />
+              className="h-8 min-w-8 px-2 rounded-lg hover:bg-indigo-600/20 hover:border-indigo-500/40 shrink-0"
+            >
+              <span className="sr-only">View profile</span>
+            </Button>
           </div>
         </div>
       </div>

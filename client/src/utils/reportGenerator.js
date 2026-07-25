@@ -32,41 +32,97 @@ function buildEmployeesTableRows(employees = []) {
   ]);
 }
 
-function exportPdf(employees = [], analysis = "") {
+function buildCandidatesTableRows(candidates = []) {
+  return candidates.map((candidate) => [
+    safeValue(candidate.full_name),
+    safeValue(candidate.role),
+    safeValue(candidate.department),
+    safeValue(candidate.sentiment_score),
+    safeValue(candidate.match_score),
+    safeValue(candidate.email),
+  ]);
+}
+
+function normalizeReportData(input) {
+  if (Array.isArray(input)) return { employees: input, candidates: [] };
+  return { employees: input?.employees || [], candidates: input?.candidates || [] };
+}
+
+function drawLetterhead(doc, timestamp, section = "Management Intelligence") {
+  doc.setFillColor(7, 17, 31);
+  doc.rect(0, 0, 210, 30, "F");
+  doc.setFillColor(14, 165, 164);
+  doc.roundedRect(15, 8, 14, 14, 3, 3, "F");
+  doc.setTextColor(7, 17, 31);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("A", 19.5, 17.5);
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(17);
+  doc.text("AURELINX", 35, 15);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text(section.toUpperCase(), 35, 21);
+  doc.text(`Generated ${timestamp}`, 195, 15, { align: "right" });
+}
+
+function drawFooter(doc, pageNumber) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  doc.setDrawColor(226, 232, 240);
+  doc.line(15, pageHeight - 15, pageWidth - 15, pageHeight - 15);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Aurelinx · Confidential management report", 15, pageHeight - 8);
+  doc.text(`Page ${pageNumber}`, pageWidth - 15, pageHeight - 8, { align: "right" });
+}
+
+function exportPdf(input = [], analysis = "") {
+  const { employees, candidates } = normalizeReportData(input);
   const doc = new jsPDF();
   const timestamp = new Date().toLocaleString();
 
-  doc.setFillColor(15, 23, 42);
-  doc.rect(0, 0, 210, 40, "F");
+  drawLetterhead(doc, timestamp);
+  doc.setTextColor(15, 23, 42);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("Executive Summary", 15, 45);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(71, 85, 105);
+  doc.text("Authoritative export of the selected Aurelinx records.", 15, 52);
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(22);
-  doc.text("AURELINX MANAGEMENT INTELLIGENCE", 20, 25);
-
-  doc.setFontSize(10);
-  doc.text(`Generated on: ${timestamp}`, 150, 32);
-
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(16);
-  doc.text("Executive Summary", 20, 55);
-
-  doc.setFontSize(10);
-  doc.text(`Total Headcount Analyzed: ${employees.length}`, 20, 65);
-  doc.text(
-    `Identified Risk Clusters: ${employees.filter((e) => e.is_at_risk).length} Employees`,
-    20,
-    72,
-  );
+  const metrics = [
+    ["EMPLOYEES", employees.length],
+    ["CANDIDATES", candidates.length],
+    ["TOTAL PEOPLE", employees.length + candidates.length],
+    ["AT-RISK EMPLOYEES", employees.filter((e) => e.is_at_risk).length],
+  ];
+  metrics.forEach(([label, value], index) => {
+    const x = 15 + index * 45;
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(x, 60, 40, 23, 2, 2, "F");
+    doc.setFontSize(7); doc.setTextColor(100, 116, 139); doc.text(label, x + 3, 67);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(15, 23, 42); doc.text(String(value), x + 3, 77);
+    doc.setFont("helvetica", "normal");
+  });
 
   if (analysis) {
-    doc.setFontSize(14);
-    doc.text("Aurelinx Strategic Analysis", 20, 85);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text("Strategic Analysis", 15, 97);
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
     const splitText = doc.splitTextToSize(analysis, 170);
-    doc.text(splitText, 20, 95);
+    doc.text(splitText, 15, 105);
   }
 
-  const startY = analysis ? 130 : 85;
+  const startY = analysis ? 128 : 97;
+  const tablePage = (page) => { drawLetterhead(doc, timestamp, page === 1 ? "Management Intelligence" : "Employee Records"); drawFooter(doc, page); };
   autoTable(doc, {
     startY,
     head: [["Name", "Role", "Department", "Sentiment", "Risk Status"]],
@@ -75,48 +131,91 @@ function exportPdf(employees = [], analysis = "") {
     headStyles: {
       fillColor: [15, 23, 42],
       textColor: [255, 255, 255],
+      fontStyle: "bold",
     },
     styles: {
       fontSize: 9,
       cellPadding: 2.2,
       overflow: "linebreak",
     },
-    alternateRowStyles: {
+      alternateRowStyles: {
       fillColor: [245, 247, 250],
     },
+    didDrawPage: (hookData) => tablePage(hookData.pageNumber),
   });
+
+  doc.addPage();
+  drawLetterhead(doc, timestamp, "Candidate Records");
+  doc.setTextColor(15, 23, 42); doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text("Candidate Records", 15, 45);
+  autoTable(doc, {
+    startY: 35,
+    head: [["Name", "Role", "Department", "Sentiment", "Match", "Email"]],
+    body: buildCandidatesTableRows(candidates),
+    theme: "grid",
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+    styles: { fontSize: 7, cellPadding: 1.8, overflow: "linebreak" },
+    alternateRowStyles: { fillColor: [245, 247, 250] },
+    didDrawPage: (hookData) => { drawLetterhead(doc, timestamp, "Candidate Records"); drawFooter(doc, hookData.pageNumber); },
+  });
+
+  for (let page = 1; page <= doc.getNumberOfPages(); page += 1) {
+    doc.setPage(page);
+    drawFooter(doc, page);
+  }
 
   doc.save(`Aurelinx_Management_Report_${Date.now()}.pdf`);
 }
 
-function exportMarkdown(employees = [], analysis = "") {
+function exportMarkdown(input = [], analysis = "") {
+  const { employees, candidates } = normalizeReportData(input);
   const timestamp = new Date().toLocaleString();
   const atRisk = employees.filter((e) => e.is_at_risk).length;
 
   const lines = [
+    "---",
+    "title: Aurelinx Management Intelligence Report",
+    `generated_at: ${new Date().toISOString()}`,
+    "format: enterprise-data-export",
+    "---",
+    "",
     "# Aurelinx Management Intelligence Report",
     "",
-    `Generated on: ${timestamp}`,
+    `> Generated on: ${timestamp}`,
     "",
     "## Executive Summary",
-    `- Total Headcount Analyzed: ${employees.length}`,
+    "",
+    "### Record Scope",
+    `- Employees: ${employees.length}`,
+    `- Candidates: ${candidates.length}`,
+    `- Total People Records: ${employees.length + candidates.length}`,
     `- Identified Risk Clusters: ${atRisk} Employees`,
     `- Risk Rate: ${employees.length ? ((atRisk / employees.length) * 100).toFixed(1) : "0.0"}%`,
   ];
 
   if (analysis) {
-    lines.push("", "## Aurelinx Strategic Analysis", analysis.trim());
+    lines.push("", "## Strategic Analysis", "", analysis.trim());
   }
 
   lines.push(
     "",
-    "## Talent Table",
+    "## Employee Records",
     "",
     "| Name | Role | Department | Sentiment | Risk Status |",
-    "| --- | --- | --- | --- | --- |",
+    "|:---|:---|:---|---:|:---|",
   );
 
   buildEmployeesTableRows(employees).forEach((row) => {
+    lines.push(`| ${row.map(escapeMarkdownCell).join(" | ")} |`);
+  });
+
+  lines.push(
+    "",
+    "## Candidate Records",
+    "",
+    "| Name | Role | Department | Sentiment | Match | Email |",
+    "|:---|:---|:---|---:|---:|:---|",
+  );
+  buildCandidatesTableRows(candidates).forEach((row) => {
     lines.push(`| ${row.map(escapeMarkdownCell).join(" | ")} |`);
   });
 
@@ -126,7 +225,8 @@ function exportMarkdown(employees = [], analysis = "") {
   downloadBlob(blob, `Aurelinx_Management_Report_${Date.now()}.md`);
 }
 
-function exportExcel(employees = [], analysis = "") {
+function exportExcel(input = [], analysis = "") {
+  const { employees, candidates } = normalizeReportData(input);
   const workbook = XLSX.utils.book_new();
   const timestamp = new Date().toLocaleString();
   const atRisk = employees.filter((e) => e.is_at_risk).length;
@@ -134,7 +234,9 @@ function exportExcel(employees = [], analysis = "") {
   const summarySheet = XLSX.utils.aoa_to_sheet([
     ["Aurelinx Management Intelligence Report"],
     ["Generated At", timestamp],
-    ["Employees Analyzed", employees.length],
+    ["Employees", employees.length],
+    ["Candidates", candidates.length],
+    ["Total People Records", employees.length + candidates.length],
     ["At-Risk Employees", atRisk],
     [
       "Risk Rate",
@@ -156,24 +258,51 @@ function exportExcel(employees = [], analysis = "") {
       email: employee.email || "",
     })),
   );
+  const candidatesSheet = XLSX.utils.json_to_sheet(
+    candidates.map((candidate) => ({
+      full_name: candidate.full_name || "",
+      email: candidate.email || "",
+      role: candidate.role || "",
+      department: candidate.department || "",
+      sentiment_score: candidate.sentiment_score ?? "",
+      match_score: candidate.match_score ?? "",
+      application_date: candidate.application_date || "",
+    })),
+  );
+
+  summarySheet["!cols"] = [{ wch: 28 }, { wch: 72 }];
+  summarySheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
+  employeesSheet["!freeze"] = { xSplit: 0, ySplit: 1 };
+  employeesSheet["!autofilter"] = { ref: `A1:G${Math.max(1, employees.length + 1)}` };
+  employeesSheet["!cols"] = [
+    { wch: 28 }, { wch: 26 }, { wch: 26 }, { wch: 16 },
+    { wch: 16 }, { wch: 16 }, { wch: 38 },
+  ];
+  candidatesSheet["!freeze"] = { xSplit: 0, ySplit: 1 };
+  candidatesSheet["!autofilter"] = { ref: `A1:G${Math.max(1, candidates.length + 1)}` };
+  candidatesSheet["!cols"] = [
+    { wch: 28 }, { wch: 38 }, { wch: 26 }, { wch: 26 },
+    { wch: 16 }, { wch: 16 }, { wch: 18 },
+  ];
 
   XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
   XLSX.utils.book_append_sheet(workbook, employeesSheet, "Employees");
+  XLSX.utils.book_append_sheet(workbook, candidatesSheet, "Candidates");
   XLSX.writeFile(workbook, `Aurelinx_Management_Report_${Date.now()}.xlsx`);
 }
 
-export const generateAurelinxReport = (employees, analysis, format = "pdf") => {
+export const generateAurelinxReport = (data, analysis, format = "pdf") => {
   const normalizedFormat = String(format || "pdf").toLowerCase();
 
   if (normalizedFormat === "excel" || normalizedFormat === "xlsx") {
-    exportExcel(employees || [], analysis || "");
+    exportExcel(data || [], analysis || "");
     return;
   }
 
   if (normalizedFormat === "markdown" || normalizedFormat === "md") {
-    exportMarkdown(employees || [], analysis || "");
+    exportMarkdown(data || [], analysis || "");
     return;
   }
 
-  exportPdf(employees || [], analysis || "");
+  exportPdf(data || [], analysis || "");
 };

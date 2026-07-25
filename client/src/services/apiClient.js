@@ -566,6 +566,8 @@ export const employeesAPI = {
     });
   },
 
+  count: () => request(`${API_V1}/employees/count`),
+
   get: (employeeId) => request(`${API_V1}/employees/${employeeId}`),
 
   create: (data) =>
@@ -599,6 +601,8 @@ export const candidatesAPI = {
       timeoutMs: LONG_REQUEST_TIMEOUT,
     });
   },
+
+  count: () => request(`${API_V1}/candidates/count`),
 
   get: (candidateId) => request(`${API_V1}/candidates/${candidateId}`),
 };

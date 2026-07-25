@@ -1,5 +1,5 @@
-@import "tailwindcss";
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+@import "tailwindcss";
 
 @theme {
   --color-background: #07111f;
@@ -40,6 +40,12 @@
     /* IE and Edge */
   }
 
+  /* Long imported names/emails must wrap inside their component, never expand the layout. */
+  img, svg, video, canvas { max-width: 100%; }
+  button, input, textarea, select { max-width: 100%; }
+  h1, h2, h3, h4, h5, h6, p, span, div { min-width: 0; }
+  [class*="premium-card"] { max-width: 100%; box-sizing: border-box; }
+
   *::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
@@ -50,6 +56,12 @@
 @layer components {
   .premium-card {
     @apply bg-[#0f1f33]/75 border border-white/10 rounded-2xl shadow-2xl transition-all duration-300;
+    background:
+      linear-gradient(135deg, rgba(52, 86, 122, 0.2), transparent 42%),
+      linear-gradient(160deg, rgba(15, 31, 51, 0.74), rgba(5, 14, 28, 0.82));
+    -webkit-backdrop-filter: blur(18px) saturate(130%);
+    backdrop-filter: blur(18px) saturate(130%);
+    border-color: rgba(255, 255, 255, 0.13);
     box-shadow:
       inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
       0 18px 60px rgba(1, 8, 20, 0.55);
@@ -60,6 +72,15 @@
 
   .premium-card-hover {
     @apply hover:border-primary/55 hover:bg-[#16304d]/75;
+  }
+
+  /* The chat canvas should remain transparent; message/tool cards keep their own surfaces. */
+  .chat-surface-transparent {
+    background: transparent !important;
+    border: none !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
   }
 
   .neon-text {
@@ -82,6 +103,50 @@
     backface-visibility: hidden;
     will-change: transform;
   }
+
+  /* Dashboard composition: use rhythm, light surfaces and data-led emphasis instead of a wall of cards. */
+  .dashboard-hero {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(520px, 1fr);
+    gap: 2rem;
+    overflow: hidden;
+    padding: clamp(1.25rem, 3vw, 2.25rem) 1.5rem;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 1rem;
+    background: rgba(15, 23, 42, 0.45);
+  }
+  .dashboard-hero::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 38%; pointer-events: none; background: radial-gradient(circle at 15% 45%, rgba(14, 165, 164, .13), transparent 68%); }
+  .dashboard-hero-copy, .dashboard-hero-metrics { position: relative; z-index: 1; }
+  .dashboard-live-dot { width: 6px; height: 6px; border-radius: 999px; background: #5eead4; box-shadow: 0 0 14px #2dd4bf; }
+  .dashboard-hero-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; }
+  .dashboard-metric { min-width: 0; padding: .35rem 1rem; border-left: 1px solid rgba(255,255,255,.1); }
+  .dashboard-metric:first-child { border-left: 0; }
+  .dashboard-metric-label { display: flex; align-items: center; gap: .45rem; color: #94a3b8; font-size: .63rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+  .dashboard-metric-label svg { color: #67e8f9; }
+  .dashboard-metric-risk .dashboard-metric-label svg, .dashboard-metric-risk .dashboard-metric-value { color: #fda4af; }
+  .dashboard-metric-value { margin-top: .85rem; color: #f8fafc; font-size: clamp(1.6rem, 3vw, 2.4rem); line-height: 1; font-weight: 800; letter-spacing: -.04em; }
+  .dashboard-metric-note { margin-top: .55rem; color: #64748b; font-size: .62rem; letter-spacing: .08em; text-transform: uppercase; }
+  .dashboard-command-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .25rem; border-top: 1px solid rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.08); }
+  .dashboard-command-link { display: flex; align-items: center; gap: .75rem; min-width: 0; padding: 1rem .65rem; text-align: left; transition: background .2s ease, transform .2s ease; }
+  .dashboard-command-link:hover { background: linear-gradient(90deg, rgba(34,211,238,.1), transparent); transform: translateX(3px); }
+  .dashboard-command-icon { display: grid; place-items: center; width: 2rem; height: 2rem; flex: 0 0 auto; color: #67e8f9; border-radius: .65rem; background: rgba(34,211,238,.08); }
+  .dashboard-insight-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 1.25rem; }
+  .dashboard-insight-panel { min-width: 0; padding: 1.25rem 0; border-top: 1px solid rgba(255,255,255,.1); border-bottom: 1px solid rgba(255,255,255,.07); }
+  .dashboard-kicker { color: #64748b; font-size: .62rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+  .dashboard-risk-row { display: flex; align-items: center; gap: .8rem; width: 100%; text-align: left; }
+  .dashboard-risk-rank { width: 1.5rem; color: #64748b; font-size: .65rem; font-weight: 800; letter-spacing: .12em; }
+  .dashboard-risk-ring { display: grid; place-items: center; width: 4.5rem; height: 4.5rem; flex: 0 0 auto; border-radius: 50%; background: conic-gradient(#fb7185 var(--risk), rgba(255,255,255,.08) 0); position: relative; }
+  .dashboard-risk-ring::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: #07111f; }
+  .dashboard-risk-ring span { position: relative; z-index: 1; color: #fda4af; font-size: .8rem; font-weight: 800; }
+  .dashboard-morale-visual { display: flex; align-items: center; gap: 1.25rem; margin: 2rem 0 1.5rem; }
+  .dashboard-morale-gauge { display: grid; place-items: center; width: 6.25rem; height: 6.25rem; flex: 0 0 auto; border-radius: 50%; background: conic-gradient(#5eead4 var(--morale), rgba(255,255,255,.08) 0); position: relative; }
+  .dashboard-morale-gauge::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: #07111f; }
+  .dashboard-morale-gauge span { position: relative; z-index: 1; color: #99f6e4; font-size: 1.3rem; font-weight: 800; }
+  .dashboard-text-action { display: inline-flex; align-items: center; gap: .35rem; color: #67e8f9; font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+  .dashboard-text-action:hover { color: #cffafe; }
+  @media (max-width: 1200px) { .dashboard-hero { grid-template-columns: 1fr; } .dashboard-command-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 760px) { .dashboard-hero-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 0; } .dashboard-metric:nth-child(3) { border-left: 0; } .dashboard-command-grid, .dashboard-insight-grid { grid-template-columns: 1fr; } .dashboard-command-link { padding-left: 0; padding-right: 0; } }
 }
 
 /* ELIMINATE RENDERING JITTER */

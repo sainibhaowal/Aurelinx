@@ -157,6 +157,7 @@ def seed_production_data():
                 sentiment_score=round(random.uniform(0.3, 1.0), 2),
                 is_at_risk=random.random() < 0.2,
                 retention_prob=round(random.uniform(0.0, 1.0), 2),
+                salary=random.randint(14, 38) * 5000, # $70,000 to $190,000
             )
             employees.append(emp)
             session.add(emp)
