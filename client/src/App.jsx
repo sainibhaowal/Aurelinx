@@ -363,7 +363,7 @@ const App = () => {
           initial={false}
           animate={{ width: isSidebarCollapsed ? 64 : 220 }}
           transition={{ duration: 0.3, ease: "circOut" }}
-          className="bg-slate-950/65 backdrop-blur-2xl border border-white/10 flex flex-col h-full relative overflow-hidden shadow-2xl rounded-2xl"
+          className="bg-[#0f1f33]/85 border border-white/10 flex flex-col h-full relative overflow-hidden shadow-2xl rounded-2xl"
         >
           <div
             data-tauri-drag-region
