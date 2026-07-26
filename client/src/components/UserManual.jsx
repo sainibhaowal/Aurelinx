@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import PremiumSelect from "./PremiumSelect";
 import {
   BookOpen,
+  LayoutDashboard,
   X,
   MessageSquare,
   Search,
@@ -60,6 +62,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
   const [activeTab, setActiveTab] = useState(defaultTab);
 
   const tabs = [
+    { id: "dashboard", label: "Executive Dashboard", icon: LayoutDashboard },
     { id: "overview", label: "Overview & Setup", icon: BookOpen },
     { id: "workflows", label: "Workflow Chat & Agents", icon: MessageSquare },
     { id: "scout", label: "Talent Scout Matchmaker", icon: Search },
@@ -72,6 +75,54 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
 
   const renderContent = () => {
     switch (activeTab) {
+      case "dashboard":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="flex items-center gap-2 text-xl font-extrabold text-white"><LayoutDashboard className="h-5 w-5 text-cyan-400" /> Executive Dashboard</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">Aurelinx is a workforce and talent-intelligence workspace. It brings employee records, candidate records, observed workforce signals, modeled risk indicators, and controlled follow-up workflows into one auditable view.</p>
+            </div>
+            <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.04] p-4 text-xs leading-relaxed text-slate-300">
+              <strong className="text-cyan-200">Why companies use it:</strong> to see the current shape of their workforce, identify where attention may be needed, understand the evidence behind a signal, and move from analysis to an owned HR action without changing employee records automatically.
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">People and headline metrics</h3>
+              <div className="grid gap-2.5 md:grid-cols-2 text-xs text-slate-300">
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">Workforce</strong>The total employee records in the authoritative employee dataset. It represents people currently recorded as employees.</div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">Candidates</strong>People in the separate candidate dataset. Candidates are not included in employee morale, workforce, or at-risk totals.</div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">At risk</strong>The unique employees whose stored policy/risk flag is true. The percentage is calculated as at-risk employees divided by total employees.</div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">Average morale</strong>The average employee sentiment score in the current snapshot. It is an observed-data aggregate, not a historical trend and not a diagnosis of any person.</div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Risk composition</h3>
+              <p className="text-xs leading-relaxed text-slate-300">The risk panel groups employees by signal. These counts are matches per category and can overlap; they must not be added together.</p>
+              <div className="space-y-2 text-xs text-slate-300">
+                <div className="border-l-2 border-rose-300/60 pl-3"><strong className="text-rose-200">Retention probability pressure</strong><p className="mt-1">Employees below the configured retention-probability threshold. This is a modeled estimate of possible departure pressure, not a fact or certainty.</p></div>
+                <div className="border-l-2 border-amber-300/60 pl-3"><strong className="text-amber-200">Low morale signals</strong><p className="mt-1">Employees below the sentiment threshold. It is a prompt for a respectful human check-in, not proof that an employee is dissatisfied.</p></div>
+                <div className="border-l-2 border-violet-300/60 pl-3"><strong className="text-violet-200">Policy risk flags</strong><p className="mt-1">Employees with the stored policy/risk flag. This currently aligns with the at-risk total and requires evidence review before any HR action.</p></div>
+              </div>
+              <p className="text-[11px] text-slate-500">For example, 408 retention matches, 289 low-morale matches, and 237 policy flags may describe overlapping groups; 237 is the unique flagged-employee headline.</p>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Workforce health and morale signal</h3>
+              <p className="text-xs leading-relaxed text-slate-300"><strong className="text-white">Morale signal</strong> is the current aggregate sentiment indicator. <strong className="text-white">Current model indicator</strong> means the value is calculated from the current employee snapshot; it is not a historical trend. Open Sentiment Intelligence for department filters, employee drilldowns, valid live snapshots, and trend history.</p>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Workspace overview and actions</h3>
+              <p className="text-xs leading-relaxed text-slate-300">Workspace Overview links to Analytics, Talent Scout, Grounded Query/Workflows, Intelligence Center, and Data Ops. Each area uses the appropriate employee or candidate scope. Clicking a risk row opens the full matching drilldown; creating an intervention records a controlled HR action and does not modify the employee profile.</p>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Exports</h3>
+              <p className="text-xs leading-relaxed text-slate-300">Dashboard export actions generate PDF, Excel, or Markdown reports from the authoritative records included in the selected report scope. Reports include the generated time and should be reviewed for scope, filters, observed fields, and modeled indicators before sharing.</p>
+            </div>
+          </div>
+        );
       case "overview":
         return (
           <div className="space-y-6">
@@ -969,6 +1020,9 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
                 The **Intelligence Center** is the mathematical core of the Aurelinx platform. While typical enterprise directories rely on static lists, Aurelinx implements a dynamic decision workbench powered by graph algorithms, global combinatorial search solvers, and semi-parametric survival models to optimize organizational structures.
               </p>
+              <div className="rounded-lg border border-amber-400/15 bg-amber-400/[0.04] p-3 text-[11px] leading-relaxed text-slate-300">
+                <strong className="text-amber-200">Observed versus modeled:</strong> employee and network records come from the tenant data scope. Adjacency paths, team optimization, survival curves, and Markov career probabilities are modeled outputs. Team optimization results include a model version, deterministic seed, tenant scope, generated timestamp, and persisted scenario ID so a result can be reproduced and audited.
+              </div>
             </div>
 
             {/* Architecture Flow Diagram */}
@@ -1484,6 +1538,18 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
             </div>
 
             <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Enterprise Connections &amp; Compliance Hub</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                The Enterprise Operations page is the operational console; this manual explains the purpose of each surface so the live page stays focused on work. It registers HRIS/ATS connections, monitors sync jobs, manages evidence-linked interventions, and exposes model governance, disaster recovery, and compliance controls.
+              </p>
+              <div className="grid gap-2.5 md:grid-cols-3 text-xs text-slate-300">
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5"><strong className="text-cyan-300 block mb-1">Integration connections</strong>Register approved Workday, Greenhouse, or other HRIS/ATS sources and monitor their sync status before data is used.</div>
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5"><strong className="text-cyan-300 block mb-1">Intervention workflows</strong>Convert reviewed workforce signals into owned, status-controlled HR actions with checkpoint history and audit evidence.</div>
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5"><strong className="text-cyan-300 block mb-1">Governance &amp; compliance</strong>Review model quality, fairness, drift, policies, recovery readiness, and audit events before production decisions.</div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
               <h3 className="text-sm font-bold text-white">Key Data Ops Surfaces</h3>
               <div className="space-y-2.5 text-xs text-slate-300">
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5">
@@ -1503,6 +1569,66 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                   Lists active prediction metrics: PR-AUC, calibration error charts, and fairness gap diagnostics.
                 </div>
               </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Interventions: evidence to accountable action</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                An intervention is a documented HR follow-up action created after a workforce signal has been reviewed. It is a tracking record only: Aurelinx does not contact, discipline, terminate, or modify an employee automatically.
+              </p>
+              <div className="grid gap-2.5 md:grid-cols-2 text-xs text-slate-300">
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <strong className="text-white block mb-1">Retention probability pressure</strong>
+                  A modeled estimate that an employee may have a higher likelihood of leaving. It is not a prediction or a finding of fact.
+                </div>
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <strong className="text-white block mb-1">Low morale signals</strong>
+                  A low sentiment indicator that may justify a private HR or manager check-in. The indicator must be validated with the employee.
+                </div>
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <strong className="text-white block mb-1">Policy risk flags</strong>
+                  A record-level policy or compliance signal that requires evidence review before any action is taken.
+                </div>
+                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                  <strong className="text-white block mb-1">Priority</strong>
+                  Low, medium, high, and critical describe the urgency of the HR action—not the certainty that an employee will leave. High and critical actions require administrator authorization.
+                </div>
+              </div>
+              <div className="rounded-lg border border-cyan-400/15 bg-cyan-400/[0.04] p-3 text-xs text-slate-300 leading-relaxed">
+                <strong className="text-cyan-200">Why names can repeat:</strong> the risk lists are grouped by signal, not by unique employee. One employee can have low retention, low morale, and a policy flag at the same time. Review all evidence and normally create one combined intervention rather than one duplicate action per signal.
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Intervention lifecycle</h3>
+              <ol className="text-xs space-y-2 text-slate-300 list-decimal pl-4 leading-relaxed">
+                <li><strong className="text-white">Create Intervention:</strong> saves a planned action with its employee, department, owner, priority, evidence context, and expected impact. It does not change the employee record.</li>
+                <li><strong className="text-white">Start:</strong> changes the action to <code className="text-cyan-300">in_progress</code> when the responsible HR owner actually begins the agreed work. It cannot be started repeatedly.</li>
+                <li><strong className="text-white">Complete:</strong> is available only after the action is in progress. It changes the action to <code className="text-cyan-300">completed</code> and records its completion time.</li>
+                <li><strong className="text-white">30D Improve / 60D Equal / 90D Degrade:</strong> records one human-reviewed checkpoint. The checkpoints must be recorded in order (30, then 60, then 90), and an existing checkpoint cannot be overwritten or duplicated.</li>
+              </ol>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                After a valid checkpoint is saved, the intervention opens its Evidence &amp; History panel and shows a confirmation, the checkpoint status, timestamp, and current outcome score. If a transition is invalid, the API rejects it and the interface displays the reason instead of silently changing data. The system does not verify calendar time or perform the HR conversation; HR must complete the real follow-up and then record the verified result. All changes are stored for tenant-scoped tracking and audit review.
+              </p>
+              <div className="rounded-lg border border-amber-400/15 bg-amber-400/[0.04] p-3 text-[11px] leading-relaxed text-slate-300">
+                <strong className="text-amber-200">Important separation:</strong> Improved, Equal, or Degrade updates only the intervention checkpoint history and outcome score. It does not change the employee profile, sentiment, retention probability, risk flag, role, or any other employee record. Those fields change only when new verified source data is imported or an authorized system update is made.
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">How this works in an actual company</h3>
+              <div className="rounded-lg border border-emerald-400/15 bg-emerald-400/[0.04] p-3 text-xs text-slate-300 leading-relaxed">
+                <ol className="list-decimal space-y-1.5 pl-4">
+                  <li>An analyst reviews the employee&apos;s underlying records and the signals that triggered attention.</li>
+                  <li>An HR owner agrees on a proportionate action with the manager and employee, such as a workload review or support check-in.</li>
+                  <li>The admin creates the intervention, assigns the owner, and starts it when the work begins.</li>
+                  <li>HR conducts the real follow-up outside the application, then records the verified 30-, 60-, or 90-day result.</li>
+                  <li>The Evidence &amp; History panel provides the saved status, timestamp, owner, checkpoint result, and outcome score for review or audit.</li>
+                </ol>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Use the workflow as decision support and case management—not as an automatic employment decision. Do not take adverse action from a modeled signal alone; validate the evidence, apply company policy, and document the human decision.
+              </p>
             </div>
           </div>
         );
@@ -1623,7 +1749,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-950/10">
                 {/* Mobile Tab Selector */}
                 <div className="md:hidden mb-6">
-                  <select
+                  <PremiumSelect
                     value={activeTab}
                     onChange={(e) => setActiveTab(e.target.value)}
                     className="w-full h-10 px-3 rounded-lg bg-slate-950 border border-white/10 text-xs text-white outline-none"
@@ -1633,7 +1759,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                         {t.label}
                       </option>
                     ))}
-                  </select>
+                  </PremiumSelect>
                 </div>
 
                 {renderContent()}

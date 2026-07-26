@@ -21,6 +21,7 @@ import remarkGfm from "remark-gfm";
 import TalentCard from "./TalentCard";
 import { UserManualButton } from "./UserManual";
 import { analysisAPI, candidatesAPI } from "../services/apiClient";
+import PremiumSelect from "./PremiumSelect";
 
 const MarkdownRenderer = ({ children }) => (
   <ReactMarkdown
@@ -146,6 +147,14 @@ const TalentScoutView = () => {
     if (typeof window === "undefined") return {};
     try { return JSON.parse(window.localStorage.getItem("aurelinx_scout_status_v1") || "{}"); } catch { return {}; }
   });
+  const [scoutRun, setScoutRun] = useState(null);
+  const [scoutElapsed, setScoutElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!loading || !scoutRun?.startedAt) return undefined;
+    const timer = window.setInterval(() => setScoutElapsed(Date.now() - scoutRun.startedAt), 100);
+    return () => window.clearInterval(timer);
+  }, [loading, scoutRun?.startedAt]);
 
   const handleSearch = async () => {
     let config = {};
@@ -171,6 +180,9 @@ const TalentScoutView = () => {
           : null);
 
     setLoading(true);
+    const startedAt = Date.now();
+    setScoutElapsed(0);
+    setScoutRun({ startedAt, status: "running", searched: null, returned: null, duration: null });
     try {
       setAnalysis("");
       setResults([]);
@@ -181,6 +193,7 @@ const TalentScoutView = () => {
         baseUrl,
         selectedModel,
       );
+      setScoutRun({ startedAt, status: "complete", searched: data.searched_records ?? null, returned: data.returned_records ?? (data.candidates || []).length, duration: data.processing_time_ms ?? Date.now() - startedAt });
       setResults(data.candidates || []);
       const saved = { query, results: data.candidates || [], analysis: data.analysis || "", savedAt: Date.now() };
       localStorage.setItem(SCOUT_CACHE_KEY, JSON.stringify(saved));
@@ -204,6 +217,7 @@ const TalentScoutView = () => {
       }, 15);
     } catch (err) {
       console.error(err);
+      setScoutRun((previous) => previous ? { ...previous, status: "error", duration: Date.now() - previous.startedAt } : previous);
       alert(
         "Analysis failed. Check the local LM Studio service or provider configuration.",
       );
@@ -325,12 +339,25 @@ const TalentScoutView = () => {
             Applied
           </div>
         </div>
+        {scoutRun && (
+          <div className="mt-4 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.035] p-4" aria-live="polite">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200">Scout pipeline</div><div className="mt-1 text-[11px] text-slate-500">Server-side candidate search and evidence ranking · no full database download to the browser</div></div><span className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${scoutRun.status === "error" ? "text-rose-300" : scoutRun.status === "complete" ? "text-emerald-300" : "text-cyan-200"}`}>{scoutRun.status === "complete" ? `Completed in ${((scoutRun.duration || 0) / 1000).toFixed(1)}s` : scoutRun.status === "error" ? "Failed" : `Running · ${(scoutElapsed / 1000).toFixed(1)}s`}</span></div>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+              {["Prepare request", "Search full pool", "Rank evidence", "Generate explanation", "Return result cards"].map((label, index) => {
+                const complete = scoutRun.status === "complete" || (scoutRun.status === "error" ? index < 2 : index === 0);
+                const active = scoutRun.status === "running" && index === 1;
+                return <div key={label} className={`relative rounded-lg border px-3 py-2 ${complete ? "border-emerald-300/25 bg-emerald-300/[0.07]" : active ? "border-cyan-300/45 bg-cyan-300/[0.09]" : "border-white/[0.08] bg-white/[0.025]"}`}><div className="flex items-center gap-2"><span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold ${complete ? "bg-emerald-300/20 text-emerald-200" : active ? "bg-cyan-300/20 text-cyan-100" : "bg-white/[0.08] text-slate-500"}`}>{complete ? "✓" : index + 1}</span><span className={`text-[10px] font-semibold ${complete ? "text-emerald-100" : active ? "text-cyan-100" : "text-slate-500"}`}>{label}</span></div>{active && <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.08]"><div className="h-full w-1/2 animate-pulse rounded-full bg-cyan-300" /></div>}</div>;
+              })}
+            </div>
+            {scoutRun.status === "complete" && <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-slate-500"><span>Database records searched: <strong className="text-slate-300">{scoutRun.searched ?? "reported by server"}</strong></span><span>Result cards returned: <strong className="text-slate-300">{scoutRun.returned}</strong></span><span>Full profile data loads only when a card is opened.</span></div>}
+          </div>
+        )}
         {results.length > 0 && (
           <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
-            <label className="flex min-w-[170px] flex-1 flex-col gap-1 text-[9px] uppercase tracking-[0.14em] text-slate-500">Department<select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="mt-1 h-9 rounded-lg border border-white/10 bg-slate-950/70 px-2 text-xs normal-case tracking-normal text-slate-200"><option value="">All departments</option>{resultDepartments.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-            <label className="flex min-w-[170px] flex-1 flex-col gap-1 text-[9px] uppercase tracking-[0.14em] text-slate-500">Role<select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="mt-1 h-9 rounded-lg border border-white/10 bg-slate-950/70 px-2 text-xs normal-case tracking-normal text-slate-200"><option value="">All roles</option>{resultRoles.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-            <label className="flex min-w-[150px] flex-1 flex-col gap-1 text-[9px] uppercase tracking-[0.14em] text-slate-500">Minimum match <input type="range" min="0" max="1" step="0.05" value={minMatch} onChange={(event) => setMinMatch(event.target.value)} /><span className="text-xs normal-case tracking-normal text-slate-300">{Math.round(minMatch * 100)}%</span></label>
-            <span className="text-[10px] text-slate-500">{filteredResults.length} of {results.length} results · {duplicateEmailCount} duplicate emails · {incompleteCount} incomplete profiles</span>
+            <label className="flex min-w-[170px] flex-1 flex-col gap-1 text-[9px] uppercase tracking-[0.14em] text-slate-500">Department<PremiumSelect value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="mt-1 h-9"><option value="">All departments</option>{resultDepartments.map((value) => <option key={value} value={value}>{value}</option>)}</PremiumSelect></label>
+            <label className="flex min-w-[170px] flex-1 flex-col gap-1 text-[9px] uppercase tracking-[0.14em] text-slate-500">Role<PremiumSelect value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="mt-1 h-9"><option value="">All roles</option>{resultRoles.map((value) => <option key={value} value={value}>{value}</option>)}</PremiumSelect></label>
+            <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-[9px] uppercase tracking-[0.14em] text-slate-500">Minimum match score <input aria-label="Minimum stored candidate match score" type="range" min="0" max="1" step="0.05" value={minMatch} onChange={(event) => setMinMatch(event.target.value)} /><span className="text-xs normal-case tracking-normal text-slate-300">Keep scores ≥ {Math.round(minMatch * 100)}% · <strong className="text-cyan-200">{filteredResults.length} visible</strong></span></label>
+            <span className="text-[10px] text-slate-500">{filteredResults.length} of {results.length} returned · {duplicateEmailCount} duplicate emails · {incompleteCount} incomplete profiles</span>
           </div>
         )}
       </div>
@@ -373,13 +400,17 @@ const TalentScoutView = () => {
                 <div className="mt-2 flex flex-wrap items-center gap-2 px-1 text-[10px]">
                   <button onClick={() => toggleShortlist(cand)} className={shortlist.some((item) => item.id === cand.id) ? "text-amber-300" : "text-slate-500 hover:text-amber-300"}><Star size={12} className="inline" /> {shortlist.some((item) => item.id === cand.id) ? "Shortlisted" : "Shortlist"}</button>
                   <button onClick={() => toggleCompare(cand)} className={selectedIds.includes(cand.id) ? "text-cyan-200" : "text-slate-500 hover:text-cyan-200"}><GitCompare size={12} className="inline" /> {selectedIds.includes(cand.id) ? "Comparing" : "Compare"}</button>
-                  <select value={candidateStatus[cand.id] || "new"} onChange={(event) => saveCandidateStatus(cand.id, event.target.value)} className="ml-auto max-w-[110px] rounded border border-white/10 bg-slate-950/70 px-1 py-1 text-[9px] text-slate-300"><option value="new">New</option><option value="review">Review</option><option value="shortlisted">Shortlisted</option><option value="rejected">Rejected</option></select>
+                  <PremiumSelect value={candidateStatus[cand.id] || "new"} onChange={(event) => saveCandidateStatus(cand.id, event.target.value)} className="ml-auto w-[110px] text-[9px]"><option value="new">New</option><option value="review">Review</option><option value="shortlisted">Shortlisted</option><option value="rejected">Rejected</option></PremiumSelect>
                 </div>
                 <input value={candidateNotes[cand.id] || ""} onChange={(event) => saveCandidateNote(cand.id, event.target.value)} placeholder="Add review note..." className="mt-2 w-full rounded border border-white/10 bg-slate-950/50 px-2 py-1.5 text-[10px] text-slate-300 outline-none" />
               </div>
             </motion.div>
           ))}
         </motion.section>
+      )}
+
+      {results.length > 0 && filteredResults.length === 0 && (
+        <div className="premium-card mt-4 p-6 text-center text-sm text-slate-400">No returned candidates meet the {Math.round(minMatch * 100)}% minimum match score. Lower the threshold to see more results.</div>
       )}
 
       {selectedIds.length > 0 && (

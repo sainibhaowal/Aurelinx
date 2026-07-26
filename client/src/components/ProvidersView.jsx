@@ -22,6 +22,7 @@ import {
   Copy,
 } from "lucide-react";
 import Toast from "./Toast";
+import PremiumSelect from "./PremiumSelect";
 import { UserManualButton } from "./UserManual";
 import { API_BASE_URL } from "../services/apiBase";
 
@@ -1321,7 +1322,7 @@ const ProvidersView = () => {
                               <label className="block text-[9px] uppercase tracking-widest text-slate-400 mb-1.5 font-bold font-mono">
                                 Simulator Employee Target
                               </label>
-                              <select
+                              <PremiumSelect
                                 value={employeeEmail}
                                 onChange={(e) =>
                                   setEmployeeEmail(e.target.value)
@@ -1337,7 +1338,7 @@ const ProvidersView = () => {
                                 <option value="clara.sutton@aurelinx.io">
                                   clara.sutton@aurelinx.io (Senior dev)
                                 </option>
-                              </select>
+                              </PremiumSelect>
                             </div>
                           </div>
 
@@ -1918,7 +1919,7 @@ await aurelinx.pushSentimentMetric({
                             <label className="block text-[9px] uppercase tracking-widest text-slate-400 mb-1.5 font-bold font-mono">
                               Authentication Protocol
                             </label>
-                            <select
+                            <PremiumSelect
                               value={formData.authProtocol}
                               onChange={(e) =>
                                 setFormData({
@@ -1931,7 +1932,7 @@ await aurelinx.pushSentimentMetric({
                               <option>API Key</option>
                               <option>None</option>
                               <option>OAuth 2.0</option>
-                            </select>
+                            </PremiumSelect>
                           </div>
 
                           <div>

@@ -18,6 +18,22 @@ function safeValue(value) {
   return String(value);
 }
 
+async function loadReportLogo() {
+  try {
+    const response = await fetch("/aurelinx-logo-final-clean-transparent.png");
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 function escapeMarkdownCell(value) {
   return safeValue(value).replace(/\|/g, "\\|").replace(/\n/g, " ").trim();
 }
@@ -48,23 +64,34 @@ function normalizeReportData(input) {
   return { employees: input?.employees || [], candidates: input?.candidates || [] };
 }
 
-function drawLetterhead(doc, timestamp, section = "Management Intelligence") {
-  doc.setFillColor(7, 17, 31);
-  doc.rect(0, 0, 210, 30, "F");
-  doc.setFillColor(14, 165, 164);
-  doc.roundedRect(15, 8, 14, 14, 3, 3, "F");
-  doc.setTextColor(7, 17, 31);
+function drawLetterhead(doc, timestamp, section = "Management Intelligence", logo = null) {
+  // Keep the cover header deliberately restrained: a deep enterprise navy,
+  // one teal accent, and a transparent logo lockup. Avoid the pale blue
+  // browser-like strip that made the previous export look unfinished.
+  doc.setFillColor(248, 250, 252);
+  doc.rect(0, 0, 210, 297, "F");
+  doc.setFillColor(8, 20, 36);
+  doc.roundedRect(10, 7, 190, 30, 4, 4, "F");
+  doc.setDrawColor(35, 89, 108);
+  doc.setLineWidth(0.35);
+  doc.roundedRect(10, 7, 190, 30, 4, 4, "S");
+  if (logo) {
+    try { doc.addImage(logo, "PNG", 16, 13, 16, 16, undefined, "FAST"); } catch { /* logo is optional if a browser blocks the asset */ }
+  }
+  doc.setTextColor(248, 250, 252);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text("A", 19.5, 17.5);
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(17);
-  doc.text("AURELINX", 35, 15);
+  doc.setFontSize(16);
+  doc.text("AURELINX", 38, 19);
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(125, 211, 210);
+  doc.text(section.toUpperCase(), 38, 26);
   doc.setFontSize(8);
-  doc.setTextColor(148, 163, 184);
-  doc.text(section.toUpperCase(), 35, 21);
-  doc.text(`Generated ${timestamp}`, 195, 15, { align: "right" });
+  doc.setTextColor(203, 213, 225);
+  doc.text(`Generated ${timestamp}`, 194, 19, { align: "right" });
+  doc.setDrawColor(45, 212, 191);
+  doc.setLineWidth(0.7);
+  doc.line(16, 33, 194, 33);
 }
 
 function drawFooter(doc, pageNumber) {
@@ -79,12 +106,13 @@ function drawFooter(doc, pageNumber) {
   doc.text(`Page ${pageNumber}`, pageWidth - 15, pageHeight - 8, { align: "right" });
 }
 
-function exportPdf(input = [], analysis = "") {
+async function exportPdf(input = [], analysis = "") {
   const { employees, candidates } = normalizeReportData(input);
   const doc = new jsPDF();
   const timestamp = new Date().toLocaleString();
+  const logo = await loadReportLogo();
 
-  drawLetterhead(doc, timestamp);
+  drawLetterhead(doc, timestamp, "Management Intelligence", logo);
   doc.setTextColor(15, 23, 42);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
@@ -122,7 +150,11 @@ function exportPdf(input = [], analysis = "") {
   }
 
   const startY = analysis ? 128 : 97;
-  const tablePage = (page) => { drawLetterhead(doc, timestamp, page === 1 ? "Management Intelligence" : "Employee Records"); drawFooter(doc, page); };
+  const tablePage = (hookData) => {
+    // The letterhead is a cover header on page one only. Continuation pages
+    // retain clean table space and the audit footer without repeating it.
+    drawFooter(doc, hookData.pageNumber);
+  };
   autoTable(doc, {
     startY,
     head: [["Name", "Role", "Department", "Sentiment", "Risk Status"]],
@@ -141,21 +173,20 @@ function exportPdf(input = [], analysis = "") {
       alternateRowStyles: {
       fillColor: [245, 247, 250],
     },
-    didDrawPage: (hookData) => tablePage(hookData.pageNumber),
+    willDrawPage: tablePage,
   });
 
   doc.addPage();
-  drawLetterhead(doc, timestamp, "Candidate Records");
-  doc.setTextColor(15, 23, 42); doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text("Candidate Records", 15, 45);
+  doc.setTextColor(15, 23, 42); doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text("Candidate Records", 15, 20);
   autoTable(doc, {
-    startY: 35,
+    startY: 28,
     head: [["Name", "Role", "Department", "Sentiment", "Match", "Email"]],
     body: buildCandidatesTableRows(candidates),
     theme: "grid",
     headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
     styles: { fontSize: 7, cellPadding: 1.8, overflow: "linebreak" },
     alternateRowStyles: { fillColor: [245, 247, 250] },
-    didDrawPage: (hookData) => { drawLetterhead(doc, timestamp, "Candidate Records"); drawFooter(doc, hookData.pageNumber); },
+    willDrawPage: (hookData) => { drawFooter(doc, hookData.pageNumber); },
   });
 
   for (let page = 1; page <= doc.getNumberOfPages(); page += 1) {

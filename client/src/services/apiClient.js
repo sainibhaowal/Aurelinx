@@ -555,18 +555,27 @@ export const authAPI = {
  * Employees API
  */
 export const employeesAPI = {
-  list: (skip = 0, limit = 10, department = null, atRiskOnly = false) => {
+  list: (skip = 0, limit = 10, department = null, atRiskOnly = false, q = null) => {
     const params = new URLSearchParams();
     params.append("skip", skip);
     params.append("limit", limit);
     if (department) params.append("department", department);
     if (atRiskOnly) params.append("at_risk_only", true);
+    if (q) params.append("q", q);
     return request(`${API_V1}/employees?${params}`, {
       timeoutMs: LONG_REQUEST_TIMEOUT,
     });
   },
 
-  count: () => request(`${API_V1}/employees/count`),
+  count: (q = null, atRiskOnly = false) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (atRiskOnly) params.set("at_risk_only", "true");
+    const query = params.toString();
+    return request(`${API_V1}/employees/count${query ? `?${query}` : ""}`);
+  },
+
+  departments: () => request(`${API_V1}/employees/departments`),
 
   get: (employeeId) => request(`${API_V1}/employees/${employeeId}`),
 
@@ -592,17 +601,19 @@ export const employeesAPI = {
  * Candidates API
  */
 export const candidatesAPI = {
-  list: (skip = 0, limit = 10, department = null) => {
+  list: (skip = 0, limit = 10, department = null, q = null) => {
     const params = new URLSearchParams();
     params.append("skip", skip);
     params.append("limit", limit);
     if (department) params.append("department", department);
+    if (q) params.append("q", q);
     return request(`${API_V1}/candidates?${params}`, {
       timeoutMs: LONG_REQUEST_TIMEOUT,
     });
   },
 
-  count: () => request(`${API_V1}/candidates/count`),
+  count: (q = null) => request(`${API_V1}/candidates/count${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  departments: () => request(`${API_V1}/candidates/departments`),
 
   get: (candidateId) => request(`${API_V1}/candidates/${candidateId}`),
 };

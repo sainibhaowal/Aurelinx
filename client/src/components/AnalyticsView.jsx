@@ -5,9 +5,10 @@ import { UserManualButton } from "./UserManual";
 import { analysisAPI } from "../services/apiClient";
 import { employeesAPI, candidatesAPI, enterpriseAPI } from "../services/apiClient";
 import { useAuth } from "../contexts/AuthContext";
+import PremiumSelect from "./PremiumSelect";
 
 const AnalyticsView = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [stats, setStats] = useState({
     depts: [],
     total: 0,
@@ -29,6 +30,7 @@ const AnalyticsView = () => {
   const [riskOnly, setRiskOnly] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [trend, setTrend] = useState([]);
+  const [hoveredSnapshot, setHoveredSnapshot] = useState(null);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -86,18 +88,30 @@ const AnalyticsView = () => {
   };
 
   const createRiskIntervention = async (employee) => {
+    const priority = Number(employee.retention_prob ?? 0.5) < 0.4 ? "high" : "medium";
+    if (priority === "high" && !user?.is_admin) {
+      // The API intentionally protects high-impact actions. Explain the
+      // approval requirement instead of sending a request that can only 403.
+      window.dispatchEvent(new CustomEvent("aurelinx:toast", {
+        detail: { message: "High-priority retention actions require administrator approval.", type: "error" },
+      }));
+      return;
+    }
     try {
       await enterpriseAPI.createIntervention({
         title: `Review retention risk for ${employee.full_name}`,
         target_scope: "employee",
         target_employee_id: employee.id,
         target_department: employee.department,
-        priority: Number(employee.retention_prob ?? 0.5) < 0.4 ? "high" : "medium",
+        priority,
         owner_name: "HRBP",
         expected_impact: "Document a retention conversation and reassess the employee risk signals.",
       });
     } catch (error) {
       console.error("Risk intervention creation failed", error);
+      window.dispatchEvent(new CustomEvent("aurelinx:toast", {
+        detail: { message: error?.status === 403 ? "Administrator approval is required for this action." : (error?.message || "Unable to create the intervention."), type: "error" },
+      }));
     }
   };
 
@@ -218,10 +232,10 @@ const AnalyticsView = () => {
       <div className="mb-8 flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
         <label className="flex min-w-[220px] flex-1 flex-col gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
           Department
-          <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="h-10 rounded-lg border border-white/10 bg-slate-950/70 px-3 text-sm normal-case tracking-normal text-slate-200 outline-none">
+          <PremiumSelect value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="h-10">
             <option value="">All employee departments</option>
             {departments.map((department) => <option key={department} value={department}>{department}</option>)}
-          </select>
+          </PremiumSelect>
         </label>
         <label className="flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/50 px-3 text-xs text-slate-300">
           <input type="checkbox" checked={riskOnly} onChange={(event) => setRiskOnly(event.target.checked)} /> At-risk only
@@ -315,30 +329,29 @@ const AnalyticsView = () => {
         </div>
       </div>
 
-      <div className="mt-8 grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="mt-8 grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
         <section className="premium-card p-5">
-          <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Department drill-down</h3>
-          <div className="space-y-3">
-            {activeDepartmentRows.map((row) => <div key={row.department} className="rounded-lg border border-white/10 bg-white/[0.02] p-3"><div className="flex justify-between text-sm"><span className="font-bold text-white">{row.department}</span><button onClick={() => setSelectedDepartment(null)} className="text-[10px] text-cyan-300">Clear</button></div><div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-slate-400"><span>Employees <strong className="text-slate-200">{row.total}</strong></span><span>Risk <strong className="text-rose-300">{row.risk}</strong></span><span>Sentiment <strong className="text-cyan-200">{row.sentiment.toFixed(2)}</strong></span></div><div className="mt-2 text-[10px] text-slate-400">Average retention: <strong className="text-emerald-200">{(row.retention * 100).toFixed(1)}%</strong></div></div>)}
+          <div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold text-slate-100">Department drill-down</h3><p className="mt-1 text-[11px] text-slate-500">Select a department from the distribution above to focus this view.</p></div>{selectedDepartment && <button onClick={() => setSelectedDepartment(null)} className="text-[10px] font-semibold text-cyan-200 hover:text-cyan-100">Show all</button>}</div>
+          <div className="divide-y divide-white/[0.07]">
+            {activeDepartmentRows.map((row) => <div key={row.department} className="py-3 first:pt-0 last:pb-0"><div className="flex items-center justify-between gap-3"><span className="font-semibold text-slate-200">{row.department}</span><span className="text-[10px] text-slate-500">{row.total} employees · {row.risk} at risk</span></div><div className="mt-2 grid grid-cols-3 gap-3 text-[10px] text-slate-500"><span>Sentiment <strong className="text-cyan-200">{row.sentiment.toFixed(2)}</strong></span><span>Retention <strong className="text-emerald-200">{(row.retention * 100).toFixed(1)}%</strong></span><span>Risk share <strong className="text-rose-200">{row.total ? ((row.risk / row.total) * 100).toFixed(1) : "0.0"}%</strong></span></div></div>)}
+            {!activeDepartmentRows.length && <p className="py-3 text-xs text-slate-500">No departments match the current filters.</p>}
           </div>
         </section>
         <section className="premium-card p-5">
-          <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Employee risk evidence</h3>
-          <div className="max-h-64 space-y-2 overflow-y-auto">{riskEmployees.slice(0, 25).map((employee) => <div key={employee.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-xs"><div className="min-w-0"><div className="truncate font-bold text-slate-200">{employee.full_name}</div><div className="truncate text-[10px] text-slate-500">{employee.department} · {employee.role}</div></div><div className="shrink-0 text-right text-[10px]"><div className="text-rose-300">Policy flag</div><div className="text-slate-400">Retention {(Number(employee.retention_prob ?? 0.5) * 100).toFixed(0)}%</div><button onClick={() => createRiskIntervention(employee)} className="mt-1 text-cyan-300 hover:text-cyan-100">Create review</button></div></div>)}{!riskEmployees.length && <p className="text-xs text-slate-500">No at-risk employees match the selected filters.</p>}</div>
+          <div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold text-slate-100">Employee risk evidence</h3><p className="mt-1 text-[11px] text-slate-500">Ordered by lowest retention probability. Review actions require administrator approval when high priority.</p></div><span className="shrink-0 rounded-full bg-rose-400/10 px-2.5 py-1 text-[10px] font-semibold text-rose-200">{riskEmployees.length} matches</span></div>
+          <div className="max-h-80 divide-y divide-white/[0.07] overflow-y-auto overscroll-contain pr-2 scroll-smooth">{riskEmployees.map((employee, index) => <div key={employee.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"><span className="w-5 text-[10px] text-slate-600">{index + 1}</span><div className="min-w-0 flex-1"><div className="truncate text-xs font-semibold text-slate-200">{employee.full_name}</div><div className="truncate text-[10px] text-slate-500">{employee.department} · {employee.role}</div></div><div className="shrink-0 text-right text-[10px]"><div className="text-rose-300">Retention {(Number(employee.retention_prob ?? 0.5) * 100).toFixed(0)}%</div><button onClick={() => createRiskIntervention(employee)} className="mt-1 font-semibold text-cyan-200 hover:text-cyan-100">Create review</button></div></div>)}{!riskEmployees.length && <p className="py-3 text-xs text-slate-500">No at-risk employees match the selected filters.</p>}</div>
         </section>
       </div>
 
       <div className="mt-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
         <section className="premium-card p-5">
-          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Candidate and hiring context</h3>
-          <p className="text-sm text-slate-300"><strong className="text-cyan-200">{candidateCount ?? "—"}</strong> candidate records are tracked separately from the employee workforce.</p>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-400"><span>Average match <strong className="text-cyan-200">{candidateAverageMatch == null ? "—" : `${(candidateAverageMatch * 100).toFixed(1)}%`}</strong></span><span>High-match (≥70%) <strong className="text-emerald-200">{candidateHighMatch}</strong></span></div>
-          <p className="mt-2 text-xs leading-relaxed text-slate-500">Candidate match scores, candidate sentiment, role, and department belong to Talent Scout and are not included in employee morale or risk totals. Hiring pipeline stages are not available in the current candidate schema, so no stage values are invented.</p>
+          <div className="mb-4"><h3 className="text-sm font-bold text-slate-100">Candidate and hiring context</h3><p className="mt-1 text-[11px] text-slate-500">A separate population from the employee workforce.</p></div>
+          <div className="grid grid-cols-3 gap-3 border-y border-white/[0.07] py-4 text-xs"><span><strong className="block text-lg text-cyan-200">{candidateCount ?? "—"}</strong><span className="text-slate-500">candidate records</span></span><span><strong className="block text-lg text-cyan-200">{candidateAverageMatch == null ? "—" : `${(candidateAverageMatch * 100).toFixed(1)}%`}</strong><span className="text-slate-500">average match</span></span><span><strong className="block text-lg text-emerald-200">{candidateHighMatch}</strong><span className="text-slate-500">high match ≥70%</span></span></div>
+          <p className="mt-4 text-[11px] leading-relaxed text-slate-500">Candidate match, sentiment, role, and department belong to Talent Scout. They are not included in employee morale or risk totals. Hiring pipeline stages are not present in the current schema.</p>
         </section>
         <section className="premium-card p-5">
-          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Snapshot trend history</h3>
-          <p className="mb-3 text-[10px] text-slate-500">Only snapshots received by this workspace are shown; no historical values are invented.</p>
-          <div className="flex h-16 items-end gap-1">{trend.map((point) => <div key={point.timestamp} title={`${new Date(point.timestamp).toLocaleString()} · risk ${point.atRiskPct}%`} className="min-w-[4px] flex-1 rounded-t bg-rose-400/60" style={{ height: `${Math.max(8, Number(point.atRiskPct || 0) * 4)}%` }} />)}</div>
+          <div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold text-slate-100">Live snapshot history</h3><p className="mt-1 text-[11px] text-slate-500">One bar is one live analytics snapshot captured in this workspace. Bar height is the at-risk percentage.</p></div><span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-slate-500">{trend.length} captured</span></div>
+          {trend.length ? <div><div className="relative flex h-20 items-end gap-1 border-b border-white/[0.08]">{trend.map((point) => <div key={point.timestamp} className="relative min-w-[4px] flex-1"><div role="img" tabIndex={0} aria-label={`${new Date(point.timestamp).toLocaleString()}; risk ${Number(point.atRiskPct).toFixed(1)} percent`} onMouseEnter={() => setHoveredSnapshot(point.timestamp)} onMouseLeave={() => setHoveredSnapshot(null)} onFocus={() => setHoveredSnapshot(point.timestamp)} onBlur={() => setHoveredSnapshot(null)} className="h-full cursor-help outline-none"><div className="absolute bottom-0 left-0 right-0 rounded-t bg-gradient-to-t from-rose-500/70 to-amber-300/70 transition-[filter] hover:brightness-125 focus-visible:brightness-125" style={{ height: `${Math.max(8, Math.min(100, Number(point.atRiskPct || 0) * 4))}%` }} />{hoveredSnapshot === point.timestamp && <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-lg border border-rose-300/30 bg-[#1b111d]/95 px-3 py-2 text-[10px] leading-relaxed text-slate-200 shadow-xl shadow-rose-950/30 backdrop-blur-md"><div className="font-semibold text-rose-100">{new Date(point.timestamp).toLocaleString()}</div><div className="mt-0.5 text-slate-400">At risk <span className="font-semibold text-white">{Number(point.atRiskPct).toFixed(1)}%</span><span className="mx-1.5 text-slate-600">·</span>Sentiment <span className="font-semibold text-cyan-200">{Number(point.avgSentiment).toFixed(2)}</span></div></div>}</div></div>)}</div><div className="mt-2 flex justify-between text-[9px] uppercase tracking-[0.14em] text-slate-600"><span>0% risk</span><span>25%+</span></div></div> : <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-white/10 text-xs text-slate-500">History will appear after the live stream captures its first snapshot.</div>}
         </section>
       </div>
 

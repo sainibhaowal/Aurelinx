@@ -22,8 +22,10 @@ import {
   FileText,
   ChevronDown,
   AlertTriangle,
+  Menu,
 } from "lucide-react";
 import TalentCard from "./components/TalentCard";
+import { UserManualButton } from "./components/UserManual";
 import AurelinxLogo from "./components/AurelinxLogo";
 import Toast from "./components/Toast";
 import AuthScreen from "./components/AuthScreen";
@@ -135,6 +137,15 @@ const App = () => {
     setTimeout(() => setToast((prev) => ({ ...prev, visible: false })), 4000);
   };
 
+  useEffect(() => {
+    const handleAppToast = (event) => {
+      const detail = event?.detail || {};
+      if (detail.message) showToast(detail.message, detail.type || "info");
+    };
+    window.addEventListener("aurelinx:toast", handleAppToast);
+    return () => window.removeEventListener("aurelinx:toast", handleAppToast);
+  }, []);
+
   const isCandidateRecord = (person) =>
     Boolean(person?.match_score !== undefined || person?.application_date);
 
@@ -220,7 +231,7 @@ const App = () => {
 
   const openDriverDrilldown = async (factor) => {
     try {
-      const res = await enterpriseAPI.getRiskDriverDrilldown(factor, 20);
+      const res = await enterpriseAPI.getRiskDriverDrilldown(factor, 10000);
       setDriverModal({ open: true, factor, items: res.items || [] });
     } catch (err) {
       console.error(err);
@@ -229,20 +240,31 @@ const App = () => {
   };
 
   const createInterventionFromDriver = async (employee, factor) => {
+    const priority = employee.risk_probability >= 0.6 ? "high" : "medium";
+    if (priority === "high" && !user?.is_admin) {
+      showToast("High-priority retention actions require administrator approval", "error");
+      return;
+    }
     try {
       await enterpriseAPI.createIntervention({
         title: `Mitigate ${factor} for ${employee.full_name}`,
         target_scope: "employee",
         target_employee_id: employee.employee_id,
         target_department: employee.department,
-        priority: employee.risk_probability >= 0.6 ? "high" : "medium",
+        priority,
         owner_name: "HRBP",
         expected_impact: `Reduce attrition risk for ${employee.full_name} by targeted retention action.`,
       });
       showToast("Intervention created from risk evidence", "success");
     } catch (err) {
       console.error(err);
-      showToast("Failed to create intervention", "error");
+      if (err?.status === 403) {
+        showToast("Admin approval is required for high-priority interventions", "error");
+      } else if (err?.status === 422) {
+        showToast(err.message || "The intervention details need correction", "error");
+      } else {
+        showToast(err?.message || "Failed to create intervention", "error");
+      }
     }
   };
 
@@ -372,15 +394,33 @@ const App = () => {
         />
 
         <div className="absolute inset-0 z-20 flex w-full min-h-0 p-0 gap-1.5 md:gap-2 overflow-hidden">
+          {!isSidebarCollapsed && (
+            <button
+              type="button"
+              aria-label="Close navigation"
+              onClick={() => setIsSidebarCollapsed(true)}
+              className="fixed inset-0 z-40 hidden bg-slate-950/55 backdrop-blur-[2px] max-md:block"
+            />
+          )}
           <motion.aside
             initial={false}
             animate={{ width: isSidebarCollapsed ? 64 : 220 }}
             transition={{ duration: 0.3, ease: "circOut" }}
-            className="bg-slate-950/65 backdrop-blur-2xl border border-white/10 flex flex-col h-full relative overflow-hidden shadow-2xl rounded-2xl"
+            className="relative z-50 flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/65 shadow-2xl backdrop-blur-2xl max-md:fixed max-md:inset-y-2 max-md:left-2"
           >
+            {isSidebarCollapsed && (
+              <button
+                type="button"
+                aria-label="Open navigation"
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="absolute left-1/2 top-2 z-10 hidden h-10 w-10 -translate-x-1/2 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-slate-300 shadow-lg transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-cyan-200 max-md:flex"
+              >
+                <Menu size={19} />
+              </button>
+            )}
             <div
               data-tauri-drag-region
-              className={`h-14 px-2 mb-2 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start"} cursor-move`}
+              className={`h-14 px-2 mb-2 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start"} cursor-move ${isSidebarCollapsed ? "max-md:invisible" : ""}`}
             >
               <AurelinxLogo collapsed={isSidebarCollapsed} size={24} />
             </div>
@@ -408,7 +448,12 @@ const App = () => {
             )}
 
             <nav
-              className={`flex-1 ${isSidebarCollapsed ? "px-1" : "px-2"} space-y-1`}
+              onClick={() => {
+                if (typeof window !== "undefined" && window.innerWidth < 768) {
+                  setIsSidebarCollapsed(true);
+                }
+              }}
+              className={`flex-1 ${isSidebarCollapsed ? "px-1" : "px-2"} space-y-1 ${isSidebarCollapsed ? "max-md:hidden" : ""}`}
             >
               <SidebarItem
                 icon={<LayoutDashboard size={16} />}
@@ -468,7 +513,7 @@ const App = () => {
               />
             </nav>
 
-            <div className={`${isSidebarCollapsed ? "px-1" : "px-2"} pb-1`}>
+            <div className={`${isSidebarCollapsed ? "px-1" : "px-2"} pb-1 ${isSidebarCollapsed ? "max-md:hidden" : ""}`}>
               <SidebarItem
                 icon={<Settings size={16} />}
                 label="Settings"
@@ -478,13 +523,13 @@ const App = () => {
               />
             </div>
 
-            <div className="mt-auto pb-2 text-center select-none pointer-events-none">
+            <div className={`mt-auto pb-2 text-center select-none pointer-events-none ${isSidebarCollapsed ? "max-md:hidden" : ""}`}>
               <span className="text-[10px] text-slate-500 font-mono tracking-wider">
                 {isSidebarCollapsed ? "v1.0.0" : "AURELINX v1.0.0"}
               </span>
             </div>
 
-            <div className={`${isSidebarCollapsed ? "px-1" : "px-2"} pb-2`}>
+            <div className={`${isSidebarCollapsed ? "px-1" : "px-2"} pb-2 ${isSidebarCollapsed ? "max-md:hidden" : ""}`}>
               <button
                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
                 className={`${isSidebarCollapsed ? "h-11 w-11 mx-auto" : "h-10 w-full"} flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-200 hover:bg-white/10 transition-all`}
@@ -498,7 +543,7 @@ const App = () => {
             </div>
           </motion.aside>
 
-          <main className={`flex-1 h-full min-h-0 relative z-10 custom-scrollbar ${activeTab === "intelligence" ? "p-0 overflow-hidden" : "p-3 md:p-5 lg:p-6 overflow-y-auto"}`}>
+          <main className={`workspace-main-scale flex-1 h-full min-h-0 relative z-10 custom-scrollbar ${activeTab === "intelligence" ? "p-0 overflow-hidden" : "p-3 md:p-5 lg:p-6 overflow-y-auto"}`}>
             <Suspense fallback={<LoadingScreen label={`Loading ${activeTab}`} />}>
               <AnimatePresence mode="wait">
                 <motion.div
@@ -525,6 +570,7 @@ const App = () => {
                           variants={itemVariants}
                           className="flex gap-2"
                         >
+                          <UserManualButton defaultTab="dashboard" />
                           <button
                             onClick={() => {
                               loadEmployees();
@@ -659,7 +705,7 @@ const App = () => {
                       </section>
 
                       <section className="dashboard-insight-grid mb-10">
-                        <div className="dashboard-insight-panel">
+                        <div className="dashboard-insight-panel dashboard-risk-panel">
                           <div className="flex items-start justify-between gap-4 mb-6">
                             <div><div className="dashboard-kicker">Risk composition</div><h2 className="mt-1 text-lg font-extrabold text-white">Where attention is concentrated</h2></div>
                             <div className="dashboard-risk-ring" style={{"--risk": `${Math.min(100, Number(analyticsSnapshot.atRiskPct || 0))}%`}}><span>{analyticsLoading ? "—" : `${analyticsSnapshot.atRiskPct}%`}</span></div>
@@ -842,23 +888,32 @@ const App = () => {
                 </h3>
                 <p className="text-sm text-slate-300 mb-4">
                   Create interventions directly from evidence-backed at-risk
-                  profiles.
+                  profiles. This records a tracked HR action; it does not
+                  change the employee record. High-priority actions require
+                  an administrator.
                 </p>
+                <div className="mb-3 flex items-center justify-between text-[11px] uppercase tracking-wider text-slate-500">
+                  <span>All matching records</span>
+                  <span className="text-cyan-200">{driverModal.items.length} total</span>
+                </div>
                 <div className="max-h-[50vh] overflow-auto space-y-2">
-                  {driverModal.items.map((item) => (
+                  {driverModal.items.map((item, index) => (
                     <div
                       key={item.employee_id}
                       className="rounded-lg border border-white/10 bg-white/5 p-3"
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div>
+                        <div className="flex min-w-0 items-start gap-3">
+                          <span className="mt-0.5 w-7 shrink-0 text-right font-mono text-[11px] text-slate-500">{index + 1}</span>
+                          <div className="min-w-0">
                           <div className="font-bold">{item.full_name}</div>
                           <div className="text-xs text-slate-300">
                             {item.role} | {item.department}
                           </div>
                           <div className="text-xs text-rose-300 mt-1">
-                            Risk {(item.risk_probability * 100).toFixed(1)}% |{" "}
+                            Estimated attrition risk {(item.risk_probability * 100).toFixed(1)}% |{" "}
                             {item.evidence}
+                          </div>
                           </div>
                         </div>
                         <button
@@ -867,7 +922,7 @@ const App = () => {
                           }
                           className="h-8 px-3 rounded border border-white/15 hover:bg-white/10 text-xs font-bold"
                         >
-                          Create Action
+                          Create Intervention
                         </button>
                       </div>
                     </div>
@@ -908,15 +963,15 @@ const App = () => {
                     <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
                       Email
                     </div>
-                    <div>{selectedProfile.email || "N/A"}</div>
+                    <div className="break-all text-slate-200">{selectedProfile.email || "N/A"}</div>
                   </div>
                   <div className="rounded-lg border border-white/10 bg-white/5 p-3">
                     <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
                       Retention
                     </div>
                     <div>
-                      {selectedProfile.retention_prob
-                        ? `${(selectedProfile.retention_prob * 100).toFixed(1)}%`
+                      {selectedProfile.retention_prob !== null && selectedProfile.retention_prob !== undefined
+                        ? `${(Number(selectedProfile.retention_prob) * 100).toFixed(1)}%`
                         : "N/A"}
                     </div>
                   </div>
@@ -933,7 +988,7 @@ const App = () => {
                     <div>
                       {selectedProfile.is_at_risk
                         ? "High Attrition Risk"
-                        : "Optimal Retention"}
+                        : "Stable"}
                     </div>
                   </div>
                 </div>
@@ -943,9 +998,7 @@ const App = () => {
                     Skills
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {(selectedProfile.skills || [])
-                      .slice(0, 12)
-                      .map((skill, idx) => (
+                    {(selectedProfile.skills || []).map((skill, idx) => (
                         <span
                           key={`${skill.name}-${idx}`}
                           className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs"
@@ -959,6 +1012,31 @@ const App = () => {
                           No skills found.
                         </span>
                       )}
+                  </div>
+                </div>
+
+                <div className="mb-6 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">Record ID</div>
+                    <div className="break-all font-mono text-slate-300">{selectedProfile.id || "N/A"}</div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">Join date</div>
+                    <div className="text-slate-300">{selectedProfile.join_date ? new Date(selectedProfile.join_date).toLocaleDateString() : "N/A"}</div>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">Experience history</div>
+                  <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
+                    {(selectedProfile.experiences || []).map((experience, idx) => (
+                      <div key={`${experience.company}-${experience.position}-${idx}`} className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs">
+                        <div className="font-semibold text-slate-200">{experience.position || "Role unavailable"}</div>
+                        <div className="text-slate-400">{experience.company || "Company unavailable"} · {experience.duration_years ?? "N/A"} years</div>
+                        {experience.description && <div className="mt-1 text-slate-500">{experience.description}</div>}
+                      </div>
+                    ))}
+                    {(!selectedProfile.experiences || selectedProfile.experiences.length === 0) && <div className="text-xs italic text-slate-500">No experience records found.</div>}
                   </div>
                 </div>
 

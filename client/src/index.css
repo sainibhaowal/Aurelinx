@@ -1,5 +1,14 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+
 @import "tailwindcss";
+
+/* Keep the navigation at its native size while giving the dense workspace
+   content a calmer desktop scale. Mobile remains unscaled for touch accuracy. */
+@media (min-width: 768px) {
+  .workspace-main-scale {
+    zoom: 0.9;
+  }
+}
 
 @theme {
   --color-background: #07111f;
@@ -132,7 +141,9 @@
   .dashboard-command-link:hover { background: linear-gradient(90deg, rgba(34,211,238,.1), transparent); transform: translateX(3px); }
   .dashboard-command-icon { display: grid; place-items: center; width: 2rem; height: 2rem; flex: 0 0 auto; color: #67e8f9; border-radius: .65rem; background: rgba(34,211,238,.08); }
   .dashboard-insight-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 1.25rem; }
-  .dashboard-insight-panel { min-width: 0; padding: 1.25rem 0; border-top: 1px solid rgba(255,255,255,.1); border-bottom: 1px solid rgba(255,255,255,.07); }
+  .dashboard-insight-panel { min-width: 0; padding: 1.25rem; border: 1px solid rgba(255,255,255,.1); border-radius: 1rem; background: linear-gradient(135deg, rgba(10,25,43,.68), rgba(4,15,29,.42)); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
+  .dashboard-risk-panel { border-color: rgba(251,113,133,.2); background: linear-gradient(135deg, rgba(73,25,45,.24), rgba(7,17,31,.56) 58%, rgba(15,25,42,.42)); }
+  .dashboard-morale-panel { border-color: rgba(94,234,212,.2); background: linear-gradient(135deg, rgba(10,55,66,.3), rgba(7,24,38,.6) 58%, rgba(10,29,43,.42)); }
   .dashboard-kicker { color: #64748b; font-size: .62rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
   .dashboard-risk-row { display: flex; align-items: center; gap: .8rem; width: 100%; text-align: left; }
   .dashboard-risk-rank { width: 1.5rem; color: #64748b; font-size: .65rem; font-weight: 800; letter-spacing: .12em; }
@@ -159,6 +170,47 @@ input,
 textarea,
 select {
   color-scheme: dark;
+}
+
+/* Shared control language for every native select. Keeping the native
+   interaction preserves keyboard navigation, mobile pickers, and form
+   semantics while removing the browser's light legacy styling. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 2.25rem;
+  padding-right: 2.25rem !important;
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+  border-radius: 0.65rem;
+  background-color: rgba(7, 17, 31, 0.78) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 0.95rem;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+select:hover {
+  border-color: rgba(103, 232, 249, 0.45) !important;
+  background-color: rgba(15, 31, 51, 0.96) !important;
+}
+
+select:focus-visible {
+  outline: none;
+  border-color: rgba(103, 232, 249, 0.7) !important;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+}
+
+select option,
+select optgroup {
+  color: #e2e8f0;
+  background: #0b1628;
+}
+
+select option:checked {
+  color: #cffafe;
+  background: #12334a;
 }
 
 .auth-input::placeholder {
