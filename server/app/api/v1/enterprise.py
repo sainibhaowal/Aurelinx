@@ -203,7 +203,7 @@ async def explain_attrition(
 @router.get("/risk-drivers/drilldown", response_model=RiskDriverDrilldownResponse)
 async def risk_driver_drilldown(
     factor: str = Query(...),
-    top_n: int = Query(30, ge=1, le=200),
+    top_n: int = Query(30, ge=1, le=10000),
     current_user: TokenData = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
@@ -340,6 +340,20 @@ async def update_intervention(
     row = db.get(InterventionTable, intervention_id)
     if not row or row.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Intervention not found")
+    requested_status = payload.status
+    if requested_status and requested_status != row.status:
+        allowed_transitions = {
+            "planned": {"approved", "in_progress", "cancelled"},
+            "approved": {"in_progress", "cancelled"},
+            "in_progress": {"completed", "cancelled"},
+            "completed": set(),
+            "cancelled": set(),
+        }
+        if requested_status not in allowed_transitions.get(row.status, set()):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Invalid intervention transition: {row.status} -> {requested_status}",
+            )
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(row, field, value)
     if row.status in {"completed", "cancelled"} and row.closed_at is None:
@@ -433,6 +447,23 @@ async def upsert_intervention_outcome(
     intervention = db.get(InterventionTable, intervention_id)
     if not intervention or intervention.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Intervention not found")
+    if intervention.status in {"planned", "cancelled"}:
+        raise HTTPException(
+            status_code=409,
+            detail="Start the intervention before recording a checkpoint; cancelled interventions cannot receive checkpoints",
+        )
+    if payload.checkpoint_day in {60, 90}:
+        required_previous_day = 30 if payload.checkpoint_day == 60 else 60
+        previous = db.exec(
+            select(InterventionOutcomeTable)
+            .where(InterventionOutcomeTable.intervention_id == intervention_id)
+            .where(InterventionOutcomeTable.checkpoint_day == required_previous_day)
+        ).first()
+        if not previous:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Record the {required_previous_day}-day checkpoint before the {payload.checkpoint_day}-day checkpoint",
+            )
     existing = db.exec(
         select(InterventionOutcomeTable)
         .where(InterventionOutcomeTable.intervention_id == intervention_id)
@@ -440,32 +471,10 @@ async def upsert_intervention_outcome(
         .where(InterventionOutcomeTable.checkpoint_day == payload.checkpoint_day)
     ).first()
     if existing:
-        existing.measured_at = datetime.utcnow()
-        existing.status = payload.status
-        existing.risk_delta = payload.risk_delta
-        existing.retention_delta = payload.retention_delta
-        existing.notes = payload.notes
-        db.add(existing)
-        db.commit()
-        db.refresh(existing)
-        # lightweight aggregate score on intervention
-        outcomes = db.exec(
-            select(InterventionOutcomeTable).where(
-                InterventionOutcomeTable.intervention_id == intervention_id
-            )
-        ).all()
-        scored = [
-            o for o in outcomes if o.status in {"improved", "neutral", "worsened"}
-        ]
-        if scored:
-            mapping = {"worsened": 0.0, "neutral": 0.5, "improved": 1.0}
-            intervention.outcome_score = round(
-                sum(mapping[o.status] for o in scored) / len(scored), 3
-            )
-            intervention.updated_at = datetime.utcnow()
-            db.add(intervention)
-            db.commit()
-        return _to_outcome_out(existing)
+        raise HTTPException(
+            status_code=409,
+            detail=f"The {payload.checkpoint_day}-day checkpoint is already recorded and cannot be overwritten",
+        )
 
     row = InterventionOutcomeTable(
         tenant_id=tenant_id,
@@ -480,6 +489,20 @@ async def upsert_intervention_outcome(
     db.add(row)
     db.commit()
     db.refresh(row)
+    outcomes = db.exec(
+        select(InterventionOutcomeTable).where(
+            InterventionOutcomeTable.intervention_id == intervention_id
+        )
+    ).all()
+    mapping = {"worsened": 0.0, "neutral": 0.5, "improved": 1.0}
+    scored = [o for o in outcomes if o.status in mapping]
+    if scored:
+        intervention.outcome_score = round(
+            sum(mapping[o.status] for o in scored) / len(scored), 3
+        )
+        intervention.updated_at = datetime.utcnow()
+        db.add(intervention)
+        db.commit()
     _audit(
         db,
         current_user,

@@ -14,6 +14,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Info,
+  Download,
 } from "lucide-react";
 import { UserManualButton } from "./UserManual";
 import { chatAPI } from "../services/apiClient";
@@ -1068,7 +1069,9 @@ const IntelligenceChatView = () => {
   const [streamText, setStreamText] = useState("");
   const [streamPhase, setStreamPhase] = useState(null);
   const [agentSteps, setAgentSteps] = useState([]);
-  const [drawerOpen, setDrawerOpen] = useState(true);
+  // Keep the session history out of the way on first visit. Users can still
+  // expand it with the rail control whenever they need to switch workflows.
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState(null);
   const [renameValue, setRenameValue] = useState("");
@@ -1494,7 +1497,7 @@ const IntelligenceChatView = () => {
   return (
     <div className="absolute inset-0 flex min-h-0 w-full flex-col overflow-hidden">
       <div
-        className="p-4 flex flex-1 flex-col min-h-0 pb-0 mr-[8px]"
+        className={`w-full max-w-[900px] p-4 flex flex-1 flex-col min-h-0 pb-0 mx-auto transition-transform duration-300 ${drawerOpen ? "sm:-translate-x-[170px]" : ""}`}
       >
         <div className="flex items-center gap-3 mb-3">
           <div className="p-2 rounded-lg bg-primary/20 text-cyan-200">
@@ -1503,27 +1506,21 @@ const IntelligenceChatView = () => {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-extrabold">
-                Aurelinx Intelligence Chat
+                Aurelinx Grounded Query
               </h2>
               <button
                 type="button"
                 onClick={() => setHelpOpen((v) => !v)}
                 className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 hover:text-cyan-200 transition-colors"
-                title="What Aurelinx Intelligence Chat can do"
-                aria-label="What Aurelinx Intelligence Chat can do"
+                title="What Aurelinx Grounded Query can do"
+                aria-label="What Aurelinx Grounded Query can do"
               >
                 <Info size={12} />
               </button>
             </div>
             <p className="text-xs text-slate-400">
-              Agentic control over dashboard, directory, sentiment, analytics,
-              scout and data tools.
+              Ask verified questions about workforce, candidates, analytics, and controlled workflows.
             </p>
-            {selectedSession && (
-              <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-500">
-                Started {formatSessionTime(selectedSession.created_at)} · Updated {formatSessionTime(selectedSession.updated_at)} · Scope: authenticated workspace
-              </div>
-            )}
           </div>
           <div className="ml-auto flex items-center gap-2">
             <UserManualButton defaultTab="workflows" />
@@ -1532,10 +1529,10 @@ const IntelligenceChatView = () => {
               disabled={!selectedSession}
               className="h-9 px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs inline-flex items-center gap-2"
             >
-              <Eraser size={13} /> Clear Chat
+              <Eraser size={13} /> Clear Query
             </button>
             <div className="relative group">
-              <button disabled={!messages.length} className="h-9 px-3 rounded-lg border border-white/10 bg-white/5 text-xs disabled:opacity-40">Export</button>
+              <button disabled={!messages.length} aria-label="Export query transcript" title="Export query transcript" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs disabled:opacity-40"><Download size={14} /></button>
               {messages.length > 0 && <div className="absolute right-0 top-full z-30 hidden w-36 rounded-lg border border-white/10 bg-[#0f1f33] p-1 shadow-xl group-hover:block"><button onClick={() => exportTranscript("pdf")} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10">PDF</button><button onClick={() => exportTranscript("excel")} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10">Excel</button><button onClick={() => exportTranscript("markdown")} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10">Markdown</button></div>}
             </div>
           </div>
@@ -1553,12 +1550,11 @@ const IntelligenceChatView = () => {
         {helpOpen && (
           <div className="mb-3 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4 text-xs text-slate-300">
             <div className="font-bold uppercase tracking-[0.16em] text-cyan-300 mb-2">
-              What this chat can do
+              What Grounded Query can do
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <div>
-                • Answer live questions from Postgres-backed workforce and
-                candidate data.
+                • Answer questions from verified workforce and candidate records.
               </div>
               <div>
                 • Explain morale, retention probability, at-risk signals, and
@@ -1569,8 +1565,7 @@ const IntelligenceChatView = () => {
                 policies, and interventions.
               </div>
               <div>
-                • Stream token-by-token responses and support file attachments
-                in sessions.
+                • Show the scope, records, calculations, and evidence behind each answer.
               </div>
               <div>
                 • Report system status, model drift, quarantine, release gates,
@@ -1589,11 +1584,10 @@ const IntelligenceChatView = () => {
             <div className="flex flex-col items-center justify-center flex-1 text-center p-8 bg-white/[0.01] border border-white/5 rounded-2xl backdrop-blur-md my-auto max-w-xl mx-auto py-16">
               <Bot size={40} className="text-cyan-400 mb-4 animate-pulse" />
               <h3 className="text-base font-extrabold text-slate-200 mb-2">
-                No Active Workflow Sessions
+                No Active Query Sessions
               </h3>
               <p className="text-xs text-slate-400 max-w-xs mb-6 leading-relaxed">
-                Create a new session to begin interacting with the Aurelinx
-                Intelligence agent.
+                Start a query session to search, analyze, and run controlled workflows.
               </p>
               <button
                 onClick={createSession}
@@ -1655,8 +1649,7 @@ const IntelligenceChatView = () => {
               )}
               {!messages.length && (
                 <div className="text-sm text-slate-400">
-                  Start a chat session and ask Aurelinx to search, analyze,
-                  and update data.
+                Start a grounded query to search, analyze, and update data.
                 </div>
               )}
               <div />
@@ -1759,11 +1752,21 @@ const IntelligenceChatView = () => {
       </div>
 
       <aside
-        className={`absolute z-40 top-0 right-0 h-full transition-all duration-300 ease-out ${drawerOpen ? "w-[calc(100vw-16px)] sm:w-[340px]" : "w-[64px]"}`}
+        style={!drawerOpen ? { top: "50%", bottom: "auto", transform: "translateY(-50%)" } : undefined}
+        className={`absolute z-40 transition-all duration-300 ease-out ${drawerOpen ? "inset-y-0 right-0 h-full w-[calc(100vw-16px)] sm:w-[340px]" : "right-0 top-1/2 h-12 w-10 -translate-y-1/2 rounded-l-2xl rounded-r-none"}`}
       >
-        <div className="premium-card h-full min-h-0 overflow-hidden flex flex-col">
+        <button
+          type="button"
+          onClick={() => setDrawerOpen((v) => !v)}
+          aria-label={drawerOpen ? "Collapse workflow history" : `Expand workflow history (${sessions.length} sessions)`}
+          title={drawerOpen ? "Collapse workflow history" : `Open workflow history · ${sessions.length} sessions`}
+          className={`absolute top-1/2 z-[70] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl border border-white/15 bg-[#091525]/[0.98] text-slate-300 shadow-xl backdrop-blur-xl transition hover:border-cyan-300/45 hover:text-cyan-200 ${drawerOpen ? "-left-5" : "left-0"}`}
+        >
+          {drawerOpen ? <PanelRightClose size={14} /> : <PanelRightOpen size={14} />}
+        </button>
+        <div className={`h-full min-h-0 overflow-hidden border border-white/15 bg-[#091525]/[0.98] shadow-[-24px_0_60px_rgba(1,8,20,0.45)] backdrop-blur-xl ${drawerOpen ? "rounded-2xl" : "rounded-l-2xl rounded-r-none"}`}>
           <div
-            className={`flex items-center ${drawerOpen ? "justify-between px-3 py-3" : "justify-center px-2 py-3"}`}
+            className={`flex items-center ${drawerOpen ? "justify-between px-3 py-3" : "h-full justify-center px-0 py-0"}`}
           >
             {drawerOpen && (
               <div className="font-bold text-sm uppercase tracking-[0.14em] text-slate-300">
@@ -1779,21 +1782,6 @@ const IntelligenceChatView = () => {
                   <Plus size={14} />
                 </button>
               )}
-              <button
-                onClick={() => setDrawerOpen((v) => !v)}
-                className="p-2 rounded-lg bg-white/10 hover:bg-white/20"
-                aria-label={
-                  drawerOpen
-                    ? "Collapse sessions drawer"
-                    : "Expand sessions drawer"
-                }
-              >
-                {drawerOpen ? (
-                  <PanelRightClose size={14} />
-                ) : (
-                  <PanelRightOpen size={14} />
-                )}
-              </button>
             </div>
           </div>
 
@@ -1848,21 +1836,7 @@ const IntelligenceChatView = () => {
                 </button>
               </div>
             </>
-          ) : (
-            <div className="flex-1 min-h-0 flex flex-col items-center justify-start gap-3 px-2 py-3">
-              <div className="flex flex-col items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-slate-400">
-                <span className="w-2 h-2 rounded-full bg-primary/80" />
-                {sessions.length}
-              </div>
-              <button
-                onClick={createSession}
-                className="p-2 rounded-lg bg-white/10 hover:bg-white/20"
-                title="New session"
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-          )}
+          ) : null}
         </div>
       </aside>
 

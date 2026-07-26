@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Search,
   Users,
@@ -15,14 +14,12 @@ import {
 } from "lucide-react";
 import TalentCard from "./TalentCard";
 import { UserManualButton } from "./UserManual";
-import {
-  analysisAPI,
-  candidatesAPI,
-  employeesAPI,
-} from "../services/apiClient";
+import { candidatesAPI, employeesAPI } from "../services/apiClient";
 
 const DirectoryView = ({ onExport }) => {
-  const DIRECTORY_LOAD_LIMIT = 10000;
+  // Keep the first paint light. Counts remain authoritative while records are
+  // paged in as the user requests them.
+  const DIRECTORY_PAGE_SIZE = 100;
   const [employees, setEmployees] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,43 +28,58 @@ const DirectoryView = ({ onExport }) => {
   const [selectedProfileLoading, setSelectedProfileLoading] = useState(false);
   const [workforceTotal, setWorkforceTotal] = useState(null);
   const [candidateTotal, setCandidateTotal] = useState(null);
+  const [atRiskTotal, setAtRiskTotal] = useState(null);
+  const [employeeDepartmentTotal, setEmployeeDepartmentTotal] = useState(null);
+  const [candidateDepartmentTotal, setCandidateDepartmentTotal] = useState(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState("all");
+  const [employeeOffset, setEmployeeOffset] = useState(0);
+  const [candidateOffset, setCandidateOffset] = useState(0);
+  const [hasMoreEmployees, setHasMoreEmployees] = useState(false);
+  const [hasMoreCandidates, setHasMoreCandidates] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreSentinelRef = useRef(null);
+  const searchInitialized = useRef(false);
 
   useEffect(() => {
     let alive = true;
-    const DIRECTORY_CACHE_KEY = "aurelinx_directory_cache_v2";
-    let useCacheOnly = false;
+    const DIRECTORY_CACHE_KEY = "aurelinx_directory_cache_v5";
+    let cachedAt = 0;
     try {
       const cached = JSON.parse(localStorage.getItem(DIRECTORY_CACHE_KEY) || "null");
       if (cached?.employees && cached?.candidates) {
         setEmployees(cached.employees);
         setCandidates(cached.candidates);
         setWorkforceTotal(cached.workforceTotal ?? null);
-        setCandidateTotal(cached.candidates.length);
+        setCandidateTotal(cached.candidateTotal ?? cached.candidates.length);
+        setAtRiskTotal(cached.atRiskTotal ?? null);
+        setEmployeeDepartmentTotal(cached.employeeDepartmentTotal ?? null);
+        setCandidateDepartmentTotal(cached.candidateDepartmentTotal ?? null);
+        setEmployeeOffset(cached.employees.length);
+        setCandidateOffset(cached.candidates.length);
+        setHasMoreEmployees(cached.employees.length < Number(cached.workforceTotal || 0));
+        setHasMoreCandidates(cached.candidates.length < Number(cached.candidateTotal || 0));
         setLoading(false);
-        useCacheOnly = cached.updatedAt && Date.now() - cached.updatedAt < 60_000;
+        cachedAt = cached.updatedAt || 0;
       }
     } catch {
       // Ignore an invalid cache and load from the API.
     }
-    if (useCacheOnly) {
+    // A fresh cache is immediately usable and avoids reloading on every tab
+    // visit. Refresh only after the short-lived cache window expires.
+    if (cachedAt && Date.now() - cachedAt < 10 * 60_000) {
       return () => { alive = false; };
     }
-    const loadAll = async (listFn) => {
-      const firstPage = await listFn(0, DIRECTORY_LOAD_LIMIT);
-      if (!Array.isArray(firstPage) || firstPage.length < DIRECTORY_LOAD_LIMIT) {
-        return firstPage || [];
-      }
-      const secondPage = await listFn(DIRECTORY_LOAD_LIMIT, DIRECTORY_LOAD_LIMIT);
-      return [...firstPage, ...(secondPage || [])];
-    };
     Promise.allSettled([
-      loadAll(employeesAPI.list),
-      loadAll(candidatesAPI.list),
-      analysisAPI.getAnalyticsSnapshot(),
+      employeesAPI.list(0, DIRECTORY_PAGE_SIZE),
+      candidatesAPI.list(0, DIRECTORY_PAGE_SIZE),
+      employeesAPI.count(),
+      candidatesAPI.count(),
+      employeesAPI.count(null, true),
+      employeesAPI.departments(),
+      candidatesAPI.departments(),
     ])
-      .then(([employeesRes, candidatesRes, snapRes]) => {
+      .then(([employeesRes, candidatesRes, employeesCountRes, candidatesCountRes, atRiskCountRes, employeeDepartmentsRes, candidateDepartmentsRes]) => {
         if (!alive) return;
         if (employeesRes.status === "fulfilled") {
           setEmployees(employeesRes.value || []);
@@ -79,23 +91,34 @@ const DirectoryView = ({ onExport }) => {
         } else {
           console.error(candidatesRes.reason);
         }
-        if (snapRes.status === "fulfilled") {
-          setWorkforceTotal(snapRes.value?.total ?? null);
+        if (employeesCountRes.status === "fulfilled") {
+          setWorkforceTotal(employeesCountRes.status === "fulfilled" ? employeesCountRes.value?.count ?? null : null);
         } else {
-          console.error(snapRes.reason);
+          console.error(employeesCountRes.reason);
         }
         setCandidateTotal(
-          candidatesRes.status === "fulfilled"
-            ? (candidatesRes.value || []).length
-            : null,
+          candidatesCountRes.status === "fulfilled" ? candidatesCountRes.value?.count ?? null : null,
         );
+        setAtRiskTotal(
+          atRiskCountRes.status === "fulfilled" ? atRiskCountRes.value?.count ?? null : null,
+        );
+        setEmployeeDepartmentTotal(employeeDepartmentsRes.status === "fulfilled" ? employeeDepartmentsRes.value?.length ?? null : null);
+        setCandidateDepartmentTotal(candidateDepartmentsRes.status === "fulfilled" ? candidateDepartmentsRes.value?.length ?? null : null);
+        setEmployeeOffset(employeesRes.status === "fulfilled" ? (employeesRes.value || []).length : 0);
+        setCandidateOffset(candidatesRes.status === "fulfilled" ? (candidatesRes.value || []).length : 0);
+        setHasMoreEmployees(employeesRes.status === "fulfilled" && employeesCountRes.status === "fulfilled" && (employeesRes.value || []).length < Number(employeesCountRes.value?.count || 0));
+        setHasMoreCandidates(candidatesRes.status === "fulfilled" && candidatesCountRes.status === "fulfilled" && (candidatesRes.value || []).length < Number(candidatesCountRes.value?.count || 0));
         try {
           localStorage.setItem(
             DIRECTORY_CACHE_KEY,
             JSON.stringify({
               employees: employeesRes.status === "fulfilled" ? employeesRes.value || [] : [],
               candidates: candidatesRes.status === "fulfilled" ? candidatesRes.value || [] : [],
-              workforceTotal: snapRes.status === "fulfilled" ? snapRes.value?.total ?? null : null,
+              workforceTotal: employeesCountRes.status === "fulfilled" ? employeesCountRes.value?.count ?? null : null,
+              candidateTotal: candidatesCountRes.status === "fulfilled" ? candidatesCountRes.value?.count ?? null : null,
+              atRiskTotal: atRiskCountRes.status === "fulfilled" ? atRiskCountRes.value?.count ?? null : null,
+              employeeDepartmentTotal: employeeDepartmentsRes.status === "fulfilled" ? employeeDepartmentsRes.value?.length ?? null : null,
+              candidateDepartmentTotal: candidateDepartmentsRes.status === "fulfilled" ? candidateDepartmentsRes.value?.length ?? null : null,
               updatedAt: Date.now(),
             }),
           );
@@ -114,6 +137,87 @@ const DirectoryView = ({ onExport }) => {
       alive = false;
     };
   }, []);
+
+  // Search is executed against the complete database, not only the currently
+  // loaded page. Debouncing keeps typing smooth while the server performs the
+  // indexed, paginated query.
+  useEffect(() => {
+    if (!searchInitialized.current) {
+      searchInitialized.current = true;
+      return undefined;
+    }
+    const query = filter.trim();
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      try {
+        const [employeeRows, candidateRows, employeeCount, candidateCount, atRiskCount] = await Promise.all([
+          employeesAPI.list(0, DIRECTORY_PAGE_SIZE, null, false, query || null),
+          candidatesAPI.list(0, DIRECTORY_PAGE_SIZE, null, query || null),
+          employeesAPI.count(query || null),
+          candidatesAPI.count(query || null),
+          employeesAPI.count(query || null, true),
+        ]);
+        setEmployees(employeeRows || []);
+        setCandidates(candidateRows || []);
+        setWorkforceTotal(employeeCount?.count ?? 0);
+        setCandidateTotal(candidateCount?.count ?? 0);
+        setAtRiskTotal(atRiskCount?.count ?? 0);
+        setEmployeeOffset((employeeRows || []).length);
+        setCandidateOffset((candidateRows || []).length);
+        setHasMoreEmployees((employeeRows || []).length < Number(employeeCount?.count || 0));
+        setHasMoreCandidates((candidateRows || []).length < Number(candidateCount?.count || 0));
+      } catch (error) {
+        console.error("Directory search failed", error);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [filter]);
+
+  const loadMore = async () => {
+    if (loadingMore || (!hasMoreEmployees && !hasMoreCandidates)) return;
+    setLoadingMore(true);
+    try {
+      const requests = [];
+      const query = filter.trim() || null;
+      if ((viewMode === "all" || viewMode === "employees") && hasMoreEmployees) {
+        requests.push(employeesAPI.list(employeeOffset, DIRECTORY_PAGE_SIZE, null, false, query).then((rows) => ({ type: "employees", rows })));
+      }
+      if ((viewMode === "all" || viewMode === "candidates") && hasMoreCandidates) {
+        requests.push(candidatesAPI.list(candidateOffset, DIRECTORY_PAGE_SIZE, null, query).then((rows) => ({ type: "candidates", rows })));
+      }
+      const results = await Promise.all(requests);
+      for (const result of results) {
+        const rows = Array.isArray(result.rows) ? result.rows : [];
+        if (result.type === "employees") {
+          setEmployees((previous) => [...previous, ...rows]);
+          setEmployeeOffset((previous) => previous + rows.length);
+          setHasMoreEmployees(rows.length === DIRECTORY_PAGE_SIZE);
+        } else {
+          setCandidates((previous) => [...previous, ...rows]);
+          setCandidateOffset((previous) => previous + rows.length);
+          setHasMoreCandidates(rows.length === DIRECTORY_PAGE_SIZE);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load more directory records", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Fetch the next lightweight metadata page as the user approaches the end
+  // of the directory. Full profile payloads are still requested only on click.
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel || loadingMore || (!hasMoreEmployees && !hasMoreCandidates)) return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) loadMore();
+    }, { rootMargin: "700px 0px" });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadingMore, hasMoreEmployees, hasMoreCandidates, employeeOffset, candidateOffset, viewMode, filter]);
 
   const isCandidateRecord = (person) =>
     Boolean(person?.match_score !== undefined || person?.application_date);
@@ -152,8 +256,8 @@ const DirectoryView = ({ onExport }) => {
     normalize(person.department).includes(filter.toLowerCase()) ||
     normalize(person.email).includes(filter.toLowerCase());
 
-  const visibleEmployees = employees.filter(matchesFilter);
-  const visibleCandidates = candidates.filter(matchesFilter);
+  const visibleEmployees = useMemo(() => employees.filter(matchesFilter), [employees, filter]);
+  const visibleCandidates = useMemo(() => candidates.filter(matchesFilter), [candidates, filter]);
   const showEmployees = viewMode === "employees" || viewMode === "all";
   const showCandidates = viewMode === "candidates" || viewMode === "all";
   const visibleCount =
@@ -253,9 +357,7 @@ const DirectoryView = ({ onExport }) => {
             )}
           </div>
           <div className="max-w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary/10 rounded-xl text-primary text-[10px] sm:text-xs font-bold uppercase tracking-widest whitespace-normal break-words">
-            <Users size={16} /> {employees.length} Employees /{" "}
-            {candidates.length} Candidates
-            {workforceTotal !== null ? ` / ${workforceTotal} Employees` : ""}
+            <Users size={16} /> Total records: {(workforceTotal ?? 0) + (candidateTotal ?? 0)}
           </div>
         </div>
       </header>
@@ -287,41 +389,40 @@ const DirectoryView = ({ onExport }) => {
           <div className="text-xs text-slate-300 uppercase tracking-[0.14em] mb-2">
             Visible Records
           </div>
-          <div className="text-2xl font-extrabold">{visibleCount}</div>
-          <div className="text-[10px] text-slate-400 mt-1">
-            {viewMode === "candidates"
-              ? candidateTotal !== null
-                ? `Of ${candidateTotal} total candidate records`
-                : "Subset of the loaded page"
-              : workforceTotal !== null
-                ? `Employees and candidates currently loaded`
-                : "Subset of the loaded page"}
+          <div className="text-2xl font-extrabold">
+            {(showEmployees ? workforceTotal ?? 0 : 0) + (showCandidates ? candidateTotal ?? 0 : 0)}
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-400">
+            <span>Employees: <strong className="text-slate-200">{workforceTotal ?? "—"}</strong></span>
+            <span>Candidates: <strong className="text-slate-200">{candidateTotal ?? "—"}</strong></span>
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1">
+            Authoritative totals; profile details load only when opened.
           </div>
         </div>
         <div className="premium-card p-4">
           <div className="text-xs text-slate-300 uppercase tracking-[0.14em] mb-2">
-            At-Risk in View
+            At-Risk in Directory
           </div>
           <div className="text-2xl font-extrabold text-rose-300">
-            {
-              (showEmployees ? visibleEmployees : []).filter(
-                (e) => e.is_at_risk,
-              ).length
-            }
+            {(showEmployees ? visibleEmployees : []).filter((e) => e.is_at_risk).length} <span className="text-sm font-semibold text-slate-500">/ {showEmployees ? (atRiskTotal ?? "—") : 0}</span>
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1">
+            Loaded matching rows / total at-risk employees
           </div>
         </div>
         <div className="premium-card p-4">
           <div className="text-xs text-slate-300 uppercase tracking-[0.14em] mb-2">
-            Unique Departments Across Both
+            Departments Across Loaded Records
           </div>
           <div className="text-2xl font-extrabold">
             {departmentCount}
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-400">
-            <span>Employee set: <strong className="text-slate-200">{employeeDepartmentCount}</strong></span>
-            <span>Candidate set: <strong className="text-slate-200">{candidateDepartmentCount}</strong></span>
+            <span>Employees: <strong className="text-slate-200">{employeeDepartmentTotal ?? employeeDepartmentCount}</strong></span>
+            <span>Candidates: <strong className="text-slate-200">{candidateDepartmentTotal ?? candidateDepartmentCount}</strong></span>
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Shared names are counted once in the total.</div>
+          <div className="text-[10px] text-slate-500 mt-1">Authoritative department totals across each database; shared departments are counted once in the union.</div>
         </div>
       </div>
 
@@ -357,18 +458,13 @@ const DirectoryView = ({ onExport }) => {
                     yet. Candidate records are loaded separately below.
                   </div>
                 )}
-                {visibleEmployees.map((emp, idx) => (
-                  <motion.div
-                    key={emp.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                  >
+                {visibleEmployees.map((emp) => (
+                  <div key={emp.id} className="[content-visibility:auto] [contain-intrinsic-size:220px]">
                     <TalentCard
                       talent={emp}
                       onOpenProfile={() => openProfileDetails(emp)}
                     />
-                  </motion.div>
+                  </div>
                 ))}
                 {employees.length > 0 && !visibleEmployees.length && (
                   <div className="premium-card p-8 text-slate-300 flex items-center gap-3 md:col-span-3">
@@ -397,18 +493,13 @@ const DirectoryView = ({ onExport }) => {
                     yet.
                   </div>
                 )}
-                {visibleCandidates.map((cand, idx) => (
-                  <motion.div
-                    key={cand.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                  >
+                {visibleCandidates.map((cand) => (
+                  <div key={cand.id} className="[content-visibility:auto] [contain-intrinsic-size:220px]">
                     <TalentCard
                       talent={cand}
                       onOpenProfile={() => openProfileDetails(cand)}
                     />
-                  </motion.div>
+                  </div>
                 ))}
                 {candidates.length > 0 && !visibleCandidates.length && (
                   <div className="premium-card p-8 text-slate-300 flex items-center gap-3 md:col-span-3">
@@ -419,6 +510,10 @@ const DirectoryView = ({ onExport }) => {
               </div>
             </section>
           )}
+
+          <div ref={loadMoreSentinelRef} className="flex min-h-12 items-center justify-center pt-2 text-[10px] text-slate-500" aria-live="polite">
+            {loadingMore ? "Loading lightweight metadata…" : ((hasMoreEmployees && showEmployees) || (hasMoreCandidates && showCandidates) ? "Scroll to load more metadata" : "All matching metadata loaded")}
+          </div>
 
           {!showEmployees && !showCandidates && (
             <div className="premium-card p-8 text-slate-300 flex items-center gap-3">

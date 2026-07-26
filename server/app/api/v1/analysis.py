@@ -512,13 +512,32 @@ async def analyze_talent(
         candidates = filter_real_records(session.exec(select(CandidateTable)).all())
         employees = filter_real_records(session.exec(select(EmployeeTable)).all())
 
+        # Fetch skills in one query instead of issuing one query per profile.
+        # This keeps ranking server-side while avoiding N+1 database latency.
+        candidate_skill_map = {}
+        if candidates:
+            candidate_skill_rows = session.exec(
+                select(SkillTable).where(
+                    SkillTable.candidate_id.in_([candidate.id for candidate in candidates])
+                )
+            ).all()
+            for skill in candidate_skill_rows:
+                candidate_skill_map.setdefault(skill.candidate_id, []).append(skill)
+        employee_skill_map = {}
+        if employees:
+            employee_skill_rows = session.exec(
+                select(SkillTable).where(
+                    SkillTable.employee_id.in_([employee.id for employee in employees])
+                )
+            ).all()
+            for skill in employee_skill_rows:
+                employee_skill_map.setdefault(skill.employee_id, []).append(skill)
+
         use_candidates = bool(candidates)
         scored: List[Tuple[float, object, List[str]]] = []
         if use_candidates:
             for cand in candidates:
-                skills = session.exec(
-                    select(SkillTable).where(SkillTable.candidate_id == cand.id)
-                ).all()
+                skills = candidate_skill_map.get(cand.id, [])
                 skill_names = [s.name for s in skills]
                 score = _score_candidate(request.prompt, cand, skill_names)
                 scored.append((score, cand, skill_names))
@@ -529,12 +548,12 @@ async def analyze_talent(
                     candidates=[],
                     confidence_score=0.0,
                     processing_time_ms=0.0,
+                    searched_records=0,
+                    returned_records=0,
                 )
 
             for emp in employees:
-                skills = session.exec(
-                    select(SkillTable).where(SkillTable.employee_id == emp.id)
-                ).all()
+                skills = employee_skill_map.get(emp.id, [])
                 skill_names = [s.name for s in skills]
                 score = _score_employee(request.prompt, emp, skill_names)
                 scored.append((score, emp, skill_names))
@@ -547,14 +566,26 @@ async def analyze_talent(
         for score, person, skill_names in top_scored:
             if use_candidates:
                 cand = person  # type: ignore[assignment]
-                candidate_out = get_candidate_out(cand, session).model_dump(mode="json")
-                candidate_out.update(
-                    {
-                        "is_at_risk": bool((cand.match_score or 0.0) < 0.55),
-                        "retention_prob": float(cand.match_score or 0.0),
-                        "updated_at": cand.created_at,
-                    }
-                )
+                candidate_out = {
+                    "id": cand.id,
+                    "full_name": cand.full_name,
+                    "email": cand.email,
+                    "department": cand.department,
+                    "role": cand.role,
+                    "sentiment_score": cand.sentiment_score,
+                    "match_score": cand.match_score,
+                    "salary": cand.salary,
+                    "application_date": cand.application_date,
+                    "created_at": cand.created_at,
+                    "updated_at": cand.updated_at,
+                    "is_at_risk": bool((cand.match_score or 0.0) < 0.55),
+                    "retention_prob": float(cand.match_score or 0.0),
+                    "skills": [
+                        {"id": skill.id, "name": skill.name, "level": skill.level, "created_at": skill.created_at}
+                        for skill in skills[:12]
+                    ],
+                    "experiences": [],
+                }
                 top_profiles.append(
                     {
                         "name": cand.full_name,
@@ -580,7 +611,25 @@ async def analyze_talent(
                         "ranking_score": round(score, 3),
                     }
                 )
-                top_candidates.append(get_employee_out(emp, session))
+                top_candidates.append({
+                    "id": emp.id,
+                    "full_name": emp.full_name,
+                    "email": emp.email,
+                    "department": emp.department,
+                    "role": emp.role,
+                    "sentiment_score": emp.sentiment_score,
+                    "is_at_risk": emp.is_at_risk,
+                    "retention_prob": emp.retention_prob,
+                    "salary": emp.salary,
+                    "join_date": emp.join_date,
+                    "created_at": emp.created_at,
+                    "updated_at": emp.updated_at,
+                    "skills": [
+                        {"id": skill.id, "name": skill.name, "level": skill.level, "created_at": skill.created_at}
+                        for skill in skills[:12]
+                    ],
+                    "experiences": [],
+                })
 
         analysis_text = await _call_openai_compatible_model(
             provider=request.provider,
@@ -598,6 +647,8 @@ async def analyze_talent(
             candidates=top_candidates,
             confidence_score=0.9 if len(top_candidates) >= 3 else 0.75,
             processing_time_ms=round(processing_ms, 1),
+            searched_records=len(candidates) if use_candidates else len(employees),
+            returned_records=len(top_candidates),
         )
 
     except httpx.HTTPStatusError as e:

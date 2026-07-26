@@ -15,8 +15,11 @@ import {
   Plus,
   Trash2,
   RefreshCw,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { UserManualButton } from "./UserManual";
+import PremiumSelect from "./PremiumSelect";
 import { API_BASE_URL } from "../services/apiBase";
 
 // Curated 2D positions for skill nodes in Dijkstra SVG graph
@@ -168,6 +171,7 @@ const apiCall = async (url, method = "GET", body = null) => {
 
 const IntelligenceCenterView = () => {
   const [activeSubTab, setActiveSubTab] = useState("skill-match");
+  const [graphExpanded, setGraphExpanded] = useState(false);
 
   // 1. Skill Match State
   const [matchSkillsInput, setMatchSkillsInput] = useState([
@@ -178,6 +182,7 @@ const IntelligenceCenterView = () => {
   const [newSkillLevel, setNewSkillLevel] = useState(3);
   const [matchResults, setMatchResults] = useState([]);
   const [matchingLoading, setMatchingLoading] = useState(false);
+  const [skillMatchStatus, setSkillMatchStatus] = useState("idle");
   const [activeMatchEmployeeId, setActiveMatchEmployeeId] = useState(null);
 
   // 2. Team Optimize State
@@ -196,7 +201,6 @@ const IntelligenceCenterView = () => {
   const [annealingTemp, setAnnealingTemp] = useState(10.0);
   const [annealingHistory, setAnnealingHistory] = useState([]);
   const [annealingStatus, setAnnealingStatus] = useState("idle"); // idle, running, complete
-  const [shuffledTeamNames, setShuffledTeamNames] = useState([]);
 
   // 3. Attrition State
   const [attritionData, setAttritionData] = useState([]);
@@ -220,6 +224,9 @@ const IntelligenceCenterView = () => {
   const [nodesState, setNodesState] = useState([]);
   const dragNodeRef = useRef(null);
   const canvasRef = useRef(null);
+  const onaCameraRef = useRef({ yaw: 0, pitch: -0.38, scale: 1 });
+  const [onaCamera, setOnaCamera] = useState({ yaw: 0, pitch: -0.38, scale: 1 });
+  const onaRotateRef = useRef(null);
 
   // 5. Career Path State
   const [careerEmployees, setCareerEmployees] = useState([]);
@@ -325,11 +332,17 @@ const IntelligenceCenterView = () => {
       // Initialize physics layout positions
       if (data.nodes && data.nodes.length > 0) {
         const initialNodes = data.nodes.map((node, idx) => {
-          const angle = (idx / data.nodes.length) * 2 * Math.PI;
+          // Distribute the real network nodes through a spherical volume rather
+          // than a 2D ring. The force solver then settles this 3D seed without
+          // changing the underlying ONA records or links.
+          const phi = Math.acos(1 - (2 * (idx + 0.5)) / data.nodes.length);
+          const theta = Math.PI * (1 + Math.sqrt(5)) * idx;
+          const radius = 170;
           return {
             ...node,
-            x: 250 + 185 * Math.cos(angle) + (Math.random() - 0.5) * 20,
-            y: 250 + 185 * Math.sin(angle) + (Math.random() - 0.5) * 20,
+            x: 250 + radius * Math.sin(phi) * Math.cos(theta) + (Math.random() - 0.5) * 12,
+            y: 250 + radius * Math.sin(phi) * Math.sin(theta) + (Math.random() - 0.5) * 12,
+            z: radius * Math.cos(phi) + (Math.random() - 0.5) * 12,
             vx: 0,
             vy: 0,
           };
@@ -362,6 +375,7 @@ const IntelligenceCenterView = () => {
           ...n,
           vx: n.vx * 0.85,
           vy: n.vy * 0.85,
+          vz: (n.vz || 0) * 0.85,
         }));
 
         // 1. Repulsion force between all nodes
@@ -371,7 +385,8 @@ const IntelligenceCenterView = () => {
             const n2 = nextNodes[j];
             const dx = n2.x - n1.x;
             const dy = n2.y - n1.y;
-            const distSq = dx * dx + dy * dy + 1.0;
+            const dz = (n2.z || 0) - (n1.z || 0);
+            const distSq = dx * dx + dy * dy + dz * dz + 1.0;
             const dist = Math.sqrt(distSq);
             if (dist < 180) {
               const force = 10.0 / distSq;
@@ -381,10 +396,12 @@ const IntelligenceCenterView = () => {
               if (n1.id !== dragNodeRef.current) {
                 nextNodes[i].vx -= fx;
                 nextNodes[i].vy -= fy;
+                nextNodes[i].vz -= (dz / dist) * force;
               }
               if (n2.id !== dragNodeRef.current) {
                 nextNodes[j].vx += fx;
                 nextNodes[j].vy += fy;
+                nextNodes[j].vz += (dz / dist) * force;
               }
             }
           }
@@ -400,7 +417,8 @@ const IntelligenceCenterView = () => {
           const nTgt = nextNodes[idxTgt];
           const dx = nTgt.x - nSrc.x;
           const dy = nTgt.y - nSrc.y;
-          const dist = Math.sqrt(dx * dx + dy * dy) + 0.1;
+          const dz = (nTgt.z || 0) - (nSrc.z || 0);
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.1;
           const desiredDist = 120;
           const force = (dist - desiredDist) * 0.015 * link.weight;
 
@@ -410,10 +428,12 @@ const IntelligenceCenterView = () => {
           if (nSrc.id !== dragNodeRef.current) {
             nextNodes[idxSrc].vx += fx;
             nextNodes[idxSrc].vy += fy;
+            nextNodes[idxSrc].vz += (dz / dist) * force;
           }
           if (nTgt.id !== dragNodeRef.current) {
             nextNodes[idxTgt].vx -= fx;
             nextNodes[idxTgt].vy -= fy;
+            nextNodes[idxTgt].vz -= (dz / dist) * force;
           }
         });
 
@@ -422,8 +442,10 @@ const IntelligenceCenterView = () => {
           if (n.id === dragNodeRef.current) return;
           const dx = 250 - n.x;
           const dy = 250 - n.y;
+          const dz = -(n.z || 0);
           nextNodes[i].vx += dx * 0.003;
           nextNodes[i].vy += dy * 0.003;
+          nextNodes[i].vz += dz * 0.0008;
         });
 
         // 4. Update coordinates with velocities
@@ -431,11 +453,14 @@ const IntelligenceCenterView = () => {
           if (n.id === dragNodeRef.current) return;
           let nextX = n.x + n.vx;
           let nextY = n.y + n.vy;
+          let nextZ = (n.z || 0) + (n.vz || 0);
           // Boundary collision
           nextX = Math.max(25, Math.min(475, nextX));
           nextY = Math.max(25, Math.min(475, nextY));
+          nextZ = Math.max(-210, Math.min(210, nextZ));
           nextNodes[i].x = nextX;
           nextNodes[i].y = nextY;
+          nextNodes[i].z = nextZ;
         });
 
         return nextNodes;
@@ -485,6 +510,64 @@ const IntelligenceCenterView = () => {
     window.addEventListener("mouseup", handleMouseUp);
     window.addEventListener("touchmove", updateCoords);
     window.addEventListener("touchend", handleMouseUp);
+  };
+
+  const projectOnaNode = (node) => {
+    const camera = onaCamera;
+    const x = node.x - 250;
+    const y = node.y - 250;
+    const z = node.z || 0;
+    const cosYaw = Math.cos(camera.yaw);
+    const sinYaw = Math.sin(camera.yaw);
+    const yawX = x * cosYaw - z * sinYaw;
+    const yawZ = x * sinYaw + z * cosYaw;
+    const cosPitch = Math.cos(camera.pitch);
+    const sinPitch = Math.sin(camera.pitch);
+    const pitchY = y * cosPitch - yawZ * sinPitch;
+    const depth = y * sinPitch + yawZ * cosPitch;
+    const perspective = 360 / Math.max(210, 360 - depth);
+    return {
+      x: 250 + yawX * perspective * camera.scale,
+      y: 250 + pitchY * perspective * camera.scale,
+      depth,
+      perspective,
+    };
+  };
+
+  const handleOnaCanvasPointerDown = (event) => {
+    if (event.target !== event.currentTarget) return;
+    onaRotateRef.current = { x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const handleOnaCanvasPointerMove = (event) => {
+    if (!onaRotateRef.current) return;
+    const previous = onaRotateRef.current;
+    const next = {
+      ...onaCameraRef.current,
+      yaw: onaCameraRef.current.yaw + (event.clientX - previous.x) * 0.008,
+      pitch: Math.max(-1.1, Math.min(1.1, onaCameraRef.current.pitch + (event.clientY - previous.y) * 0.008)),
+    };
+    onaRotateRef.current = { x: event.clientX, y: event.clientY };
+    onaCameraRef.current = next;
+    setOnaCamera(next);
+  };
+
+  const handleOnaCanvasPointerUp = () => {
+    onaRotateRef.current = null;
+  };
+
+  const handleOnaCanvasWheel = (event) => {
+    event.preventDefault();
+    const next = { ...onaCameraRef.current, scale: Math.max(0.65, Math.min(1.8, onaCameraRef.current.scale - event.deltaY * 0.001)) };
+    onaCameraRef.current = next;
+    setOnaCamera(next);
+  };
+
+  const resetOnaCamera = () => {
+    const next = { yaw: 0, pitch: -0.38, scale: 1 };
+    onaCameraRef.current = next;
+    setOnaCamera(next);
   };
 
   async function fetchCareerEmployees() {
@@ -540,6 +623,7 @@ const IntelligenceCenterView = () => {
     if (matchSkillsInput.length === 0) return;
     try {
       setMatchingLoading(true);
+      setSkillMatchStatus("running");
       const results = await apiCall("/skill-match", "POST", {
         target_skills: matchSkillsInput,
       });
@@ -547,9 +631,11 @@ const IntelligenceCenterView = () => {
       if (results.length > 0) {
         setActiveMatchEmployeeId(results[0].employee_id);
       }
+      setSkillMatchStatus("complete");
       setMatchingLoading(false);
     } catch (err) {
       console.error(err);
+      setSkillMatchStatus("error");
       setMatchingLoading(false);
     }
   };
@@ -574,20 +660,6 @@ const IntelligenceCenterView = () => {
       const stepsCount = history.length;
       const simulationSteps = Math.min(25, stepsCount);
 
-      // Live slot machine roster swap animations
-      const mockNamesPool = [
-        "Aurelia Vance",
-        "Cyrus Sterling",
-        "Silas Thorne",
-        "Maeve Brooks",
-        "Julian Cross",
-        "Dante Blackwell",
-        "Eleni Moretti",
-        "Leona Mercer",
-        "Gideon Cole",
-        "Fiona Hayes",
-      ];
-
       let currentSimIndex = 0;
       const intervalId = setInterval(() => {
         if (currentSimIndex >= simulationSteps) {
@@ -599,19 +671,12 @@ const IntelligenceCenterView = () => {
           setAnnealingStatus("complete");
           setOptimizingLoading(false);
         } else {
-          // Shuffle mock roster visually
           const stepData =
             history[currentSimIndex] || history[history.length - 1];
           setAnnealingStep(stepData.step);
           setAnnealingTemp(stepData.temperature);
           setAnnealingHistory(history.slice(0, currentSimIndex + 1));
 
-          // Generate active random names to show visual state changes
-          const randomSelection = Array.from({ length: teamSize }).map(
-            () =>
-              mockNamesPool[Math.floor(Math.random() * mockNamesPool.length)],
-          );
-          setShuffledTeamNames(randomSelection);
           currentSimIndex++;
         }
       }, 90);
@@ -714,18 +779,30 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 text-left"
+              className="grid grid-cols-1 items-start lg:grid-cols-[360px_1fr] gap-6 text-left"
             >
               {/* Left Settings */}
               <div className="space-y-6">
-                <div className="premium-card p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2 flex items-center gap-2">
-                    <Briefcase size={14} className="text-indigo-400" /> Define
-                    Target Requirements
-                  </h3>
+                <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)]">
+                  <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+                    <div>
+                      <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">
+                        <Briefcase size={13} /> Target definition
+                      </div>
+                      <h3 className="text-sm font-semibold tracking-tight text-white">
+                        Define target requirements
+                      </h3>
+                      <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                        Add the skills and minimum levels the graph solver must evaluate.
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-indigo-300/20 bg-indigo-300/10 px-2 py-1 text-[9px] font-semibold text-indigo-200">
+                      {matchSkillsInput.length} requirement{matchSkillsInput.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
 
                   {/* Skill Add Input */}
-                  <div className="space-y-3 mb-6">
+                  <div className="space-y-3 px-5 pt-5">
                     <div>
                       <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
                         Skill Node
@@ -735,53 +812,54 @@ const IntelligenceCenterView = () => {
                         placeholder="e.g. PyTorch, React, FastAPI"
                         value={newSkillName}
                         onChange={(e) => setNewSkillName(e.target.value)}
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 text-xs text-white placeholder-slate-600 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
                       />
                     </div>
                     <div>
                       <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
                         Min Proficiency
                       </label>
-                      <select
+                      <PremiumSelect
                         value={newSkillLevel}
                         onChange={(e) =>
                           setNewSkillLevel(Number(e.target.value))
                         }
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
                       >
                         {[1, 2, 3, 4, 5].map((v) => (
                           <option key={v} value={v}>
                             Lvl {v}
                           </option>
                         ))}
-                      </select>
+                      </PremiumSelect>
                     </div>
                     <button
                       onClick={addSkillMatchReq}
-                      className="w-full h-10 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold uppercase tracking-wider text-white transition-all inline-flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                      className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-300/20 bg-indigo-500/90 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(99,102,241,.18)] transition hover:bg-indigo-400"
                     >
                       <Plus size={14} /> Add Skill requirement
                     </button>
                   </div>
 
                   {/* List of current targets */}
-                  <div className="space-y-2 max-h-[180px] overflow-y-auto custom-scrollbar border-t border-white/5 pt-3">
+                  <div className="mx-5 mt-5 max-h-[180px] space-y-2 overflow-y-auto border-t border-white/10 pt-3 custom-scrollbar">
                     {matchSkillsInput.map((skill, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl px-3 py-2"
+                        className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 transition hover:border-indigo-300/30 hover:bg-indigo-300/[0.06]"
                       >
                         <div className="text-xs">
                           <span className="font-bold text-white">
                             {skill.name}
                           </span>
-                          <span className="text-indigo-400 ml-2">
-                            Lvl {skill.level}
+                          <span className="ml-2 rounded-full bg-indigo-300/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-200">
+                            L{skill.level}
                           </span>
                         </div>
                         <button
                           onClick={() => removeSkillMatchReq(idx)}
-                          className="text-rose-400 hover:text-rose-300"
+                          aria-label={`Remove ${skill.name}`}
+                          className="rounded-md p-1 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -797,13 +875,35 @@ const IntelligenceCenterView = () => {
                   <button
                     onClick={triggerSkillMatch}
                     disabled={matchingLoading || matchSkillsInput.length === 0}
-                    className="w-full mt-6 h-11 rounded-xl border border-primary bg-primary/10 hover:bg-primary/20 text-xs font-bold uppercase tracking-wider text-primary transition-all inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="mx-5 mb-5 mt-5 inline-flex h-11 w-[calc(100%-2.5rem)] cursor-pointer items-center justify-center gap-2 rounded-xl border border-cyan-300/50 bg-cyan-300/[0.07] text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200 transition hover:bg-cyan-300/[0.14] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Search size={14} />{" "}
                     {matchingLoading
                       ? "Graph Traversing..."
                       : "Solve Adjacencies"}
                   </button>
+
+                  {(skillMatchStatus === "running" || skillMatchStatus === "complete" || skillMatchStatus === "error") && (
+                    <div className="border-t border-white/10 bg-black/10 px-5 py-4" aria-live="polite">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                          Solver request status
+                        </span>
+                        <span className={`text-[10px] font-medium ${skillMatchStatus === "error" ? "text-rose-300" : skillMatchStatus === "complete" ? "text-emerald-300" : "text-cyan-300"}`}>
+                          {skillMatchStatus === "error" ? "Request failed" : skillMatchStatus === "complete" ? `${matchResults.length} matches returned` : "Processing on server"}
+                        </span>
+                      </div>
+                      <div className="mb-3 h-1 overflow-hidden rounded-full bg-white/10">
+                        <div className={`h-full rounded-full transition-all duration-500 ${skillMatchStatus === "error" ? "w-full bg-rose-400" : skillMatchStatus === "complete" ? "w-full bg-emerald-400" : "w-2/3 animate-pulse bg-cyan-300"}`} />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-[9px]">
+                        {["Requirements validated", "Adjacency solver", "Matches rendered"].map((label, index) => {
+                          const reached = skillMatchStatus === "complete" || (skillMatchStatus === "running" && index < 2) || (skillMatchStatus === "error" && index < 2);
+                          return <div key={label} className={`flex items-center gap-1.5 ${reached ? "text-slate-200" : "text-slate-600"}`}><span className={`h-1.5 w-1.5 rounded-full ${reached ? (skillMatchStatus === "error" && index === 1 ? "bg-rose-300" : "bg-cyan-300") : "bg-white/15"}`} />{label}</div>;
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -939,22 +1039,28 @@ const IntelligenceCenterView = () => {
                             </div>
 
                             {/* visual DAG map */}
-                            <div className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between">
+                            <div className={`${graphExpanded ? "fixed inset-3 z-[90] flex flex-col rounded-2xl border border-cyan-300/25 bg-[#020617]/[0.98] p-4 shadow-[0_24px_90px_rgba(0,0,0,.65)] backdrop-blur-2xl md:inset-8 md:p-6" : "relative rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between"}`} onClick={(event) => event.stopPropagation()}>
                               <div>
-                                <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-2">
-                                  Shortest Path Graph View
-                                </div>
-                                <div className="text-[10px] text-slate-400 leading-relaxed mb-4">
-                                  Dijkstra nodes in neon green are present in
-                                  candidate profile. Lines light up in cyan
-                                  showing path transitions.
+                                <div className="mb-2 flex items-start justify-between gap-3">
+                                  <div>
+                                    <div className="text-[9px] uppercase tracking-widest text-slate-300 font-bold">
+                                      Shortest path graph view
+                                    </div>
+                                    <div className="mt-1 text-[10px] text-slate-500 leading-relaxed">
+                                      Green nodes are present in the candidate profile. Cyan paths show the evaluated transitions.
+                                    </div>
+                                  </div>
+                                  <button type="button" aria-label={graphExpanded ? "Collapse graph" : "Expand graph"} title={graphExpanded ? "Collapse graph" : "Expand graph"} onClick={() => setGraphExpanded((open) => !open)} className="shrink-0 rounded-lg border border-white/10 bg-white/[0.05] p-2 text-slate-300 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-cyan-200">
+                                    {graphExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                                  </button>
                                 </div>
                               </div>
 
-                              <div className="relative h-72 border border-white/5 rounded-lg overflow-hidden bg-slate-950/80">
+                              <div className={`${graphExpanded ? "min-h-0 flex-1" : "h-72"} relative border border-white/5 rounded-lg overflow-hidden bg-slate-950/80`}>
                                 <svg
                                   className="absolute inset-0 h-full w-full pointer-events-none"
                                   viewBox="0 0 1000 550"
+                                  preserveAspectRatio="xMidYMid meet"
                                 >
                                   {/* Links */}
                                   {SKILL_GRAPH_LINKS.map((link, idx) => {
@@ -1005,7 +1111,7 @@ const IntelligenceCenterView = () => {
                                           <circle
                                             cx={node.x}
                                             cy={node.y}
-                                            r={isHighlighted ? 15 : 7}
+                                            r={isHighlighted ? 10 : 5}
                                             fill={
                                               isHighlighted
                                                 ? "#10b981"
@@ -1023,17 +1129,22 @@ const IntelligenceCenterView = () => {
                                           />
                                           <text
                                             x={node.x}
-                                            y={node.y - 12}
+                                            y={node.y - (isHighlighted ? 14 : 10)}
                                             fill={
                                               isHighlighted
                                                 ? "#ffffff"
                                                 : "#475569"
                                             }
-                                            fontSize="13"
+                                            fontSize={isHighlighted ? "12" : "10"}
                                             fontWeight={
                                               isHighlighted ? "black" : "normal"
                                             }
                                             textAnchor="middle"
+                                            paintOrder="stroke"
+                                            stroke="#020617"
+                                            strokeWidth="4"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
                                           >
                                             {name}
                                           </text>
@@ -1070,13 +1181,21 @@ const IntelligenceCenterView = () => {
             >
               {/* Left Config */}
               <div className="space-y-6">
-                <div className="premium-card p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2">
-                    Combinatorial Constraints
-                  </h3>
+                <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)]">
+                  <div className="border-b border-white/10 px-5 py-4">
+                    <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">
+                      <Zap size={13} /> Team constraints
+                    </div>
+                    <h3 className="text-sm font-semibold tracking-tight text-white">
+                      Combinatorial constraints
+                    </h3>
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                      Set the operating limits used by the optimization solver.
+                    </p>
+                  </div>
 
                   {/* Inputs */}
-                  <div className="space-y-4">
+                  <div className="space-y-4 px-5 py-5">
                     <div>
                       <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1.5 block">
                         Budget Cap (CFO Limit)
@@ -1089,7 +1208,7 @@ const IntelligenceCenterView = () => {
                           onChange={(e) =>
                             setTeamBudget(Number(e.target.value))
                           }
-                          className="w-full bg-slate-950 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 py-2.5 pl-9 pr-3 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
                         />
                       </div>
                     </div>
@@ -1103,7 +1222,7 @@ const IntelligenceCenterView = () => {
                         max="6"
                         value={teamSize}
                         onChange={(e) => setTeamSize(Number(e.target.value))}
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
                       />
                     </div>
 
@@ -1112,12 +1231,12 @@ const IntelligenceCenterView = () => {
                       <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-2 block">
                         Skill Matrix Demands
                       </label>
-                      <div className="flex gap-2 mb-3">
+                      <div className="mb-3 flex gap-2">
                         <input
                           type="text"
                           id="team-skill-name"
                           placeholder="e.g. AWS, Python, Docker"
-                          className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
                         />
                         <button
                           type="button"
@@ -1132,7 +1251,7 @@ const IntelligenceCenterView = () => {
                               inputEl.value = "";
                             }
                           }}
-                          className="h-8 px-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-200 cursor-pointer"
+                          className="h-9 shrink-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 text-xs text-slate-200 transition hover:border-indigo-300/40 hover:bg-indigo-300/10"
                         >
                           Add
                         </button>
@@ -1141,13 +1260,13 @@ const IntelligenceCenterView = () => {
                         {teamSkillsInput.map((skill, idx) => (
                           <div
                             key={idx}
-                            className="flex items-center justify-between bg-white/5 rounded-lg px-2.5 py-1 text-xs"
+                            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2 text-xs"
                           >
                             <span className="text-white font-bold">
                               {skill.name}
                             </span>
                             <div className="flex items-center gap-2">
-                              <select
+                              <PremiumSelect
                                 value={skill.level}
                                 onChange={(e) => {
                                   const next = [...teamSkillsInput];
@@ -1161,7 +1280,7 @@ const IntelligenceCenterView = () => {
                                     L{v}
                                   </option>
                                 ))}
-                              </select>
+                              </PremiumSelect>
                               <button
                                 onClick={() =>
                                   setTeamSkillsInput(
@@ -1182,7 +1301,7 @@ const IntelligenceCenterView = () => {
                   <button
                     onClick={triggerTeamOptimize}
                     disabled={optimizingLoading || teamSkillsInput.length === 0}
-                    className="w-full mt-6 h-11 rounded-xl bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-500/90 text-xs font-bold uppercase tracking-wider text-white shadow-lg transition-all inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="mt-6 inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-indigo-600 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_28px_rgba(79,70,229,.22)] transition hover:from-primary/90 hover:to-indigo-500/90 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Play size={14} />{" "}
                     {optimizingLoading
@@ -1224,22 +1343,37 @@ const IntelligenceCenterView = () => {
                         />
                       </div>
 
-                      {/* visual slots random team selection */}
-                      <div className="flex gap-2">
-                        {shuffledTeamNames.map((name, i) => (
-                          <div
-                            key={i}
-                            className="px-3 py-2 bg-slate-900 border border-white/10 text-slate-300 font-mono text-[10px] uppercase rounded-lg animate-pulse"
-                          >
-                            {name}
-                          </div>
-                        ))}
+                      <div className="grid w-full max-w-md grid-cols-3 gap-2 text-center text-[10px] font-mono">
+                        <div className="rounded-lg border border-white/10 bg-slate-900/70 px-2 py-2">
+                          <div className="text-slate-500 uppercase">Solver step</div>
+                          <div className="mt-1 font-bold text-white">{annealingHistory.at(-1)?.step ?? 0}</div>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-slate-900/70 px-2 py-2">
+                          <div className="text-slate-500 uppercase">Coverage</div>
+                          <div className="mt-1 font-bold text-cyan-300">{Number(annealingHistory.at(-1)?.coverage ?? 0).toFixed(1)}%</div>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-slate-900/70 px-2 py-2">
+                          <div className="text-slate-500 uppercase">Energy</div>
+                          <div className="mt-1 font-bold text-white">{Number(annealingHistory.at(-1)?.energy ?? 0).toFixed(2)}</div>
+                        </div>
                       </div>
+                      <p className="max-w-md text-center text-[10px] leading-relaxed text-slate-500">
+                        Showing recorded solver metrics from the backend run. Employee names appear only after the final roster is returned.
+                      </p>
                     </div>
                   )}
 
                   {annealingStatus === "complete" && optimizedTeam && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="md:col-span-2 rounded-lg border border-cyan-400/15 bg-cyan-400/[0.03] px-3 py-2 text-[10px] text-slate-400">
+                        <span className="font-bold uppercase tracking-wider text-cyan-200">Modeled result</span>
+                        <span className="mx-2 text-slate-600">·</span>
+                        Model {optimizedTeam.model_version || "unversioned"}
+                        <span className="mx-2 text-slate-600">·</span>
+                        Seed {optimizedTeam.seed ?? "—"}
+                        <span className="mx-2 text-slate-600">·</span>
+                        Scenario {optimizedTeam.scenario_id || "not persisted"}
+                      </div>
                       {/* Left: Team Members & Budget Check */}
                       <div className="space-y-4">
                         <div className="rounded-xl border border-white/5 bg-slate-950 p-4 relative overflow-hidden">
@@ -1390,15 +1524,15 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 text-left"
+              className="grid grid-cols-1 items-start lg:grid-cols-[360px_1fr] gap-6 text-left"
             >
               {/* Left Employee list */}
-              <div className="premium-card p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md">
+              <div className="premium-card self-start p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md">
                 <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2">
                   Employee Registry Attrition Hazard
                 </h3>
 
-                <div className="space-y-2 max-h-[460px] overflow-y-auto custom-scrollbar">
+                <div className="space-y-2 max-h-[min(460px,calc(100vh-260px))] overflow-y-auto custom-scrollbar pr-1">
                   {attritionLoading ? (
                     <div className="text-xs text-slate-500 text-center py-8">
                       Loading hazard computations...
@@ -1440,6 +1574,9 @@ const IntelligenceCenterView = () => {
                       <div>
                         <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
                           Survival Hazard Breakdown & Simulation Sandbox
+                        </div>
+                        <div className="mt-1 text-[9px] uppercase tracking-wider text-amber-300">
+                          Modeled · {selectedAttritionEmp.model_version || "cox-sandbox-v1"} · {selectedAttritionEmp.validation_status || "synthetic validation only"}
                         </div>
                         <h3 className="text-xl font-extrabold text-white mt-1">
                           {selectedAttritionEmp.full_name}
@@ -1660,19 +1797,25 @@ const IntelligenceCenterView = () => {
               {/* Left Graph Panel */}
               <div className="premium-card p-6 border border-white/5 bg-slate-950/20 flex flex-col justify-between relative overflow-hidden min-h-[460px]">
                 <div>
-                  <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
-                    <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
-                      Corporate Collaboration Graph (Draggable Forces)
-                    </h3>
-                    <span className="text-[10px] text-slate-500">
-                      PageRank Influence Leaders
-                    </span>
+                  <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 gap-3">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
+                        Corporate collaboration graph
+                      </h3>
+                      <p className="mt-1 text-[10px] text-slate-500">3D force layout · drag a node · drag the canvas to rotate · wheel to zoom</p>
+                    </div>
+                    <button type="button" onClick={resetOnaCamera} className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400 transition hover:border-cyan-300/40 hover:text-cyan-200">Reset view</button>
                   </div>
 
                   {/* Physics SVG Canvas */}
                   <div
                     ref={canvasRef}
-                    className="relative h-[400px] border border-white/5 bg-slate-950/80 rounded-2xl overflow-hidden flex items-center justify-center select-none"
+                    onPointerDown={handleOnaCanvasPointerDown}
+                    onPointerMove={handleOnaCanvasPointerMove}
+                    onPointerUp={handleOnaCanvasPointerUp}
+                    onPointerCancel={handleOnaCanvasPointerUp}
+                    onWheel={handleOnaCanvasWheel}
+                    className="relative h-[clamp(360px,62vh,620px)] min-h-0 cursor-grab touch-none border border-cyan-300/10 bg-[radial-gradient(circle_at_50%_45%,rgba(30,64,175,.16),transparent_52%),#020617] rounded-2xl overflow-hidden flex items-center justify-center select-none active:cursor-grabbing"
                   >
                     {onaLoading ? (
                       <div className="text-slate-400 text-xs flex items-center gap-2">
@@ -1691,16 +1834,20 @@ const IntelligenceCenterView = () => {
                               (n) => n.id === link.target,
                             );
                             if (!srcNode || !tgtNode) return null;
+                            const src = projectOnaNode(srcNode);
+                            const tgt = projectOnaNode(tgtNode);
+                            const opacity = Math.max(0.08, Math.min(0.65, 0.7 - ((src.depth + tgt.depth) / 1200)));
 
                             return (
                               <line
                                 key={idx}
-                                x1={`${(srcNode.x / 500) * 100}%`}
-                                y1={`${(srcNode.y / 500) * 100}%`}
-                                x2={`${(tgtNode.x / 500) * 100}%`}
-                                y2={`${(tgtNode.y / 500) * 100}%`}
+                                x1={`${(src.x / 500) * 100}%`}
+                                y1={`${(src.y / 500) * 100}%`}
+                                x2={`${(tgt.x / 500) * 100}%`}
+                                y2={`${(tgt.y / 500) * 100}%`}
                                 stroke="#4f46e5"
                                 strokeWidth={link.weight * 2.5}
+                                strokeOpacity={opacity}
                               />
                             );
                           })}
@@ -1710,25 +1857,32 @@ const IntelligenceCenterView = () => {
                         {nodesState.map((node) => {
                           const size = 15 + node.influence_pagerank * 20;
                           const isSelected = selectedOnaNode?.id === node.id;
+                          const projected = projectOnaNode(node);
+                          const depthScale = Math.max(0.72, Math.min(1.22, projected.perspective));
+                          const depthOpacity = Math.max(0.42, Math.min(1, 0.72 + projected.perspective * 0.22));
 
                           return (
                             <div
                               key={node.id}
                               onMouseDown={(e) => {
+                                e.stopPropagation();
                                 setSelectedOnaNode(node);
                                 handleNodeMouseDown(node.id, e);
                               }}
                               onTouchStart={(e) => {
+                                e.stopPropagation();
                                 setSelectedOnaNode(node);
                                 handleNodeMouseDown(node.id, e);
                               }}
                               style={{
-                                left: `${(node.x / 500) * 100}%`,
-                                top: `${(node.y / 500) * 100}%`,
-                                width: `${size}px`,
-                                height: `${size}px`,
-                                marginLeft: `-${size / 2}px`,
-                                marginTop: `-${size / 2}px`,
+                                left: `${(projected.x / 500) * 100}%`,
+                                top: `${(projected.y / 500) * 100}%`,
+                                width: `${size * depthScale}px`,
+                                height: `${size * depthScale}px`,
+                                marginLeft: `-${(size * depthScale) / 2}px`,
+                                marginTop: `-${(size * depthScale) / 2}px`,
+                                opacity: depthOpacity,
+                                zIndex: Math.round(1000 - projected.depth),
                               }}
                               className={`absolute rounded-full border transition-shadow duration-300 flex items-center justify-center group pointer-events-auto cursor-pointer select-none ${
                                 isSelected
@@ -1883,7 +2037,7 @@ const IntelligenceCenterView = () => {
                       <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1.5 block">
                         Select Employee Profile
                       </label>
-                      <select
+                      <PremiumSelect
                         value={selectedCareerEmpId}
                         onChange={(e) => {
                           setSelectedCareerEmpId(e.target.value);
@@ -1896,7 +2050,7 @@ const IntelligenceCenterView = () => {
                             {e.full_name}
                           </option>
                         ))}
-                      </select>
+                      </PremiumSelect>
                     </div>
 
                     {careerPathData && (
@@ -1923,7 +2077,7 @@ const IntelligenceCenterView = () => {
                     Markov Career Transition Horizon
                   </h3>
                   <span className="text-[10px] text-slate-500">
-                    Calculated probabilities over 3-year timeline
+                    {careerPathData?.model_version || "markov-career-v1"} · modeled probabilities
                   </span>
                 </div>
 

@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 from uuid import UUID
 from typing import List
 from datetime import datetime
+from sqlalchemy import func, or_
 
 from app.schemas.schemas import (
     EmployeeCreate,
@@ -19,7 +20,7 @@ from app.schemas.schemas import (
 from app.models.database import EmployeeTable, SkillTable, ExperienceTable, get_session
 from app.core.security import get_current_user, TokenData
 from app.core.logging_config import get_logger
-from app.core.data_policy import filter_real_records
+from app.core.data_policy import filter_real_records, include_sample_data
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 logger = get_logger(__name__)
@@ -69,6 +70,7 @@ async def list_employees(
     limit: int = Query(100, ge=1, le=10000),
     department: str = Query(None),
     at_risk_only: bool = Query(False),
+    q: str = Query(None, max_length=120),
     current_user: TokenData = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -90,6 +92,14 @@ async def list_employees(
 
     if at_risk_only:
         query = query.where(EmployeeTable.is_at_risk)
+    if q and q.strip():
+        pattern = f"%{q.strip()}%"
+        query = query.where(or_(
+            EmployeeTable.full_name.ilike(pattern),
+            EmployeeTable.email.ilike(pattern),
+            EmployeeTable.role.ilike(pattern),
+            EmployeeTable.department.ilike(pattern),
+        ))
 
     query = query.offset(skip).limit(limit)
     employees = filter_real_records(session.exec(query).all())
@@ -136,6 +146,47 @@ async def create_employee(
     logger.info(f"Employee created: {employee.id}")
 
     return get_employee_out(employee, session)
+
+
+@router.get("/count")
+async def count_employees(
+    q: str = Query(None, max_length=120),
+    at_risk_only: bool = Query(False),
+    current_user: TokenData = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Return the authoritative employee count without loading profile details."""
+    query = select(func.count()).select_from(EmployeeTable)
+    if q and q.strip():
+        pattern = f"%{q.strip()}%"
+        query = query.where(or_(
+            EmployeeTable.full_name.ilike(pattern),
+            EmployeeTable.email.ilike(pattern),
+            EmployeeTable.role.ilike(pattern),
+            EmployeeTable.department.ilike(pattern),
+        ))
+    if at_risk_only:
+        query = query.where(EmployeeTable.is_at_risk)
+    if not include_sample_data():
+        query = query.where(
+            ~EmployeeTable.email.ilike("%@company.com"),
+            ~EmployeeTable.email.ilike("candidate.%@example.com"),
+        )
+    return {"count": int(session.exec(query).one() or 0)}
+
+
+@router.get("/departments", response_model=List[str])
+async def list_employee_departments(
+    current_user: TokenData = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    rows = session.exec(
+        select(EmployeeTable.department)
+        .where(EmployeeTable.department.is_not(None))
+        .distinct()
+        .order_by(EmployeeTable.department)
+    ).all()
+    return [str(value) for value in rows if value]
 
 
 @router.get("/{employee_id}", response_model=EmployeeOut)

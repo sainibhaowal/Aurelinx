@@ -9,6 +9,7 @@ import {
 import { analysisAPI, candidatesAPI, employeesAPI } from "../services/apiClient";
 import { UserManualButton } from "./UserManual";
 import { useAuth } from "../contexts/AuthContext";
+import PremiumSelect from "./PremiumSelect";
 
 const SentimentPulseView = () => {
   const { token } = useAuth();
@@ -22,6 +23,7 @@ const SentimentPulseView = () => {
   const [atRiskOnly, setAtRiskOnly] = useState(false);
   const [filteredReport, setFilteredReport] = useState(null);
   const [trend, setTrend] = useState([]);
+  const [hoveredSnapshot, setHoveredSnapshot] = useState(null);
 
   useEffect(() => {
     if (!token) {
@@ -85,20 +87,32 @@ const SentimentPulseView = () => {
   }, [token]);
 
   useEffect(() => {
-    if (!token || (!departmentFilter && !atRiskOnly)) {
+    // The at-risk checkbox controls the drill-down lists only. It must not
+    // change the denominator of the organization risk headline (otherwise
+    // every included row is at risk and the headline incorrectly becomes
+    // 100%). Department filtering may still recalculate the aggregate for
+    // that department.
+    if (!token || !departmentFilter) {
       setFilteredReport(null);
       return undefined;
     }
     let active = true;
-    analysisAPI.getSentimentReport(departmentFilter || null, atRiskOnly)
+    analysisAPI.getSentimentReport(departmentFilter, false)
       .then((report) => { if (active) setFilteredReport(report); })
       .catch((err) => console.error("Filtered sentiment report failed", err));
     return () => { active = false; };
-  }, [token, departmentFilter, atRiskOnly]);
+  }, [token, departmentFilter]);
 
   useEffect(() => {
     if (!data) return;
-    const point = { timestamp: data.timestamp, avg_sentiment: data.avg_sentiment, at_risk_percentage: data.at_risk_percentage };
+    const sentimentValue = Number(data.avg_sentiment ?? data.average_sentiment ?? data.avgSentiment);
+    const riskValue = Number(data.at_risk_percentage ?? data.atRiskPercentage ?? 0);
+    if (!data.timestamp || !Number.isFinite(sentimentValue)) return;
+    const point = {
+      timestamp: data.timestamp,
+      avg_sentiment: Math.min(1, Math.max(0, sentimentValue)),
+      at_risk_percentage: Number.isFinite(riskValue) ? riskValue : 0,
+    };
     setTrend((previous) => {
       const next = [...previous.filter((item) => item.timestamp !== point.timestamp), point].slice(-24);
       try { localStorage.setItem("aurelinx_sentiment_trend_v1", JSON.stringify(next)); } catch {}
@@ -109,7 +123,12 @@ const SentimentPulseView = () => {
   useEffect(() => {
     try {
       const cached = JSON.parse(localStorage.getItem("aurelinx_sentiment_trend_v1") || "[]");
-      if (Array.isArray(cached)) setTrend(cached.slice(-24));
+      if (Array.isArray(cached)) {
+        const valid = cached.filter(
+          (point) => point?.timestamp && Number.isFinite(Number(point.avg_sentiment)),
+        );
+        setTrend(valid.slice(-24));
+      }
     } catch {}
   }, []);
 
@@ -121,12 +140,17 @@ const SentimentPulseView = () => {
   const displayData = filteredReport || data || {};
   const displayRiskPct = Number(displayData?.at_risk_percentage ?? displayData?.atRiskPct ?? 0);
   const displayPriority = displayRiskPct >= 20 ? "Level 3" : displayRiskPct >= 10 ? "Level 2" : "Level 1";
-  const lowSentiment = [...visibleEmployees].filter((employee) => Number(employee.sentiment_score || 0) < 0.45).sort((a, b) => a.sentiment_score - b.sentiment_score).slice(0, 8);
-  const lowRetention = [...visibleEmployees].filter((employee) => Number(employee.retention_prob ?? 0.5) < 0.55).sort((a, b) => a.retention_prob - b.retention_prob).slice(0, 8);
+  const lowSentimentMatches = [...visibleEmployees].filter((employee) => Number(employee.sentiment_score || 0) < 0.45).sort((a, b) => a.sentiment_score - b.sentiment_score);
+  const lowRetentionMatches = [...visibleEmployees].filter((employee) => Number(employee.retention_prob ?? 0.5) < 0.55).sort((a, b) => a.retention_prob - b.retention_prob);
+  // These records are already loaded for the sentiment view. Render the full
+  // matching set in a contained list; scrolling it must never trigger a
+  // network request or expand the page indefinitely.
+  const lowSentiment = lowSentimentMatches;
+  const lowRetention = lowRetentionMatches;
   const departmentBreakdown = departments.map((department) => {
     const rows = visibleEmployees.filter((employee) => employee.department === department);
     const risk = rows.filter((employee) => employee.is_at_risk).length;
-    return { department, total: rows.length, risk, sentiment: rows.length ? rows.reduce((sum, row) => sum + Number(row.sentiment_score || 0), 0) / rows.length : 0 };
+    return { department, total: rows.length, risk, riskPct: rows.length ? (risk / rows.length) * 100 : 0, sentiment: rows.length ? rows.reduce((sum, row) => sum + Number(row.sentiment_score || 0), 0) / rows.length : 0 };
   }).filter((row) => row.total > 0);
 
   const exportSentimentReport = async (format = "pdf") => {
@@ -266,10 +290,10 @@ const SentimentPulseView = () => {
       <div className="mb-8 flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
         <label className="flex min-w-[220px] flex-1 flex-col gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
           Department
-          <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="h-10 rounded-lg border border-white/10 bg-slate-950/70 px-3 text-sm normal-case tracking-normal text-slate-200 outline-none">
+          <PremiumSelect value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="h-10">
             <option value="">All employee departments</option>
             {departments.map((department) => <option key={department} value={department}>{department}</option>)}
-          </select>
+          </PremiumSelect>
         </label>
         <label className="flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/50 px-3 text-xs text-slate-300">
           <input type="checkbox" checked={atRiskOnly} onChange={(event) => setAtRiskOnly(event.target.checked)} /> At-risk only
@@ -336,41 +360,67 @@ const SentimentPulseView = () => {
         Coverage is a data-volume indicator, not statistical confidence. Velocity compares the current database snapshot with the previous stream snapshot; it remains zero when records have not changed.
       </p>
 
-      <div className="mt-10 grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="mt-10 grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-6">
         <section className="premium-card p-5">
-          <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Department sentiment and risk</h3>
-          <div className="space-y-3">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-100">Where risk is concentrated</h3>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">Observed employee records grouped by department. Bars show the department's at-risk share; the number at right is the average sentiment score.</p>
+            </div>
+            <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-slate-500">{departmentBreakdown.length} departments</span>
+          </div>
+          <div className="space-y-4">
             {departmentBreakdown.map((row) => (
-              <div key={row.department} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
-                <div className="flex justify-between gap-3 text-xs"><span className="truncate text-slate-200">{row.department}</span><span className="text-slate-400">{row.total} employees</span></div>
-                <div className="mt-2 flex justify-between text-[10px] text-slate-400"><span>Average sentiment: <strong className="text-cyan-200">{row.sentiment.toFixed(2)}</strong></span><span>At risk: <strong className="text-rose-300">{row.risk}</strong></span></div>
+              <div key={row.department} className="group">
+                <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+                  <span className="truncate font-medium text-slate-200">{row.department}</span>
+                  <span className="shrink-0 text-slate-400">{row.risk} at risk · {row.total} total</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.08]" title={`${row.riskPct.toFixed(1)}% at risk`}>
+                    <div className="h-full rounded-full bg-gradient-to-r from-cyan-400/80 to-rose-400/80" style={{ width: `${Math.min(100, row.riskPct)}%` }} />
+                  </div>
+                  <span className="w-16 text-right text-[11px] font-semibold text-cyan-200">{row.sentiment.toFixed(2)} sentiment</span>
+                </div>
               </div>
             ))}
           </div>
         </section>
         <section className="premium-card p-5">
-          <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Observed data vs modeled indicators</h3>
-          <div className="space-y-2 text-xs leading-relaxed text-slate-400">
-            <p><strong className="text-slate-200">Observed:</strong> employee sentiment score, retention probability, department, and policy-risk flag stored on each record.</p>
-            <p><strong className="text-slate-200">Modeled:</strong> burnout risk, department concentration balance, retention-sentiment index, and priority level derived from those fields.</p>
-            <p><strong className="text-slate-200">Candidate context:</strong> {candidateCount ?? "—"} candidates are tracked separately using match score and candidate sentiment; they are not included in employee morale totals.</p>
+          <div className="mb-5">
+            <h3 className="text-sm font-bold text-slate-100">How to read this page</h3>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">The page separates stored facts from calculations so a reviewer can trace every conclusion.</p>
+          </div>
+          <div className="space-y-4 text-xs leading-relaxed">
+            <div className="border-l-2 border-cyan-300/60 pl-3"><div className="font-semibold text-cyan-200">Observed record fields</div><p className="mt-1 text-slate-400">Sentiment score, retention probability, department, and policy-risk flag stored on each employee record.</p></div>
+            <div className="border-l-2 border-amber-300/60 pl-3"><div className="font-semibold text-amber-200">Derived indicators</div><p className="mt-1 text-slate-400">Burnout risk, concentration balance, retention-sentiment index, and priority level calculated from observed fields.</p></div>
+            <div className="border-l-2 border-violet-300/60 pl-3"><div className="font-semibold text-violet-200">Separate candidate context</div><p className="mt-1 text-slate-400">{candidateCount ?? "—"} candidate records use match and candidate sentiment values. They are not included in employee morale or at-risk totals.</p></div>
           </div>
         </section>
       </div>
 
       <div className="mt-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {[['Low sentiment employees', lowSentiment, 'sentiment_score'], ['Low retention employees', lowRetention, 'retention_prob']].map(([title, rows, field]) => (
+        {[
+          ['Low sentiment', lowSentiment, lowSentimentMatches.length, 'sentiment_score', 'Records below the 0.45 sentiment threshold.'],
+          ['Low retention probability', lowRetention, lowRetentionMatches.length, 'retention_prob', 'Records below the 0.55 retention-probability threshold.'],
+        ].map(([title, rows, matchCount, field, description]) => (
           <section key={title} className="premium-card p-5">
-            <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">{title}</h3>
-            <div className="space-y-2">{rows.map((row) => <div key={row.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-xs"><span className="min-w-0 truncate text-slate-200">{row.full_name}</span><span className="shrink-0 text-rose-300">{Number(row[field] ?? 0).toFixed(2)}</span></div>)}{!rows.length && <p className="text-xs text-slate-500">No records match this indicator.</p>}</div>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div><h3 className="text-sm font-bold text-slate-100">{title}</h3><p className="mt-1 text-[11px] text-slate-500">{description}</p></div>
+              <span className="shrink-0 rounded-full bg-rose-400/10 px-2.5 py-1 text-[10px] font-semibold text-rose-200">{matchCount} match{matchCount === 1 ? '' : 'es'}</span>
+            </div>
+            <div className="max-h-[28rem] overflow-y-auto overscroll-contain pr-2 scroll-smooth">
+              {rows.map((row, index) => <div key={row.id} className="flex items-center gap-3 border-b border-white/[0.06] py-2.5 text-xs last:border-0"><span className="w-5 text-[10px] text-slate-600">{index + 1}</span><span className="min-w-0 flex-1 truncate text-slate-200">{row.full_name}</span><span className="shrink-0 font-semibold text-rose-300">{Number(row[field] ?? 0).toFixed(2)}</span></div>)}
+              {!rows.length && <p className="py-3 text-xs text-slate-500">No records match this threshold.</p>}
+            </div>
+            <p className="mt-3 text-[10px] text-slate-500">All {matchCount} matching records are loaded in this panel. Scroll inside the list to review them.</p>
           </section>
         ))}
       </div>
 
       <section className="premium-card mt-6 p-5">
-        <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Snapshot trend history</h3>
-        <p className="mb-4 text-[10px] text-slate-500">Stored snapshots from this workspace session; no synthetic historical values are invented.</p>
-        <div className="flex items-end gap-1 h-20">{trend.map((point) => <div key={point.timestamp} title={`${new Date(point.timestamp).toLocaleString()} · sentiment ${Number(point.avg_sentiment).toFixed(2)}`} className="flex-1 min-w-[4px] rounded-t bg-cyan-400/60" style={{ height: `${Math.max(8, Number(point.avg_sentiment || 0) * 100)}%` }} />)}</div>
+        <div className="mb-4 flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-slate-100">Live snapshot history</h3><p className="mt-1 text-[11px] text-slate-500">Each bar is one real database snapshot captured during this workspace session—not an employee record or invented historical value.</p></div><span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-slate-500">{trend.length} captured</span></div>
+        {trend.length ? <div><div className="relative h-24"><div className="absolute inset-x-0 top-1/2 border-t border-dashed border-white/10" /><div className="relative flex h-full items-end gap-1">{trend.map((point) => <div key={point.timestamp} className="relative min-w-[5px] flex-1"><div role="img" tabIndex={0} aria-label={`${new Date(point.timestamp).toLocaleString()}; average sentiment ${Number(point.avg_sentiment).toFixed(2)}; at-risk ${Number(point.at_risk_percentage).toFixed(1)} percent`} onMouseEnter={() => setHoveredSnapshot(point.timestamp)} onMouseLeave={() => setHoveredSnapshot(null)} onFocus={() => setHoveredSnapshot(point.timestamp)} onBlur={() => setHoveredSnapshot(null)} className="h-full cursor-help outline-none"><div className="absolute bottom-0 left-0 right-0 rounded-t bg-gradient-to-t from-cyan-500/70 to-cyan-200/80 transition-[filter] duration-150 hover:brightness-125 focus-visible:brightness-125" style={{ height: `${Math.max(8, Number(point.avg_sentiment || 0) * 100)}%` }} />{hoveredSnapshot === point.timestamp && <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-lg border border-cyan-300/30 bg-[#071827]/95 px-3 py-2 text-[10px] leading-relaxed text-slate-200 shadow-xl shadow-cyan-950/30 backdrop-blur-md"><div className="font-semibold text-cyan-100">{new Date(point.timestamp).toLocaleString()}</div><div className="mt-0.5 text-slate-400">Sentiment <span className="font-semibold text-white">{Number(point.avg_sentiment).toFixed(2)}</span><span className="mx-1.5 text-slate-600">·</span>At risk <span className="font-semibold text-rose-200">{Number(point.at_risk_percentage).toFixed(1)}%</span></div></div>}</div></div>)}</div></div><div className="mt-2 flex justify-between text-[9px] uppercase tracking-[0.14em] text-slate-600"><span>0.00 sentiment</span><span>1.00 sentiment</span></div></div> : <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-white/10 text-xs text-slate-500">History will appear after the live stream records its first snapshot.</div>}
       </section>
 
       <section className="premium-card mt-6 p-5">

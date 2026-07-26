@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PremiumSelect from "./PremiumSelect";
 import {
   Link2,
   ShieldAlert,
@@ -57,6 +58,10 @@ const EnterpriseOpsView = () => {
   const [selectedConnectionId, setSelectedConnectionId] = useState(null);
   const [fieldMappings, setFieldMappings] = useState([]);
   const [syncJobs, setSyncJobs] = useState([]);
+  const [expandedInterventionId, setExpandedInterventionId] = useState(null);
+  const [interventionOutcomes, setInterventionOutcomes] = useState({});
+  const [outcomeLoading, setOutcomeLoading] = useState({});
+  const [outcomeFeedback, setOutcomeFeedback] = useState({});
 
   // Form States
   const [connForm, setConnForm] = useState({
@@ -314,8 +319,22 @@ const EnterpriseOpsView = () => {
   };
 
   const setInterventionStatus = async (id, status) => {
-    await enterpriseAPI.updateIntervention(id, { status });
-    await loadAll();
+    setOutcomeLoading((prev) => ({ ...prev, [id]: true }));
+    try {
+      await enterpriseAPI.updateIntervention(id, { status });
+      setOutcomeFeedback((prev) => ({
+        ...prev,
+        [id]: `Action status saved as ${status.replaceAll("_", " ")}.`,
+      }));
+      await loadAll();
+    } catch (error) {
+      setOutcomeFeedback((prev) => ({
+        ...prev,
+        [id]: `Status was not saved: ${error?.message || "invalid lifecycle transition"}.`,
+      }));
+    } finally {
+      setOutcomeLoading((prev) => ({ ...prev, [id]: false }));
+    }
   };
 
   const triggerSync = async (connectionId) => {
@@ -329,12 +348,44 @@ const EnterpriseOpsView = () => {
   };
 
   const upsertOutcome = async (interventionId, checkpointDay, status) => {
-    await enterpriseAPI.upsertInterventionOutcome(interventionId, {
-      checkpoint_day: checkpointDay,
-      status,
-      notes: `Checkpoint ${checkpointDay} status updated to ${status}`,
-    });
-    await loadAll();
+    setOutcomeLoading((prev) => ({ ...prev, [interventionId]: true }));
+    try {
+      await enterpriseAPI.upsertInterventionOutcome(interventionId, {
+        checkpoint_day: checkpointDay,
+        status,
+        notes: `Checkpoint ${checkpointDay} status updated to ${status}`,
+      });
+      const outcomes = await enterpriseAPI.listInterventionOutcomes(interventionId);
+      setInterventionOutcomes((prev) => ({ ...prev, [interventionId]: outcomes || [] }));
+      setExpandedInterventionId(interventionId);
+      setOutcomeFeedback((prev) => ({
+        ...prev,
+        [interventionId]: `${checkpointDay}-day checkpoint saved: ${status}.`,
+      }));
+      await loadAll();
+    } catch (error) {
+      setExpandedInterventionId(interventionId);
+      setOutcomeFeedback((prev) => ({
+        ...prev,
+        [interventionId]: `Checkpoint was not saved: ${error?.message || "review the lifecycle and existing history"}.`,
+      }));
+    } finally {
+      setOutcomeLoading((prev) => ({ ...prev, [interventionId]: false }));
+    }
+  };
+
+  const toggleInterventionHistory = async (interventionId) => {
+    const nextOpen = expandedInterventionId === interventionId ? null : interventionId;
+    setExpandedInterventionId(nextOpen);
+    if (nextOpen && !interventionOutcomes[interventionId]) {
+      setOutcomeLoading((prev) => ({ ...prev, [interventionId]: true }));
+      try {
+        const outcomes = await enterpriseAPI.listInterventionOutcomes(interventionId);
+        setInterventionOutcomes((prev) => ({ ...prev, [interventionId]: outcomes || [] }));
+      } finally {
+        setOutcomeLoading((prev) => ({ ...prev, [interventionId]: false }));
+      }
+    }
   };
 
   const createContract = async () => {
@@ -666,6 +717,12 @@ const EnterpriseOpsView = () => {
     );
   };
 
+  const openInterventionStatuses = new Set(["planned", "approved", "in_progress"]);
+  const openInterventions = interventions.filter((item) => openInterventionStatuses.has(item.status));
+  const latestDrill = drRunbooks
+    .filter((runbook) => runbook.last_drill_at)
+    .sort((a, b) => new Date(b.last_drill_at) - new Date(a.last_drill_at))[0];
+
   return (
     <div className="w-full pb-20 text-slate-100 antialiased selection:bg-cyan-500/30">
       {/* Header Panel */}
@@ -701,62 +758,6 @@ const EnterpriseOpsView = () => {
         </button>
       </header>
 
-      {/* Dynamic Business Guide */}
-      <div className="premium-card p-5 border border-cyan-500/20 bg-cyan-500/5 mb-8 relative overflow-hidden text-left">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500/10 blur-[60px] rounded-full translate-x-12 -translate-y-12 pointer-events-none" />
-        <div className="flex items-start gap-4">
-          <div className="h-11 w-11 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 border border-cyan-500/20 flex-shrink-0">
-            <Link2 size={20} className="animate-pulse" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-wider">
-              Enterprise Connections & Compliance Hub
-            </h3>
-            <p className="text-xs text-slate-300 leading-relaxed mb-4 max-w-5xl">
-              This dashboard manages the operational backbone and data pipelines
-              of Aurelinx. It registers active integrations, monitors sync jobs,
-              audits model fairness, retrains models, tracks SRE Disaster
-              Recovery drills, and details corporate compliance.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-slate-950/40 p-3 rounded-xl border border-white/5">
-                <div className="font-extrabold text-[10px] text-cyan-400 uppercase tracking-wider mb-1">
-                  1. Integration Connections
-                </div>
-                <p className="text-[10px] text-slate-400 leading-relaxed">
-                  The data gateway. Register your Greenhouse ATS or Workday HRIS
-                  systems. Use "Realtime Sync" or "Pipeline Sync" to pull fresh
-                  employees and applications directly into your talent
-                  dashboard.
-                </p>
-              </div>
-              <div className="bg-slate-950/40 p-3 rounded-xl border border-white/5">
-                <div className="font-extrabold text-[10px] text-cyan-400 uppercase tracking-wider mb-1">
-                  2. Intervention & Action Flows
-                </div>
-                <p className="text-[10px] text-slate-400 leading-relaxed">
-                  Turn predictive metrics into tangible actions. When our AI
-                  flags an employee at risk of resigning, track the retention
-                  efforts (interventions) here and log progress updates to
-                  evaluate long-term success.
-                </p>
-              </div>
-              <div className="bg-slate-950/40 p-3 rounded-xl border border-white/5">
-                <div className="font-extrabold text-[10px] text-cyan-400 uppercase tracking-wider mb-1">
-                  3. Model Governance & Compliance
-                </div>
-                <p className="text-[10px] text-slate-400 leading-relaxed">
-                  Audit, retrain, and validate AI models. Monitor model
-                  accuracy, fairness gaps, and feature drift, ensuring your
-                  automated talent screening conforms to corporate standards and
-                  regional HR policies.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Oversight Stats Bar */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {/* Connections Stat */}
@@ -787,9 +788,9 @@ const EnterpriseOpsView = () => {
               INTERVENTIONS
             </div>
             <div className="text-lg font-black text-white flex items-baseline gap-1.5 mt-0.5">
-              {interventions.filter((i) => i.status === "in_progress").length}{" "}
+              {openInterventions.length}{" "}
               <span className="text-[10px] font-normal text-amber-400">
-                / {interventions.length} total
+                open / {interventions.length} total
               </span>
             </div>
           </div>
@@ -805,11 +806,13 @@ const EnterpriseOpsView = () => {
               GOVERNANCE & BIAS
             </div>
             <div className="text-sm font-black text-white flex items-baseline gap-1 mt-0.5 uppercase truncate max-w-[150px]">
-              {fairness
+              {loading
+                ? "LOADING"
+                : fairness
                 ? fairness.compliant
                   ? "COMPLIANT"
                   : "ATTN REQUIRED"
-                : "ACTIVE"}
+                : "UNAVAILABLE"}
               {fairness?.max_gap !== undefined && (
                 <span className="text-[9px] font-normal text-emerald-400">
                   gap: {fairness.max_gap}
@@ -831,7 +834,9 @@ const EnterpriseOpsView = () => {
             <div className="text-sm font-black text-white flex items-baseline gap-1.5 mt-0.5">
               {drRunbooks.length} runbooks{" "}
               <span className="text-[10px] font-normal text-rose-400">
-                {drillResult ? "DRILL COMPLETE" : "PENDING"}
+                {latestDrill
+                  ? `LAST DRILL ${new Date(latestDrill.last_drill_at).toLocaleDateString()}`
+                  : "NO DRILL RECORDED"}
               </span>
             </div>
           </div>
@@ -938,7 +943,7 @@ const EnterpriseOpsView = () => {
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
                         Source Type
                       </label>
-                      <select
+                      <PremiumSelect
                         className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all outline-none cursor-pointer"
                         value={connForm.source_type}
                         onChange={(e) =>
@@ -953,13 +958,13 @@ const EnterpriseOpsView = () => {
                         <option value="engagement">Engagement</option>
                         <option value="productivity">Productivity</option>
                         <option value="finance">Finance</option>
-                      </select>
+                      </PremiumSelect>
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
                         Status
                       </label>
-                      <select
+                      <PremiumSelect
                         className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all outline-none cursor-pointer"
                         value={connForm.status}
                         onChange={(e) =>
@@ -970,7 +975,7 @@ const EnterpriseOpsView = () => {
                         <option value="active">Active</option>
                         <option value="paused">Paused</option>
                         <option value="error">Error</option>
-                      </select>
+                      </PremiumSelect>
                     </div>
                   </div>
                   <div>
@@ -1649,7 +1654,7 @@ const EnterpriseOpsView = () => {
                     </button>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mb-3">
-                    <select
+                    <PremiumSelect
                       className="h-8 px-2 rounded-lg bg-slate-950/50 border border-white/10 text-slate-300 text-xs"
                       value={contractForm.source_type}
                       onChange={(e) =>
@@ -1661,7 +1666,7 @@ const EnterpriseOpsView = () => {
                     >
                       <option value="hris">HRIS</option>
                       <option value="ats">ATS</option>
-                    </select>
+                    </PremiumSelect>
                     <input
                       className="h-8 px-2 rounded-lg bg-slate-950/50 border border-white/10 text-slate-300 text-xs"
                       placeholder="workday / greenhouse"
@@ -2107,7 +2112,7 @@ const EnterpriseOpsView = () => {
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
                         Target Scope
                       </label>
-                      <select
+                      <PremiumSelect
                         className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all outline-none cursor-pointer"
                         value={intForm.target_scope}
                         onChange={(e) =>
@@ -2121,13 +2126,13 @@ const EnterpriseOpsView = () => {
                         <option value="team">Team</option>
                         <option value="department">Department</option>
                         <option value="org">Organization</option>
-                      </select>
+                      </PremiumSelect>
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
                         Priority
                       </label>
-                      <select
+                      <PremiumSelect
                         className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all outline-none cursor-pointer"
                         value={intForm.priority}
                         onChange={(e) =>
@@ -2141,7 +2146,7 @@ const EnterpriseOpsView = () => {
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                         <option value="critical">Critical</option>
-                      </select>
+                      </PremiumSelect>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -2309,18 +2314,15 @@ const EnterpriseOpsView = () => {
                             {s.scenario_name}
                           </div>
                           <div className="mt-0.5">
-                            Budget:{" "}
-                            <span className="text-cyan-400 font-bold">
-                              ${s.input_payload?.budget_cap?.toLocaleString() || s.budget_cap?.toLocaleString()}
-                            </span>{" "}
-                            | Hires:{" "}
-                            <span className="text-slate-300 font-bold">
-                              {s.input_payload?.target_hires ?? s.target_hires}
-                            </span>{" "}
-                            | Retain:{" "}
-                            <span className="text-slate-300 font-bold">
-                              {s.input_payload?.target_retentions ?? s.target_retentions}
-                            </span>
+                            {s.output_payload?.model_version ? (
+                              <>
+                                Model: <span className="text-cyan-400 font-bold">{s.output_payload.model_version}</span>
+                                {s.output_payload.scenario_id && <> · Scenario: <span className="text-slate-300 font-bold">{s.output_payload.scenario_id}</span></>}
+                                {s.output_payload.validation_status && <> · <span className="text-amber-300">{s.output_payload.validation_status.replaceAll("_", " ")}</span></>}
+                              </>
+                            ) : (
+                              <>Budget: <span className="text-cyan-400 font-bold">${s.input_payload?.budget_cap?.toLocaleString() || s.budget_cap?.toLocaleString()}</span> | Hires: <span className="text-slate-300 font-bold">{s.input_payload?.target_hires ?? s.target_hires}</span> | Retain: <span className="text-slate-300 font-bold">{s.input_payload?.target_retentions ?? s.target_retentions}</span></>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -2342,7 +2344,7 @@ const EnterpriseOpsView = () => {
                     </h2>
                   </div>
                   <span className="text-xs text-slate-400">
-                    Active Interventions: {interventions.length}
+                    Open interventions: {openInterventions.length} · Total records: {interventions.length}
                   </span>
                 </div>
 
@@ -2379,8 +2381,63 @@ const EnterpriseOpsView = () => {
                         </div>
                       )}
 
+                      <div className="flex items-center justify-between gap-3 border-y border-white/5 py-2.5">
+                        <div className="text-[10px] text-slate-500">
+                          {i.created_at ? `Created ${new Date(i.created_at).toLocaleString()}` : "Creation time unavailable"}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleInterventionHistory(i.id)}
+                          className="rounded-lg border border-cyan-400/20 bg-cyan-400/[0.05] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan-200 transition hover:bg-cyan-400/15"
+                        >
+                          {expandedInterventionId === i.id ? "Hide evidence & history" : "View evidence & history"}
+                        </button>
+                      </div>
+
+                      {expandedInterventionId === i.id && (
+                        <div className="mt-3 rounded-lg border border-cyan-400/15 bg-cyan-400/[0.03] p-3">
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-200">
+                              Auditable checkpoint history
+                            </span>
+                            <span className="text-[10px] text-slate-500">
+                              Outcome score: {i.outcome_score == null ? "Not measured" : `${Math.round(Number(i.outcome_score) * 100)}%`}
+                            </span>
+                          </div>
+                          {outcomeLoading[i.id] && (
+                            <div className="mb-2 text-[10px] text-cyan-200">Saving and loading the recorded result…</div>
+                          )}
+                          {outcomeFeedback[i.id] && (
+                            <div className="mb-2 rounded-md border border-emerald-400/20 bg-emerald-400/[0.06] px-2.5 py-2 text-[10px] font-semibold text-emerald-200">
+                              ✓ {outcomeFeedback[i.id]}
+                            </div>
+                          )}
+                          <div className="space-y-1.5">
+                            {[30, 60, 90].map((day) => {
+                              const checkpoint = (interventionOutcomes[i.id] || []).find((item) => item.checkpoint_day === day);
+                              return (
+                                <div key={day} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/5 bg-slate-950/35 px-2.5 py-2 text-[10px]">
+                                  <span className="font-bold text-slate-200">{day}-day review</span>
+                                  {checkpoint ? (
+                                    <span className="text-slate-300">
+                                      <strong className={checkpoint.status === "improved" ? "text-emerald-300" : checkpoint.status === "worsened" ? "text-rose-300" : "text-amber-200"}>{checkpoint.status}</strong>
+                                      {checkpoint.measured_at && ` · ${new Date(checkpoint.measured_at).toLocaleString()}`}
+                                    </span>
+                                  ) : <span className="text-slate-500">Not recorded</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
+                            Checkpoints are human-entered follow-up records. They are not automatic measurements and should only be saved after the real HR review.
+                          </p>
+                        </div>
+                      )}
+
                       <div className="flex flex-wrap gap-2 justify-end pt-2.5 border-t border-white/5">
                         <button
+                          disabled={outcomeLoading[i.id] || !["planned", "approved"].includes(i.status)}
+                          title={i.status === "in_progress" ? "Already started" : i.status === "completed" ? "This intervention is complete" : "Start this intervention"}
                           className="h-8 px-3 rounded-lg border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-wider text-slate-300 inline-flex items-center gap-1 transition-all active:scale-95"
                           onClick={() =>
                             setInterventionStatus(i.id, "in_progress")
@@ -2389,6 +2446,8 @@ const EnterpriseOpsView = () => {
                           Start
                         </button>
                         <button
+                          disabled={outcomeLoading[i.id] || i.status !== "in_progress"}
+                          title={i.status === "in_progress" ? "Complete this intervention" : "Start the intervention before completing it"}
                           className="h-8 px-3 rounded-lg border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-wider text-slate-300 inline-flex items-center gap-1 transition-all active:scale-95"
                           onClick={() =>
                             setInterventionStatus(i.id, "completed")
@@ -2398,18 +2457,24 @@ const EnterpriseOpsView = () => {
                         </button>
                         <div className="h-4 w-px bg-white/10 mx-1 align-middle self-center" />
                         <button
+                          disabled={outcomeLoading[i.id] || ["planned", "cancelled"].includes(i.status) || Boolean((interventionOutcomes[i.id] || []).some((item) => item.checkpoint_day === 30))}
+                          title="Record the reviewed 30-day outcome once"
                           className="h-8 px-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25 transition-all text-[10px] font-extrabold uppercase"
                           onClick={() => upsertOutcome(i.id, 30, "improved")}
                         >
                           30d Improve
                         </button>
                         <button
+                          disabled={outcomeLoading[i.id] || ["planned", "cancelled"].includes(i.status) || Boolean((interventionOutcomes[i.id] || []).some((item) => item.checkpoint_day === 60)) || !(interventionOutcomes[i.id] || []).some((item) => item.checkpoint_day === 30)}
+                          title="Record the reviewed 60-day outcome once"
                           className="h-8 px-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/25 transition-all text-[10px] font-extrabold uppercase"
                           onClick={() => upsertOutcome(i.id, 60, "neutral")}
                         >
                           60d Equal
                         </button>
                         <button
+                          disabled={outcomeLoading[i.id] || ["planned", "cancelled"].includes(i.status) || Boolean((interventionOutcomes[i.id] || []).some((item) => item.checkpoint_day === 90)) || !(interventionOutcomes[i.id] || []).some((item) => item.checkpoint_day === 60)}
+                          title="Record the reviewed 90-day outcome once"
                           className="h-8 px-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/25 transition-all text-[10px] font-extrabold uppercase"
                           onClick={() => upsertOutcome(i.id, 90, "worsened")}
                         >
@@ -2543,7 +2608,7 @@ const EnterpriseOpsView = () => {
                       }
                     />
                     <div className="grid grid-cols-2 gap-2">
-                      <select
+                      <PremiumSelect
                         className="h-9 px-2 rounded-lg bg-slate-950/50 border border-white/10 text-slate-300 text-xs cursor-pointer"
                         value={drForm.environment}
                         onChange={(e) =>
@@ -2556,8 +2621,8 @@ const EnterpriseOpsView = () => {
                         <option value="dev">DEV</option>
                         <option value="stage">STAGE</option>
                         <option value="prod">PROD</option>
-                      </select>
-                      <select
+                      </PremiumSelect>
+                      <PremiumSelect
                         className="h-9 px-2 rounded-lg bg-slate-950/50 border border-white/10 text-slate-300 text-xs cursor-pointer"
                         value={drForm.status}
                         onChange={(e) =>
@@ -2567,7 +2632,7 @@ const EnterpriseOpsView = () => {
                         <option value="draft">Draft</option>
                         <option value="active">Active</option>
                         <option value="retired">Retired</option>
-                      </select>
+                      </PremiumSelect>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <input
@@ -2695,7 +2760,7 @@ const EnterpriseOpsView = () => {
                         }))
                       }
                     />
-                    <select
+                    <PremiumSelect
                       className="h-9 px-2 rounded-lg bg-slate-950/50 border border-white/10 text-slate-300 text-xs cursor-pointer"
                       value={policyForm.action_type}
                       onChange={(e) =>
@@ -2709,7 +2774,7 @@ const EnterpriseOpsView = () => {
                       <option value="export">Export</option>
                       <option value="sync">Sync</option>
                       <option value="recommendation">Recommendation</option>
-                    </select>
+                    </PremiumSelect>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <input
@@ -2766,7 +2831,7 @@ const EnterpriseOpsView = () => {
                 </div>
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
-                    <select
+                    <PremiumSelect
                       className="h-9 px-2 rounded-lg bg-slate-950/50 border border-white/10 text-slate-300 text-xs cursor-pointer"
                       value={artifactForm.artifact_type}
                       onChange={(e) =>
@@ -2782,8 +2847,8 @@ const EnterpriseOpsView = () => {
                       <option value="caiq">CAIQ</option>
                       <option value="sla">SLA</option>
                       <option value="security_pack">Security Pack</option>
-                    </select>
-                    <select
+                    </PremiumSelect>
+                    <PremiumSelect
                       className="h-9 px-2 rounded-lg bg-slate-950/50 border border-white/10 text-slate-300 text-xs cursor-pointer"
                       value={artifactForm.status}
                       onChange={(e) =>
@@ -2797,7 +2862,7 @@ const EnterpriseOpsView = () => {
                       <option value="in_review">In Review</option>
                       <option value="approved">Approved</option>
                       <option value="archived">Archived</option>
-                    </select>
+                    </PremiumSelect>
                   </div>
                   <input
                     className="w-full h-9 px-3 rounded-lg bg-slate-950/50 border border-white/10 text-slate-300 text-xs outline-none"

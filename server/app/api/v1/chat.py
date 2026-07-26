@@ -208,10 +208,25 @@ def _tokenize(text: str) -> List[str]:
     return re.findall(r"[a-z0-9\+\#\.]{2,}", text.lower())
 
 
+def _skills_by_entity(db: Session, rows: List[Any], entity_field: str) -> Dict[UUID, List[SkillTable]]:
+    """Load all skills for a result set in one query (avoids N+1 searches)."""
+    ids = [row.id for row in rows]
+    if not ids:
+        return {}
+    field = getattr(SkillTable, entity_field)
+    grouped: Dict[UUID, List[SkillTable]] = {}
+    for skill in db.exec(select(SkillTable).where(field.in_(ids))).all():
+        entity_id = getattr(skill, entity_field)
+        if entity_id:
+            grouped.setdefault(entity_id, []).append(skill)
+    return grouped
+
+
 def _search_employees(
-    db: Session, query_text: str, limit: int = 5
+    db: Session, query_text: str, limit: int = 5, offset: int = 0
 ) -> List[EmployeeTable]:
     employees = db.exec(select(EmployeeTable)).all()
+    skills_by_employee = _skills_by_entity(db, employees, "employee_id")
     query_lower = query_text.lower()
     scored = []
     
@@ -248,7 +263,7 @@ def _search_employees(
             score += (emp.sentiment_score or 0.5) * 15.0
             
         # 3. Skills overlap
-        skills = db.exec(select(SkillTable).where(SkillTable.employee_id == emp.id)).all()
+        skills = skills_by_employee.get(emp.id, [])
         for s in skills:
             if s.name and s.name.lower() in query_lower:
                 score += 5.0
@@ -256,13 +271,14 @@ def _search_employees(
         scored.append((score, emp))
         
     scored.sort(key=lambda x: x[0], reverse=True)
-    return [row[1] for row in scored[:limit]]
+    return [row[1] for row in scored[offset : offset + limit]]
 
 
 def _search_candidates(
-    db: Session, query_text: str, limit: int = 5
+    db: Session, query_text: str, limit: int = 5, offset: int = 0
 ) -> List[CandidateTable]:
     candidates = db.exec(select(CandidateTable)).all()
+    skills_by_candidate = _skills_by_entity(db, candidates, "candidate_id")
     query_lower = query_text.lower()
     scored = []
     
@@ -295,7 +311,7 @@ def _search_candidates(
             score += (c.sentiment_score or 0.5) * 10.0
             
         # 3. Skills overlap
-        skills = db.exec(select(SkillTable).where(SkillTable.candidate_id == c.id)).all()
+        skills = skills_by_candidate.get(c.id, [])
         for s in skills:
             if s.name and s.name.lower() in query_lower:
                 score += 5.0
@@ -303,7 +319,7 @@ def _search_candidates(
         scored.append((score, c))
         
     scored.sort(key=lambda x: x[0], reverse=True)
-    return [row[1] for row in scored[:limit]]
+    return [row[1] for row in scored[offset : offset + limit]]
 
 
 def _compute_dashboard_snapshot(db: Session) -> Dict:
@@ -2019,6 +2035,7 @@ def _agent_controller_prompt(
         '{"action":"approval_required","message":"explain why admin approval is required"}\n'
         "Rules:\n"
         "- Select at most one tool per turn, then wait for its result.\n"
+        "- Employee/candidate searches run against the full database; use arguments.limit up to 500 and arguments.offset for additional batches.\n"
         "- Use live tools for Aurelinx workspace facts; do not guess records or metrics.\n"
         "- Never select data.mutate for a delete/remove request; select approval_required instead.\n"
         f"- Current user role: {'admin' if current_user.is_admin else 'member'}.\n"
@@ -2046,18 +2063,30 @@ def _execute_agent_tool(
         ).all()
         query = str(arguments.get("query") or user_text)[:12000]
         if tool_name == "employee.search":
-            rows = _search_employees(db, query, limit=min(int(arguments.get("limit", 8)), 20))
+            requested_limit = max(1, min(int(arguments.get("limit", 8)), 500))
+            offset = max(0, int(arguments.get("offset", 0)))
+            rows = _search_employees(db, query, limit=requested_limit, offset=offset)
             return {
                 "tool": tool_name,
+                "offset": offset,
+                "limit": requested_limit,
+                "returned": len(rows),
+                "has_more": len(rows) == requested_limit,
                 "matches": [
                     {"name": row.full_name, "email": row.email, "role": row.role, "department": row.department, "risk": row.is_at_risk}
                     for row in rows
                 ],
             }
         if tool_name == "candidate.search":
-            rows = _search_candidates(db, query, limit=min(int(arguments.get("limit", 8)), 20))
+            requested_limit = max(1, min(int(arguments.get("limit", 8)), 500))
+            offset = max(0, int(arguments.get("offset", 0)))
+            rows = _search_candidates(db, query, limit=requested_limit, offset=offset)
             return {
                 "tool": tool_name,
+                "offset": offset,
+                "limit": requested_limit,
+                "returned": len(rows),
+                "has_more": len(rows) == requested_limit,
                 "matches": [
                     {"name": row.full_name, "email": row.email, "role": row.role, "department": row.department, "match_score": row.match_score}
                     for row in rows

@@ -10,12 +10,14 @@ from datetime import datetime
 import functools
 import math
 import random
+import hashlib
+import json
 from typing import List, Dict, Any, Tuple, Set
 from collections import deque
 import heapq
 
-from app.models.database import EmployeeTable, SkillTable, get_session
-from app.core.security import get_current_user, TokenData
+from app.models.database import EmployeeTable, SkillTable, ForecastScenarioTable, get_session
+from app.core.security import get_current_user, get_tenant_id, TokenData
 from app.core.logging_config import get_logger
 from app.core.data_policy import filter_real_records
 
@@ -362,6 +364,7 @@ def optimize_team(
     payload: Dict[str, Any],
     session: Session = Depends(get_session),
     current_user: TokenData = Depends(get_current_user),
+    tenant_id: str = Depends(get_tenant_id),
 ):
     """
     Implements a Simulated Annealing algorithm to find the optimal combination of
@@ -370,6 +373,16 @@ def optimize_team(
     target_skills = payload.get("target_skills", [])
     budget_cap = float(payload.get("budget_cap", 300000.0))
     max_team_size = int(payload.get("max_team_size", 4))
+    requested_seed = payload.get("seed")
+    canonical_inputs = json.dumps(
+        {"target_skills": target_skills, "budget_cap": budget_cap, "max_team_size": max_team_size},
+        sort_keys=True,
+        default=str,
+    )
+    seed = int(requested_seed) if requested_seed is not None else int(
+        hashlib.sha256(f"{tenant_id}:{canonical_inputs}".encode()).hexdigest()[:16], 16
+    )
+    rng = random.Random(seed)
 
     if not target_skills:
         raise HTTPException(status_code=400, detail="target_skills are required")
@@ -406,7 +419,7 @@ def optimize_team(
     min_temp = 0.1
 
     # Initial state: random selection
-    current_team = random.sample(employees, max_team_size)
+    current_team = rng.sample(employees, max_team_size)
     current_energy, current_breakdown = evaluate_team(
         current_team, target_skills, budget_cap, session, skills_by_employee
     )
@@ -426,8 +439,8 @@ def optimize_team(
             break
 
         candidate_team = list(current_team)
-        swap_idx = random.randint(0, len(candidate_team) - 1)
-        new_member = random.choice(remaining)
+        swap_idx = rng.randint(0, len(candidate_team) - 1)
+        new_member = rng.choice(remaining)
         candidate_team[swap_idx] = new_member
 
         cand_energy, cand_breakdown = evaluate_team(
@@ -436,7 +449,7 @@ def optimize_team(
 
         # Accept criteria (Metropolis Hastings)
         delta = cand_energy - current_energy
-        if delta > 0 or random.random() < math.exp(delta / temp):
+        if delta > 0 or rng.random() < math.exp(delta / temp):
             current_team = candidate_team
             current_energy = cand_energy
             current_breakdown = cand_breakdown
@@ -458,7 +471,7 @@ def optimize_team(
 
         temp *= cooling_rate
 
-    return {
+    output = {
         "optimized_team": [
             {
                 "id": emp.id,
@@ -472,7 +485,27 @@ def optimize_team(
         "optimization_history": history,
         "metrics": best_breakdown,
         "total_optimization_steps": step,
+        "model_version": "team-annealing-v1",
+        "model_status": "synthetic_calibration_only",
+        "validation_status": "algorithmic_consistency_checked_not_real_world_validated",
+        "seed": seed,
+        "generated_at": datetime.utcnow().isoformat(),
+        "source_scope": {"tenant_id": tenant_id, "employee_count": len(employees)},
     }
+    scenario = ForecastScenarioTable(
+        tenant_id=tenant_id,
+        scenario_name=f"Team optimization · {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}",
+        input_payload=json.dumps({"target_skills": target_skills, "budget_cap": budget_cap, "max_team_size": max_team_size, "seed": seed}, default=str),
+        output_payload=json.dumps(output, default=str),
+        created_by=current_user.user_id,
+    )
+    session.add(scenario)
+    session.commit()
+    output["scenario_id"] = str(scenario.id)
+    scenario.output_payload = json.dumps(output, default=str)
+    session.add(scenario)
+    session.commit()
+    return output
 
 
 # =====================================================================
@@ -613,6 +646,9 @@ def calculate_hazard_rate(
                 "monthly_attrition_hazard": round(min(1.0, current_hazard), 3),
                 "covariates_explain": covariates,
                 "survival_forecast": survival_timeline,
+                "model_version": "cox-sandbox-v1",
+                "model_status": "synthetic_calibration_only",
+                "validation_status": "not_validated_on_observed_turnover_outcomes",
             }
         )
 
@@ -981,4 +1017,7 @@ def predict_career_path(
         "full_name": emp.full_name,
         "current_role": emp.role,
         "career_progression_markov": structured_predictions,
+        "model_version": "markov-career-v1",
+        "model_status": "synthetic_calibration_only",
+        "validation_status": "not_validated_on_observed_career_transitions",
     }

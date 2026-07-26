@@ -77,6 +77,8 @@ ppt_render_*/
 uploads/
 server/uploads/
 deliverables/
+# Local documentation, datasets, and working notes
+/Docs/
 # Generated datasets and large files
 DataSets/
 !server/datasets/

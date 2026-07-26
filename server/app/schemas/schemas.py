@@ -270,9 +270,14 @@ class AIAnalysisResponse(BaseModel):
     """Response from AI analysis"""
 
     analysis: str
-    candidates: List[EmployeeOut] = []
+    # Scout cards intentionally use the same public field shape, but omit
+    # heavy experience payloads. The existing profile endpoint remains the
+    # source of full details when a card is opened.
+    candidates: List[dict] = []
     confidence_score: Optional[float]
     processing_time_ms: float
+    searched_records: Optional[int] = None
+    returned_records: Optional[int] = None
 
 
 class AICopilotRequest(BaseModel):
