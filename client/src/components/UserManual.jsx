@@ -1033,7 +1033,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <li>Read the totals separately from the loaded-card count. “Records in scope” is the authoritative count; the small “shown” label describes rendered matching cards.</li>
                 <li>Click an employee card to open the personnel dossier. Click a candidate card to open the candidate dossier. The dossier request is made only after selection.</li>
                 <li>Use the Department, Risk status, and Sentiment range filters to query the complete server-side population. “At-risk employees only” applies only to employees; candidates remain separate.</li>
-                <li>Scroll-to-load uses paginated metadata and a windowed card renderer, so only rows near the viewport are mounted. This is not a limit on search or totals.</li>
+                <li>Scroll-to-load uses paginated metadata. Off-screen cards use browser content-visibility optimization, while server-side pagination prevents the full database from being loaded at once. This is not a limit on search or totals.</li>
                 <li><strong>Demo compensation display:</strong> when a sample profile has no salary value, the dossier may show an illustrative base salary and market index marked <strong className="text-amber-200">DEMO</strong>. This is presentation scaffolding, not an authoritative compensation value.</li>
                 <li>Use the refresh icon to re-fetch directory pages, totals, department totals, and risk totals. A spinner indicates the request is running.</li>
                 <li>Use the export menu or <strong className="text-white">Quick PDF</strong> to request a report. Exports repeat the active tab, search, department, risk, and sentiment filters and page through the matching database population until complete.</li>
@@ -1053,7 +1053,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               <strong className="text-cyan-200 block">Profile quality, provenance, and audit details</strong>
               <p>Opening a dossier requests validation metadata in addition to the profile: source classification and directory version, missing required fields, exact duplicate-name/email warnings, and audit events available to the signed-in user for that record.</p>
               <p>A “review” status means a required field or duplicate warning needs attention; it does not delete, merge, or rewrite records. “No audit events” means none are available to this user, not that the record has never changed. Organization-wide audit review remains governed by the protected audit surface.</p>
-              <p>ONA (organizational network analysis) is calculated and explored in Intel Center. Directory does not infer collaboration relationships or train models.</p>
+              <p>Directory includes a lightweight ONA summary (network people, links, and leading influence/bridge signals) returned by the protected ONA service. The full interactive graph, filters, and node exploration remain in Intel Center. Directory does not train models or invent relationships.</p>
             </div>
           </div>
         );

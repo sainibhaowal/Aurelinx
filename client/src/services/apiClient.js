@@ -633,6 +633,11 @@ export const candidatesAPI = {
   get: (candidateId) => request(`${API_V1}/candidates/${candidateId}`),
 };
 
+/** Organizational network analysis (shared with Intel Center). */
+export const intelligenceAPI = {
+  ona: (limit = 45) => request(`${API_V1}/intelligence/ona?limit=${encodeURIComponent(limit)}`, { timeoutMs: LONG_REQUEST_TIMEOUT }),
+};
+
 /**
  * AI Analysis API
  */
@@ -1049,6 +1054,7 @@ export default {
   authAPI,
   employeesAPI,
   candidatesAPI,
+  intelligenceAPI,
   analysisAPI,
   enterpriseAPI,
   leanAPI,
