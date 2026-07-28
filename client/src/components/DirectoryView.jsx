@@ -14,8 +14,9 @@ import {
   DollarSign,
 } from "lucide-react";
 import TalentCard from "./TalentCard";
+import PremiumSelect from "./PremiumSelect";
 import { UserManualButton } from "./UserManual";
-import { candidatesAPI, employeesAPI } from "../services/apiClient";
+import { candidatesAPI, employeesAPI, intelligenceAPI } from "../services/apiClient";
 
 const VirtualizedCardGrid = ({ items, renderCard }) => {
   const containerRef = useRef(null);
@@ -86,9 +87,29 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
   const [sentimentBand, setSentimentBand] = useState("all");
   const [employeeDepartments, setEmployeeDepartments] = useState([]);
   const [candidateDepartments, setCandidateDepartments] = useState([]);
+  const [onaSummary, setOnaSummary] = useState(null);
+  const [onaLoading, setOnaLoading] = useState(true);
+  const [onaError, setOnaError] = useState("");
   const loadMoreSentinelRef = useRef(null);
   const searchInitialized = useRef(false);
   const sentimentBounds = useMemo(() => (sentimentBand === "low" ? [null, 0.45] : sentimentBand === "mid" ? [0.45, 0.75] : sentimentBand === "high" ? [0.75, null] : [null, null]), [sentimentBand]);
+
+  useEffect(() => {
+    let alive = true;
+    setOnaLoading(true);
+    setOnaError("");
+    intelligenceAPI.ona(45).then((data) => {
+      if (!alive) return;
+      const nodes = Array.isArray(data?.nodes) ? data.nodes : [];
+      const links = Array.isArray(data?.links) ? data.links : [];
+      setOnaSummary({ nodes, links, leaders: [...nodes].sort((a, b) => Number(b.influence_pagerank || 0) - Number(a.influence_pagerank || 0)).slice(0, 3) });
+    }).catch((error) => {
+      if (!alive) return;
+      console.error("Directory ONA summary failed", error);
+      setOnaError("ONA summary is unavailable. Intel Center remains available for the full graph.");
+    }).finally(() => { if (alive) setOnaLoading(false); });
+    return () => { alive = false; };
+  }, [cacheScope, refreshNonce]);
 
   useEffect(() => {
     let alive = true;
@@ -113,6 +134,8 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
         cachedAt = cached.updatedAt || 0;
         setCacheUpdatedAt(cachedAt || null);
         setIsStale(Boolean(cachedAt && Date.now() - cachedAt >= 10 * 60_000));
+        if (Array.isArray(cached.employeeDepartments)) setEmployeeDepartments(cached.employeeDepartments);
+        if (Array.isArray(cached.candidateDepartments)) setCandidateDepartments(cached.candidateDepartments);
       }
     } catch {
       // Ignore an invalid cache and load from the API.
@@ -120,6 +143,17 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
     // A fresh cache is immediately usable and avoids reloading on every tab
     // visit. Refresh only after the short-lived cache window expires.
     if (refreshNonce === 0 && cachedAt && Date.now() - cachedAt < 10 * 60_000) {
+      Promise.allSettled([employeesAPI.departments(), candidatesAPI.departments()]).then(([employeeDepartmentsRes, candidateDepartmentsRes]) => {
+        if (!alive) return;
+        const employeeOptions = employeeDepartmentsRes.status === "fulfilled" ? employeeDepartmentsRes.value || [] : [];
+        const candidateOptions = candidateDepartmentsRes.status === "fulfilled" ? candidateDepartmentsRes.value || [] : [];
+        setEmployeeDepartments(employeeOptions);
+        setCandidateDepartments(candidateOptions);
+        try {
+          const existing = JSON.parse(localStorage.getItem(DIRECTORY_CACHE_KEY) || "{}");
+          localStorage.setItem(DIRECTORY_CACHE_KEY, JSON.stringify({ ...existing, employeeDepartments: employeeOptions, candidateDepartments: candidateOptions }));
+        } catch { /* cache is an optimization only */ }
+      });
       return () => { alive = false; };
     }
     setLoading(true);
@@ -181,6 +215,8 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
               atRiskTotal: atRiskCountRes.status === "fulfilled" ? atRiskCountRes.value?.count ?? null : atRiskTotal,
               employeeDepartmentTotal: employeeDepartmentsRes.status === "fulfilled" ? employeeDepartmentsRes.value?.length ?? null : employeeDepartmentTotal,
               candidateDepartmentTotal: candidateDepartmentsRes.status === "fulfilled" ? candidateDepartmentsRes.value?.length ?? null : candidateDepartmentTotal,
+              employeeDepartments: employeeDepartmentsRes.status === "fulfilled" ? employeeDepartmentsRes.value || [] : employeeDepartments,
+              candidateDepartments: candidateDepartmentsRes.status === "fulfilled" ? candidateDepartmentsRes.value || [] : candidateDepartments,
               updatedAt: Date.now(),
             }),
           );
@@ -496,20 +532,20 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
       <div className="mb-4 rounded-2xl border border-white/10 bg-slate-950/75 p-4 shadow-2xl shadow-black/20" aria-label="Directory filters">
         <div className="flex flex-wrap items-end gap-3">
           <label className="min-w-[190px] flex-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">Department
-            <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-slate-900/80 px-3 text-sm text-slate-200 outline-none focus:border-cyan-400/60">
+            <PremiumSelect value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className="mt-2 h-10 w-full">
               <option value="">All departments</option>
               {[...new Set([...employeeDepartments, ...candidateDepartments])].sort().map((department) => <option key={department} value={department}>{department}</option>)}
-            </select>
+            </PremiumSelect>
           </label>
           <label className="min-w-[160px] flex-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">Risk status
-            <select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value)} className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-slate-900/80 px-3 text-sm text-slate-200 outline-none focus:border-cyan-400/60">
+            <PremiumSelect value={riskFilter} onChange={(e) => setRiskFilter(e.target.value)} className="mt-2 h-10 w-full">
               <option value="all">All workforce status</option><option value="at_risk">At-risk employees only</option>
-            </select>
+            </PremiumSelect>
           </label>
           <label className="min-w-[170px] flex-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">Sentiment range
-            <select value={sentimentBand} onChange={(e) => setSentimentBand(e.target.value)} className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-slate-900/80 px-3 text-sm text-slate-200 outline-none focus:border-cyan-400/60">
+            <PremiumSelect value={sentimentBand} onChange={(e) => setSentimentBand(e.target.value)} className="mt-2 h-10 w-full">
               <option value="all">All sentiment scores</option><option value="low">Low (&lt; 0.45)</option><option value="mid">Moderate (0.45–0.75)</option><option value="high">High (≥ 0.75)</option>
-            </select>
+            </PremiumSelect>
           </label>
           {(departmentFilter || riskFilter !== "all" || sentimentBand !== "all" || filter) && <button onClick={() => { setFilter(""); setDepartmentFilter(""); setRiskFilter("all"); setSentimentBand("all"); }} className="h-10 rounded-xl border border-white/10 px-4 text-xs font-semibold text-slate-300 hover:bg-white/10">Clear filters</button>}
         </div>
@@ -559,6 +595,14 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
         </div>
       </div>
 
+      <section className="mb-10 rounded-2xl border border-indigo-300/15 bg-indigo-950/15 p-5" aria-label="Directory organizational network summary">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-200">Organizational network summary</h2><p className="mt-1 text-[10px] text-slate-500">Computed from the protected ONA service for employee collaboration context. The full interactive graph remains in Intel Center.</p></div>
+          <span className="rounded-full border border-indigo-300/20 bg-indigo-300/10 px-2.5 py-1 text-[10px] text-indigo-200">{onaLoading ? "Analyzing…" : `${onaSummary?.nodes?.length || 0} people · ${onaSummary?.links?.length || 0} links`}</span>
+        </div>
+        {onaError ? <p className="mt-3 text-xs text-amber-200">{onaError}</p> : <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">{(onaSummary?.leaders || []).map((leader) => <div key={leader.id} className="rounded-xl border border-white/10 bg-slate-950/40 p-3"><div className="text-sm font-semibold text-slate-200">{leader.name}</div><div className="mt-1 text-[10px] text-slate-500">{leader.role || "Role not reported"} · {leader.department || "Department not reported"}</div><div className="mt-2 flex justify-between text-[10px] text-indigo-200"><span>Influence {(Number(leader.influence_pagerank || 0) * 100).toFixed(0)}%</span><span>Bridge {(Number(leader.bridge_betweenness || 0) * 100).toFixed(0)}%</span></div></div>)}{!onaLoading && !onaSummary?.leaders?.length && <div className="text-xs text-slate-500">No network relationships are available in the current employee scope.</div>}</div>}
+      </section>
+
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, idx) => (
@@ -591,7 +635,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                     yet. Candidate records are loaded separately below.
                   </div>
                 )}
-                {visibleEmployees.length > 0 && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                {visibleEmployees.length > 0 && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-5 gap-4">
                   {visibleEmployees.map((emp) => <div key={emp.id} className="[content-visibility:auto] [contain-intrinsic-size:220px]"><TalentCard talent={emp} onOpenProfile={() => openProfileDetails(emp)} /></div>)}
                 </div>}
                 {employees.length > 0 && !visibleEmployees.length && (
@@ -621,7 +665,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                     yet.
                   </div>
                 )}
-                {visibleCandidates.length > 0 && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                {visibleCandidates.length > 0 && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-5 gap-4">
                   {visibleCandidates.map((cand) => <div key={cand.id} className="[content-visibility:auto] [contain-intrinsic-size:220px]"><TalentCard talent={cand} onOpenProfile={() => openProfileDetails(cand)} /></div>)}
                 </div>}
                 {candidates.length > 0 && !visibleCandidates.length && (
