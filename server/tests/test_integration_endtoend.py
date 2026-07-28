@@ -79,7 +79,9 @@ def test_signature_and_header_auth_and_expiry(client_db):
     }
 
     # first call should 404 because employee not found (but signature/auth should pass)
-    resp = client.post("/api/v1/integrations/slack", headers=headers, json=payload)
+    # Sign and send the exact same bytes; signing one JSON serialization and
+    # sending another would correctly fail HMAC verification.
+    resp = client.post("/api/v1/integrations/slack", headers=headers, content=body)
     print("RESP BODY:", resp.text)
     assert resp.status_code in (400, 404)
 
