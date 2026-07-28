@@ -80,46 +80,81 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
           <div className="space-y-6">
             <div>
               <h2 className="flex items-center gap-2 text-xl font-extrabold text-white"><LayoutDashboard className="h-5 w-5 text-cyan-400" /> Executive Dashboard</h2>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300">Aurelinx is a workforce and talent-intelligence workspace. It brings employee records, candidate records, observed workforce signals, modeled risk indicators, and controlled follow-up workflows into one auditable view.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">Aurelinx is a workforce and talent-intelligence application. It connects operational views, search, analysis, decision support, and controlled follow-up actions in one auditable workspace.</p>
             </div>
             <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.04] p-4 text-xs leading-relaxed text-slate-300">
-              <strong className="text-cyan-200">Why companies use it:</strong> to see the current shape of their workforce, identify where attention may be needed, understand the evidence behind a signal, and move from analysis to an owned HR action without changing employee records automatically.
+              <strong className="text-cyan-200">Why companies use it:</strong> to understand organizational signals, investigate evidence, make informed decisions, and move from analysis to an owned action without changing source records automatically.
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">People and headline metrics</h3>
+              <h3 className="text-sm font-bold text-white">Headline metrics</h3>
               <div className="grid gap-2.5 md:grid-cols-2 text-xs text-slate-300">
-                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">Workforce</strong>The total employee records in the authoritative employee dataset. It represents people currently recorded as employees.</div>
-                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">Candidates</strong>People in the separate candidate dataset. Candidates are not included in employee morale, workforce, or at-risk totals.</div>
-                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">At risk</strong>The unique employees whose stored policy/risk flag is true. The percentage is calculated as at-risk employees divided by total employees.</div>
-                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">Average morale</strong>The average employee sentiment score in the current snapshot. It is an observed-data aggregate, not a historical trend and not a diagnosis of any person.</div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">Workforce</strong>A count of people in the organization scope selected for the workspace. It provides the population context for workforce metrics.</div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">Candidates</strong>A separate hiring-pool count. Candidate measures remain separate from workforce health and workforce risk measures.</div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">At risk</strong>The number of people matching the configured risk flag. The percentage expresses that count relative to the workforce scope.</div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">Average morale</strong>An aggregate sentiment indicator for the current scope. It is a summary signal for investigation, not a diagnosis or a definitive prediction about any person.</div>
               </div>
             </div>
 
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-white">Risk composition</h3>
-              <p className="text-xs leading-relaxed text-slate-300">The risk panel groups employees by signal. These counts are matches per category and can overlap; they must not be added together.</p>
+              <p className="text-xs leading-relaxed text-slate-300">The risk panel groups the workforce scope by signal. These counts are matches per category and can overlap; they must not be added together.</p>
               <div className="space-y-2 text-xs text-slate-300">
-                <div className="border-l-2 border-rose-300/60 pl-3"><strong className="text-rose-200">Retention probability pressure</strong><p className="mt-1">Employees below the configured retention-probability threshold. This is a modeled estimate of possible departure pressure, not a fact or certainty.</p></div>
-                <div className="border-l-2 border-amber-300/60 pl-3"><strong className="text-amber-200">Low morale signals</strong><p className="mt-1">Employees below the sentiment threshold. It is a prompt for a respectful human check-in, not proof that an employee is dissatisfied.</p></div>
-                <div className="border-l-2 border-violet-300/60 pl-3"><strong className="text-violet-200">Policy risk flags</strong><p className="mt-1">Employees with the stored policy/risk flag. This currently aligns with the at-risk total and requires evidence review before any HR action.</p></div>
+                <div className="border-l-2 border-rose-300/60 pl-3"><strong className="text-rose-200">Retention probability pressure</strong><p className="mt-1">People below the configured retention-probability threshold. This is a modeled estimate of possible departure pressure, not a fact or certainty.</p></div>
+                <div className="border-l-2 border-amber-300/60 pl-3"><strong className="text-amber-200">Low morale signals</strong><p className="mt-1">People below the configured sentiment threshold. It is a prompt for respectful human review, not proof of dissatisfaction.</p></div>
+                <div className="border-l-2 border-violet-300/60 pl-3"><strong className="text-violet-200">Policy risk flags</strong><p className="mt-1">People matching the configured policy-risk rule. A flag is a review signal and requires evidence before any action.</p></div>
               </div>
-              <p className="text-[11px] text-slate-500">For example, 408 retention matches, 289 low-morale matches, and 237 policy flags may describe overlapping groups; 237 is the unique flagged-employee headline.</p>
+              <p className="text-[11px] text-slate-500">These categories can overlap. Their counts describe separate signals and must not be added together.</p>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">How the thresholds work</h3>
+              <p className="text-xs leading-relaxed text-slate-300">Each threshold is an inclusive rule applied independently to every record in the current workforce scope. A record is counted when its value satisfies the rule; it is not counted when the value is exactly on the safe side of the boundary.</p>
+              <div className="grid gap-2.5 md:grid-cols-3 text-xs text-slate-300">
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">Retention &lt; 0.55</strong><p className="mt-1">A retention probability of 0.54 is included; 0.55 is not. The value is a modeled likelihood signal, not a promise that someone will leave.</p></div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">Sentiment &lt; 0.45</strong><p className="mt-1">A sentiment score of 0.44 is included; 0.45 is not. The score is a screening signal for human review, not a diagnosis.</p></div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-white">Department risk ≥ 25%</strong><p className="mt-1">A department is concentrated when at least one quarter of its scoped people are flagged at risk. This driver counts departments, not people.</p></div>
+              </div>
+              <p className="text-[11px] text-slate-500">Changing a source value or risk rule changes the next snapshot. Threshold matches are not additive because one person or department can satisfy more than one rule.</p>
             </div>
 
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-white">Workforce health and morale signal</h3>
-              <p className="text-xs leading-relaxed text-slate-300"><strong className="text-white">Morale signal</strong> is the current aggregate sentiment indicator. <strong className="text-white">Current model indicator</strong> means the value is calculated from the current employee snapshot; it is not a historical trend. Open Sentiment Intelligence for department filters, employee drilldowns, valid live snapshots, and trend history.</p>
+              <p className="text-xs leading-relaxed text-slate-300"><strong className="text-white">Morale signal</strong> is the arithmetic mean of the stored sentiment scores in the current workforce scope. The Dashboard label <strong className="text-white">Current model indicator</strong> means this is a calculated summary used for decision support; it is not a trained clinical measure or a historical trend. Open Sentiment Intelligence for filters, drilldowns, live snapshots, and trend history.</p>
             </div>
 
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-white">Workspace overview and actions</h3>
-              <p className="text-xs leading-relaxed text-slate-300">Workspace Overview links to Analytics, Talent Scout, Grounded Query/Workflows, Intelligence Center, and Data Ops. Each area uses the appropriate employee or candidate scope. Clicking a risk row opens the full matching drilldown; creating an intervention records a controlled HR action and does not modify the employee profile.</p>
+              <p className="text-xs leading-relaxed text-slate-300">Workspace Overview links to Analytics, Talent Scout, Grounded Query/Workflows, Intelligence Center, and Data Ops. Each area has a defined purpose and scope. Clicking a risk row opens its drilldown; creating an intervention records a controlled action and does not modify source records automatically.</p>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Controls and day-to-day operation</h3>
+              <div className="space-y-2 text-xs leading-relaxed text-slate-300">
+                <p><strong className="text-white">Manual</strong> opens this guide at the Executive Dashboard section.</p>
+                <p><strong className="text-white">Refresh</strong> requests the latest workforce cards, candidate count, and analytics snapshot. During the request, values show a loading state. Refresh does not alter records or run an intervention.</p>
+                <p><strong className="text-white">Export</strong> opens PDF, Excel, and Markdown actions. Export runs against the report scope and may take longer for a large scope; wait for the success or error notification before closing the page.</p>
+                <p><strong className="text-white">Import Data</strong> opens Data Ops, where authorized users manage ingestion and validation. Import is separate from Refresh; refresh reads the currently available records after an import has completed.</p>
+                <p><strong className="text-white">Workspace links</strong> navigate to the relevant operational area without changing the dashboard scope.</p>
+                <p><strong className="text-white">Risk rows</strong> are interactive. Select one to open its matching drilldown and review evidence before creating any controlled action.</p>
+                <p><strong className="text-white">Talent stream cards</strong> are lightweight previews. Selecting a card opens the full profile on demand; candidates remain separate from workforce risk and morale calculations.</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white">Loading, freshness, and failure states</h3>
+              <div className="space-y-2 text-xs leading-relaxed text-slate-300">
+                <p><strong className="text-white">Loading</strong> is shown as a placeholder while a request is in progress. Existing cached values may remain visible until the new response replaces them.</p>
+                <p><strong className="text-white">Freshness</strong> means the timestamp of the most recently returned snapshot, not the timestamp of the underlying source system. The dashboard is a current snapshot view; it does not invent historical values. The current Dashboard does not display a separate freshness badge, so use Refresh before a decision or export.</p>
+                <p><strong className="text-white">Source and scope</strong> identify which workspace population the metrics summarize. The Dashboard shows the current-record scope; source/version and ingestion details are managed in Data Ops. Workforce measures and candidate measures must always be interpreted separately.</p>
+                <p><strong className="text-white">Errors</strong> are surfaced with an error notification when an API, authentication session, or provider request fails. Retry with Refresh after correcting the underlying connection or session; an error must not be interpreted as a zero metric.</p>
+                <p><strong className="text-white">Stale values</strong> should be refreshed before a decision or export. If a refresh fails, treat the last visible snapshot as unconfirmed until a successful response is shown.</p>
+              </div>
             </div>
 
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-white">Exports</h3>
-              <p className="text-xs leading-relaxed text-slate-300">Dashboard export actions generate PDF, Excel, or Markdown reports from the authoritative records included in the selected report scope. Reports include the generated time and should be reviewed for scope, filters, observed fields, and modeled indicators before sharing.</p>
+              <p className="text-xs leading-relaxed text-slate-300">Dashboard export actions generate PDF, Excel, or Markdown reports for the selected report scope. Reports include generation time and should be reviewed for scope, filters, observed fields, and modeled indicators before sharing.</p>
             </div>
           </div>
         );
@@ -792,20 +827,20 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <Users className="text-purple-400 h-5 w-5" /> Talent Directory
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                The Talent Directory is Aurelinx's primary analytical gateway. It acts as a unified interface that aggregates live organizational telemetry, predictive machine learning models, and skills inventory.
+                The Talent Directory is the searchable, paginated record browser. It presents lightweight employee and candidate metadata, keeps the two populations separate, and opens a full profile only when you select a card.
               </p>
             </div>
 
-            {/* ONA Deep Dive Feature Card */}
+            {/* Directory scope card */}
             <div className="p-4 rounded-xl border border-purple-500/20 bg-purple-950/10 space-y-2.5">
               <h4 className="text-xs font-black uppercase tracking-wider text-purple-300 flex items-center gap-2">
-                <Network className="h-4 w-4 text-purple-400" /> Focus: Organizational Network Analysis (ONA)
+                <Users className="h-4 w-4 text-purple-400" /> Directory scope and safety
               </h4>
               <p className="text-xs text-slate-300 leading-relaxed">
-                <strong>What is ONA?</strong> ONA stands for <strong>Organizational Network Analysis</strong>. Rather than viewing a company as a flat list or static hierarchy, ONA models the organization as a living network of nodes (employees) and edges (interactions like Slack messages, Jira ticket collaborations, and Git code reviews).
+                Directory cards are read-only previews. They contain enough metadata to search and browse quickly, while skills, experience, and other full-profile fields are requested only after a profile is opened.
               </p>
               <p className="text-xs text-slate-300 leading-relaxed">
-                By tracking these connections, Aurelinx detects who is doing the heavy lifting, who acts as an key information broker, and who is structurally isolated. When an employee with high network value (many incoming collaboration links) displays low morale, the system flags them as high-risk, as their departure would cause a major communication gap.
+                Employee risk and morale indicators are separate from candidate matching. The Directory does not change a record merely because it is viewed or flagged; controlled changes belong in authorized workflows.
               </p>
             </div>
 
@@ -823,9 +858,9 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-purple-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(168,85,247,0.5)]">
                       1
                     </span>
-                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider block mt-1">TELEMETRY</span>
-                    <h6 className="text-xs text-white font-bold mt-1">Telemetry Ingest</h6>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Aggregates Slack logs, Jira assignments, Git commits, & Workday profiles.</p>
+                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider block mt-1">SCOPE</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Metadata load</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Loads the configured directory metadata scope.</p>
                   </div>
 
                   {/* Step 2 */}
@@ -833,9 +868,9 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-purple-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(168,85,247,0.5)]">
                       2
                     </span>
-                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider block mt-1">INTELLIGENCE</span>
-                    <h6 className="text-xs text-white font-bold mt-1">Scoring Models</h6>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Calculates NLP communication sentiment & ML Attrition Risk probability.</p>
+                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider block mt-1">FIELDS</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Field display</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Reads stored fields and configured indicators for display.</p>
                   </div>
 
                   {/* Step 3 */}
@@ -843,9 +878,9 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-purple-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(168,85,247,0.5)]">
                       3
                     </span>
-                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider block mt-1">STATE CONTROL</span>
-                    <h6 className="text-xs text-white font-bold mt-1">Aggregation</h6>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Categorizes employee profiles into OPTIMAL or AT-RISK classification pools.</p>
+                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider block mt-1">SEPARATION</span>
+                    <h6 className="text-xs text-white font-bold mt-1">Scope separation</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Separates employee and candidate views without mixing their metrics.</p>
                   </div>
 
                   {/* Step 4 */}
@@ -853,9 +888,9 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-purple-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(168,85,247,0.5)]">
                       4
                     </span>
-                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider block mt-1">HR INITIATIVE</span>
-                    <h6 className="text-xs text-white font-bold mt-1">Direct Action</h6>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Enables structured 30/60/90-day intervention setups and exportable PDF Briefings.</p>
+                    <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider block mt-1">DETAILS</span>
+                    <h6 className="text-xs text-white font-bold mt-1">On-demand profile</h6>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Opens a profile or sends the selected report scope to export.</p>
                   </div>
 
                 </div>
@@ -872,11 +907,11 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 </div>
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5">
                   <strong className="text-cyan-300 block mb-1">NLP (Natural Language Processing)</strong>
-                  AI algorithms that analyze human language text to classify communication tone as positive, negative, or neutral.
+                  A general term for language-analysis capabilities used by applicable intelligence features; opening a Directory card does not run a new NLP analysis.
                 </div>
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5">
                   <strong className="text-emerald-300 block mb-1">ML (Machine Learning)</strong>
-                  Algorithms that study historical features to predict future probabilities, such as attrition risks.
+                  A general term for modeled indicators. A Directory card displays returned values; it does not claim that a new model was trained or run during browsing.
                 </div>
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5">
                   <strong className="text-pink-300 block mb-1">HRIS (Human Resources Info System)</strong>
@@ -893,7 +928,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                   <h4 className="text-xs font-black uppercase tracking-wider text-cyan-300">Employees</h4>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Internal workforce resources. Evaluated using ONA (Organizational Network Analysis) connection graphs, live sentiment analysis, and continuous performance and attrition modeling.
+                  People in the employee/workforce scope. Employee cards can show stored role, department, sentiment, retention, and risk fields when those fields are available.
                 </p>
               </div>
 
@@ -903,7 +938,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                   <h4 className="text-xs font-black uppercase tracking-wider text-pink-300">Candidates</h4>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  External database of applicants. Indexed conceptual profiles matched against jobs using semantic distance algorithms in the Talent Scout.
+                  People in the candidate scope. Candidate cards use candidate fields such as role, department, skills, application date, and match score; they are not included in workforce risk or morale totals.
                 </p>
               </div>
             </div>
@@ -913,24 +948,24 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               <h3 className="text-sm font-bold text-white">Understanding Directory Metrics</h3>
               <div className="space-y-3 text-xs">
                 <div className="p-3.5 bg-white/5 rounded-lg border border-white/5">
-                  <strong className="text-white block text-xs mb-1">💬 Morale Sentiment (Scale: 1-5)</strong>
+                  <strong className="text-white block text-xs mb-1">💬 Sentiment score (normalized 0–1)</strong>
                   <p className="text-slate-300 leading-relaxed">
-                    This represents the qualitative emotional state of the individual.
+                    This is a normalized signal used for workforce analysis. It is not a diagnosis or a direct statement of how a person feels.
                   </p>
                   <ul className="list-disc pl-4 mt-2 space-y-1 text-slate-400">
-                    <li><strong className="text-slate-300">How it works:</strong> Natural Language Processing (NLP) runs continuously on collaboration logs (Slack messages, commit descriptions, ticket updates).</li>
-                    <li><strong className="text-slate-300">Interpretation:</strong> <code className="text-red-300">1-2</code> indicates poor morale, potential dissatisfaction, or conflict. <code className="text-emerald-300">4-5</code> indicates strong engagement and satisfaction.</li>
+                    <li><strong className="text-slate-300">How it works:</strong> The Directory displays the stored score returned by the employee profile endpoint; the Directory itself does not infer a new score while you browse.</li>
+                    <li><strong className="text-slate-300">Interpretation:</strong> Lower values are review signals and higher values are more favorable signals within the configured scale. Use Sentiment Intelligence for definitions, filters, and trends.</li>
                   </ul>
                 </div>
 
                 <div className="p-3.5 bg-white/5 rounded-lg border border-white/5">
-                  <strong className="text-white block text-xs mb-1">⚠️ Attrition Risk Probability (Percentage: 0% - 100%)</strong>
+                  <strong className="text-white block text-xs mb-1">⚠️ Retention probability (0%–100%)</strong>
                   <p className="text-slate-300 leading-relaxed">
-                    This represents the likelihood of an employee leaving the company within the next 90 days.
+                    This is a stored or modeled probability-like indicator used to prioritize review. It is not a guaranteed departure date or outcome.
                   </p>
                   <ul className="list-disc pl-4 mt-2 space-y-1 text-slate-400">
-                    <li><strong className="text-slate-300">How it works:</strong> The machine learning model processes active indicators: sentiment trends, PageRank (influence bottleneck), work overload (commit rates), and interaction volume.</li>
-                    <li><strong className="text-slate-300">Why the name:</strong> It directly maps the calculated threat percentage to help HR prioritize retention budgets before attrition happens.</li>
+                    <li><strong className="text-slate-300">How it works:</strong> The Directory reads the value returned by the employee profile endpoint and renders it as a percentage.</li>
+                    <li><strong className="text-slate-300">Why it matters:</strong> It helps users decide which records need evidence review; it must not be used alone for an employment decision.</li>
                   </ul>
                 </div>
               </div>
@@ -943,24 +978,24 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-2">
                   <span className="inline-block px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase">OPTIMAL</span>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    The employee is highly retained and emotionally stable. 
+                    The record does not currently match the configured at-risk flag.
                   </p>
                   <ul className="text-[11px] text-slate-400 list-disc pl-4 space-y-1">
-                    <li>Risk Probability is low (typically &lt; 30%)</li>
-                    <li>Morale sentiment is stable (&gt; 3.0)</li>
-                    <li>Balanced workload and network connections</li>
+                    <li>Review the displayed retention and sentiment values.</li>
+                    <li>Confirm the record is in the correct scope.</li>
+                    <li>Do not treat the label as a guarantee of future stability.</li>
                   </ul>
                 </div>
 
                 <div className="p-4 bg-rose-500/5 border border-rose-500/20 rounded-xl space-y-2">
                   <span className="inline-block px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 text-[10px] font-black uppercase">AT RISK</span>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    The employee is a high flight risk requiring active attention.
+                    The record matches the configured at-risk flag and requires evidence review.
                   </p>
                   <ul className="text-[11px] text-slate-400 list-disc pl-4 space-y-1">
-                    <li>Risk Probability is high (&gt; 50%)</li>
-                    <li>Morale sentiment shows downward trend</li>
-                    <li>High betweenness centrality indicating bottleneck stress</li>
+                    <li>Open the full profile to inspect the supporting fields.</li>
+                    <li>Use Sentiment Intelligence or Analytics for broader context.</li>
+                    <li>Create a controlled intervention only after review and authorization.</li>
                   </ul>
                 </div>
               </div>
@@ -993,18 +1028,32 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               <h3 className="text-sm font-bold text-white">Operational Checklist</h3>
               <ul className="text-xs space-y-2 text-slate-200 list-disc pl-4">
                 <li>Use tabs at the top (<strong className="text-white">All / Employees / Candidates</strong>) to toggle records.</li>
-                <li>Filter records in real-time using search queries for name, role, or department.</li>
-                <li>Click the <strong className="text-white">Quick PDF</strong> button to generate printable executive personnel reports.</li>
-                <li>Click on any individual card to open their profile modal and review details, historical risk trends, and specific skill tiers.</li>
+                <li>Search by name, email, role, or department. Search is debounced and executed server-side across the full matching population, not only the cards already loaded.</li>
+                <li>The first metadata page contains up to 100 rows. Scroll near the end to load more lightweight metadata automatically; full skills and experience are not loaded for every card.</li>
+                <li>Read the totals separately from the loaded-card count. “Records in scope” is the authoritative count; the small “shown” label describes rendered matching cards.</li>
+                <li>Click an employee card to open the personnel dossier. Click a candidate card to open the candidate dossier. The dossier request is made only after selection.</li>
+                <li>Use the Department, Risk status, and Sentiment range filters to query the complete server-side population. “At-risk employees only” applies only to employees; candidates remain separate.</li>
+                <li>Scroll-to-load uses paginated metadata and a windowed card renderer, so only rows near the viewport are mounted. This is not a limit on search or totals.</li>
+                <li><strong>Demo compensation display:</strong> when a sample profile has no salary value, the dossier may show an illustrative base salary and market index marked <strong className="text-amber-200">DEMO</strong>. This is presentation scaffolding, not an authoritative compensation value.</li>
+                <li>Use the refresh icon to re-fetch directory pages, totals, department totals, and risk totals. A spinner indicates the request is running.</li>
+                <li>Use the export menu or <strong className="text-white">Quick PDF</strong> to request a report. Exports repeat the active tab, search, department, risk, and sentiment filters and page through the matching database population until complete.</li>
+                <li>If a warning appears, use <strong className="text-white">Retry</strong>. Do not interpret an error or missing response as a zero count.</li>
               </ul>
             </div>
 
-            <div className="p-3 bg-white/5 rounded-lg border border-white/5 text-xs text-slate-300 leading-relaxed">
-              <strong className="text-white block mb-1">Healing Tip:</strong>
-              If you notice an employee is incorrectly listed as AT-RISK, you can click on their profile, launch an intervention, or use the **Workflow Chat** to modify their status:
-              <code className="block mt-2 p-1.5 bg-black/40 text-cyan-300 rounded font-mono">
-                "Set employee [email] risk to false"
-              </code>
+            <div className="p-4 bg-white/5 rounded-lg border border-white/5 text-xs text-slate-300 leading-relaxed space-y-2">
+              <strong className="text-white block">Caching, freshness, and failures</strong>
+              <p>The Directory may show a user-scoped cached metadata page for up to ten minutes so navigation stays fast. A stale-cache notice tells you to refresh before making a decision or exporting.</p>
+              <p>Employee and candidate totals are requested separately. Department totals are also separated before the shared department union is displayed.</p>
+              <p>Profile retrieval errors, search errors, and pagination errors are operational failures—not empty datasets. Retry after checking authentication and connectivity.</p>
+              <p>The Directory is a read and review surface. To change a risk flag or create an HR action, use an authorized workflow with its audit and approval controls.</p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-cyan-400/15 bg-cyan-400/[0.04] text-xs text-slate-300 leading-relaxed space-y-2">
+              <strong className="text-cyan-200 block">Profile quality, provenance, and audit details</strong>
+              <p>Opening a dossier requests validation metadata in addition to the profile: source classification and directory version, missing required fields, exact duplicate-name/email warnings, and audit events available to the signed-in user for that record.</p>
+              <p>A “review” status means a required field or duplicate warning needs attention; it does not delete, merge, or rewrite records. “No audit events” means none are available to this user, not that the record has never changed. Organization-wide audit review remains governed by the protected audit surface.</p>
+              <p>ONA (organizational network analysis) is calculated and explored in Intel Center. Directory does not infer collaboration relationships or train models.</p>
             </div>
           </div>
         );

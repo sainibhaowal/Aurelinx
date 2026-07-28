@@ -268,23 +268,29 @@ const App = () => {
     }
   };
 
-  const exportCurrentReport = async (format = "pdf") => {
-    const loadAllRecords = async (listFn) => {
-      const pageSize = 10000;
-      const first = await listFn(0, pageSize);
-      if (!Array.isArray(first) || first.length < pageSize) return first || [];
-      const second = await listFn(pageSize, pageSize);
-      return [...first, ...(second || [])];
+  const exportCurrentReport = async (request = "pdf") => {
+    const scope = typeof request === "string" ? { format: request } : (request || {});
+    const { format = "pdf", query = null, viewMode = "all", department = null, riskOnly = false, sentimentMin = null, sentimentMax = null } = scope;
+    const loadAllRecords = async (listFn, args = []) => {
+      const pageSize = 1000;
+      const rows = [];
+      for (let offset = 0; ; offset += pageSize) {
+        const page = await listFn(offset, pageSize, ...args);
+        if (!Array.isArray(page) || page.length === 0) break;
+        rows.push(...page);
+        if (page.length < pageSize) break;
+      }
+      return rows;
     };
-    const [allEmployees, allCandidates] = await Promise.all([
-      loadAllRecords(employeesAPI.list),
-      loadAllRecords(candidatesAPI.list),
-    ]);
+    const allEmployees = (viewMode === "all" || viewMode === "employees")
+      ? await loadAllRecords(employeesAPI.list, [department, riskOnly, query, sentimentMin, sentimentMax]) : [];
+    const allCandidates = (viewMode === "all" || viewMode === "candidates")
+      ? await loadAllRecords(candidatesAPI.list, [department, query, sentimentMin, sentimentMax]) : [];
     const atRisk = allEmployees.filter((e) => e.is_at_risk).length;
     const ratio = allEmployees.length
       ? ((atRisk / allEmployees.length) * 100).toFixed(1)
       : "0.0";
-    const summary = `Aurelinx full database export: ${allEmployees.length} employees, ${allCandidates.length} candidates, ${atRisk} policy risk flags (${ratio}%).`;
+    const summary = `Aurelinx Directory export: ${allEmployees.length} employees, ${allCandidates.length} candidates, ${atRisk} policy risk flags (${ratio}%). Filters: ${query || "none"}; tab: ${viewMode}; department: ${department || "all"}; risk-only: ${riskOnly ? "yes" : "no"}; sentiment: ${sentimentMin ?? "-"} to ${sentimentMax ?? "-"}.`;
     const { generateAurelinxReport } = await import("./utils/reportGenerator");
     generateAurelinxReport({ employees: allEmployees, candidates: allCandidates }, summary, format);
     showToast(`Exported ${String(format).toUpperCase()}`, "success");
@@ -574,6 +580,7 @@ const App = () => {
                           <button
                             onClick={() => {
                               loadEmployees();
+                              loadCandidates();
                               loadAnalyticsSnapshot();
                             }}
                             className="px-4 py-2 rounded-lg border border-white/15 hover:bg-white/10 transition-all text-xs font-bold tracking-wide inline-flex items-center gap-2"
@@ -846,7 +853,10 @@ const App = () => {
                     </>
                   )}
                   {activeTab === "directory" && (
-                    <DirectoryView onExport={exportCurrentReport} />
+                    <DirectoryView
+                      onExport={exportCurrentReport}
+                      cacheScope={user?.tenant_id || user?.workspace_id || user?.user_id || "workspace"}
+                    />
                   )}
                   {activeTab === "analytics" && <AnalyticsView />}
                   {activeTab === "scout" && <TalentScoutView />}

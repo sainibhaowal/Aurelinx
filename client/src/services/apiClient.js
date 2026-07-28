@@ -555,22 +555,27 @@ export const authAPI = {
  * Employees API
  */
 export const employeesAPI = {
-  list: (skip = 0, limit = 10, department = null, atRiskOnly = false, q = null) => {
+  list: (skip = 0, limit = 10, department = null, atRiskOnly = false, q = null, sentimentMin = null, sentimentMax = null) => {
     const params = new URLSearchParams();
     params.append("skip", skip);
     params.append("limit", limit);
     if (department) params.append("department", department);
     if (atRiskOnly) params.append("at_risk_only", true);
     if (q) params.append("q", q);
+    if (sentimentMin != null) params.append("sentiment_min", sentimentMin);
+    if (sentimentMax != null) params.append("sentiment_max", sentimentMax);
     return request(`${API_V1}/employees?${params}`, {
       timeoutMs: LONG_REQUEST_TIMEOUT,
     });
   },
 
-  count: (q = null, atRiskOnly = false) => {
+  count: (q = null, atRiskOnly = false, department = null, sentimentMin = null, sentimentMax = null) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (atRiskOnly) params.set("at_risk_only", "true");
+    if (department) params.set("department", department);
+    if (sentimentMin != null) params.set("sentiment_min", sentimentMin);
+    if (sentimentMax != null) params.set("sentiment_max", sentimentMax);
     const query = params.toString();
     return request(`${API_V1}/employees/count${query ? `?${query}` : ""}`);
   },
@@ -601,18 +606,28 @@ export const employeesAPI = {
  * Candidates API
  */
 export const candidatesAPI = {
-  list: (skip = 0, limit = 10, department = null, q = null) => {
+  list: (skip = 0, limit = 10, department = null, q = null, sentimentMin = null, sentimentMax = null) => {
     const params = new URLSearchParams();
     params.append("skip", skip);
     params.append("limit", limit);
     if (department) params.append("department", department);
     if (q) params.append("q", q);
+    if (sentimentMin != null) params.append("sentiment_min", sentimentMin);
+    if (sentimentMax != null) params.append("sentiment_max", sentimentMax);
     return request(`${API_V1}/candidates?${params}`, {
       timeoutMs: LONG_REQUEST_TIMEOUT,
     });
   },
 
-  count: (q = null) => request(`${API_V1}/candidates/count${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  count: (q = null, department = null, sentimentMin = null, sentimentMax = null) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (department) params.set("department", department);
+    if (sentimentMin != null) params.set("sentiment_min", sentimentMin);
+    if (sentimentMax != null) params.set("sentiment_max", sentimentMax);
+    const query = params.toString();
+    return request(`${API_V1}/candidates/count${query ? `?${query}` : ""}`);
+  },
   departments: () => request(`${API_V1}/candidates/departments`),
 
   get: (candidateId) => request(`${API_V1}/candidates/${candidateId}`),

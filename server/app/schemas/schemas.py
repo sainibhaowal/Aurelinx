@@ -163,6 +163,12 @@ class EmployeeOut(BaseModel):
     experiences: List[ExperienceOut] = []
     created_at: datetime
     updated_at: datetime
+    source_type: str = "database_record"
+    source_version: str = "directory-v1"
+    validation_status: str = "valid"
+    missing_fields: List[str] = []
+    duplicate_warnings: List[str] = []
+    audit_history: List[dict] = []
 
 
 class EmployeeListOut(BaseModel):
@@ -212,6 +218,13 @@ class CandidateOut(BaseModel):
     experiences: List[ExperienceOut] = []
     application_date: datetime
     created_at: datetime
+    updated_at: Optional[datetime] = None
+    source_type: str = "database_record"
+    source_version: str = "directory-v1"
+    validation_status: str = "valid"
+    missing_fields: List[str] = []
+    duplicate_warnings: List[str] = []
+    audit_history: List[dict] = []
 
 
 class CandidateListOut(BaseModel):

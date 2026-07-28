@@ -2,6 +2,7 @@
 Employee management endpoints
 """
 
+import json
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 from uuid import UUID
@@ -17,7 +18,7 @@ from app.schemas.schemas import (
     SkillOut,
     ExperienceOut,
 )
-from app.models.database import EmployeeTable, SkillTable, ExperienceTable, get_session
+from app.models.database import AuditLogTable, EmployeeTable, SkillTable, ExperienceTable, get_session
 from app.core.security import get_current_user, TokenData
 from app.core.logging_config import get_logger
 from app.core.data_policy import filter_real_records, include_sample_data
@@ -26,7 +27,49 @@ router = APIRouter(prefix="/employees", tags=["employees"])
 logger = get_logger(__name__)
 
 
-def get_employee_out(emp: EmployeeTable, session: Session) -> EmployeeOut:
+def _employee_quality(emp: EmployeeTable, session: Session, current_user: TokenData | None = None) -> dict:
+    missing = [field for field, value in {
+        "full_name": emp.full_name,
+        "email": emp.email,
+        "department": emp.department,
+        "role": emp.role,
+    }.items() if not str(value or "").strip()]
+    if emp.sentiment_score is None:
+        missing.append("sentiment_score")
+    duplicate_warnings = []
+    if emp.email:
+        email_count = session.exec(select(EmployeeTable).where(EmployeeTable.email == emp.email)).all()
+        if len(email_count) > 1:
+            duplicate_warnings.append("duplicate employee email")
+    if emp.full_name:
+        name_count = session.exec(select(EmployeeTable).where(EmployeeTable.full_name == emp.full_name)).all()
+        if len(name_count) > 1:
+            duplicate_warnings.append("duplicate employee name")
+    audit_history = []
+    user_uuid = None
+    if current_user and current_user.user_id:
+        try:
+            user_uuid = UUID(current_user.user_id)
+        except ValueError:
+            user_uuid = None
+    if user_uuid:
+        for row in session.exec(select(AuditLogTable).where(AuditLogTable.resource_type == "employee", AuditLogTable.resource_id == emp.id, AuditLogTable.user_id == user_uuid).order_by(AuditLogTable.created_at.desc()).limit(50)).all():
+            try:
+                details = json.loads(row.details or "{}")
+            except (TypeError, ValueError):
+                details = {"raw": row.details}
+            audit_history.append({"action": row.action, "details": details, "created_at": row.created_at.isoformat()})
+    return {
+        "source_type": "database_record",
+        "source_version": "directory-v1",
+        "validation_status": "review" if missing or duplicate_warnings else "valid",
+        "missing_fields": missing,
+        "duplicate_warnings": duplicate_warnings,
+        "audit_history": audit_history,
+    }
+
+
+def get_employee_out(emp: EmployeeTable, session: Session, current_user: TokenData | None = None) -> EmployeeOut:
     skills = session.exec(
         select(SkillTable).where(SkillTable.employee_id == emp.id)
     ).all()
@@ -61,6 +104,7 @@ def get_employee_out(emp: EmployeeTable, session: Session) -> EmployeeOut:
         ],
         created_at=emp.created_at,
         updated_at=emp.updated_at,
+        **_employee_quality(emp, session, current_user),
     )
 
 
@@ -71,6 +115,8 @@ async def list_employees(
     department: str = Query(None),
     at_risk_only: bool = Query(False),
     q: str = Query(None, max_length=120),
+    sentiment_min: float = Query(None, ge=0.0, le=1.0),
+    sentiment_max: float = Query(None, ge=0.0, le=1.0),
     current_user: TokenData = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -100,8 +146,20 @@ async def list_employees(
             EmployeeTable.role.ilike(pattern),
             EmployeeTable.department.ilike(pattern),
         ))
+    if sentiment_min is not None:
+        query = query.where(EmployeeTable.sentiment_score >= sentiment_min)
+    if sentiment_max is not None:
+        query = query.where(EmployeeTable.sentiment_score <= sentiment_max)
 
-    query = query.offset(skip).limit(limit)
+    # Apply the same production-record policy before pagination so list pages
+    # and count results always describe the same population.
+    if not include_sample_data():
+        query = query.where(
+            ~EmployeeTable.email.ilike("%@company.com"),
+            ~EmployeeTable.email.ilike("candidate.%@example.com"),
+        )
+
+    query = query.order_by(EmployeeTable.id).offset(skip).limit(limit)
     employees = filter_real_records(session.exec(query).all())
 
     # Return lightweight response (no N+1 queries for skills/experiences)
@@ -152,11 +210,16 @@ async def create_employee(
 async def count_employees(
     q: str = Query(None, max_length=120),
     at_risk_only: bool = Query(False),
+    department: str = Query(None),
+    sentiment_min: float = Query(None, ge=0.0, le=1.0),
+    sentiment_max: float = Query(None, ge=0.0, le=1.0),
     current_user: TokenData = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     """Return the authoritative employee count without loading profile details."""
     query = select(func.count()).select_from(EmployeeTable)
+    if department:
+        query = query.where(EmployeeTable.department == department)
     if q and q.strip():
         pattern = f"%{q.strip()}%"
         query = query.where(or_(
@@ -167,6 +230,10 @@ async def count_employees(
         ))
     if at_risk_only:
         query = query.where(EmployeeTable.is_at_risk)
+    if sentiment_min is not None:
+        query = query.where(EmployeeTable.sentiment_score >= sentiment_min)
+    if sentiment_max is not None:
+        query = query.where(EmployeeTable.sentiment_score <= sentiment_max)
     if not include_sample_data():
         query = query.where(
             ~EmployeeTable.email.ilike("%@company.com"),
@@ -180,12 +247,13 @@ async def list_employee_departments(
     current_user: TokenData = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    rows = session.exec(
-        select(EmployeeTable.department)
-        .where(EmployeeTable.department.is_not(None))
-        .distinct()
-        .order_by(EmployeeTable.department)
-    ).all()
+    query = select(EmployeeTable.department).where(EmployeeTable.department.is_not(None))
+    if not include_sample_data():
+        query = query.where(
+            ~EmployeeTable.email.ilike("%@company.com"),
+            ~EmployeeTable.email.ilike("candidate.%@example.com"),
+        )
+    rows = session.exec(query.distinct().order_by(EmployeeTable.department)).all()
     return [str(value) for value in rows if value]
 
 
@@ -207,7 +275,7 @@ async def get_employee(
 
     logger.info(f"User {current_user.user_id} accessed employee {employee_id}")
 
-    return get_employee_out(employee, session)
+    return get_employee_out(employee, session, current_user)
 
 
 @router.patch("/{employee_id}", response_model=EmployeeOut)
