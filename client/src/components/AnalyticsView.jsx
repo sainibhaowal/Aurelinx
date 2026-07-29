@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { PieChart, TrendingUp, Target, Loader2, Radio } from "lucide-react";
 import { UserManualButton } from "./UserManual";
@@ -32,22 +32,49 @@ const AnalyticsView = () => {
   const [trend, setTrend] = useState([]);
   const [hoveredSnapshot, setHoveredSnapshot] = useState(null);
   const [serverDepartmentRows, setServerDepartmentRows] = useState(null);
+  const [riskTotal, setRiskTotal] = useState(0);
+  const [serverScopeTotal, setServerScopeTotal] = useState(0);
+  const [serverScopeAtRisk, setServerScopeAtRisk] = useState(0);
+  const [loadingMoreRisk, setLoadingMoreRisk] = useState(false);
+  const riskSentinelRef = useRef(null);
   const isFiltered = Boolean(departmentFilter || riskOnly);
 
   useEffect(() => {
     if (!token) return undefined;
     let active = true;
-    Promise.all([analysisAPI.getAnalyticsOverview({ limit: 100 }), candidatesAPI.count()])
-      .then(([overview, candidateTotal]) => {
+    setLoading(true);
+    analysisAPI.getAnalyticsOverview({ department: departmentFilter, riskOnly, offset: 0, limit: 100 })
+      .then((overview) => {
         if (!active) return;
         setEmployees(overview?.riskEmployees || []);
         setServerDepartmentRows(overview?.departments || []);
-        setCandidateCount(candidateTotal?.count ?? null);
+        setRiskTotal(Number(overview?.riskTotal || 0));
+        setServerScopeTotal(Number(overview?.total || 0));
+        setServerScopeAtRisk(Number(overview?.atRisk || 0));
+        setCandidateCount(overview?.candidateCount ?? null);
         setCandidateRecords([]);
+        setLoading(false);
       })
-      .catch((error) => console.error("Analytics context load failed", error));
+      .catch((error) => { console.error("Analytics context load failed", error); if (active) setLoading(false); });
     return () => { active = false; };
-  }, [token]);
+  }, [token, departmentFilter, riskOnly]);
+
+  useEffect(() => {
+    const node = riskSentinelRef.current;
+    if (!node || !riskTotal || employees.length >= riskTotal) return undefined;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting || loadingMoreRisk) return;
+      setLoadingMoreRisk(true);
+      analysisAPI.getAnalyticsOverview({ department: departmentFilter, riskOnly, offset: employees.length, limit: 100 })
+        .then((overview) => {
+          setEmployees((previous) => [...previous, ...(overview?.riskEmployees || [])]);
+          setLoadingMoreRisk(false);
+        })
+        .catch(() => setLoadingMoreRisk(false));
+    }, { rootMargin: "320px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [departmentFilter, riskOnly, employees.length, riskTotal, loadingMoreRisk]);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -85,8 +112,9 @@ const AnalyticsView = () => {
   const candidateMatchValues = candidateRecords.map((candidate) => Number(candidate.match_score)).filter((score) => Number.isFinite(score));
   const candidateAverageMatch = candidateMatchValues.length ? candidateMatchValues.reduce((sum, score) => sum + score, 0) / candidateMatchValues.length : null;
   const candidateHighMatch = candidateMatchValues.filter((score) => score >= 0.7).length;
-  const filteredAtRiskCount = visibleEmployees.filter((employee) => employee.is_at_risk).length;
-  const filteredRiskPct = visibleEmployees.length ? (filteredAtRiskCount / visibleEmployees.length) * 100 : 0;
+  const filteredAtRiskCount = isFiltered ? serverScopeAtRisk : visibleEmployees.filter((employee) => employee.is_at_risk).length;
+  const filteredScopeCount = isFiltered ? serverScopeTotal : visibleEmployees.length;
+  const filteredRiskPct = filteredScopeCount ? (filteredAtRiskCount / filteredScopeCount) * 100 : 0;
   const displayedRiskPct = isFiltered ? filteredRiskPct : stats.atRiskPct;
   const displayedRiskLevel = displayedRiskPct >= 20 ? "HIGH" : displayedRiskPct >= 10 ? "MEDIUM" : "LOW";
   const displayedTopRisk = [...departmentRows].sort((a, b) => (b.total ? b.risk / b.total : 0) - (a.total ? a.risk / a.total : 0))[0];
@@ -257,13 +285,13 @@ const AnalyticsView = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
         <MetricCard
           title="Total Workforce"
-          value={isFiltered ? visibleEmployees.length : stats.total}
+          value={isFiltered ? serverScopeTotal : stats.total}
           delta={isFiltered ? "Filtered employee records" : "Live employee records"}
           color="primary"
         />
         <MetricCard
           title="At-Risk Employees"
-          value={isFiltered ? filteredAtRiskCount : stats.atRisk}
+          value={isFiltered ? serverScopeAtRisk : stats.atRisk}
           delta={`${displayedRiskPct.toFixed(1)}% of ${isFiltered ? "view" : "workforce"}`}
           color="risk"
         />
@@ -348,7 +376,7 @@ const AnalyticsView = () => {
         </section>
         <section className="premium-card p-5">
           <div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold text-slate-100">Employee risk evidence</h3><p className="mt-1 text-[11px] text-slate-500">Ordered by lowest retention probability. Review actions require administrator approval when high priority.</p></div><span className="shrink-0 rounded-full bg-rose-400/10 px-2.5 py-1 text-[10px] font-semibold text-rose-200">{riskEmployees.length} matches</span></div>
-          <div className="max-h-80 divide-y divide-white/[0.07] overflow-y-auto overscroll-contain pr-2 scroll-smooth">{riskEmployees.map((employee, index) => <div key={employee.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"><span className="w-5 text-[10px] text-slate-600">{index + 1}</span><div className="min-w-0 flex-1"><div className="truncate text-xs font-semibold text-slate-200">{employee.full_name}</div><div className="truncate text-[10px] text-slate-500">{employee.department} · {employee.role}</div></div><div className="shrink-0 text-right text-[10px]"><div className="text-rose-300">Retention {(Number(employee.retention_prob ?? 0.5) * 100).toFixed(0)}%</div><button onClick={() => createRiskIntervention(employee)} className="mt-1 font-semibold text-cyan-200 hover:text-cyan-100">Create review</button></div></div>)}{!riskEmployees.length && <p className="py-3 text-xs text-slate-500">No at-risk employees match the selected filters.</p>}</div>
+          <div className="max-h-80 divide-y divide-white/[0.07] overflow-y-auto overscroll-contain pr-2 scroll-smooth">{riskEmployees.map((employee, index) => <div key={employee.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"><span className="w-5 text-[10px] text-slate-600">{index + 1}</span><div className="min-w-0 flex-1"><div className="truncate text-xs font-semibold text-slate-200">{employee.full_name}</div><div className="truncate text-[10px] text-slate-500">{employee.department} · {employee.role}</div></div><div className="shrink-0 text-right text-[10px]"><div className="text-rose-300">Retention {(Number(employee.retention_prob ?? 0.5) * 100).toFixed(0)}%</div><button onClick={() => createRiskIntervention(employee)} className="mt-1 font-semibold text-cyan-200 hover:text-cyan-100">Create review</button></div></div>)}{loadingMoreRisk && <p className="py-2 text-center text-[10px] text-cyan-200">Loading more evidence…</p>}{!riskEmployees.length && <p className="py-3 text-xs text-slate-500">No at-risk employees match the selected filters.</p>}<div ref={riskSentinelRef} className="h-1" aria-hidden="true" /></div>
         </section>
       </div>
 
