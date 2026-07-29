@@ -944,7 +944,7 @@ async def analytics_overview(
             bucket["retention"] = round(bucket["retention"] / bucket["total"], 3) if bucket["total"] else 0.0
             department_rows.append(bucket)
         department_rows.sort(key=lambda item: item["department"] or "")
-        evidence = sorted(employees, key=lambda row: float(row.retention_prob if row.retention_prob is not None else 0.5))
+        evidence = sorted([row for row in employees if row.is_at_risk], key=lambda row: float(row.retention_prob if row.retention_prob is not None else 0.5))
         candidates = filter_real_records(session.exec(select(CandidateTable)).all())
         match_scores = [float(row.match_score) for row in candidates if row.match_score is not None]
         return {
