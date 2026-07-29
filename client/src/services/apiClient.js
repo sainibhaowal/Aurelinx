@@ -673,6 +673,11 @@ export const analysisAPI = {
       timeoutMs: LONG_REQUEST_TIMEOUT,
     }),
 
+  getAnalyticsHistory: (limit = 24) =>
+    request(`${API_V1}/ai/analytics/history?limit=${encodeURIComponent(limit)}`, {
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    }),
+
   streamAnalytics: (handlers = {}, signal = null) =>
     streamRequest(`${API_V1}/ai/analytics/stream`, handlers, signal),
 

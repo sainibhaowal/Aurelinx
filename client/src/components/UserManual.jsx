@@ -503,7 +503,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <BarChart3 className="text-emerald-400 h-5 w-5" /> Sentiment Intelligence & Org Pulse
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                Sentiment Intelligence is the core forecasting engine of Aurelinx. It maps the continuous emotional health of your workforce by analyzing active communication streams.
+                Sentiment Intelligence is a current workforce-snapshot view. It reads stored employee sentiment, retention, department, and policy-risk fields, then calculates transparent organizational indicators and review lists. It is not a clinical assessment or validated forecasting model.
               </p>
             </div>
 
@@ -513,10 +513,10 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 Why Sentiment? The Philosophy of Aurelinx
               </h4>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Traditional organizations rely on **annual surveys** to measure company culture. Surveys fail because they suffer from <em>recency bias</em>, <em>low participation rates</em>, and are <em>too late</em>—by the time the survey is analyzed, key talent has already resigned.
+                Organizations use this view to identify which stored workforce signals deserve human review instead of treating one metric as a decision.
               </p>
               <p className="text-xs text-slate-300 leading-relaxed">
-                <strong>Aurelinx was built to solve this.</strong> It replaces static surveys with passive, privacy-preserving **live sentiment telemetry**. By scanning the emotional tone of collaboration logs, Aurelinx detects early warning signs of burnout, team conflict, and career dissatisfaction in real-time.
+                Aurelinx does not silently scan collaboration messages in this page. It presents the authenticated database snapshot and clearly separates observed fields from derived indicators.
               </p>
             </div>
 
@@ -536,7 +536,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     </span>
                     <span className="text-[9px] font-black text-emerald-300 uppercase tracking-wider block mt-1">TELEMETRY INGEST</span>
                     <h6 className="text-xs text-white font-bold mt-1">Raw Ingestion</h6>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Pipes active communications from Slack, Jira commits, and Git messages.</p>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Reads the authenticated employee snapshot and its stored sentiment, retention, department, and risk fields.</p>
                   </div>
 
                   {/* Step B */}
@@ -546,7 +546,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     </span>
                     <span className="text-[9px] font-black text-emerald-300 uppercase tracking-wider block mt-1">NLP PARSER</span>
                     <h6 className="text-xs text-white font-bold mt-1">Valence Mapping</h6>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Applies rolling sentiment vectors to identify communication moods.</p>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Uses the normalized 0–1 sentiment values already stored on employee records.</p>
                   </div>
 
                   {/* Step C */}
@@ -556,7 +556,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     </span>
                     <span className="text-[9px] font-black text-emerald-300 uppercase tracking-wider block mt-1">TELEMETRY SOLVER</span>
                     <h6 className="text-xs text-white font-bold mt-1">Three Pillars</h6>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Calculates current morale, velocity trends, and communication confidence.</p>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Calculates averages, threshold lists, department breakdowns, and snapshot-to-snapshot velocity.</p>
                   </div>
 
                   {/* Step D */}
@@ -566,7 +566,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     </span>
                     <span className="text-[9px] font-black text-emerald-300 uppercase tracking-wider block mt-1">THREAT CLASSIFIER</span>
                     <h6 className="text-xs text-white font-bold mt-1">Macro Status Index</h6>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Aggregates flagged ratios to assign overall Level 1, 2, or 3 priority alerts.</p>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Maps the current employee at-risk ratio to Level 1, 2, or 3 review priority.</p>
                   </div>
 
                 </div>
@@ -583,12 +583,12 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Pillar 1 */}
                 <div className="p-3.5 bg-white/5 rounded-xl border border-white/5 space-y-2">
-                  <span className="text-xs font-black text-cyan-300 block">📊 Current Score (1.0 - 5.0)</span>
+                  <span className="text-xs font-black text-cyan-300 block">📊 Current sentiment score (0.0–1.0)</span>
                   <p className="text-[11px] text-slate-300 leading-relaxed">
-                    The moving average of emotional valence from recent workspace posts. A score of <strong>5.0</strong> indicates high motivation, while <strong>1.0</strong> indicates severe disengagement.
+                    The normalized sentiment value stored on an employee record. Lower values are review signals; higher values are more favorable within this dataset. It is not a diagnosis.
                   </p>
                   <div className="text-[10px] font-mono text-cyan-300 bg-black/30 p-1.5 rounded">
-                    Score = (Σ Positive) / (Σ Total Messages)
+                    Organizational morale = Σ employee sentiment / employee count
                   </div>
                 </div>
 
@@ -596,21 +596,21 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <div className="p-3.5 bg-white/5 rounded-xl border border-white/5 space-y-2">
                   <span className="text-xs font-black text-purple-300 block">⚡ Velocity (dM/dt)</span>
                   <p className="text-[11px] text-slate-300 leading-relaxed">
-                    The rate of change of morale over a rolling 7-day window. A negative velocity means morale is plummeting, while positive velocity indicates improvement.
+                    The difference between the current snapshot and the previous captured snapshot. It is zero when no prior snapshot differs; it is not guaranteed to represent seven days.
                   </p>
                   <div className="text-[10px] font-mono text-purple-300 bg-black/30 p-1.5 rounded">
-                    Velocity = ΔScore / ΔTime
+                    Velocity = current snapshot score − previous snapshot score
                   </div>
                 </div>
 
                 {/* Pillar 3 */}
                 <div className="p-3.5 bg-white/5 rounded-xl border border-white/5 space-y-2">
-                  <span className="text-xs font-black text-emerald-300 block">🎯 Confidence Level (0% - 100%)</span>
+                  <span className="text-xs font-black text-emerald-300 block">🎯 Coverage (0% - 100%)</span>
                   <p className="text-[11px] text-slate-300 leading-relaxed">
-                    Represents the reliability of the score. If an employee messages frequently, confidence is 90%+. If they write very little, the score defaults to neutral with low confidence.
+                    The table's Coverage value describes record/data coverage. It is a volume indicator, not statistical confidence or model accuracy.
                   </p>
                   <div className="text-[10px] font-mono text-emerald-300 bg-black/30 p-1.5 rounded">
-                    Confidence = min(1.0, msg_count / 15)
+                    Coverage = records represented / records in the current scope
                   </div>
                 </div>
               </div>
@@ -630,12 +630,12 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     <Activity className="h-3.5 w-3.5 text-primary" /> System Status (Live Telemetry)
                   </strong>
                   <p className="text-slate-300 leading-relaxed">
-                    This left card displays the raw live telemetry counts ingested by the Aurelinx pipeline:
+                    This left card displays the current authenticated employee snapshot:
                   </p>
                   <ul className="list-disc pl-4 space-y-1 text-slate-400">
                     <li><strong className="text-slate-300">Total Analyzed:</strong> Count of employees currently tracked by sentiment telemetry.</li>
-                    <li><strong className="text-slate-300">Current Average Sentiment:</strong> The rolling organizational morale average (scaled 1.0 to 5.0).</li>
-                    <li><strong className="text-slate-300">Flagged Profiles:</strong> Total count of employees actively marked as "At Risk" based on low morale or high attrition probability.</li>
+                    <li><strong className="text-slate-300">Current Average Sentiment:</strong> The arithmetic mean of stored normalized 0.0–1.0 employee sentiment scores.</li>
+                    <li><strong className="text-slate-300">Flagged Profiles:</strong> Count of employee records whose stored policy/risk flag is true.</li>
                   </ul>
                 </div>
 
@@ -645,7 +645,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     <ShieldAlert className="h-3.5 w-3.5 text-rose-400" /> Intervention Priority (Dynamic Ranking)
                   </strong>
                   <p className="text-slate-300 leading-relaxed">
-                    This right card represents the <strong>macro organizational threat level</strong>. It calculates the company-wide At-Risk Ratio (ratio of flagged employees to the total workforce) and maps it into three priority tiers:
+                    This right card represents a <strong>macro review priority</strong>. It calculates the current at-risk ratio (flagged employees divided by employee scope) and maps it into three tiers:
                   </p>
                   <ul className="list-disc pl-4 space-y-1 text-slate-400">
                     <li>
@@ -664,24 +664,24 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <div className="p-3.5 bg-white/5 rounded-lg border border-white/5 space-y-1.5">
                   <strong className="text-white block">🚨 Individual Employee Intervention Priority</strong>
                   <p className="text-slate-300 leading-relaxed">
-                    Within the talent directory and profiles, individual employees are ranked to determine how urgently HR must step in. This is calculated using a combination of Attrition Risk (ML) and ONA Betweenness Centrality:
+                    Individual review urgency is based on the stored employee risk flag and the configured workforce indicators. ONA is available separately in Intel Center and is not used as proof of employee sentiment:
                   </p>
                   <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-300 mt-2">
                     <div className="p-2 bg-red-500/10 border border-red-500/25 rounded">
                       <span className="text-red-400 font-bold block">CRITICAL Priority</span>
-                      ML Risk &gt; 80%, low morale, and high PageRank influence bottleneck.
+                      Stored risk flag plus multiple supporting review signals.
                     </div>
                     <div className="p-2 bg-orange-500/10 border border-orange-500/25 rounded">
                       <span className="text-orange-400 font-bold block">HIGH Priority</span>
-                      ML Risk &gt; 50% with declining velocity.
+                      Stored risk flag with a supporting low-sentiment or low-retention signal.
                     </div>
                     <div className="p-2 bg-yellow-500/10 border border-yellow-500/25 rounded">
                       <span className="text-yellow-400 font-bold block">MEDIUM Priority</span>
-                      Moderately high risk with stable velocity.
+                      One or more derived indicators requiring context.
                     </div>
                     <div className="p-2 bg-blue-500/10 border border-blue-500/25 rounded">
                       <span className="text-blue-400 font-bold block">LOW Priority</span>
-                      Low attrition likelihood; normal telemetry logs.
+                      No current stored risk flag.
                     </div>
                   </div>
                 </div>
@@ -713,8 +713,8 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     <span className="text-[10px] text-slate-400 block">Flags employees as at-risk and calculates department concentrations.</span>
                   </div>
                   <div className="p-2 bg-white/5 rounded border border-white/5">
-                    <span className="text-[10px] font-bold text-emerald-300 block">3. PREDICTIVE RISK VECTOR</span>
-                    <span className="text-[10px] text-slate-400 block">Calculates the total organization Risk Coefficient (LOW, MEDIUM, HIGH).</span>
+                    <span className="text-[10px] font-bold text-emerald-300 block">3. RULE-BASED RISK RATE</span>
+                    <span className="text-[10px] text-slate-400 block">Calculates the current snapshot coefficient (LOW, MEDIUM, HIGH); it is not a validated predictive model.</span>
                   </div>
                 </div>
               </div>
@@ -752,7 +752,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
                   <strong className="text-white block">🔮 Predictive Risk Vector & Risk Coefficient</strong>
                   <p className="text-slate-300 leading-relaxed text-[11px]">
-                    Unlike historical metrics that analyze why people *left*, the **Predictive Risk Vector** uses active telemetry (Jira workload density, Slack mood shifts) to forecast who is *likely* to leave in the next 90 days. The **Risk Coefficient** categorizes this threat level:
+                    The risk vector is a derived review indicator based on the current employee snapshot. It is not a validated prediction of who will leave in the next 90 days. The priority coefficient categorizes the current at-risk ratio:
                   </p>
                   <ul className="list-disc pl-4 space-y-0.5 text-slate-400 text-[10px] mt-1">
                     <li><strong className="text-slate-300">LOW Risk Coefficient:</strong> Overall organization at-risk ratio &lt; 10%.</li>
@@ -777,15 +777,30 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               </div>
             </div>
 
+            <div className="space-y-3 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.03] p-4 text-xs text-slate-300">
+              <h4 className="font-bold text-cyan-200">Organizational Analytics: operational guide</h4>
+              <p className="leading-relaxed">This page is an employee-workforce view. Candidate totals and match scores are shown in a separate hiring-context panel and never enter employee morale, risk, department, or gauge calculations.</p>
+              <ul className="list-disc space-y-1 pl-4 text-[11px] leading-relaxed">
+                <li><strong className="text-slate-100">Department:</strong> filters every employee card, headline, department drill-down, risk-evidence list, and the risk gauge. Choose “All employee departments” to clear it.</li>
+                <li><strong className="text-slate-100">At-risk only:</strong> restricts the view to stored <code>is_at_risk</code> records. With no matching rows, cards and the gauge intentionally show <strong>0</strong>, never organization-wide fallback totals.</li>
+                <li><strong className="text-slate-100">Gauge:</strong> filtered ratio = matching at-risk employees ÷ matching employees × 100. With no filter it uses the full employee snapshot. LOW &lt;10%, MEDIUM 10–&lt;20%, HIGH ≥20%.</li>
+                <li><strong className="text-slate-100">Thresholds:</strong> low sentiment is <code>sentiment_score &lt; 0.45</code>; retention pressure is <code>retention_prob &lt; 0.55</code>; department concentration is <code>department at-risk share ≥ 25%</code>. These are transparent review rules, not clinical or validated predictive truth.</li>
+                <li><strong className="text-slate-100">Exports:</strong> PDF, Excel, and Markdown use the currently visible filtered employee scope and include the filter context. A disabled export means the current scope contains zero rows.</li>
+                <li><strong className="text-slate-100">Drill-down:</strong> selecting a distribution row focuses department evidence; “Show all” clears the focus. “Create review” opens the protected intervention workflow and does not mutate the employee record.</li>
+                <li><strong className="text-slate-100">History:</strong> the latest 24 snapshots are stored in the tenant-scoped analytics snapshot table. If the history endpoint is unavailable, the live stream can still render current metrics and the page shows an empty/failure state rather than fabricated history.</li>
+                <li><strong className="text-slate-100">Freshness and failures:</strong> the header timestamp is the snapshot generation time; a disconnected stream means the page is not receiving updates. Authentication/API failures are surfaced and do not silently replace filtered results with stale totals.</li>
+              </ul>
+            </div>
+
             {/* Core Calculations */}
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-white">Mathematical Model Formulations</h3>
               <div className="space-y-3 text-xs">
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5">
                   <strong className="text-white block mb-0.5">Burnout Risk Vector</strong>
-                  Calculates potential burnout using employee risk indicators and sentiment:
+                    A derived display indicator using employee risk flags and normalized sentiment:
                   <div className="mt-1 font-mono text-[10px] text-emerald-300 bg-black/20 p-1.5 rounded">
-                    Burnout = (at_risk_ratio * 0.7) + ((1.0 - (avg_sentiment / 5.0)) * 0.3)
+                    Burnout indicator = (at-risk ratio × 0.7) + ((1.0 − average sentiment) × 0.3)
                   </div>
                 </div>
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5">
@@ -797,9 +812,9 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 </div>
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5">
                   <strong className="text-white block mb-0.5">Leadership Trust</strong>
-                  Estimates alignment with management based on morale and retention averages:
+                    A derived display indicator based on current morale and retention values; it is not a validated trust measure:
                   <div className="mt-1 font-mono text-[10px] text-emerald-300 bg-black/20 p-1.5 rounded">
-                    Trust = (avg_retention_prob * 0.6) + ((avg_sentiment / 5.0) * 0.4)
+                    Trust indicator = (average retention × 0.6) + (average sentiment × 0.4)
                   </div>
                 </div>
               </div>
@@ -809,11 +824,14 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
             <div className="rounded-lg border border-red-500/20 bg-red-950/10 p-3 flex items-start gap-2.5">
               <ShieldAlert className="h-4 w-4 text-red-400 flex-none mt-0.5" />
               <div>
-                <h4 className="text-xs font-bold text-red-300">Predictive Risk Warning</h4>
+                <h4 className="text-xs font-bold text-red-300">Risk Review Warning</h4>
                 <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
                   If the overall risk percentage of your workforce exceeds 20%, the system status auto-escalates to **Level 3 (High)** and warns administrators to review ONA bottlenecks.
                 </p>
               </div>
+            </div>
+            <div className="rounded-lg border border-amber-300/15 bg-amber-300/[0.04] p-3 text-[11px] leading-relaxed text-slate-300">
+              <strong className="text-amber-200">Snapshot history and evidence boundary:</strong> this page reads the current authenticated employee snapshot. The chart keeps the latest 24 tenant-scoped snapshots in the durable analytics snapshot store; it is an operational trend, not a complete historical warehouse or an audited time series. Coverage describes record volume, not statistical confidence. Derived indicators support review and must not be treated as validated clinical or predictive truth.
             </div>
           </div>
         );

@@ -27,6 +27,7 @@ from app.models.database import (
     ForecastScenarioTable,
     InterventionTable,
     MLModelCardTable,
+    GoldMetricSnapshotTable,
     SkillTable,
     engine,
     get_session,
@@ -43,6 +44,31 @@ from app.schemas.schemas import (
 router = APIRouter(prefix="/ai", tags=["analysis"])
 logger = get_logger(__name__)
 _SENTIMENT_PREV_SNAPSHOT = {}
+
+def _tenant_key(current_user: TokenData) -> str:
+    """Resolve the authenticated workspace scope without trusting client input."""
+    return str(getattr(current_user, "tenant_id", None) or "default")
+
+def _save_analytics_snapshot(session: Session, snapshot: dict, tenant_id: str = "default") -> None:
+    """Persist a compact, tenant-scoped analytics point for durable trend history."""
+    row = GoldMetricSnapshotTable(
+        tenant_id=tenant_id,
+        metric_type="analytics",
+        payload=json.dumps(snapshot),
+    )
+    session.add(row)
+    session.commit()
+    # Keep the history bounded per tenant; this is an operational trend, not an audit log.
+    old = session.exec(
+        select(GoldMetricSnapshotTable)
+        .where(GoldMetricSnapshotTable.tenant_id == tenant_id)
+        .where(GoldMetricSnapshotTable.metric_type == "analytics")
+        .order_by(GoldMetricSnapshotTable.created_at.desc())
+    ).all()
+    for stale in old[24:]:
+        session.delete(stale)
+    if len(old) > 24:
+        session.commit()
 
 
 def _analytics_snapshot(session: Session) -> dict:
@@ -831,6 +857,7 @@ async def analytics_stream(
             try:
                 with Session(engine) as session:
                     snapshot = _analytics_snapshot(session)
+                    _save_analytics_snapshot(session, snapshot, _tenant_key(current_user))
                 yield f"event: analytics\ndata: {json.dumps(snapshot)}\n\n"
             except Exception as e:
                 logger.error(f"Analytics stream error: {e}", exc_info=True)
@@ -857,6 +884,32 @@ async def analytics_snapshot(
     """
     with Session(engine) as session:
         return _analytics_snapshot(session)
+
+
+@router.get("/analytics/history")
+async def analytics_history(
+    current_user: TokenData = Depends(get_current_user),
+    limit: int = 24,
+):
+    """Return durable tenant-scoped analytics snapshots for the trend panel."""
+    limit = max(1, min(int(limit), 24))
+    with Session(engine) as session:
+        rows = session.exec(
+            select(GoldMetricSnapshotTable)
+            .where(GoldMetricSnapshotTable.tenant_id == _tenant_key(current_user))
+            .where(GoldMetricSnapshotTable.metric_type == "analytics")
+            .order_by(GoldMetricSnapshotTable.created_at.desc())
+            .limit(limit)
+        ).all()
+        points = []
+        for row in reversed(rows):
+            try:
+                point = json.loads(row.payload)
+                point["timestamp"] = point.get("timestamp") or row.created_at.isoformat()
+                points.append(point)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+        return {"points": points, "source": "durable_analytics_snapshots", "limit": limit}
 
 
 @router.get("/copilot/context")
