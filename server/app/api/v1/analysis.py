@@ -912,6 +912,56 @@ async def analytics_history(
         return {"points": points, "source": "durable_analytics_snapshots", "limit": limit}
 
 
+@router.get("/analytics/overview")
+async def analytics_overview(
+    current_user: TokenData = Depends(get_current_user),
+    department: str = "",
+    risk_only: bool = False,
+    offset: int = 0,
+    limit: int = 100,
+):
+    """Server-side analytics aggregates plus a paginated employee evidence page."""
+    offset = max(0, int(offset))
+    limit = max(1, min(int(limit), 200))
+    with Session(engine) as session:
+        employees = filter_real_records(session.exec(select(EmployeeTable)).all())
+        if department:
+            employees = [row for row in employees if row.department == department]
+        if risk_only:
+            employees = [row for row in employees if row.is_at_risk]
+        total = len(employees)
+        at_risk = sum(1 for row in employees if row.is_at_risk)
+        departments = {}
+        for row in employees:
+            bucket = departments.setdefault(row.department, {"department": row.department, "total": 0, "risk": 0, "sentiment": 0.0, "retention": 0.0})
+            bucket["total"] += 1
+            bucket["risk"] += int(row.is_at_risk)
+            bucket["sentiment"] += float(row.sentiment_score or 0.0)
+            bucket["retention"] += float(row.retention_prob if row.retention_prob is not None else 0.5)
+        department_rows = []
+        for bucket in departments.values():
+            bucket["sentiment"] = round(bucket["sentiment"] / bucket["total"], 3) if bucket["total"] else 0.0
+            bucket["retention"] = round(bucket["retention"] / bucket["total"], 3) if bucket["total"] else 0.0
+            department_rows.append(bucket)
+        department_rows.sort(key=lambda item: item["department"] or "")
+        evidence = sorted(employees, key=lambda row: float(row.retention_prob if row.retention_prob is not None else 0.5))
+        candidates = filter_real_records(session.exec(select(CandidateTable)).all())
+        match_scores = [float(row.match_score) for row in candidates if row.match_score is not None]
+        return {
+            "total": total,
+            "atRisk": at_risk,
+            "atRiskPct": round(at_risk / total * 100, 1) if total else 0.0,
+            "departments": department_rows,
+            "riskEmployees": [get_employee_out(row, session, current_user) for row in evidence[offset:offset + limit]],
+            "riskTotal": len(evidence),
+            "offset": offset,
+            "limit": limit,
+            "candidateCount": len(candidates),
+            "candidateAverageMatch": round(sum(match_scores) / len(match_scores), 3) if match_scores else None,
+            "candidateHighMatch": sum(1 for score in match_scores if score >= 0.7),
+        }
+
+
 @router.get("/copilot/context")
 async def copilot_context(
     current_user: TokenData = Depends(get_current_user),
