@@ -31,6 +31,7 @@ const AnalyticsView = () => {
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [trend, setTrend] = useState([]);
   const [hoveredSnapshot, setHoveredSnapshot] = useState(null);
+  const isFiltered = Boolean(departmentFilter || riskOnly);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -48,21 +49,22 @@ const AnalyticsView = () => {
   }, [token]);
 
   useEffect(() => {
+    if (!token) return undefined;
+    let active = true;
+    analysisAPI.getAnalyticsHistory(24).then((payload) => {
+      if (active && Array.isArray(payload?.points)) setTrend(payload.points);
+    }).catch(() => { /* stream remains the live fallback */ });
+    return () => { active = false; };
+  }, [token]);
+
+  useEffect(() => {
     if (!stats.timestamp) return;
     const point = { timestamp: stats.timestamp, atRiskPct: stats.atRiskPct, avgSentiment: stats.avgSentiment };
     setTrend((previous) => {
       const next = [...previous.filter((item) => item.timestamp !== point.timestamp), point].slice(-24);
-      try { localStorage.setItem("aurelinx_analytics_trend_v1", JSON.stringify(next)); } catch {}
       return next;
     });
   }, [stats.timestamp]);
-
-  useEffect(() => {
-    try {
-      const cached = JSON.parse(localStorage.getItem("aurelinx_analytics_trend_v1") || "[]");
-      if (Array.isArray(cached)) setTrend(cached.slice(-24));
-    } catch {}
-  }, []);
 
   const visibleEmployees = employees.filter((employee) =>
     (!departmentFilter || employee.department === departmentFilter) &&
@@ -81,6 +83,11 @@ const AnalyticsView = () => {
   const candidateMatchValues = candidateRecords.map((candidate) => Number(candidate.match_score)).filter((score) => Number.isFinite(score));
   const candidateAverageMatch = candidateMatchValues.length ? candidateMatchValues.reduce((sum, score) => sum + score, 0) / candidateMatchValues.length : null;
   const candidateHighMatch = candidateMatchValues.filter((score) => score >= 0.7).length;
+  const filteredAtRiskCount = visibleEmployees.filter((employee) => employee.is_at_risk).length;
+  const filteredRiskPct = visibleEmployees.length ? (filteredAtRiskCount / visibleEmployees.length) * 100 : 0;
+  const displayedRiskPct = isFiltered ? filteredRiskPct : stats.atRiskPct;
+  const displayedRiskLevel = displayedRiskPct >= 20 ? "HIGH" : displayedRiskPct >= 10 ? "MEDIUM" : "LOW";
+  const displayedTopRisk = [...departmentRows].sort((a, b) => (b.total ? b.risk / b.total : 0) - (a.total ? a.risk / a.total : 0))[0];
 
   const exportAnalytics = async (format) => {
     const { generateAurelinxReport } = await import("../utils/reportGenerator");
@@ -248,19 +255,19 @@ const AnalyticsView = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
         <MetricCard
           title="Total Workforce"
-          value={visibleEmployees.length ? visibleEmployees.length : stats.total}
-          delta={departmentFilter || riskOnly ? "Filtered employee records" : "Live employee records"}
+          value={isFiltered ? visibleEmployees.length : stats.total}
+          delta={isFiltered ? "Filtered employee records" : "Live employee records"}
           color="primary"
         />
         <MetricCard
           title="At-Risk Employees"
-          value={visibleEmployees.length ? visibleEmployees.filter((employee) => employee.is_at_risk).length : stats.atRisk}
-          delta={`${visibleEmployees.length ? ((visibleEmployees.filter((employee) => employee.is_at_risk).length / visibleEmployees.length) * 100).toFixed(1) : stats.atRiskPct}% of view`}
+          value={isFiltered ? filteredAtRiskCount : stats.atRisk}
+          delta={`${displayedRiskPct.toFixed(1)}% of ${isFiltered ? "view" : "workforce"}`}
           color="risk"
         />
         <MetricCard
           title="Employee Departments"
-          value={departmentRows.length || stats.depts.length}
+          value={isFiltered ? departmentRows.length : stats.depts.length}
           delta="Departments represented by employees"
           color="accent"
         />
@@ -276,7 +283,7 @@ const AnalyticsView = () => {
           </div>
 
           <div className="space-y-6">
-            {(departmentRows.length ? departmentRows : stats.depts.map((dept) => ({ department: dept.name, total: dept.count, risk: 0, sentiment: 0, retention: 0 }))).map((dept) => (
+            {(isFiltered ? departmentRows : (departmentRows.length ? departmentRows : stats.depts.map((dept) => ({ department: dept.name, total: dept.count, risk: 0, sentiment: 0, retention: 0 })))).map((dept) => (
               <button key={dept.department} onClick={() => setSelectedDepartment(dept.department)} className="block w-full space-y-2 text-left">
                 <div className="flex justify-between text-sm font-bold">
                   <span className="text-white/60 uppercase tracking-widest">
@@ -288,7 +295,7 @@ const AnalyticsView = () => {
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{
-                      width: `${(visibleEmployees.length || stats.total) > 0 ? (dept.total / (visibleEmployees.length || stats.total)) * 100 : 0}%`,
+                      width: `${(isFiltered ? visibleEmployees.length : stats.total) > 0 ? (dept.total / (isFiltered ? visibleEmployees.length : stats.total)) * 100 : 0}%`,
                     }}
                     className="h-full bg-primary"
                   />
@@ -313,17 +320,17 @@ const AnalyticsView = () => {
             </div>
             <div className="text-center z-10">
               <div className="text-6xl font-black neon-text">
-                {stats.atRiskPct.toFixed(1)}%
+                {displayedRiskPct.toFixed(1)}%
               </div>
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mt-2">
-                {stats.riskLevel} Risk Coefficient
+                {displayedRiskLevel} Rule-Based Risk Rate
               </div>
             </div>
           </div>
 
           <div className="mt-8 pt-8 border-t border-white/5 text-sm text-white/50 leading-relaxed text-center uppercase tracking-wide font-bold">
-            {stats.topRiskDepartment
-              ? `${stats.topRiskDepartment} currently has the highest recorded risk concentration at ${stats.topRiskDepartmentRatio.toFixed(1)}%. This is a rule-based ratio, not a validated predictive model.`
+            {(isFiltered ? displayedTopRisk : stats.topRiskDepartment)
+              ? `${isFiltered ? displayedTopRisk.department : stats.topRiskDepartment} currently has the highest recorded risk concentration at ${(isFiltered ? (displayedTopRisk.total ? displayedTopRisk.risk / displayedTopRisk.total * 100 : 0) : stats.topRiskDepartmentRatio).toFixed(1)}%. This is a rule-based ratio, not a validated predictive model.`
               : "No department-level risk concentration detected."}
           </div>
         </div>
