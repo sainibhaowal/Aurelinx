@@ -677,6 +677,10 @@ export const analysisAPI = {
     request(`${API_V1}/ai/analytics/history?limit=${encodeURIComponent(limit)}`, {
       timeoutMs: LONG_REQUEST_TIMEOUT,
     }),
+  getAnalyticsOverview: ({ department = "", riskOnly = false, offset = 0, limit = 100 } = {}) => {
+    const params = new URLSearchParams({ department, risk_only: String(riskOnly), offset: String(offset), limit: String(limit) });
+    return request(`${API_V1}/ai/analytics/overview?${params}`, { timeoutMs: LONG_REQUEST_TIMEOUT });
+  },
 
   streamAnalytics: (handlers = {}, signal = null) =>
     streamRequest(`${API_V1}/ai/analytics/stream`, handlers, signal),

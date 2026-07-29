@@ -31,18 +31,19 @@ const AnalyticsView = () => {
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [trend, setTrend] = useState([]);
   const [hoveredSnapshot, setHoveredSnapshot] = useState(null);
+  const [serverDepartmentRows, setServerDepartmentRows] = useState(null);
   const isFiltered = Boolean(departmentFilter || riskOnly);
 
   useEffect(() => {
     if (!token) return undefined;
     let active = true;
-    const allCandidateRows = candidatesAPI.list(0, 10000).then(async (rows) => rows.length === 10000 ? [...rows, ...(await candidatesAPI.list(10000, 10000))] : rows);
-    Promise.all([employeesAPI.list(0, 10000), candidatesAPI.count(), allCandidateRows])
-      .then(([employeeRows, candidateTotal, candidateRows]) => {
+    Promise.all([analysisAPI.getAnalyticsOverview({ limit: 100 }), candidatesAPI.count()])
+      .then(([overview, candidateTotal]) => {
         if (!active) return;
-        setEmployees(employeeRows || []);
+        setEmployees(overview?.riskEmployees || []);
+        setServerDepartmentRows(overview?.departments || []);
         setCandidateCount(candidateTotal?.count ?? null);
-        setCandidateRecords(candidateRows || []);
+        setCandidateRecords([]);
       })
       .catch((error) => console.error("Analytics context load failed", error));
     return () => { active = false; };
@@ -72,13 +73,14 @@ const AnalyticsView = () => {
   );
   const departments = [...new Set(employees.map((employee) => employee.department).filter(Boolean))].sort();
   const riskEmployees = visibleEmployees.filter((employee) => employee.is_at_risk).sort((a, b) => Number(a.retention_prob ?? 0.5) - Number(b.retention_prob ?? 0.5));
-  const departmentRows = departments.map((department) => {
+  const derivedDepartmentRows = departments.map((department) => {
     const rows = visibleEmployees.filter((employee) => employee.department === department);
     const risk = rows.filter((employee) => employee.is_at_risk).length;
     const sentiment = rows.length ? rows.reduce((sum, row) => sum + Number(row.sentiment_score || 0), 0) / rows.length : 0;
     const retention = rows.length ? rows.reduce((sum, row) => sum + Number(row.retention_prob ?? 0.5), 0) / rows.length : 0;
     return { department, total: rows.length, risk, sentiment, retention };
   }).filter((row) => row.total > 0);
+  const departmentRows = serverDepartmentRows || derivedDepartmentRows;
   const activeDepartmentRows = selectedDepartment ? departmentRows.filter((row) => row.department === selectedDepartment) : departmentRows;
   const candidateMatchValues = candidateRecords.map((candidate) => Number(candidate.match_score)).filter((score) => Number.isFinite(score));
   const candidateAverageMatch = candidateMatchValues.length ? candidateMatchValues.reduce((sum, score) => sum + score, 0) / candidateMatchValues.length : null;
