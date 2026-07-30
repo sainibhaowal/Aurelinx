@@ -31,6 +31,7 @@ import { enterpriseAPI, leanAPI } from "../services/apiClient";
 const EnterpriseOpsView = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("pipelines"); // 'pipelines', 'ai-gov', 'workflows', 'compliance'
+  const [riskView, setRiskView] = useState("reviews");
 
   // Data States
   const [connections, setConnections] = useState([]);
@@ -2081,11 +2082,15 @@ const EnterpriseOpsView = () => {
 
         {/* TAB 3: WORKFLOWS & RISK */}
         {activeTab === "workflows" && (
+          <div>
+            <div className="mb-6 flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-950/45 p-2 backdrop-blur-xl">
+              {[['reviews','Reviews'],['create','Create Intervention'],['active','Active Interventions'],['cfo','CFO Scenario Lab'],['attrition','Explainable Attrition']].map(([id,label]) => <button key={id} onClick={() => setRiskView(id)} className={`rounded-xl px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider transition-all ${riskView === id ? 'bg-cyan-400/15 text-cyan-200 ring-1 ring-cyan-300/40 shadow-[0_0_18px_rgba(34,211,238,0.12)]' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'}`}>{label}</button>)}
+            </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column: Create Intervention & CFO Scenario Lab */}
             <div className="lg:col-span-1 space-y-8">
               {/* Create Intervention */}
-              <section className="premium-card p-5 border border-white/5 bg-slate-900/40">
+              <section className={`premium-card p-5 border border-white/5 bg-slate-900/40 ${riskView === 'create' ? '' : 'hidden'}`}>
                 <div className="flex items-center gap-2 mb-4 border-b border-white/5 pb-3">
                   <BriefcaseBusiness size={16} className="text-cyan-400" />
                   <h2 className="font-bold text-sm uppercase tracking-wider text-white">
@@ -2212,7 +2217,7 @@ const EnterpriseOpsView = () => {
               </section>
 
               {/* CFO Scenario Lab */}
-              <section className="premium-card p-5 border border-white/5 bg-slate-900/40">
+              <section className={`premium-card p-5 border border-white/5 bg-slate-900/40 ${riskView === 'cfo' ? '' : 'hidden'}`}>
                 <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-3">
                   <div className="flex items-center gap-2">
                     <BarChart3 size={16} className="text-cyan-400" />
@@ -2335,12 +2340,12 @@ const EnterpriseOpsView = () => {
             {/* Right Column: Interventions queue, attrition explain list */}
             <div className="lg:col-span-2 space-y-8">
               {/* Active Interventions Workflow */}
-              <section className="premium-card p-5 border border-white/5">
+              <section className={`premium-card p-5 border border-white/5 lg:col-span-2 ${riskView === 'active' || riskView === 'reviews' ? '' : 'hidden'}`}>
                 <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-3">
                   <div className="flex items-center gap-2">
                     <BriefcaseBusiness size={16} className="text-cyan-400" />
                     <h2 className="font-bold text-sm uppercase tracking-wider text-white">
-                      Active Interventions Workflow
+                      {riskView === 'reviews' ? 'Review Queue' : 'Active Interventions Workflow'}
                     </h2>
                   </div>
                   <span className="text-xs text-slate-400">
@@ -2349,7 +2354,7 @@ const EnterpriseOpsView = () => {
                 </div>
 
                 <div className="space-y-4 max-h-[460px] overflow-y-auto pr-1">
-                  {interventions.map((i) => (
+                  {(riskView === 'reviews' ? interventions.filter((i) => /^Review retention risk/i.test(i.title || '')) : interventions).map((i) => (
                     <div
                       key={i.id}
                       className="rounded-xl border border-white/5 bg-slate-950/20 p-4 text-xs text-left relative overflow-hidden group hover:border-white/10 transition-all"
@@ -2501,7 +2506,7 @@ const EnterpriseOpsView = () => {
               </section>
 
               {/* Explainable Attrition Top 15 */}
-              <section className="premium-card p-5 border border-white/5">
+              <section className={`premium-card p-5 border border-white/5 lg:col-span-2 ${riskView === 'attrition' ? '' : 'hidden'}`}>
                 <div className="flex items-center gap-2 mb-4 border-b border-white/5 pb-3">
                   <ShieldAlert
                     size={16}
@@ -2569,6 +2574,7 @@ const EnterpriseOpsView = () => {
                 </div>
               </section>
             </div>
+          </div>
           </div>
         )}
 
