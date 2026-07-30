@@ -111,6 +111,15 @@ const App = () => {
     }
   }, []);
 
+  useEffect(() => {
+    const handleNavigate = (event) => {
+      const tab = event?.detail?.tab;
+      if (tab) setActiveTab(tab);
+    };
+    window.addEventListener("aurelinx:navigate", handleNavigate);
+    return () => window.removeEventListener("aurelinx:navigate", handleNavigate);
+  }, []);
+
   const [analyticsSnapshot, setAnalyticsSnapshot] = useState({
     total: 0,
     atRisk: 0,

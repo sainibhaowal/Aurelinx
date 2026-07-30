@@ -151,7 +151,7 @@ const AnalyticsView = () => {
         status: "planned",
         expected_impact: "Document a retention conversation and reassess the employee risk signals.",
       });
-      setActionMessage({ type: "success", text: `Review created for ${employee.full_name}.` });
+      setActionMessage({ type: "success", text: `Review created for ${employee.full_name}.`, employee: employee.full_name });
     } catch (error) {
       console.error("Risk intervention creation failed", error);
       window.dispatchEvent(new CustomEvent("aurelinx:toast", {
@@ -274,7 +274,7 @@ const AnalyticsView = () => {
         </div>
         <UserManualButton defaultTab="analytics" className="flex-none mt-2" />
       </header>
-      {actionMessage && <div role="status" className={`mb-4 rounded-lg border px-4 py-3 text-xs ${actionMessage.type === "success" ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100" : "border-rose-300/20 bg-rose-300/10 text-rose-100"}`}>{actionMessage.text}<button className="ml-3 text-white/60 hover:text-white" onClick={() => setActionMessage(null)} aria-label="Dismiss">×</button></div>}
+      {actionMessage && <div role="status" className={`mb-4 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-xs ${actionMessage.type === "success" ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100" : "border-rose-300/20 bg-rose-300/10 text-rose-100"}`}><span>{actionMessage.text}</span>{actionMessage.type === "success" && <button onClick={() => window.dispatchEvent(new CustomEvent("aurelinx:navigate", { detail: { tab: "enterprise" } }))} className="rounded-md border border-emerald-200/30 px-2.5 py-1 font-semibold text-emerald-100 hover:bg-emerald-200/10">Open review workflow</button>}<button className="ml-auto text-white/60 hover:text-white" onClick={() => setActionMessage(null)} aria-label="Dismiss">×</button></div>}
 
       <div className="mb-8 flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
         <label className="flex min-w-[220px] flex-1 flex-col gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
