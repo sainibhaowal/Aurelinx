@@ -137,15 +137,9 @@ const AnalyticsView = () => {
   };
 
   const createRiskIntervention = async (employee) => {
-    const priority = Number(employee.retention_prob ?? 0.5) < 0.4 ? "high" : "medium";
-    if (priority === "high" && !user?.is_admin) {
-      // The API intentionally protects high-impact actions. Explain the
-      // approval requirement instead of sending a request that can only 403.
-      window.dispatchEvent(new CustomEvent("aurelinx:toast", {
-        detail: { message: "High-priority retention actions require administrator approval.", type: "error" },
-      }));
-      return;
-    }
+    // This button creates a documented review request, not an immediate
+    // high-impact intervention. Escalation remains protected server-side.
+    const priority = "medium";
     try {
       await enterpriseAPI.createIntervention({
         title: `Review retention risk for ${employee.full_name}`,
@@ -154,6 +148,7 @@ const AnalyticsView = () => {
         target_department: employee.department,
         priority,
         owner_name: "HRBP",
+        status: "planned",
         expected_impact: "Document a retention conversation and reassess the employee risk signals.",
       });
       setActionMessage({ type: "success", text: `Review created for ${employee.full_name}.` });
