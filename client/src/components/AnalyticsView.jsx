@@ -26,6 +26,9 @@ const AnalyticsView = () => {
   const [employees, setEmployees] = useState([]);
   const [candidateCount, setCandidateCount] = useState(null);
   const [candidateRecords, setCandidateRecords] = useState([]);
+  const [serverCandidateAverage, setServerCandidateAverage] = useState(null);
+  const [serverCandidateHigh, setServerCandidateHigh] = useState(0);
+  const [actionMessage, setActionMessage] = useState(null);
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [riskOnly, setRiskOnly] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
@@ -52,6 +55,8 @@ const AnalyticsView = () => {
         setServerScopeTotal(Number(overview?.total || 0));
         setServerScopeAtRisk(Number(overview?.atRisk || 0));
         setCandidateCount(overview?.candidateCount ?? null);
+        setServerCandidateAverage(overview?.candidateAverageMatch ?? null);
+        setServerCandidateHigh(Number(overview?.candidateHighMatch || 0));
         setCandidateRecords([]);
         setLoading(false);
       })
@@ -80,7 +85,14 @@ const AnalyticsView = () => {
     if (!token) return undefined;
     let active = true;
     analysisAPI.getAnalyticsHistory(24).then((payload) => {
-      if (active && Array.isArray(payload?.points)) setTrend(payload.points);
+      if (active && Array.isArray(payload?.points)) {
+        setTrend(payload.points.map((point) => ({
+          ...point,
+          timestamp: point.timestamp || point.created_at,
+          atRiskPct: Number(point.atRiskPct ?? point.at_risk_pct ?? 0),
+          avgSentiment: Number(point.avgSentiment ?? point.avg_sentiment ?? 0),
+        })).filter((point) => point.timestamp));
+      }
     }).catch(() => { /* stream remains the live fallback */ });
     return () => { active = false; };
   }, [token]);
@@ -110,8 +122,8 @@ const AnalyticsView = () => {
   const departmentRows = serverDepartmentRows || derivedDepartmentRows;
   const activeDepartmentRows = selectedDepartment ? departmentRows.filter((row) => row.department === selectedDepartment) : departmentRows;
   const candidateMatchValues = candidateRecords.map((candidate) => Number(candidate.match_score)).filter((score) => Number.isFinite(score));
-  const candidateAverageMatch = candidateMatchValues.length ? candidateMatchValues.reduce((sum, score) => sum + score, 0) / candidateMatchValues.length : null;
-  const candidateHighMatch = candidateMatchValues.filter((score) => score >= 0.7).length;
+  const candidateAverageMatch = candidateMatchValues.length ? candidateMatchValues.reduce((sum, score) => sum + score, 0) / candidateMatchValues.length : serverCandidateAverage;
+  const candidateHighMatch = candidateMatchValues.length ? candidateMatchValues.filter((score) => score >= 0.7).length : serverCandidateHigh;
   const filteredAtRiskCount = isFiltered ? serverScopeAtRisk : visibleEmployees.filter((employee) => employee.is_at_risk).length;
   const filteredScopeCount = isFiltered ? serverScopeTotal : visibleEmployees.length;
   const filteredRiskPct = filteredScopeCount ? (filteredAtRiskCount / filteredScopeCount) * 100 : 0;
@@ -144,11 +156,13 @@ const AnalyticsView = () => {
         owner_name: "HRBP",
         expected_impact: "Document a retention conversation and reassess the employee risk signals.",
       });
+      setActionMessage({ type: "success", text: `Review created for ${employee.full_name}.` });
     } catch (error) {
       console.error("Risk intervention creation failed", error);
       window.dispatchEvent(new CustomEvent("aurelinx:toast", {
         detail: { message: error?.status === 403 ? "Administrator approval is required for this action." : (error?.message || "Unable to create the intervention."), type: "error" },
       }));
+      setActionMessage({ type: "error", text: error?.status === 403 ? "Review blocked: administrator approval is required." : (error?.message || "Review could not be created.") });
     }
   };
 
@@ -265,6 +279,7 @@ const AnalyticsView = () => {
         </div>
         <UserManualButton defaultTab="analytics" className="flex-none mt-2" />
       </header>
+      {actionMessage && <div role="status" className={`mb-4 rounded-lg border px-4 py-3 text-xs ${actionMessage.type === "success" ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100" : "border-rose-300/20 bg-rose-300/10 text-rose-100"}`}>{actionMessage.text}<button className="ml-3 text-white/60 hover:text-white" onClick={() => setActionMessage(null)} aria-label="Dismiss">×</button></div>}
 
       <div className="mb-8 flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
         <label className="flex min-w-[220px] flex-1 flex-col gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
@@ -388,7 +403,7 @@ const AnalyticsView = () => {
         </section>
         <section className="premium-card p-5">
           <div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold text-slate-100">Live snapshot history</h3><p className="mt-1 text-[11px] text-slate-500">One bar is one live analytics snapshot captured in this workspace. Bar height is the at-risk percentage.</p></div><span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-slate-500">{trend.length} captured</span></div>
-          {trend.length ? <div><div className="relative flex h-20 items-end gap-1 border-b border-white/[0.08]">{trend.map((point) => <div key={point.timestamp} className="relative min-w-[4px] flex-1"><div role="img" tabIndex={0} aria-label={`${new Date(point.timestamp).toLocaleString()}; risk ${Number(point.atRiskPct).toFixed(1)} percent`} onMouseEnter={() => setHoveredSnapshot(point.timestamp)} onMouseLeave={() => setHoveredSnapshot(null)} onFocus={() => setHoveredSnapshot(point.timestamp)} onBlur={() => setHoveredSnapshot(null)} className="h-full cursor-help outline-none"><div className="absolute bottom-0 left-0 right-0 rounded-t bg-gradient-to-t from-rose-500/70 to-amber-300/70 transition-[filter] hover:brightness-125 focus-visible:brightness-125" style={{ height: `${Math.max(8, Math.min(100, Number(point.atRiskPct || 0) * 4))}%` }} />{hoveredSnapshot === point.timestamp && <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-lg border border-rose-300/30 bg-[#1b111d]/95 px-3 py-2 text-[10px] leading-relaxed text-slate-200 shadow-xl shadow-rose-950/30 backdrop-blur-md"><div className="font-semibold text-rose-100">{new Date(point.timestamp).toLocaleString()}</div><div className="mt-0.5 text-slate-400">At risk <span className="font-semibold text-white">{Number(point.atRiskPct).toFixed(1)}%</span><span className="mx-1.5 text-slate-600">·</span>Sentiment <span className="font-semibold text-cyan-200">{Number(point.avgSentiment).toFixed(2)}</span></div></div>}</div></div>)}</div><div className="mt-2 flex justify-between text-[9px] uppercase tracking-[0.14em] text-slate-600"><span>0% risk</span><span>25%+</span></div></div> : <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-white/10 text-xs text-slate-500">History will appear after the live stream captures its first snapshot.</div>}
+          {trend.length ? <div><div className="relative flex h-20 items-end gap-1 border-b border-white/[0.08]">{trend.map((point, index) => <div key={`${point.timestamp}-${index}`} className="relative min-w-[4px] flex-1"><div role="img" tabIndex={0} aria-label={`${new Date(point.timestamp).toLocaleString()}; risk ${Number(point.atRiskPct).toFixed(1)} percent`} onMouseEnter={() => setHoveredSnapshot(point.timestamp)} onMouseLeave={() => setHoveredSnapshot(null)} onFocus={() => setHoveredSnapshot(point.timestamp)} onBlur={() => setHoveredSnapshot(null)} className="h-full cursor-help outline-none"><div className="absolute bottom-0 left-0 right-0 min-h-[6px] rounded-t bg-gradient-to-t from-rose-500/80 to-amber-300/80 transition-[filter] hover:brightness-125 focus-visible:brightness-125" style={{ height: `${Math.max(8, Math.min(100, Number(point.atRiskPct || 0) * 4))}%` }} />{hoveredSnapshot === point.timestamp && <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-lg border border-rose-300/30 bg-[#1b111d]/95 px-3 py-2 text-[10px] leading-relaxed text-slate-200 shadow-xl shadow-rose-950/30 backdrop-blur-md"><div className="font-semibold text-rose-100">{new Date(point.timestamp).toLocaleString()}</div><div className="mt-0.5 text-slate-400">At risk <span className="font-semibold text-white">{Number(point.atRiskPct).toFixed(1)}%</span><span className="mx-1.5 text-slate-600">·</span>Sentiment <span className="font-semibold text-cyan-200">{Number(point.avgSentiment).toFixed(2)}</span></div></div>}</div></div>)}</div><div className="mt-2 flex justify-between text-[9px] uppercase tracking-[0.14em] text-slate-600"><span>0% risk</span><span>25%+</span></div></div> : <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-white/10 text-xs text-slate-500">History will appear after the live stream captures its first snapshot.</div>}
         </section>
       </div>
 
