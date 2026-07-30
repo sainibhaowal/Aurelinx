@@ -500,7 +500,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
             {/* Header */}
             <div>
               <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-                <BarChart3 className="text-emerald-400 h-5 w-5" /> Sentiment Intelligence & Org Pulse
+                <BarChart3 className="text-emerald-400 h-5 w-5" /> Sentiment Intelligence
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
                 Sentiment Intelligence is a current workforce-snapshot view. It reads stored employee sentiment, retention, department, and policy-risk fields, then calculates transparent organizational indicators and review lists. It is not a clinical assessment or validated forecasting model.
@@ -694,6 +694,9 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
               <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                 <PieChart className="text-cyan-400 h-4 w-4" /> Organizational Analytics & Workforce Distribution
               </h3>
+              <div className="rounded-lg border border-cyan-300/20 bg-cyan-300/[0.04] p-3 text-[11px] leading-relaxed text-slate-300">
+                <strong className="text-cyan-200">Separate from Sentiment Intelligence:</strong> Sentiment Intelligence is the dedicated normalized-sentiment and risk-review page. This Organizational Analytics section is the workforce distribution, department aggregation, server-side risk evidence, candidate hiring context, exports, and durable snapshot trend view. Candidate metrics here never alter employee sentiment or risk totals.
+              </div>
               <p className="text-xs text-slate-300 leading-relaxed">
                 The **Organizational Analytics** view aggregates individual employee risk telemetry to map macro department-level health and workforce layout.
               </p>
@@ -786,7 +789,8 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <li><strong className="text-slate-100">Gauge:</strong> filtered ratio = matching at-risk employees ÷ matching employees × 100. With no filter it uses the full employee snapshot. LOW &lt;10%, MEDIUM 10–&lt;20%, HIGH ≥20%.</li>
                 <li><strong className="text-slate-100">Thresholds:</strong> low sentiment is <code>sentiment_score &lt; 0.45</code>; retention pressure is <code>retention_prob &lt; 0.55</code>; department concentration is <code>department at-risk share ≥ 25%</code>. These are transparent review rules, not clinical or validated predictive truth.</li>
                 <li><strong className="text-slate-100">Exports:</strong> PDF, Excel, and Markdown use the currently visible filtered employee scope and include the filter context. A disabled export means the current scope contains zero rows.</li>
-                <li><strong className="text-slate-100">Drill-down:</strong> selecting a distribution row focuses department evidence; “Show all” clears the focus. “Create review” opens the protected intervention workflow and does not mutate the employee record.</li>
+                <li><strong className="text-slate-100">Drill-down:</strong> selecting a distribution row focuses department evidence; “Show all” clears the focus. Risk evidence is server-paginated and loads more as its list is scrolled.</li>
+                <li><strong className="text-slate-100">Create review:</strong> creates a planned, medium-priority HR review request tied to the employee and evidence context. It does not change the employee record. A later high/critical escalation remains administrator-protected. Success or permission/API failure is shown inline.</li>
                 <li><strong className="text-slate-100">History:</strong> the latest 24 snapshots are stored in the tenant-scoped analytics snapshot table. If the history endpoint is unavailable, the live stream can still render current metrics and the page shows an empty/failure state rather than fabricated history.</li>
                 <li><strong className="text-slate-100">Freshness and failures:</strong> the header timestamp is the snapshot generation time; a disconnected stream means the page is not receiving updates. Authentication/API failures are surfaced and do not silently replace filtered results with stale totals.</li>
               </ul>
