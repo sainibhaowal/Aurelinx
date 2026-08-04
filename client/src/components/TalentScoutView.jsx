@@ -280,7 +280,7 @@ const TalentScoutView = () => {
 
       <header className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 min-w-0">
         <div className="min-w-0">
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-white">
             Talent Scout
           </h1>
           <p className="mt-2 max-w-3xl text-sm md:text-base leading-relaxed text-slate-400">

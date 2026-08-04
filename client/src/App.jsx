@@ -558,7 +558,7 @@ const App = () => {
             </div>
           </motion.aside>
 
-          <main className={`workspace-main-scale flex-1 h-full min-h-0 relative z-10 custom-scrollbar ${activeTab === "intelligence" ? "p-0 overflow-hidden" : "p-3 md:p-5 lg:p-6 overflow-y-auto"}`}>
+          <main className={`workspace-main-scale flex-1 h-full min-h-0 relative z-10 custom-scrollbar ${activeTab === "intelligence" ? "p-0 overflow-hidden" : activeTab === "enterprise" ? "p-3 md:p-5 lg:p-6 overflow-hidden flex flex-col" : "p-3 md:p-5 lg:p-6 overflow-y-auto"}`}>
             <Suspense fallback={<LoadingScreen label={`Loading ${activeTab}`} />}>
               <AnimatePresence mode="wait">
                 <motion.div
@@ -567,7 +567,7 @@ const App = () => {
                   initial="hidden"
                   animate="visible"
                   exit="hidden"
-                  className={`relative min-h-0 flex flex-col ${activeTab === "intelligence" ? "h-full" : "h-auto"}`}
+                  className={`relative min-h-0 flex flex-col ${activeTab === "intelligence" || activeTab === "enterprise" ? "h-full" : "h-auto"}`}
                 >
                   {activeTab === "dashboard" && (
                     <>
@@ -724,19 +724,19 @@ const App = () => {
                         <div className="dashboard-insight-panel dashboard-risk-panel">
                           <div className="flex items-start justify-between gap-4 mb-6">
                             <div><div className="dashboard-kicker">Risk composition</div><h2 className="mt-1 text-lg font-extrabold text-white">Where attention is concentrated</h2></div>
-                            <div className="dashboard-risk-ring" style={{"--risk": `${Math.min(100, Number(analyticsSnapshot.atRiskPct || 0))}%`}}><span>{analyticsLoading ? "—" : `${analyticsSnapshot.atRiskPct}%`}</span></div>
+                            <div className="dashboard-risk-ring" style={{ "--risk": `${Math.min(100, Number(analyticsSnapshot.atRiskPct || 0))}%` }}><span>{analyticsLoading ? "—" : `${analyticsSnapshot.atRiskPct}%`}</span></div>
                           </div>
                           <div className="space-y-4">
                             {(analyticsSnapshot.topRiskDrivers || []).length ? analyticsSnapshot.topRiskDrivers.map((driver, index, rows) => {
                               const max = Math.max(...rows.map((item) => Number(item.count || 0)), 1);
-                              return <button key={driver.factor} onClick={() => openDriverDrilldown(driver.factor)} className="dashboard-risk-row group"><span className="dashboard-risk-rank">0{index + 1}</span><span className="min-w-0 flex-1 text-left"><span className="block text-sm font-semibold text-slate-200 group-hover:text-white">{driver.factor}</span><span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-rose-400 to-orange-300" style={{width: `${(Number(driver.count || 0) / max) * 100}%`}} /></span></span><strong className="text-sm text-rose-300">{driver.count}</strong></button>;
+                              return <button key={driver.factor} onClick={() => openDriverDrilldown(driver.factor)} className="dashboard-risk-row group"><span className="dashboard-risk-rank">0{index + 1}</span><span className="min-w-0 flex-1 text-left"><span className="block text-sm font-semibold text-slate-200 group-hover:text-white">{driver.factor}</span><span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-rose-400 to-orange-300" style={{ width: `${(Number(driver.count || 0) / max) * 100}%` }} /></span></span><strong className="text-sm text-rose-300">{driver.count}</strong></button>;
                             }) : <div className="text-sm text-slate-500">No risk-driver data in the current snapshot.</div>}
                           </div>
                         </div>
                         <div className="dashboard-insight-panel dashboard-morale-panel">
                           <div className="dashboard-kicker">Workforce health</div>
                           <h2 className="mt-1 text-lg font-extrabold text-white">Morale signal</h2>
-                          <div className="dashboard-morale-visual"><div className="dashboard-morale-gauge" style={{"--morale": `${Math.max(0, Math.min(100, Number(analyticsSnapshot.avgSentiment || 0) * 100))}%`}}><span>{analyticsLoading ? "—" : Number(analyticsSnapshot.avgSentiment || 0).toFixed(2)}</span></div><div><div className="text-sm font-semibold text-slate-200">Current model indicator</div><p className="mt-1 text-xs leading-relaxed text-slate-500">This is an observed snapshot, not a historical trend. Open Sentiment for department and time-based analysis.</p></div></div>
+                          <div className="dashboard-morale-visual"><div className="dashboard-morale-gauge" style={{ "--morale": `${Math.max(0, Math.min(100, Number(analyticsSnapshot.avgSentiment || 0) * 100))}%` }}><span>{analyticsLoading ? "—" : Number(analyticsSnapshot.avgSentiment || 0).toFixed(2)}</span></div><div><div className="text-sm font-semibold text-slate-200">Current model indicator</div><p className="mt-1 text-xs leading-relaxed text-slate-500">This is an observed snapshot, not a historical trend. Open Sentiment for department and time-based analysis.</p></div></div>
                           <button onClick={() => setActiveTab("sentiment")} className="dashboard-text-action">Open sentiment intelligence <ChevronRight size={14} /></button>
                         </div>
                       </section>
@@ -925,14 +925,14 @@ const App = () => {
                         <div className="flex min-w-0 items-start gap-3">
                           <span className="mt-0.5 w-7 shrink-0 text-right font-mono text-[11px] text-slate-500">{index + 1}</span>
                           <div className="min-w-0">
-                          <div className="font-bold">{item.full_name}</div>
-                          <div className="text-xs text-slate-300">
-                            {item.role} | {item.department}
-                          </div>
-                          <div className="text-xs text-rose-300 mt-1">
-                            Estimated attrition risk {(item.risk_probability * 100).toFixed(1)}% |{" "}
-                            {item.evidence}
-                          </div>
+                            <div className="font-bold">{item.full_name}</div>
+                            <div className="text-xs text-slate-300">
+                              {item.role} | {item.department}
+                            </div>
+                            <div className="text-xs text-rose-300 mt-1">
+                              Estimated attrition risk {(item.risk_probability * 100).toFixed(1)}% |{" "}
+                              {item.evidence}
+                            </div>
                           </div>
                         </div>
                         <button
@@ -1018,13 +1018,13 @@ const App = () => {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {(selectedProfile.skills || []).map((skill, idx) => (
-                        <span
-                          key={`${skill.name}-${idx}`}
-                          className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs"
-                        >
-                          {skill.name} (L{skill.level})
-                        </span>
-                      ))}
+                      <span
+                        key={`${skill.name}-${idx}`}
+                        className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs"
+                      >
+                        {skill.name} (L{skill.level})
+                      </span>
+                    ))}
                     {(!selectedProfile.skills ||
                       selectedProfile.skills.length === 0) && (
                         <span className="text-slate-400 text-sm">
