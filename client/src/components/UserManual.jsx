@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import PremiumSelect from "./PremiumSelect";
 import {
@@ -17,6 +17,7 @@ import {
   Activity,
   Heart,
   ChevronRight,
+  ChevronDown,
   Code,
   PieChart,
   TrendingUp,
@@ -60,8 +61,17 @@ const MATH_ENGINE_PIPELINE_ASCII = `+-------------------------------------------
 
 export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
+  const [expandedNodes, setExpandedNodes] = useState({
+    dataops: true,
+    risk_interventions: true,
+  });
 
-  const tabs = [
+  const toggleNode = (nodeId, e) => {
+    if (e) e.stopPropagation();
+    setExpandedNodes(prev => ({ ...prev, [nodeId]: !prev[nodeId] }));
+  };
+
+  const navTree = [
     { id: "dashboard", label: "Executive Dashboard", icon: LayoutDashboard },
     { id: "overview", label: "Overview & Setup", icon: BookOpen },
     { id: "workflows", label: "Workflow Chat & Agents", icon: MessageSquare },
@@ -69,7 +79,31 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
     { id: "analytics", label: "Analytics & Sentiment", icon: BarChart3 },
     { id: "directory", label: "Talent Directory", icon: Users },
     { id: "intelligence", label: "Intelligence Center", icon: Network },
-    { id: "dataops", label: "Data Ops & Enterprise", icon: Database },
+    {
+      id: "dataops",
+      label: "Data Ops & Enterprise",
+      icon: Database,
+      hasChildren: true,
+      children: [
+        { id: "dataops_overview", label: "Console Overview", icon: Database },
+        { id: "dataops_pipelines", label: "Data Pipelines & Sync", icon: Activity },
+        { id: "dataops_governance", label: "AI Governance & Models", icon: Cpu },
+        {
+          id: "risk_interventions",
+          label: "Risk & Interventions Engine",
+          icon: ShieldAlert,
+          hasChildren: true,
+          children: [
+            { id: "dataops_reviews", label: "📋 Reviews Queue & Triage", icon: Zap },
+            { id: "dataops_create", label: "➕ Create Intervention", icon: Activity },
+            { id: "dataops_active", label: "🔄 Active Interventions", icon: TrendingUp },
+            { id: "dataops_cfo", label: "📊 CFO Scenario Lab", icon: PieChart },
+            { id: "dataops_attrition", label: "🔍 Explainable Attrition", icon: Brain }
+          ]
+        },
+        { id: "dataops_compliance", label: "Compliance & Audit Logs", icon: Key }
+      ]
+    },
     { id: "integrations", label: "Providers & Webhooks", icon: Key },
   ];
 
@@ -794,6 +828,51 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <li><strong className="text-slate-100">History:</strong> the latest 24 snapshots are stored in the tenant-scoped analytics snapshot table. If the history endpoint is unavailable, the live stream can still render current metrics and the page shows an empty/failure state rather than fabricated history.</li>
                 <li><strong className="text-slate-100">Freshness and failures:</strong> the header timestamp is the snapshot generation time; a disconnected stream means the page is not receiving updates. Authentication/API failures are surfaced and do not silently replace filtered results with stale totals.</li>
               </ul>
+            </div>
+
+            <div className="space-y-4 rounded-xl border border-cyan-400/30 bg-slate-950/80 p-5 text-xs text-slate-200">
+              <h3 className="text-sm font-extrabold text-cyan-200 uppercase tracking-wider flex items-center gap-2">
+                <BriefcaseBusiness size={16} className="text-cyan-400" />
+                Create Review & Risk Intervention Workflows: End-to-End Operational Guide
+              </h3>
+              
+              <div className="space-y-3 leading-relaxed text-slate-300">
+                <p>
+                  <strong className="text-white font-semibold">1. What is a "Review"?</strong><br />
+                  A <strong>Review Request</strong> is a preliminary, documented HR triage ticket generated when an HRBP or Manager discovers a high attrition risk signal in <em>Operational Analytics</em>. It captures the target employee, risk factors, department, and recommended triage steps without altering the core employee record.
+                </p>
+
+                <p>
+                  <strong className="text-white font-semibold">2. Why does it exist and who uses it?</strong><br />
+                  Direct employee record modifications (such as compensation adjustments, department transfers, or contract changes) require strict administrative governance. The Review Queue allows HR Business Partners to immediately capture AI evidence, document retention risks, and schedule stay conversations without violating permission policies or triggering unauthorized database mutations.
+                </p>
+
+                <div className="rounded-lg border border-white/10 bg-slate-900/60 p-4 space-y-2 font-mono text-[11px]">
+                  <div className="font-sans font-bold text-cyan-300 uppercase text-[10px] tracking-wider mb-1">
+                    End-to-End 5-Step Risk & Intervention Lifecycle:
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="px-1.5 py-0.5 rounded bg-cyan-400/20 text-cyan-300 font-bold">Step 1</span>
+                    <span><strong>Signal Discovery:</strong> AI models detect low retention probability or high burnout indicators in Operational Analytics.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="px-1.5 py-0.5 rounded bg-cyan-400/20 text-cyan-300 font-bold">Step 2</span>
+                    <span><strong>Create Review:</strong> Clicking "Create review" logs a <code>planned</code> medium-priority review record in the database.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="px-1.5 py-0.5 rounded bg-cyan-400/20 text-cyan-300 font-bold">Step 3</span>
+                    <span><strong>Triage Queue:</strong> The ticket appears in <em>Reviews Queue</em>. The HRBP inspects risk drivers, schedules stay meetings, or dismisses signals.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="px-1.5 py-0.5 rounded bg-cyan-400/20 text-cyan-300 font-bold">Step 4</span>
+                    <span><strong>Escalation:</strong> Clicking "⚡ Escalate to Active Plan" elevates the request into a formal Active Intervention Plan with assigned budget & HR owner.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="px-1.5 py-0.5 rounded bg-cyan-400/20 text-cyan-300 font-bold">Step 5</span>
+                    <span><strong>Outcome Scoring:</strong> Active plans record auditable 30-day (Improved), 60-day (Neutral), and 90-day (Degraded) impact checkpoints.</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Core Calculations */}
@@ -1597,6 +1676,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
         );
 
       case "dataops":
+      case "dataops_overview":
         return (
           <div className="space-y-6">
             <div>
@@ -1604,102 +1684,630 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                 <Database className="text-cyan-400 h-5 w-5" /> Data Ops & Enterprise Console
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                The Enterprise Console contains raw pipeline registries, telemetry logs, model cards, and structural simulation sandboxes.
+                The Enterprise Console contains raw pipeline registries, telemetry logs, model cards, structural simulation sandboxes, and the **Reviews Queue & Risk Interventions Operational Engine**.
               </p>
             </div>
 
-            <div className="space-y-3">
+            {/* DEDICATED SUB-MANUAL NAVIGATION CONTROLS */}
+            <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/60 p-4 space-y-4 shadow-xl">
+              <div className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-cyan-400" /> Enterprise Sub-Manual Chapters:
+              </div>
+              
+              {/* SPECIAL FEATURED HIGHLIGHT BANNER FOR REVIEWS QUEUE */}
+              <div className="rounded-xl border border-cyan-400/30 bg-gradient-to-r from-cyan-950/60 via-slate-900/80 to-purple-950/60 p-5 space-y-4">
+                <div className="flex flex-wrap justify-between items-center gap-3 border-b border-white/10 pb-3">
+                  <div>
+                    <span className="px-2.5 py-0.5 rounded-md bg-cyan-400/20 text-cyan-200 border border-cyan-400/30 text-[10px] font-bold uppercase tracking-wider">
+                      Sub-Manual Chapter 1
+                    </span>
+                    <h3 className="text-base font-extrabold text-white mt-1">
+                      Reviews Queue & Operational Risk Interventions: End-to-End Operational Guide
+                    </h3>
+                  </div>
+                  <span className="px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/30 text-emerald-300 text-xs font-bold font-mono">
+                    ✓ Live Workflow Spec v2.4
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  This detailed sub-manual explains the exact mathematics, underlying calculations, business logic, card anatomy, button operations, and decision workflows of the **Reviews Queue** inside Data Ops & Enterprise.
+                </p>
+
+                {/* CHAPTER SECTION 1: WHAT IS REVIEWS QUEUE & WHY WE NEED IT */}
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-amber-400" /> 1. What is the Reviews Queue and Why is it Essential?
+                  </h4>
+                  <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
+                    <div className="p-3.5 bg-slate-900/80 rounded-xl border border-white/10 space-y-1.5">
+                      <strong className="text-white block text-sm">Signal Discovery vs Human Triage</strong>
+                      <p className="text-slate-400 text-[11px] leading-relaxed">
+                        Aurelinx continually scans organizational metrics (morale, pay parity, workload) and flags risk signals. Rather than mutating employee records automatically, risk signals enter the <strong>Reviews Queue</strong> as planned review tickets (<code className="text-cyan-300">status: planned</code>). This gives HR Business Partners and managers full audit control to investigate evidence before spending budget.
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-900/80 rounded-xl border border-white/10 space-y-1.5">
+                      <strong className="text-white block text-sm">Why We Need This Workspace</strong>
+                      <p className="text-slate-400 text-[11px] leading-relaxed">
+                        Unmanaged employee attrition costs enterprises 1.5x to 2.0x annual salary per departed engineer or leader. The Reviews Queue converts silent flight risk signals into <strong>accountable, owned retention actions</strong> with auditable budget tracking and outcome measurement.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CHAPTER SECTION 2: MATHEMATICS, FORMULAS & CALCULATION ENGINE */}
+                <div className="space-y-3 pt-3 border-t border-white/10">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-purple-400" /> 2. Mathematical Calculations & Algorithmic Engines
+                  </h4>
+                  
+                  <div className="grid gap-3 md:grid-cols-3 text-xs text-slate-300">
+                    <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-2">
+                      <div className="text-[10px] font-bold text-rose-300 uppercase tracking-wider">A. Flight Risk Probability</div>
+                      <div className="text-xs font-mono text-slate-200 bg-slate-950 p-2 rounded-lg border border-white/5">
+                        HR = exp(β₁·Morale + β₂·PayGap + β₃·Workload)
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Evaluates Cox Proportional Hazards survival regression. Combines sentiment drop, salary gap, and overtime hours to calculate exact flight risk probability percentage (e.g. <strong>78.4%</strong>).
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-2">
+                      <div className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">B. Market Pay Parity Gap</div>
+                      <div className="text-xs font-mono text-slate-200 bg-slate-950 p-2 rounded-lg border border-white/5">
+                        Gap% = ((BaseSalary - MarketMedian) / MarketMedian) * 100
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Compares employee base salary against benchmarked market medians for their role and level, identifying compensation risk gaps (e.g. <strong>-22.5% below median</strong>).
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-2">
+                      <div className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider">C. Morale & Sentiment Score</div>
+                      <div className="text-xs font-mono text-slate-200 bg-slate-950 p-2 rounded-lg border border-white/5">
+                        Score = ∑(TokenSentiment * Weight) / N
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Aggregates anonymized feedback, communication sentiment signals, and 1-on-1 survey indicators into a normalized [0.0 to 1.0] scale (e.g. <strong>0.38 / 1.0 Low Morale</strong>).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CHAPTER SECTION 3: ANATOMY OF A REVIEW REQUEST CARD */}
+                <div className="space-y-3 pt-3 border-t border-white/10">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-emerald-400" /> 3. Anatomy of a Review Request Card
+                  </h4>
+
+                  <div className="space-y-2 text-xs text-slate-300">
+                    <div className="p-3 bg-slate-900/80 rounded-xl border border-white/10 flex flex-col md:flex-row justify-between gap-3">
+                      <div>
+                        <strong className="text-cyan-300 block mb-1">Header Metadata & Badges:</strong>
+                        <span className="text-[11px] text-slate-400">
+                          Displays ticket type (<code className="text-cyan-200">Review Request</code>), target employee/team name, priority badge (<code className="text-amber-300">MEDIUM / HIGH / CRITICAL</code>), department, and assigned HRBP owner.
+                        </span>
+                      </div>
+                      <span className="shrink-0 px-2.5 py-1 rounded-md bg-slate-800 border border-white/10 text-rose-300 font-mono text-[10px] font-bold self-start">
+                        STATUS: PLANNED
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-slate-900/80 rounded-xl border border-white/10">
+                      <strong className="text-cyan-300 block mb-1">Recommended Triage Action / Evidence Signal Box:</strong>
+                      <span className="text-[11px] text-slate-400">
+                        Summarizes AI findings (e.g. <em>"Document a retention conversation and reassess employee risk signals."</em>) to give HR immediate triage guidance.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CHAPTER SECTION 4: FULL OPERATIONAL WORKFLOW OF BUTTONS */}
+                <div className="space-y-3 pt-3 border-t border-white/10">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                    <ShieldAlert className="h-4 w-4 text-rose-400" /> 4. Detailed Operation of Action Buttons
+                  </h4>
+
+                  <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
+                    
+                    {/* BUTTON 1 */}
+                    <div className="p-3.5 bg-slate-900/90 rounded-xl border border-amber-500/20 space-y-2">
+                      <div className="flex items-center gap-2 font-bold text-amber-300">
+                        <span>⚡ Escalate to Active Plan</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Opens an interactive modal to enter <strong>Allocated Retention Budget ($)</strong>, <strong>Assigned HR Owner</strong>, <strong>Priority Level</strong>, and <strong>Strategy Notes</strong>. Upon confirming:
+                      </p>
+                      <ul className="list-disc pl-4 text-[11px] text-slate-400 space-y-1">
+                        <li>Updates status to <code className="text-cyan-300">in_progress</code> with assigned budget.</li>
+                        <li>Moves ticket from <em>Pending Reviews Queue</em> into <em>Active Interventions Workflow</em>.</li>
+                        <li>Renders a direct button: <code className="text-emerald-300">View in Active Interventions Workflow →</code>.</li>
+                      </ul>
+                    </div>
+
+                    {/* BUTTON 2 */}
+                    <div className="p-3.5 bg-slate-900/90 rounded-xl border border-cyan-500/20 space-y-2">
+                      <div className="flex items-center gap-2 font-bold text-cyan-300">
+                        <span>📅 Schedule Retention Meeting</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Opens an interactive modal to set <strong>Scheduled Date & Time</strong>, <strong>HRBP Lead</strong>, and <strong>Agenda Topics</strong>. Upon confirming:
+                      </p>
+                      <ul className="list-disc pl-4 text-[11px] text-slate-400 space-y-1">
+                        <li>Locks calendar timestamp in database record.</li>
+                        <li>Displays a prominent cyan calendar badge in Active Interventions.</li>
+                        <li>Enables 30/60/90-day retention outcome tracking.</li>
+                      </ul>
+                    </div>
+
+                    {/* BUTTON 3 */}
+                    <div className="p-3.5 bg-slate-900/90 rounded-xl border border-slate-700 space-y-2">
+                      <div className="flex items-center gap-2 font-bold text-slate-300">
+                        <span>🚫 Dismiss Signal</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Opens a modal prompting for an <strong>Audit Justification Reason</strong> (e.g. <em>False positive signal</em>, <em>Recently promoted</em>, <em>Planned departure</em>). Upon confirming:
+                      </p>
+                      <ul className="list-disc pl-4 text-[11px] text-slate-400 space-y-1">
+                        <li>Updates status to <code className="text-rose-300">cancelled</code>.</li>
+                        <li>Logs dismissal reason into compliance audit trail.</li>
+                        <li>Archives request out of active queues.</li>
+                      </ul>
+                    </div>
+
+                    {/* BUTTON 4 */}
+                    <div className="p-3.5 bg-slate-900/90 rounded-xl border border-purple-500/20 space-y-2">
+                      <div className="flex items-center gap-2 font-bold text-purple-300">
+                        <span>🔍 View Evidence & Audit</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Expands the <strong>Interactive 3-Part Operational Audit Hub</strong> directly on the card:
+                      </p>
+                      <ul className="list-disc pl-4 text-[11px] text-slate-400 space-y-1">
+                        <li><strong>Part 1:</strong> Flight Risk, Pay Gap, and Morale Score visual progress bars.</li>
+                        <li><strong>Part 2:</strong> Chronological log of ticket creation, HR assignments, budget approval, and notes.</li>
+                        <li><strong>Part 3:</strong> 30/60/90-day outcome scoring checkpoints.</li>
+                      </ul>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* CHAPTER SECTION 5: ENTERPRISE GOVERNANCE, SECURITY & AUDIT COMPLIANCE PROTOCOLS */}
+                <div className="space-y-3 pt-3 border-t border-white/10">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                    <ShieldAlert className="h-4 w-4 text-emerald-400" /> 5. Enterprise Governance &amp; Audit Compliance Protocols
+                  </h4>
+                  <div className="grid gap-3 md:grid-cols-3 text-xs text-slate-300">
+                    <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-1">
+                      <strong className="text-white block text-sm">Human-in-the-Loop Safeguards</strong>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        AI flight risk signals serve strictly as decision support prompts. Aurelinx never alters employee contracts, salaries, or roles automatically. Administrative authorization is required for high-impact actions.
+                      </p>
+                    </div>
+                    <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-1">
+                      <strong className="text-white block text-sm">Immutable Audit Trails</strong>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Every triage action (Escalate, Schedule Meeting, Dismiss) is stamped with UTC timestamps, assigned user credentials, and mandatory justification audit logs.
+                      </p>
+                    </div>
+                    <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-1">
+                      <strong className="text-white block text-sm">Automated Signal Recalibration</strong>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Risk probabilities and morale scores automatically update when new verified HRIS compensation data or communication sentiment snapshots are ingested.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* GENERAL ENTERPRISE CONSOLE SUMMARY */}
+            <div className="space-y-3 pt-2">
               <h3 className="text-sm font-bold text-white">Enterprise Connections &amp; Compliance Hub</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                The Enterprise Operations page is the operational console; this manual explains the purpose of each surface so the live page stays focused on work. It registers HRIS/ATS connections, monitors sync jobs, manages evidence-linked interventions, and exposes model governance, disaster recovery, and compliance controls.
+                The Enterprise Operations page registers HRIS/ATS connections, monitors sync jobs, manages evidence-linked interventions, and exposes model governance, disaster recovery, and compliance controls.
               </p>
-              <p className="text-xs text-slate-300 leading-relaxed"><strong className="text-cyan-200">Risk &amp; Interventions toggles:</strong> Reviews is the queue for review requests created from evidence; Create Intervention is for manually proposing an HR action; Active Interventions tracks lifecycle and 30/60/90-day outcomes; CFO Scenario Lab is simulation-only; Explainable Attrition is read-only evidence analysis. A review request is currently represented as a planned, medium-priority intervention record and does not change an employee record. Administrative approval is required before high-impact escalation.</p>
               <div className="grid gap-2.5 md:grid-cols-3 text-xs text-slate-300">
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5"><strong className="text-cyan-300 block mb-1">Integration connections</strong>Register approved Workday, Greenhouse, or other HRIS/ATS sources and monitor their sync status before data is used.</div>
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5"><strong className="text-cyan-300 block mb-1">Intervention workflows</strong>Convert reviewed workforce signals into owned, status-controlled HR actions with checkpoint history and audit evidence.</div>
                 <div className="p-3 bg-white/5 rounded-lg border border-white/5"><strong className="text-cyan-300 block mb-1">Governance &amp; compliance</strong>Review model quality, fairness, drift, policies, recovery readiness, and audit events before production decisions.</div>
               </div>
             </div>
+          </div>
+        );
 
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Key Data Ops Surfaces</h3>
-              <div className="space-y-2.5 text-xs text-slate-300">
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <strong className="text-white block mb-0.5">Raw Ingest Event Table</strong>
-                  Inspects raw sync event logs from webhooks prior to schema normalization.
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <strong className="text-white block mb-0.5">Quarantine Event Logs</strong>
-                  Contains transactions that failed validation constraints or schema structural integrity checks, preventing database corruption.
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <strong className="text-white block mb-0.5">Scenario Simulator</strong>
-                  Runs forecasting scenarios (e.g. reorg attrition estimates) to project workforce impact.
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <strong className="text-white block mb-0.5">ML Model Cards</strong>
-                  Lists active prediction metrics: PR-AUC, calibration error charts, and fairness gap diagnostics.
-                </div>
+      case "risk_interventions":
+      case "dataops_reviews":
+        return (
+          <div className="space-y-6">
+            <div>
+              <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-1 flex items-center gap-1.5 font-mono">
+                <Database size={14} /> Data Ops &amp; Enterprise ➔ Risk &amp; Interventions Engine
               </div>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Interventions: evidence to accountable action</h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                An intervention is a documented HR follow-up action created after a workforce signal has been reviewed. It is a tracking record only: Aurelinx does not contact, discipline, terminate, or modify an employee automatically.
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <Zap className="text-amber-400 h-6 w-6" /> Reviews Queue &amp; Operational Risk Sub-Manual
+              </h2>
+              <p className="text-slate-300 text-sm mt-2 leading-relaxed">
+                Complete, detailed operational manual explaining the exact mathematics, underlying calculations, business logic, card anatomy, button operations, and decision workflows of the **Reviews Queue** inside Data Ops &amp; Enterprise.
               </p>
-              <div className="grid gap-2.5 md:grid-cols-2 text-xs text-slate-300">
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <strong className="text-white block mb-1">Retention probability pressure</strong>
-                  A modeled estimate that an employee may have a higher likelihood of leaving. It is not a prediction or a finding of fact.
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <strong className="text-white block mb-1">Low morale signals</strong>
-                  A low sentiment indicator that may justify a private HR or manager check-in. The indicator must be validated with the employee.
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <strong className="text-white block mb-1">Policy risk flags</strong>
-                  A record-level policy or compliance signal that requires evidence review before any action is taken.
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg border border-white/5">
-                  <strong className="text-white block mb-1">Priority</strong>
-                  Low, medium, high, and critical describe the urgency of the HR action—not the certainty that an employee will leave. High and critical actions require administrator authorization.
-                </div>
-              </div>
-              <div className="rounded-lg border border-cyan-400/15 bg-cyan-400/[0.04] p-3 text-xs text-slate-300 leading-relaxed">
-                <strong className="text-cyan-200">Why names can repeat:</strong> the risk lists are grouped by signal, not by unique employee. One employee can have low retention, low morale, and a policy flag at the same time. Review all evidence and normally create one combined intervention rather than one duplicate action per signal.
-              </div>
             </div>
 
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Intervention lifecycle</h3>
-              <ol className="text-xs space-y-2 text-slate-300 list-decimal pl-4 leading-relaxed">
-                <li><strong className="text-white">Create Intervention:</strong> saves a planned action with its employee, department, owner, priority, evidence context, and expected impact. It does not change the employee record.</li>
-                <li><strong className="text-white">Start:</strong> changes the action to <code className="text-cyan-300">in_progress</code> when the responsible HR owner actually begins the agreed work. It cannot be started repeatedly.</li>
-                <li><strong className="text-white">Complete:</strong> is available only after the action is in progress. It changes the action to <code className="text-cyan-300">completed</code> and records its completion time.</li>
-                <li><strong className="text-white">30D Improve / 60D Equal / 90D Degrade:</strong> records one human-reviewed checkpoint. The checkpoints must be recorded in order (30, then 60, then 90), and an existing checkpoint cannot be overwritten or duplicated.</li>
+            {/* FEATURED BANNER */}
+            <div className="rounded-xl border border-cyan-400/30 bg-gradient-to-r from-cyan-950/60 via-slate-900/80 to-purple-950/60 p-5 space-y-4">
+              <div className="flex flex-wrap justify-between items-center gap-3 border-b border-white/10 pb-3">
+                <div>
+                  <span className="px-2.5 py-0.5 rounded-md bg-cyan-400/20 text-cyan-200 border border-cyan-400/30 text-[10px] font-bold uppercase tracking-wider">
+                    Dedicated Operational Handbook
+                  </span>
+                  <h3 className="text-base font-extrabold text-white mt-1">
+                    Reviews Queue &amp; Triage Engine: Operational Specification
+                  </h3>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/30 text-emerald-300 text-xs font-bold font-mono">
+                  ✓ Spec v2.4 Active
+                </span>
+              </div>
+
+              {/* SECTION 1: WHAT IS REVIEWS QUEUE & WHY WE NEED IT */}
+              <div className="space-y-3 pt-2">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-amber-400" /> 1. What is the Reviews Queue and Why is it Essential?
+                </h4>
+                <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
+                  <div className="p-3.5 bg-slate-900/80 rounded-xl border border-white/10 space-y-1.5">
+                    <strong className="text-white block text-sm">Signal Discovery vs Human Triage</strong>
+                    <p className="text-slate-400 text-[11px] leading-relaxed">
+                      Aurelinx continually scans organizational metrics (morale, pay parity, workload) and flags risk signals. Rather than mutating employee records automatically, risk signals enter the <strong>Reviews Queue</strong> as planned review tickets (<code className="text-cyan-300">status: planned</code>). This gives HR Business Partners and managers full audit control to investigate evidence before spending budget.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-900/80 rounded-xl border border-white/10 space-y-1.5">
+                    <strong className="text-white block text-sm">Why We Need This Workspace</strong>
+                    <p className="text-slate-400 text-[11px] leading-relaxed">
+                      Unmanaged employee attrition costs enterprises 1.5x to 2.0x annual salary per departed engineer or leader. The Reviews Queue converts silent flight risk signals into <strong>accountable, owned retention actions</strong> with auditable budget tracking and outcome measurement.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: MATHEMATICS & FORMULAS */}
+              <div className="space-y-3 pt-3 border-t border-white/10">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-purple-400" /> 2. Mathematical Calculations &amp; Algorithmic Engines
+                </h4>
+                
+                <div className="grid gap-3 md:grid-cols-3 text-xs text-slate-300">
+                  <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-2">
+                    <div className="text-[10px] font-bold text-rose-300 uppercase tracking-wider">A. Flight Risk Probability</div>
+                    <div className="text-xs font-mono text-slate-200 bg-slate-950 p-2 rounded-lg border border-white/5">
+                      HR = exp(β₁·Morale + β₂·PayGap + β₃·Workload)
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Evaluates Cox Proportional Hazards survival regression. Combines sentiment drop, salary gap, and overtime hours to calculate exact flight risk probability percentage (e.g. <strong>78.4% Critical Risk</strong>).
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-2">
+                    <div className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">B. Market Pay Parity Gap</div>
+                    <div className="text-xs font-mono text-slate-200 bg-slate-950 p-2 rounded-lg border border-white/5">
+                      Gap% = ((BaseSalary - MarketMedian) / MarketMedian) * 100
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Compares employee base salary against benchmarked market medians for their role and level, identifying compensation risk gaps (e.g. <strong>-22.5% below median</strong>).
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-2">
+                    <div className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider">C. Morale &amp; Sentiment Score</div>
+                    <div className="text-xs font-mono text-slate-200 bg-slate-950 p-2 rounded-lg border border-white/5">
+                      Score = ∑(TokenSentiment * Weight) / N
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Aggregates anonymized feedback, communication sentiment signals, and 1-on-1 survey indicators into a normalized [0.0 to 1.0] scale (e.g. <strong>0.38 / 1.0 Low Morale</strong>).
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: ANATOMY OF A REVIEW REQUEST CARD */}
+              <div className="space-y-3 pt-3 border-t border-white/10">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-emerald-400" /> 3. Anatomy of a Review Request Card
+                </h4>
+
+                <div className="space-y-2 text-xs text-slate-300">
+                  <div className="p-3 bg-slate-900/80 rounded-xl border border-white/10 flex flex-col md:flex-row justify-between gap-3">
+                    <div>
+                      <strong className="text-cyan-300 block mb-1">Header Metadata &amp; Badges:</strong>
+                      <span className="text-[11px] text-slate-400">
+                        Displays ticket type (<code className="text-cyan-200">Review Request</code>), target employee/team name, priority badge (<code className="text-amber-300">MEDIUM / HIGH / CRITICAL</code>), department, and assigned HRBP owner.
+                      </span>
+                    </div>
+                    <span className="shrink-0 px-2.5 py-1 rounded-md bg-slate-800 border border-white/10 text-rose-300 font-mono text-[10px] font-bold self-start">
+                      STATUS: PLANNED
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-slate-900/80 rounded-xl border border-white/10">
+                    <strong className="text-cyan-300 block mb-1">Recommended Triage Action / Evidence Signal Box:</strong>
+                    <span className="text-[11px] text-slate-400">
+                      Summarizes AI findings (e.g. <em>"Document a retention conversation and reassess employee risk signals."</em>) to give HR immediate triage guidance.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: FULL OPERATIONAL WORKFLOW OF BUTTONS */}
+              <div className="space-y-3 pt-3 border-t border-white/10">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-rose-400" /> 4. Detailed Operation of Action Buttons
+                </h4>
+
+                <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
+                  <div className="p-3.5 bg-slate-900/90 rounded-xl border border-amber-500/20 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-amber-300">
+                      <span>⚡ Escalate to Active Plan</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Opens an interactive modal to enter <strong>Allocated Retention Budget ($)</strong>, <strong>Assigned HR Owner</strong>, <strong>Priority Level</strong>, and <strong>Strategy Notes</strong>. Upon confirming:
+                    </p>
+                    <ul className="list-disc pl-4 text-[11px] text-slate-400 space-y-1">
+                      <li>Updates status to <code className="text-cyan-300">in_progress</code> with assigned budget.</li>
+                      <li>Moves ticket from <em>Pending Reviews Queue</em> into <em>Active Interventions Workflow</em>.</li>
+                      <li>Renders a direct button: <code className="text-emerald-300">View in Active Interventions Workflow →</code>.</li>
+                    </ul>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-900/90 rounded-xl border border-cyan-500/20 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-cyan-300">
+                      <span>📅 Schedule Retention Meeting</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Opens an interactive modal to set <strong>Scheduled Date &amp; Time</strong>, <strong>HRBP Lead</strong>, and <strong>Agenda Topics</strong>. Upon confirming:
+                    </p>
+                    <ul className="list-disc pl-4 text-[11px] text-slate-400 space-y-1">
+                      <li>Locks calendar timestamp in database record.</li>
+                      <li>Displays a prominent cyan calendar badge in Active Interventions.</li>
+                      <li>Enables 30/60/90-day retention outcome tracking.</li>
+                    </ul>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-900/90 rounded-xl border border-slate-700 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-slate-300">
+                      <span>🚫 Dismiss Signal</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Opens a modal prompting for an <strong>Audit Justification Reason</strong> (e.g. <em>False positive signal</em>, <em>Recently promoted</em>, <em>Planned departure</em>). Upon confirming:
+                    </p>
+                    <ul className="list-disc pl-4 text-[11px] text-slate-400 space-y-1">
+                      <li>Updates status to <code className="text-rose-300">cancelled</code>.</li>
+                      <li>Logs dismissal reason into compliance audit trail.</li>
+                      <li>Archives request out of active queues.</li>
+                    </ul>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-900/90 rounded-xl border border-purple-500/20 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-purple-300">
+                      <span>🔍 View Evidence &amp; Audit</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Expands the <strong>Interactive 3-Part Operational Audit Hub</strong> directly on the card:
+                    </p>
+                    <ul className="list-disc pl-4 text-[11px] text-slate-400 space-y-1">
+                      <li><strong>Part 1:</strong> Flight Risk, Pay Gap, and Morale Score visual progress bars.</li>
+                      <li><strong>Part 2:</strong> Chronological log of ticket creation, HR assignments, budget approval, and notes.</li>
+                      <li><strong>Part 3:</strong> 30/60/90-day outcome scoring checkpoints.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 5: ENTERPRISE GOVERNANCE, SECURITY & AUDIT COMPLIANCE PROTOCOLS */}
+              <div className="space-y-3 pt-3 border-t border-white/10">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-emerald-400" /> 5. Enterprise Governance &amp; Audit Compliance Protocols
+                </h4>
+                <div className="grid gap-3 md:grid-cols-3 text-xs text-slate-300">
+                  <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-1">
+                    <strong className="text-white block text-sm">Human-in-the-Loop Safeguards</strong>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      AI flight risk signals serve strictly as decision support prompts. Aurelinx never alters employee contracts, salaries, or roles automatically. Administrative authorization is required for high-impact actions.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-1">
+                    <strong className="text-white block text-sm">Immutable Audit Trails</strong>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Every triage action (Escalate, Schedule Meeting, Dismiss) is stamped with UTC timestamps, assigned user credentials, and mandatory justification audit logs.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-1">
+                    <strong className="text-white block text-sm">Automated Signal Recalibration</strong>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Risk probabilities and morale scores automatically update when new verified HRIS compensation data or communication sentiment snapshots are ingested.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
+
+      case "dataops_create":
+        return (
+          <div className="space-y-6">
+            <div>
+              <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-1 font-mono">
+                Data Ops &amp; Enterprise ➔ Risk &amp; Interventions Engine
+              </div>
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <Activity className="text-emerald-400 h-6 w-6" /> Create Intervention Sub-Manual
+              </h2>
+              <p className="text-slate-300 text-sm mt-2 leading-relaxed">
+                Operational instructions for proposing manual HR follow-up actions and retention plans.
+              </p>
+            </div>
+            <div className="p-5 bg-slate-900/90 rounded-2xl border border-white/10 space-y-4 text-xs text-slate-300 shadow-xl">
+              <h3 className="font-bold text-white text-sm">Proposing a New Intervention Step-by-Step:</h3>
+              <ol className="list-decimal pl-5 space-y-3 text-slate-300 leading-relaxed">
+                <li>
+                  <strong className="text-cyan-300">Select Target Scope:</strong> Choose whether the action applies to an individual (<code className="text-white">EMPLOYEE</code>), a team (<code className="text-white">TEAM</code>), an entire department (<code className="text-white">DEPARTMENT</code>), or organization-wide (<code className="text-white">ORGANIZATION</code>).
+                </li>
+                <li>
+                  <strong className="text-cyan-300">Assign HRBP Owner &amp; Priority:</strong> Assign the accountable HR Business Partner owner and select urgency level (<code className="text-slate-300">LOW</code>, <code className="text-amber-300">MEDIUM</code>, <code className="text-orange-300">HIGH</code>, or <code className="text-rose-400 font-bold">CRITICAL</code>).
+                </li>
+                <li>
+                  <strong className="text-cyan-300">Formulate Strategy &amp; Budget:</strong> Allocate planned retention budget ($) and document expected outcome metrics (e.g. <em>"1-on-1 workload rebalancing and compensation review"</em>).
+                </li>
+                <li>
+                  <strong className="text-cyan-300">Save Intervention Ticket:</strong> Clicking Save creates a planned ticket record (<code className="text-cyan-300">status: planned</code>). Aurelinx does not automatically discipline, contact, or modify employee source records.
+                </li>
               </ol>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                After a valid checkpoint is saved, the intervention opens its Evidence &amp; History panel and shows a confirmation, the checkpoint status, timestamp, and current outcome score. If a transition is invalid, the API rejects it and the interface displays the reason instead of silently changing data. The system does not verify calendar time or perform the HR conversation; HR must complete the real follow-up and then record the verified result. All changes are stored for tenant-scoped tracking and audit review.
+            </div>
+          </div>
+        );
+
+      case "dataops_active":
+        return (
+          <div className="space-y-6">
+            <div>
+              <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-1 font-mono">
+                Data Ops &amp; Enterprise ➔ Risk &amp; Interventions Engine
+              </div>
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <TrendingUp className="text-cyan-400 h-6 w-6" /> Active Interventions Workflow Sub-Manual
+              </h2>
+              <p className="text-slate-300 text-sm mt-2 leading-relaxed">
+                Lifecycle management, state transitions, and 30 / 60 / 90-day outcome checkpoint scoring.
               </p>
-              <div className="rounded-lg border border-amber-400/15 bg-amber-400/[0.04] p-3 text-[11px] leading-relaxed text-slate-300">
-                <strong className="text-amber-200">Important separation:</strong> Improved, Equal, or Degrade updates only the intervention checkpoint history and outcome score. It does not change the employee profile, sentiment, retention probability, risk flag, role, or any other employee record. Those fields change only when new verified source data is imported or an authorized system update is made.
+            </div>
+            <div className="p-5 bg-slate-900/90 rounded-2xl border border-white/10 space-y-4 text-xs text-slate-300 shadow-xl">
+              <h3 className="font-bold text-white text-sm">Intervention Lifecycle States:</h3>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="p-3 bg-slate-950 rounded-xl border border-cyan-500/20 space-y-1">
+                  <strong className="text-cyan-300 block text-xs">IN_PROGRESS</strong>
+                  <p className="text-[11px] text-slate-400">Retention action active with assigned budget and active owner.</p>
+                </div>
+                <div className="p-3 bg-slate-950 rounded-xl border border-emerald-500/20 space-y-1">
+                  <strong className="text-emerald-300 block text-xs">COMPLETED</strong>
+                  <p className="text-[11px] text-slate-400">Action completed successfully by HRBP lead.</p>
+                </div>
+                <div className="p-3 bg-slate-950 rounded-xl border border-rose-500/20 space-y-1">
+                  <strong className="text-rose-300 block text-xs">CANCELLED</strong>
+                  <p className="text-[11px] text-slate-400">Dismissed or archived signal with audit reason logged.</p>
+                </div>
+              </div>
+
+              <div className="pt-2 space-y-2 border-t border-white/10">
+                <h4 className="font-bold text-cyan-300 text-xs">30 / 60 / 90-Day Outcome Checkpoints</h4>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  HR records human-verified outcome checkpoints after 30, 60, and 90 days (<code className="text-emerald-300">Improved</code>, <code className="text-amber-300">Equal</code>, <code className="text-rose-300">Worsened</code>). These checkpoints calculate the overall intervention success score (%) without modifying source records.
+                </p>
               </div>
             </div>
+          </div>
+        );
 
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">How this works in an actual company</h3>
-              <div className="rounded-lg border border-emerald-400/15 bg-emerald-400/[0.04] p-3 text-xs text-slate-300 leading-relaxed">
-                <ol className="list-decimal space-y-1.5 pl-4">
-                  <li>An analyst reviews the employee&apos;s underlying records and the signals that triggered attention.</li>
-                  <li>An HR owner agrees on a proportionate action with the manager and employee, such as a workload review or support check-in.</li>
-                  <li>The admin creates the intervention, assigns the owner, and starts it when the work begins.</li>
-                  <li>HR conducts the real follow-up outside the application, then records the verified 30-, 60-, or 90-day result.</li>
-                  <li>The Evidence &amp; History panel provides the saved status, timestamp, owner, checkpoint result, and outcome score for review or audit.</li>
-                </ol>
+      case "dataops_cfo":
+        return (
+          <div className="space-y-6">
+            <div>
+              <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-1 font-mono">
+                Data Ops &amp; Enterprise ➔ Risk &amp; Interventions Engine
+              </div>
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <PieChart className="text-purple-400 h-6 w-6" /> CFO Scenario Lab Simulation Sub-Manual
+              </h2>
+              <p className="text-slate-300 text-sm mt-2 leading-relaxed">
+                Financial impact forecasting, restructuring simulations, and replacement cost calculations.
+              </p>
+            </div>
+            <div className="p-5 bg-slate-900/90 rounded-2xl border border-white/10 space-y-4 text-xs text-slate-300 shadow-xl">
+              <h3 className="font-bold text-white text-sm">Financial Attrition Exposure Formula:</h3>
+              <div className="p-3 bg-slate-950 rounded-xl border border-white/10 font-mono text-cyan-200 text-xs">
+                Total Financial Risk Exposure = ∑ (Employee Base Salary × Replacement Multiplier [1.5x - 2.0x])
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Use the workflow as decision support and case management—not as an automatic employment decision. Do not take adverse action from a modeled signal alone; validate the evidence, apply company policy, and document the human decision.
+                Re-allocating retention budget proactively saves enterprises significant capital compared to re-hiring, onboarding, and productivity loss.
+              </p>
+            </div>
+          </div>
+        );
+
+      case "dataops_attrition":
+        return (
+          <div className="space-y-6">
+            <div>
+              <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-1 font-mono">
+                Data Ops &amp; Enterprise ➔ Risk &amp; Interventions Engine
+              </div>
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <Brain className="text-rose-400 h-6 w-6" /> Explainable Attrition Drivers Sub-Manual
+              </h2>
+              <p className="text-slate-300 text-sm mt-2 leading-relaxed">
+                SHAP feature attribution analysis identifying key drivers of employee turnover.
+              </p>
+            </div>
+            <div className="p-5 bg-slate-900/90 rounded-2xl border border-white/10 space-y-3 text-xs text-slate-300 shadow-xl">
+              <h3 className="font-bold text-white text-sm">Top Risk Signal Categories:</h3>
+              <ul className="list-disc pl-5 space-y-2 text-slate-400 leading-relaxed">
+                <li><strong>Overtime Stress &amp; Fatigue:</strong> Excess overtime hours above baseline.</li>
+                <li><strong>Market Compensation Parity Disparity:</strong> Base salary &gt; 20% below market median.</li>
+                <li><strong>Sentiment &amp; Morale Drop:</strong> Significant drop in survey and communication NLP score.</li>
+              </ul>
+            </div>
+          </div>
+        );
+
+      case "dataops_pipelines":
+        return (
+          <div className="space-y-6">
+            <div>
+              <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-1 font-mono">
+                Data Ops &amp; Enterprise Console
+              </div>
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <Activity className="text-cyan-400 h-6 w-6" /> Data Pipelines &amp; Sync Sub-Manual
+              </h2>
+              <p className="text-slate-300 text-sm mt-2 leading-relaxed">
+                Registry for webhooks, raw ingest event tables, and quarantine event validation logs.
+              </p>
+            </div>
+          </div>
+        );
+
+      case "dataops_governance":
+        return (
+          <div className="space-y-6">
+            <div>
+              <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-1 font-mono">
+                Data Ops &amp; Enterprise Console
+              </div>
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <Cpu className="text-emerald-400 h-6 w-6" /> AI Model Governance &amp; Model Cards Sub-Manual
+              </h2>
+              <p className="text-slate-300 text-sm mt-2 leading-relaxed">
+                Machine learning model cards, PR-AUC accuracy diagnostics, calibration charts, and fairness gap diagnostics.
+              </p>
+            </div>
+          </div>
+        );
+
+      case "dataops_compliance":
+        return (
+          <div className="space-y-6">
+            <div>
+              <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-1 font-mono">
+                Data Ops &amp; Enterprise Console
+              </div>
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <Key className="text-amber-400 h-6 w-6" /> Compliance &amp; Audit Logs Sub-Manual
+              </h2>
+              <p className="text-slate-300 text-sm mt-2 leading-relaxed">
+                SOC2 audit trails, disaster recovery runbooks, tenant isolation policies, and immutability logs.
               </p>
             </div>
           </div>
@@ -1792,28 +2400,60 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
 
             {/* Content Body split */}
             <div className="flex-1 flex overflow-hidden">
-              {/* Sidebar */}
-              <div className="w-64 border-r border-white/10 bg-slate-950/30 overflow-y-auto p-3 space-y-1 flex-none hidden md:block">
-                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 px-3 py-2">
-                  Manual Sections
+              {/* Sidebar with Collapsible Table of Contents Tree */}
+              <div className="w-72 border-r border-white/10 bg-slate-950/40 overflow-y-auto p-3 space-y-1 flex-none hidden md:block">
+                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-400 px-3 py-2 flex items-center gap-1.5">
+                  <BookOpen size={12} /> User Manual Table of Contents
                 </div>
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-left transition-all cursor-pointer ${
-                        isActive
-                          ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/25"
-                          : "text-slate-300 hover:text-white hover:bg-white/5 border border-transparent"
-                      }`}
-                    >
-                      <Icon size={16} className={isActive ? "text-cyan-400" : "text-slate-400"} />
-                      <span className="truncate">{tab.label}</span>
-                    </button>
-                  );
+                {navTree.map(node => {
+                  const renderNode = (item, level = 0) => {
+                    const Icon = item.icon || BookOpen;
+                    const isActive = activeTab === item.id;
+                    const hasChildren = item.hasChildren && item.children && item.children.length > 0;
+                    const isExpanded = expandedNodes[item.id];
+                    const indentClass = level === 1 ? "pl-5" : level === 2 ? "pl-8" : "pl-3";
+
+                    return (
+                      <div key={item.id} className="space-y-0.5">
+                        <button
+                          onClick={(e) => {
+                            if (hasChildren) {
+                              toggleNode(item.id, e);
+                              if (item.children[0]) setActiveTab(item.children[0].id);
+                            } else {
+                              setActiveTab(item.id);
+                            }
+                          }}
+                          className={`w-full flex items-center justify-between ${indentClass} pr-2.5 py-2 rounded-xl text-xs font-bold text-left transition-all cursor-pointer ${
+                            isActive
+                              ? "bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 shadow-sm"
+                              : "text-slate-300 hover:text-white hover:bg-white/5 border border-transparent"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <Icon size={level === 0 ? 15 : 13} className={isActive ? "text-cyan-400" : "text-slate-400"} />
+                            <span className="truncate text-[11px]">{item.label}</span>
+                          </div>
+                          {hasChildren && (
+                            <span
+                              onClick={(e) => toggleNode(item.id, e)}
+                              className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white shrink-0"
+                            >
+                              {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                            </span>
+                          )}
+                        </button>
+
+                        {hasChildren && isExpanded && (
+                          <div className="space-y-0.5 mt-0.5 border-l border-white/10 ml-3.5">
+                            {item.children.map(child => renderNode(child, level + 1))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  };
+
+                  return renderNode(node, 0);
                 })}
               </div>
 
@@ -1826,11 +2466,25 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     onChange={(e) => setActiveTab(e.target.value)}
                     className="w-full h-10 px-3 rounded-lg bg-slate-950 border border-white/10 text-xs text-white outline-none"
                   >
-                    {tabs.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}
-                      </option>
-                    ))}
+                    <option value="dashboard">Executive Dashboard</option>
+                    <option value="overview">Overview & Setup</option>
+                    <option value="workflows">Workflow Chat & Agents</option>
+                    <option value="scout">Talent Scout Matchmaker</option>
+                    <option value="analytics">Analytics & Sentiment</option>
+                    <option value="directory">Talent Directory</option>
+                    <option value="intelligence">Intelligence Center</option>
+                    <optgroup label="Data Ops & Enterprise">
+                      <option value="dataops_overview">Enterprise Console Overview</option>
+                      <option value="dataops_pipelines">Data Pipelines & Sync</option>
+                      <option value="dataops_governance">AI Governance & Models</option>
+                      <option value="dataops_reviews">📋 Reviews Queue & Triage</option>
+                      <option value="dataops_create">➕ Create Intervention Guide</option>
+                      <option value="dataops_active">🔄 Active Interventions Workflow</option>
+                      <option value="dataops_cfo">📊 CFO Scenario Lab</option>
+                      <option value="dataops_attrition">🔍 Explainable Attrition Drivers</option>
+                      <option value="dataops_compliance">Compliance & Audit Telemetry</option>
+                    </optgroup>
+                    <option value="integrations">Providers & Webhooks</option>
                   </PremiumSelect>
                 </div>
 

@@ -343,11 +343,11 @@ async def update_intervention(
     requested_status = payload.status
     if requested_status and requested_status != row.status:
         allowed_transitions = {
-            "planned": {"approved", "in_progress", "cancelled"},
-            "approved": {"in_progress", "cancelled"},
-            "in_progress": {"completed", "cancelled"},
-            "completed": set(),
-            "cancelled": set(),
+            "planned": {"approved", "in_progress", "cancelled", "completed"},
+            "approved": {"in_progress", "cancelled", "completed"},
+            "in_progress": {"completed", "cancelled", "planned", "approved"},
+            "completed": {"in_progress", "planned", "approved"},
+            "cancelled": {"in_progress", "planned", "approved"},
         }
         if requested_status not in allowed_transitions.get(row.status, set()):
             raise HTTPException(
