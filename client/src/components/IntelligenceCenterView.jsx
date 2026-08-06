@@ -705,7 +705,7 @@ const IntelligenceCenterView = () => {
   const highlightNodes = getHighlightPathNodes();
 
   return (
-    <div className="flex flex-col min-h-full pb-12">
+    <div className="space-y-6 pb-12">
       {/* Top Header */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-white/5 pb-6">
         <div className="flex-1 flex items-start justify-between">
@@ -770,7 +770,7 @@ const IntelligenceCenterView = () => {
       </div>
 
       {/* TABS CONTAINER */}
-      <div className="relative flex-1 flex flex-col min-h-[calc(100vh-280px)]">
+      <div className="relative">
         <AnimatePresence mode="wait">
           {/* TAB 1: SKILL GRAPH DIJKSTRA MATCH */}
           {activeSubTab === "skill-match" && (
@@ -779,7 +779,7 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-[600px]"
+              className="grid grid-cols-1 items-start lg:grid-cols-[360px_1fr] gap-6 text-left"
             >
               {/* Left Settings */}
               <div className="space-y-6">
@@ -908,7 +908,7 @@ const IntelligenceCenterView = () => {
               </div>
 
               {/* Right Output */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 flex flex-col justify-between flex-1 min-h-[580px] h-full">
+              <div className="premium-card p-6 border border-white/5 bg-slate-950/20">
                 <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
                   <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
                     Semantic Matching Matrix & Path Analysis
@@ -972,7 +972,7 @@ const IntelligenceCenterView = () => {
                                 </h4>
                               </div>
 
-                              <div className="space-y-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {activeMatch.match_details.detailed_matches.map(
                                   (detail, idx) => (
                                     <div
@@ -1056,10 +1056,10 @@ const IntelligenceCenterView = () => {
                                 </div>
                               </div>
 
-                              <div className={`${graphExpanded ? "min-h-0 flex-1" : "h-72"} relative border border-white/5 rounded-lg overflow-hidden bg-slate-950/80`}>
+                              <div className={`${graphExpanded ? "min-h-0 flex-1" : "h-[380px] min-h-[380px]"} relative border border-white/5 rounded-lg overflow-hidden bg-slate-950/80`}>
                                 <svg
                                   className="absolute inset-0 h-full w-full pointer-events-none"
-                                  viewBox="0 0 1000 550"
+                                  viewBox="80 70 840 400"
                                   preserveAspectRatio="xMidYMid meet"
                                 >
                                   {/* Links */}
@@ -1507,9 +1507,8 @@ const IntelligenceCenterView = () => {
                   )}
 
                   {annealingStatus === "idle" && (
-                    <div className="text-slate-400 text-sm py-20 text-center">
-                      Configure target skills, budget constraint, and click
-                      Solve to run Simulated Annealing team building.
+                    <div className="py-12 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-4 text-xs text-slate-400 leading-relaxed">
+                      Configure target skills, budget constraint, and click <span className="font-semibold text-cyan-300">Find Mathematically Perfect Team</span> to execute Simulated Annealing optimization.
                     </div>
                   )}
                 </div>
