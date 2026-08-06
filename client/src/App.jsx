@@ -79,10 +79,16 @@ const App = () => {
   });
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window === "undefined") return defaultWorkspaceTab;
-    return isAppPath(window.location.pathname)
-      ? defaultWorkspaceTab
-      : "landing";
+    if (!isAppPath(window.location.pathname)) return "landing";
+    const savedTab = localStorage.getItem("aurelinx_active_tab");
+    return savedTab || defaultWorkspaceTab;
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && activeTab && activeTab !== "landing") {
+      localStorage.setItem("aurelinx_active_tab", activeTab);
+    }
+  }, [activeTab]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
     typeof window !== "undefined" ? window.innerWidth < 1200 : false,
   );
