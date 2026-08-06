@@ -779,11 +779,11 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-start lg:grid-cols-[360px_1fr] gap-6 text-left"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left min-h-[580px]"
             >
               {/* Left Settings */}
-              <div className="space-y-6">
-                <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)]">
+              <div className="space-y-6 flex flex-col h-full">
+                <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)] h-full min-h-[580px] flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
                     <div>
                       <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">
@@ -908,7 +908,7 @@ const IntelligenceCenterView = () => {
               </div>
 
               {/* Right Output */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20">
+              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full min-h-[580px] flex flex-col justify-between">
                 <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
                   <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
                     Semantic Matching Matrix & Path Analysis
@@ -1161,9 +1161,14 @@ const IntelligenceCenterView = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-slate-400 text-sm py-20 text-center">
-                    Enter target requirements and click solve to run graph
-                    shortest-path matching.
+                  <div className="flex-1 min-h-[440px] flex flex-col items-center justify-center py-12 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-auto">
+                    <div className="h-12 w-12 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 flex items-center justify-center text-indigo-300 mb-4 shadow-[0_0_20px_rgba(99,102,241,0.15)]">
+                      <Brain size={24} />
+                    </div>
+                    <h4 className="text-sm font-extrabold text-white tracking-wide uppercase mb-2">Graph Solver Standing By</h4>
+                    <p className="text-xs text-slate-400 leading-relaxed max-w-md">
+                      Enter target skill requirements on the left panel and click <span className="font-semibold text-cyan-300">Solve Adjacencies</span> to calculate graph shortest-path Dijkstra matching across the workforce.
+                    </p>
                   </div>
                 )}
               </div>
@@ -1177,11 +1182,11 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 text-left"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left min-h-[580px]"
             >
               {/* Left Config */}
-              <div className="space-y-6">
-                <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)]">
+              <div className="space-y-6 flex flex-col h-full">
+                <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)] h-full min-h-[580px] flex flex-col justify-between">
                   <div className="border-b border-white/10 px-5 py-4">
                     <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">
                       <Zap size={13} /> Team constraints
@@ -1312,7 +1317,7 @@ const IntelligenceCenterView = () => {
               </div>
 
               {/* Right Graph/Output */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 flex flex-col justify-between">
+              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full min-h-[580px] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
                     <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
@@ -1523,15 +1528,16 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-start lg:grid-cols-[360px_1fr] gap-6 text-left"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left min-h-[580px]"
             >
               {/* Left Employee list */}
-              <div className="premium-card self-start p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md">
-                <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2">
-                  Employee Registry Attrition Hazard
-                </h3>
+              <div className="premium-card h-full min-h-[580px] p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col justify-between">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2">
+                    Employee Registry Attrition Hazard
+                  </h3>
 
-                <div className="space-y-2 max-h-[min(460px,calc(100vh-260px))] overflow-y-auto custom-scrollbar pr-1">
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
                   {attritionLoading ? (
                     <div className="text-xs text-slate-500 text-center py-8">
                       Loading hazard computations...
@@ -1564,9 +1570,10 @@ const IntelligenceCenterView = () => {
                   )}
                 </div>
               </div>
+            </div>
 
               {/* Right Survival Analysis Details */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20">
+              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full min-h-[580px] flex flex-col justify-between">
                 {selectedAttritionEmp ? (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between border-b border-white/5 pb-3">
@@ -1600,7 +1607,7 @@ const IntelligenceCenterView = () => {
                             </span>
                           </div>
 
-                          <div className="h-48 w-full relative border-b border-l border-white/5 bg-black/20 rounded">
+                          <div className="h-64 w-full relative border-b border-l border-white/5 bg-black/20 rounded">
                             <svg
                               className="absolute inset-0 h-full w-full pointer-events-none"
                               viewBox="0 0 100 100"
