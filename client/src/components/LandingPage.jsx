@@ -1323,7 +1323,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     color: "rgba(148,163,184,0.5)",
                   }}
                 >
-                  sync: default_tenant
+                  sync: live_production_tenant
                 </span>
               </div>
 
