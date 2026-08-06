@@ -779,11 +779,11 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-[480px] h-[calc(100vh-320px)]"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-[540px] h-[calc(100vh-200px)]"
             >
               {/* Left Settings */}
               <div className="space-y-6 flex flex-col h-full">
-                <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)] h-full min-h-[480px] flex flex-col justify-between">
+                <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)] h-full min-h-[540px] flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
                     <div>
                       <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">
@@ -908,7 +908,7 @@ const IntelligenceCenterView = () => {
               </div>
 
               {/* Right Output */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full min-h-[480px] flex flex-col justify-between overflow-hidden">
+              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full min-h-[540px] flex flex-col justify-between overflow-hidden">
                 <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
                   <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
                     Semantic Matching Matrix & Path Analysis
@@ -1161,7 +1161,7 @@ const IntelligenceCenterView = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex-1 min-h-[360px] flex flex-col items-center justify-center py-10 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-auto">
+                  <div className="flex-1 min-h-[420px] flex flex-col items-center justify-center py-10 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-auto">
                     <div className="h-12 w-12 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 flex items-center justify-center text-indigo-300 mb-4 shadow-[0_0_20px_rgba(99,102,241,0.15)]">
                       <Brain size={24} />
                     </div>
@@ -1182,11 +1182,11 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-[480px] h-[calc(100vh-320px)]"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-[540px] h-[calc(100vh-200px)]"
             >
               {/* Left Config */}
               <div className="space-y-6 flex flex-col h-full">
-                <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)] h-full min-h-[480px] flex flex-col justify-between">
+                <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)] h-full min-h-[540px] flex flex-col justify-between">
                   <div className="border-b border-white/10 px-5 py-4">
                     <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">
                       <Zap size={13} /> Team constraints
@@ -1317,7 +1317,7 @@ const IntelligenceCenterView = () => {
               </div>
 
               {/* Right Graph/Output */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full min-h-[480px] flex flex-col justify-between overflow-hidden">
+              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full min-h-[540px] flex flex-col justify-between overflow-hidden">
                 <div>
                   <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
                     <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
@@ -1528,16 +1528,16 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-[480px] h-[calc(100vh-320px)]"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-[540px] h-[calc(100vh-200px)]"
             >
               {/* Left Employee list */}
-              <div className="premium-card h-full min-h-[480px] p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col justify-between">
+              <div className="premium-card h-full min-h-[540px] p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col justify-between">
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2">
                     Employee Registry Attrition Hazard
                   </h3>
 
-                  <div className="space-y-2 max-h-[calc(100vh-420px)] overflow-y-auto custom-scrollbar pr-1">
+                  <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar pr-1">
                   {attritionLoading ? (
                     <div className="text-xs text-slate-500 text-center py-8">
                       Loading hazard computations...
@@ -1573,7 +1573,7 @@ const IntelligenceCenterView = () => {
             </div>
 
               {/* Right Survival Analysis Details */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full min-h-[480px] flex flex-col justify-between overflow-hidden">
+              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full min-h-[540px] flex flex-col justify-between overflow-hidden">
                 {selectedAttritionEmp ? (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between border-b border-white/5 pb-3">
@@ -1798,10 +1798,10 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[1fr_340px] gap-6 text-left flex-1 min-h-[480px] h-[calc(100vh-320px)]"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[1fr_340px] gap-6 text-left flex-1 min-h-[540px] h-[calc(100vh-200px)]"
             >
               {/* Left Graph Panel */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 flex flex-col justify-between relative overflow-hidden h-full min-h-[480px]">
+              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 flex flex-col justify-between relative overflow-hidden h-full min-h-[540px]">
                 <div>
                   <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 gap-3">
                     <div>
@@ -2029,10 +2029,10 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[320px_1fr] gap-6 text-left flex-1 min-h-[480px] h-[calc(100vh-320px)]"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[320px_1fr] gap-6 text-left flex-1 min-h-[540px] h-[calc(100vh-200px)]"
             >
               {/* Left Selector */}
-              <div className="premium-card p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col justify-between h-full min-h-[480px]">
+              <div className="premium-card p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col justify-between h-full min-h-[540px]">
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2">
                     Active Career Tracker
