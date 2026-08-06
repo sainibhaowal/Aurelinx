@@ -268,6 +268,24 @@ const ProvidersView = () => {
   const [webhookEvents, setWebhookEvents] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const [integrationSubTab, setIntegrationSubTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("aurelinx_integration_subtab") || "keys";
+    }
+    return "keys";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("aurelinx_providers_category", activeCategory);
+    }
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("aurelinx_integration_subtab", integrationSubTab);
+    }
+  }, [integrationSubTab]);
 
   const showToast = (message, type = "info") => {
     setToast({ visible: true, message, type });
@@ -438,34 +456,37 @@ const ProvidersView = () => {
   const handleSimulateIngest = async (type) => {
     setSimulatingWebhook(type);
     try {
-      const apiBase =
-        API_BASE_URL;
-      const activeToken =
-        generatedKey || (tokens.length > 0 ? tokens[0].api_key : null);
-      if (!activeToken) {
-        showToast(
-          "No integration token is available. Generate one while logged in as admin.",
-          "error",
-        );
-        return;
+      const apiBase = API_BASE_URL;
+      const authHeaders = getAuthHeaders();
+      let tokenToUse = generatedKey || (tokens.length > 0 ? tokens[0].api_key : null);
+
+      if (!tokenToUse && authHeaders.Authorization) {
+        try {
+          const genResp = await fetch(
+            `${apiBase}/api/v1/integrations/token?name=Demo-Simulator-Key`,
+            {
+              method: "POST",
+              headers: authHeaders,
+            }
+          );
+          if (genResp.ok) {
+            const genData = await genResp.json();
+            tokenToUse = genData.api_key;
+            setGeneratedKey(genData.api_key);
+            await fetchTokens();
+          }
+        } catch (e) {
+          console.error("Auto-generate token error:", e);
+        }
       }
 
-      let tokenToUse = activeToken;
-      const authHeaders = getAuthHeaders();
-      if (!generatedKey && tokens.length === 0 && authHeaders.Authorization) {
-        const genResp = await fetch(
-          `${apiBase}/api/v1/integrations/token?name=Demo-Simulator`,
-          {
-            method: "POST",
-            headers: authHeaders,
-          },
+      if (!tokenToUse) {
+        showToast(
+          "No integration token available. Click 'Generate Token' on the API Key Registry tab.",
+          "error"
         );
-        if (genResp.ok) {
-          const genData = await genResp.json();
-          tokenToUse = genData.api_key;
-          setGeneratedKey(genData.api_key);
-          await fetchTokens();
-        }
+        setSimulatingWebhook(null);
+        return;
       }
 
       let endpoint = "";
@@ -1263,17 +1284,16 @@ const ProvidersView = () => {
                       exit={{ opacity: 0, y: -5 }}
                       className="flex-1 flex flex-col min-h-0 text-left"
                     >
-                      <div className="border-b border-white/5 pb-3 mb-4 flex items-center justify-between">
+                      <div className="border-b border-white/5 pb-3 mb-3 flex items-center justify-between">
                         <div>
                           <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-mono">
                             B2B Middleware Console
                           </span>
                           <h2 className="text-xl font-black text-white leading-none uppercase mt-0.5">
-                            Enterprise API Ingestions & SDK
+                            Enterprise API Ingestions &amp; SDK
                           </h2>
                           <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wide">
-                            Secure live synchronization for Jira, Slack, Workday
-                            APIs, and custom B2B SDK integrations.
+                            Secure live synchronization for Jira, Slack, Workday APIs, and custom B2B SDK integrations.
                           </p>
                         </div>
 
@@ -1283,592 +1303,594 @@ const ProvidersView = () => {
                         </div>
                       </div>
 
-                      <div className="flex-1 overflow-y-auto space-y-6 pr-1 custom-scrollbar">
-                        {/* SECTION 1: CREDENTIALS MANAGER */}
-                        <div className="premium-card p-5 border border-white/5 bg-[#0a1222]/40 rounded-2xl">
-                          <div className="flex items-center gap-2 mb-4">
-                            <KeyRound size={16} className="text-cyan-400" />
-                            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                              Integrations API Key Registry
-                            </h3>
-                          </div>
+                      {/* SUB-TAB NAVIGATION BAR */}
+                      <div className="flex items-center gap-2 p-2 rounded-2xl bg-[#06101e]/95 border border-cyan-500/30 shadow-[0_12px_40px_rgba(0,0,0,0.7)] backdrop-blur-2xl overflow-x-auto custom-scrollbar mb-4 shrink-0">
+                        {[
+                          { id: "keys", label: "API Key Registry", icon: KeyRound, badge: tokens.length },
+                          { id: "webhooks", label: "Secure Webhooks", icon: Globe, badge: "3 Endpoints" },
+                          { id: "telemetry", label: "Delivery Dashboard", icon: Activity, badge: integrationLogs.length ? `${integrationLogs.length} Logs` : "Live" },
+                          { id: "sdk", label: "REST API Specs", icon: Code },
+                        ].map((st) => {
+                          const Icon = st.icon;
+                          const isActive = integrationSubTab === st.id;
+                          return (
+                            <button
+                              key={st.id}
+                              onClick={() => setIntegrationSubTab(st.id)}
+                              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all duration-300 whitespace-nowrap cursor-pointer ${
+                                isActive
+                                  ? "bg-gradient-to-r from-cyan-500/20 via-teal-500/15 to-cyan-500/10 border border-cyan-400/40 text-cyan-300 shadow-lg shadow-cyan-950/50 scale-[1.02]"
+                                  : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent"
+                              }`}
+                            >
+                              <Icon size={14} className={isActive ? "text-cyan-400" : "text-slate-500"} />
+                              <span>{st.label}</span>
+                              {st.badge !== undefined && (
+                                <span
+                                  className={`ml-1 px-2 py-0.5 rounded-full text-[9px] font-mono ${
+                                    isActive
+                                      ? "bg-cyan-400/20 text-cyan-200 border border-cyan-400/30"
+                                      : "bg-white/5 text-slate-400 border border-white/10"
+                                  }`}
+                                >
+                                  {st.badge}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <div className="md:col-span-2">
-                              <label className="block text-[9px] uppercase tracking-widest text-slate-400 mb-1.5 font-bold font-mono">
-                                New Webhook API Key Name
-                              </label>
-                              <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  placeholder="e.g. Jira-Agile-Connector"
-                                  value={newTokenName}
-                                  onChange={(e) =>
-                                    setNewTokenName(e.target.value)
-                                  }
-                                  className="flex-1 h-10 rounded-xl bg-slate-950/80 border border-white/10 px-3 text-xs outline-none focus:border-cyan-500/40 text-slate-200"
-                                />
+                      <div className="flex-1 overflow-y-auto space-y-6 pr-1 custom-scrollbar">
+                        {/* SUB-TAB 1: API KEY REGISTRY & CREDENTIALS */}
+                        {integrationSubTab === "keys" && (
+                          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 w-full pb-6">
+                            {/* Left Column (2 cols): Token Generator Form & Security Rules */}
+                            <div className="lg:col-span-2 space-y-5">
+                              {/* Form Card */}
+                              <div className="premium-card p-5 border border-white/10 bg-[#0a1222]/60 rounded-2xl relative z-10 shadow-2xl">
+                                <div className="flex items-center gap-2 mb-4 border-b border-white/5 pb-3">
+                                  <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+                                    <KeyRound size={16} />
+                                  </div>
+                                  <div>
+                                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                                      Generate New Webhook API Key
+                                    </h3>
+                                    <span className="text-[10px] text-slate-400 font-mono block">B2B Middleware Credentials</span>
+                                  </div>
+                                </div>
+                                <div className="space-y-4">
+                                  <div>
+                                    <label className="block text-[9px] uppercase tracking-widest text-slate-400 mb-1.5 font-bold font-mono">
+                                      Webhook API Key Name
+                                    </label>
+                                    <input
+                                      type="text"
+                                      placeholder="e.g. Jira-Agile-Connector"
+                                      value={newTokenName}
+                                      onChange={(e) => setNewTokenName(e.target.value)}
+                                      className="w-full h-10 rounded-xl bg-slate-950/80 border border-white/10 px-3 text-xs outline-none focus:border-cyan-500/40 text-slate-200"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[9px] uppercase tracking-widest text-slate-400 mb-1.5 font-bold font-mono">
+                                      Simulator Employee Target
+                                    </label>
+                                    <PremiumSelect
+                                      value={employeeEmail}
+                                      onChange={(e) => setEmployeeEmail(e.target.value)}
+                                      className="w-full h-10 rounded-xl bg-slate-950/80 border border-white/10 px-3 text-xs outline-none focus:border-cyan-500/40 text-slate-200"
+                                    >
+                                      <option value={employeeEmail}>
+                                        {employeeEmail} (Active Dev)
+                                      </option>
+                                      <option value="silas.vance@aurelinx.io">
+                                        silas.vance@aurelinx.io (Seed lead)
+                                      </option>
+                                      <option value="clara.sutton@aurelinx.io">
+                                        clara.sutton@aurelinx.io (Senior dev)
+                                      </option>
+                                    </PremiumSelect>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleGenerateToken}
+                                    className="w-full h-10 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-900 text-xs font-black tracking-wide transition-all shadow-md shadow-cyan-950/20 cursor-pointer uppercase inline-flex items-center justify-center gap-2 active:scale-95 mt-1"
+                                  >
+                                    <Plus size={14} /> Generate Ingestion Token
+                                  </button>
+                                </div>
+
+                                {generatedKey && (
+                                  <motion.div
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 mt-4 flex items-center justify-between gap-4"
+                                  >
+                                    <div className="min-w-0">
+                                      <span className="text-[8px] uppercase tracking-widest text-emerald-400 font-bold block font-mono">
+                                        New Secret Key Generated
+                                      </span>
+                                      <div className="text-xs font-mono text-white truncate select-all font-bold mt-0.5">
+                                        {generatedKey}
+                                      </div>
+                                      <span className="text-[8px] text-slate-400 mt-1 block">
+                                        Copy this token securely. It will not be shown again!
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(generatedKey);
+                                        showToast("API Key copied to clipboard!", "success");
+                                        setGeneratedKey("");
+                                      }}
+                                      className="w-9 h-9 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-500/20 transition-all cursor-pointer shrink-0"
+                                      title="Copy API Key"
+                                    >
+                                      <Copy size={13} />
+                                    </button>
+                                  </motion.div>
+                                )}
+                              </div>
+
+                              {/* Security & Governance Guidelines Card */}
+                              <div className="premium-card p-5 border border-white/5 bg-[#0a1222]/40 rounded-2xl space-y-3">
+                                <div className="flex items-center gap-2 text-xs font-bold text-slate-200 uppercase tracking-wider border-b border-white/5 pb-2.5">
+                                  <ShieldCheck size={15} className="text-cyan-400" />
+                                  <span>Token Security &amp; Ingestion Governance</span>
+                                </div>
+                                <div className="space-y-2.5 text-[10px] text-slate-400 leading-relaxed">
+                                  <div className="flex items-start gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
+                                    <span className="text-cyan-400 font-mono font-bold shrink-0">01.</span>
+                                    <div>
+                                      <strong className="text-slate-200 block mb-0.5">Header-Based Authentication</strong>
+                                      Every request requires standard <code className="text-cyan-300 font-mono">X-API-Key</code> header matching an active token registered in this database.
+                                    </div>
+                                  </div>
+                                  <div className="flex items-start gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
+                                    <span className="text-cyan-400 font-mono font-bold shrink-0">02.</span>
+                                    <div>
+                                      <strong className="text-slate-200 block mb-0.5">Instant Key Revocation</strong>
+                                      Revoking a credential terminates ingestion access across Jira, Slack, and Workday middleware routers within 250 milliseconds.
+                                    </div>
+                                  </div>
+                                  <div className="flex items-start gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
+                                    <span className="text-cyan-400 font-mono font-bold shrink-0">03.</span>
+                                    <div>
+                                      <strong className="text-slate-200 block mb-0.5">Idempotency Protection</strong>
+                                      Optional <code className="text-cyan-300 font-mono">Idempotency-Key</code> header ensures replay protection during transient network retries.
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Right Column (3 cols): Token Credentials Registry Table & Telemetry Stats */}
+                            <div className="lg:col-span-3 space-y-5">
+                              {/* Token Registry Table */}
+                              <div className="premium-card p-5 border border-white/5 bg-[#0a1222]/40 rounded-2xl min-h-[320px] flex flex-col justify-between">
+                                <div>
+                                  <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-3">
+                                    <div className="flex items-center gap-2">
+                                      <KeyRound size={16} className="text-cyan-400" />
+                                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                                        Integrations API Key Registry
+                                      </h3>
+                                    </div>
+                                    <span className="text-xs text-slate-400 font-mono bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+                                      Active Tokens: <strong className="text-cyan-300">{tokens.length}</strong>
+                                    </span>
+                                  </div>
+
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-left font-mono text-[10px] text-slate-400 border border-white/5 rounded-xl overflow-hidden">
+                                      <thead>
+                                        <tr className="bg-slate-950/60 text-slate-400 border-b border-white/5">
+                                          <th className="p-3 text-[9px] uppercase tracking-widest font-bold font-mono">
+                                            Credential Name
+                                          </th>
+                                          <th className="p-3 text-[9px] uppercase tracking-widest font-bold font-mono">
+                                            Created At
+                                          </th>
+                                          <th className="p-3 text-[9px] uppercase tracking-widest font-bold font-mono">
+                                            Expires At
+                                          </th>
+                                          <th className="p-3 text-[9px] uppercase tracking-widest font-bold font-mono">
+                                            Status
+                                          </th>
+                                          <th className="p-3 text-right">Action</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {loadingTokens ? (
+                                          <tr>
+                                            <td colSpan={5} className="p-8 text-center text-slate-500">
+                                              <RefreshCw size={16} className="animate-spin inline mr-2 text-cyan-400" />
+                                              Loading active credentials...
+                                            </td>
+                                          </tr>
+                                        ) : tokens.length === 0 ? (
+                                          <tr>
+                                            <td colSpan={5} className="p-10 text-center text-slate-500">
+                                              <div className="max-w-xs mx-auto space-y-2">
+                                                <KeyRound size={28} className="mx-auto text-slate-600 mb-1" />
+                                                <div className="text-xs text-slate-300 font-bold uppercase tracking-wider">
+                                                  No Active Credentials
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 leading-normal">
+                                                  No B2B Ingestion Credentials registered yet. Use the form on the left to generate a token for your Jira, Slack, or Workday pipeline.
+                                                </p>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ) : (
+                                          tokens.map((token) => (
+                                            <tr key={token.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                              <td className="p-3 font-bold text-white">{token.name}</td>
+                                              <td className="p-3">{new Date(token.created_at).toLocaleDateString()}</td>
+                                              <td className="p-3">{token.expires_at ? new Date(token.expires_at).toLocaleDateString() : "Never"}</td>
+                                              <td className="p-3">
+                                                <span
+                                                  className={`px-2 py-0.5 rounded text-[8px] uppercase tracking-wider font-extrabold ${
+                                                    token.status === "active"
+                                                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                                      : "bg-slate-800 text-slate-500"
+                                                  }`}
+                                                >
+                                                  {token.status}
+                                                </span>
+                                              </td>
+                                              <td className="p-3 text-right">
+                                                {token.status === "active" && (
+                                                  <button
+                                                    onClick={() => handleRevokeToken(token.id)}
+                                                    className="text-slate-500 hover:text-rose-400 p-1.5 transition-colors cursor-pointer"
+                                                    title="Revoke Key Access"
+                                                  >
+                                                    <Trash2 size={12} />
+                                                  </button>
+                                                )}
+                                              </td>
+                                            </tr>
+                                          ))
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Router Ingestion Status Telemetry Banner */}
+                              <div className="premium-card p-4 border border-white/5 bg-[#0a1222]/40 rounded-2xl grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="bg-slate-950/40 p-3 rounded-xl border border-white/5 min-w-0">
+                                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Router Endpoint</span>
+                                  <span className="text-xs font-mono text-cyan-300 font-bold truncate block" title={`${API_BASE_URL}/api/v1/integrations`}>
+                                    {`${API_BASE_URL}/api/v1/integrations`}
+                                  </span>
+                                </div>
+                                <div className="bg-slate-950/40 p-3 rounded-xl border border-white/5 min-w-0">
+                                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Protection Protocol</span>
+                                  <span className="text-xs font-mono text-emerald-300 font-bold truncate block">X-API-Key + SHA256</span>
+                                </div>
+                                <div className="bg-slate-950/40 p-3 rounded-xl border border-white/5 min-w-0">
+                                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Ingestion Health</span>
+                                  <span className="text-xs font-mono text-teal-300 font-bold truncate block">100% Operational</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* SUB-TAB 2: SECURE WEBHOOK ENDPOINTS */}
+                        {integrationSubTab === "webhooks" && (
+                          <div className="premium-card p-5 border border-white/5 bg-[#0a1222]/40 rounded-2xl">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Globe size={16} className="text-cyan-400" />
+                              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                                Secure Ingest Webhooks (Jira, Slack, Workday)
+                              </h3>
+                            </div>
+                            <p className="text-[10px] text-slate-400 leading-relaxed mb-4">
+                              This ingestion pipeline uses header-based protection:{" "}
+                              <span className="font-mono text-slate-100">X-API-Key</span>,{" "}
+                              <span className="font-mono text-slate-100">X-Signature</span>, and optional{" "}
+                              <span className="font-mono text-slate-100">Idempotency-Key</span>. URLs shown below are endpoint targets only.
+                            </p>
+
+                            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                              {/* Card 1: JIRA */}
+                              <div className="p-4 rounded-xl border border-white/5 bg-slate-950/40 flex flex-col justify-between h-full space-y-4">
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/20">
+                                      Jira Agile API
+                                    </span>
+                                    <span className="text-[8px] text-slate-500 font-mono">ONA Network Graph</span>
+                                  </div>
+                                  <h4 className="text-xs font-bold text-white mb-1.5 uppercase">Jira Ticket &amp; Assignee sync</h4>
+                                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                                    Captures pull request reviews and task activities between developers, dynamically building ONA spring-physics link weights in real-time.
+                                  </p>
+                                </div>
+                                <div className="space-y-2 mt-auto">
+                                  <div className="p-2 bg-black/60 rounded-lg text-[9px] font-mono text-slate-300 select-all truncate">
+                                    {`${API_BASE_URL}/api/v1/integrations/jira`}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(`${API_BASE_URL}/api/v1/integrations/jira`);
+                                        showToast("Jira Ingestion Endpoint copied!", "success");
+                                      }}
+                                      className="flex-1 h-9 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-[10px] font-bold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer"
+                                    >
+                                      <Copy size={11} /> Copy URL
+                                    </button>
+                                    <button
+                                      onClick={() => handleSimulateIngest("jira")}
+                                      disabled={simulatingWebhook === "jira"}
+                                      className="flex-1 h-9 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
+                                    >
+                                      {simulatingWebhook === "jira" ? (
+                                        <RefreshCw size={11} className="animate-spin" />
+                                      ) : (
+                                        <Play size={11} />
+                                      )}
+                                      Simulate Event
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Card 2: SLACK */}
+                              <div className="p-4 rounded-xl border border-white/5 bg-slate-950/40 flex flex-col justify-between h-full space-y-4">
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/20">
+                                      Slack Morale API
+                                    </span>
+                                    <span className="text-[8px] text-slate-500 font-mono">Cox Attrition Curve</span>
+                                  </div>
+                                  <h4 className="text-xs font-bold text-white mb-1.5 uppercase">Slack channel Sentiment score</h4>
+                                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                                    Ingests message sentiments, dynamically shifting employee hazard ratios, survival timelines, and risk indicators automatically in-memory.
+                                  </p>
+                                </div>
+                                <div className="space-y-2 mt-auto">
+                                  <div className="p-2 bg-black/60 rounded-lg text-[9px] font-mono text-slate-300 select-all truncate">
+                                    {`${API_BASE_URL}/api/v1/integrations/slack`}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(`${API_BASE_URL}/api/v1/integrations/slack`);
+                                        showToast("Slack Ingestion Endpoint copied!", "success");
+                                      }}
+                                      className="flex-1 h-9 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-[10px] font-bold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer"
+                                    >
+                                      <Copy size={11} /> Copy URL
+                                    </button>
+                                    <button
+                                      onClick={() => handleSimulateIngest("slack")}
+                                      disabled={simulatingWebhook === "slack"}
+                                      className="flex-1 h-9 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
+                                    >
+                                      {simulatingWebhook === "slack" ? (
+                                        <RefreshCw size={11} className="animate-spin" />
+                                      ) : (
+                                        <Play size={11} />
+                                      )}
+                                      Simulate Event
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Card 3: WORKDAY */}
+                              <div className="p-4 rounded-xl border border-white/5 bg-slate-950/40 flex flex-col justify-between h-full space-y-4">
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/20">
+                                      Workday HRIS
+                                    </span>
+                                    <span className="text-[8px] text-slate-500 font-mono">Directory Sync</span>
+                                  </div>
+                                  <h4 className="text-xs font-bold text-white mb-1.5 uppercase">Workday automated Directory Sync</h4>
+                                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                                    Connects directly to employee directories. Promotes, hires, or updates developers and skill matrices transactionally with zero manual clicks.
+                                  </p>
+                                </div>
+                                <div className="space-y-2 mt-auto">
+                                  <div className="p-2 bg-black/60 rounded-lg text-[9px] font-mono text-slate-300 select-all truncate">
+                                    {`${API_BASE_URL}/api/v1/integrations/workday`}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(`${API_BASE_URL}/api/v1/integrations/workday`);
+                                        showToast("Workday Ingestion Endpoint copied!", "success");
+                                      }}
+                                      className="flex-1 h-9 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-[10px] font-bold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer"
+                                    >
+                                      <Copy size={11} /> Copy URL
+                                    </button>
+                                    <button
+                                      onClick={() => handleSimulateIngest("workday")}
+                                      disabled={simulatingWebhook === "workday"}
+                                      className="flex-1 h-9 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
+                                    >
+                                      {simulatingWebhook === "workday" ? (
+                                        <RefreshCw size={11} className="animate-spin" />
+                                      ) : (
+                                        <Play size={11} />
+                                      )}
+                                      Simulate Event
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* SUB-TAB 3: DELIVERY AUDIT DASHBOARD */}
+                        {integrationSubTab === "telemetry" && (
+                          <div className="premium-card p-5 border border-white/5 bg-[#0a1222]/40 rounded-2xl text-left space-y-4">
+                            <div className="flex items-center gap-2">
+                              <Activity size={16} className="text-cyan-400" />
+                              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                                Integration Delivery Dashboard
+                              </h3>
+                            </div>
+                            <p className="text-[10px] text-slate-400 leading-relaxed">
+                              View recent tenant-scoped ingestion logs and webhook events with retry and idempotency state. Requires admin access for full audit visibility.
+                            </p>
+
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                              <div className="rounded-2xl border border-white/5 bg-slate-950/60 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div>
+                                    <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+                                      Recent Ingestion Audit Logs
+                                    </p>
+                                    <p className="text-[10px] text-slate-500">Last 20 audit entries</p>
+                                  </div>
+                                  {loadingLogs && <RefreshCw size={14} className="text-cyan-400 animate-spin" />}
+                                </div>
+                                <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
+                                  {integrationLogs.length === 0 ? (
+                                    <div className="text-[10px] text-slate-500 py-6 text-center">
+                                      No ingestion logs available for this tenant or session.
+                                    </div>
+                                  ) : (
+                                    integrationLogs.slice(0, 8).map((entry) => (
+                                      <div key={entry.id} className="rounded-xl border border-white/10 bg-[#08111e]/90 p-3 text-[10px] text-slate-300">
+                                        <div className="font-bold text-slate-100 truncate">{entry.integration_name.toUpperCase()}</div>
+                                        <div className="text-slate-400 truncate">{entry.details}</div>
+                                        <div className="text-[9px] text-slate-500 mt-2 flex items-center justify-between">
+                                          <span>{new Date(entry.created_at).toLocaleString()}</span>
+                                          <span className={`px-2 py-0.5 rounded ${entry.status === "success" ? "bg-emerald-500/10 text-emerald-300" : "bg-rose-500/10 text-rose-300"}`}>
+                                            {entry.status}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="rounded-2xl border border-white/5 bg-slate-950/60 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div>
+                                    <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+                                      Webhook Delivery Events
+                                    </p>
+                                    <p className="text-[10px] text-slate-500">Delivery status &amp; retries</p>
+                                  </div>
+                                  {loadingEvents && <RefreshCw size={14} className="text-cyan-400 animate-spin" />}
+                                </div>
+                                <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
+                                  {webhookEvents.length === 0 ? (
+                                    <div className="text-[10px] text-slate-500 py-6 text-center">
+                                      No webhook delivery events found for this tenant.
+                                    </div>
+                                  ) : (
+                                    webhookEvents.slice(0, 8).map((event) => (
+                                      <div key={event.id} className="rounded-xl border border-white/10 bg-[#08111e]/90 p-3 text-[10px] text-slate-300">
+                                        <div className="font-bold text-slate-100 truncate">
+                                          {event.integration_name.toUpperCase()} • {event.endpoint}
+                                        </div>
+                                        <div className="text-slate-400 truncate">
+                                          Idempotency: {event.idempotency_key || "none"}
+                                        </div>
+                                        <div className="text-[9px] text-slate-500 mt-2 flex items-center justify-between">
+                                          <span>{event.status}</span>
+                                          <span>{event.attempts} attempt{event.attempts === 1 ? "" : "s"}</span>
+                                        </div>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* SUB-TAB 4: REST API & INTEGRATION SPECS */}
+                        {integrationSubTab === "sdk" && (
+                          <div className="premium-card p-5 border border-white/5 bg-[#0a1222]/40 rounded-2xl text-left space-y-4">
+                            <div className="flex items-center gap-2">
+                              <Code size={16} className="text-cyan-400" />
+                              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                                REST API &amp; Ingestion Specifications
+                              </h3>
+                            </div>
+
+                            <p className="text-[10px] text-slate-400 leading-relaxed">
+                              Send HTTP POST payloads directly from your backend services, cURL scripts, or API gateways to feed telemetry directly into Aurelinx. Zero external npm packages required.
+                            </p>
+
+                            <div className="rounded-xl border border-white/10 bg-slate-950 overflow-hidden flex flex-col font-mono text-[10px] text-slate-300">
+                              {/* cURL Command Example */}
+                              <div className="bg-slate-900 px-4 py-2 text-[9px] uppercase tracking-wider text-slate-400 font-bold border-b border-white/5 flex items-center justify-between">
+                                <span>cURL (Terminal Payload Command)</span>
                                 <button
                                   type="button"
-                                  onClick={handleGenerateToken}
-                                  className="h-10 px-4 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-900 text-xs font-black tracking-wide transition-all shadow-md shadow-cyan-950/20 cursor-pointer shrink-0"
+                                  onClick={() => {
+                                    const curlCmd = `curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\\n  -H "Content-Type: application/json" \\\n  -H "X-API-Key: ${generatedKey || "aur_your_secure_ingestion_api_token"}" \\\n  -d '{\n    "action": "sync",\n    "employee_email": "${employeeEmail}",\n    "metrics": { "sentiment_score": 0.85, "message_count": 142 }\n  }'`;
+                                    navigator.clipboard.writeText(curlCmd);
+                                    showToast("cURL command copied!", "success");
+                                  }}
+                                  className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-[9px] cursor-pointer"
                                 >
-                                  Generate Token
+                                  Copy cURL
                                 </button>
                               </div>
-                            </div>
-
-                            <div>
-                              <label className="block text-[9px] uppercase tracking-widest text-slate-400 mb-1.5 font-bold font-mono">
-                                Simulator Employee Target
-                              </label>
-                              <PremiumSelect
-                                value={employeeEmail}
-                                onChange={(e) =>
-                                  setEmployeeEmail(e.target.value)
-                                }
-                                className="w-full h-10 rounded-xl bg-slate-950/80 border border-white/10 px-3 text-xs outline-none focus:border-cyan-500/40 text-slate-200"
-                              >
-                                <option value={employeeEmail}>
-                                  {employeeEmail} (Active Dev)
-                                </option>
-                                <option value="silas.vance@aurelinx.io">
-                                  silas.vance@aurelinx.io (Seed lead)
-                                </option>
-                                <option value="clara.sutton@aurelinx.io">
-                                  clara.sutton@aurelinx.io (Senior dev)
-                                </option>
-                              </PremiumSelect>
-                            </div>
-                          </div>
-
-                          {generatedKey && (
-                            <motion.div
-                              initial={{ opacity: 0, y: 5 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 mb-4 flex items-center justify-between gap-4"
-                            >
-                              <div className="min-w-0">
-                                <span className="text-[8px] uppercase tracking-widest text-emerald-400 font-bold block font-mono">
-                                  New Secret Key Generated
-                                </span>
-                                <div className="text-xs font-mono text-white truncate select-all font-bold mt-0.5">
-                                  {generatedKey}
-                                </div>
-                                <span className="text-[8px] text-slate-400 mt-1 block">
-                                  Copy this token securely. It will not be shown
-                                  again!
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(generatedKey);
-                                  showToast(
-                                    "API Key copied to clipboard!",
-                                    "success",
-                                  );
-                                  // Clear the generated key from the UI to avoid accidental exposure
-                                  setGeneratedKey("");
-                                }}
-                                className="w-9 h-9 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-500/20 transition-all cursor-pointer shrink-0"
-                                title="Copy API Key"
-                              >
-                                <Copy size={13} />
-                              </button>
-                            </motion.div>
-                          )}
-
-                          {/* Token credentials list */}
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-left font-mono text-[10px] text-slate-400 border border-white/5 rounded-xl overflow-hidden">
-                              <thead>
-                                <tr className="bg-slate-950/60 text-slate-400 border-b border-white/5">
-                                  <th className="p-3 text-[9px] uppercase tracking-widest font-bold font-mono">
-                                    Credential Name
-                                  </th>
-                                  <th className="p-3 text-[9px] uppercase tracking-widest font-bold font-mono">
-                                    Created At
-                                  </th>
-                                  <th className="p-3 text-[9px] uppercase tracking-widest font-bold font-mono">
-                                    Expires At
-                                  </th>
-                                  <th className="p-3 text-[9px] uppercase tracking-widest font-bold font-mono">
-                                    Status
-                                  </th>
-                                  <th className="p-3 text-right">Action</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {loadingTokens ? (
-                                  <tr>
-                                    <td
-                                      colSpan={5}
-                                      className="p-6 text-center text-slate-500"
-                                    >
-                                      <RefreshCw
-                                        size={14}
-                                        className="animate-spin inline mr-1 text-cyan-400"
-                                      />
-                                      Loading active credentials...
-                                    </td>
-                                  </tr>
-                                ) : tokens.length === 0 ? (
-                                  <tr>
-                                    <td
-                                      colSpan={5}
-                                      className="p-6 text-center text-slate-500"
-                                    >
-                                      No B2B Ingestion Credentials registered
-                                      yet. Click Generate Token above.
-                                    </td>
-                                  </tr>
-                                ) : (
-                                  tokens.map((token) => (
-                                    <tr
-                                      key={token.id}
-                                      className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                                    >
-                                      <td className="p-3 font-bold text-white">
-                                        {token.name}
-                                      </td>
-                                      <td className="p-3">
-                                        {new Date(
-                                          token.created_at,
-                                        ).toLocaleDateString()}
-                                      </td>
-                                      <td className="p-3">
-                                        {token.expires_at
-                                          ? new Date(
-                                              token.expires_at,
-                                            ).toLocaleDateString()
-                                          : "Never"}
-                                      </td>
-                                      <td className="p-3">
-                                        <span
-                                          className={`px-2 py-0.5 rounded text-[8px] uppercase tracking-wider font-extrabold ${
-                                            token.status === "active"
-                                              ? "bg-emerald-500/20 text-emerald-300"
-                                              : "bg-slate-800 text-slate-500"
-                                          }`}
-                                        >
-                                          {token.status}
-                                        </span>
-                                      </td>
-                                      <td className="p-3 text-right">
-                                        {token.status === "active" && (
-                                          <button
-                                            onClick={() =>
-                                              handleRevokeToken(token.id)
-                                            }
-                                            className="text-slate-500 hover:text-rose-400 p-1.5 transition-colors cursor-pointer"
-                                            title="Revoke Key Access"
-                                          >
-                                            <Trash2 size={12} />
-                                          </button>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  ))
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-
-                        {/* SECTION 2: ENDPOINT INGESTION CONSOLE */}
-                        <div className="premium-card p-5 border border-white/5 bg-[#0a1222]/40 rounded-2xl">
-                          <div className="flex items-center gap-2 mb-4">
-                            <Globe size={16} className="text-cyan-400" />
-                            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                              Secure Ingest Webhooks (Jira, Slack, Workday)
-                            </h3>
-                          </div>
-
-                          <p className="text-[10px] text-slate-400 leading-relaxed mb-4">
-                            This ingestion pipeline uses header-based
-                            protection:{" "}
-                            <span className="font-mono text-slate-100">
-                              X-API-Key
-                            </span>
-                            ,{" "}
-                            <span className="font-mono text-slate-100">
-                              X-Signature
-                            </span>
-                            , and optional{" "}
-                            <span className="font-mono text-slate-100">
-                              Idempotency-Key
-                            </span>
-                            . URLs shown below are endpoint targets only.
-                          </p>
-                          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-                            {/* Card 1: JIRA */}
-                            <div className="p-4 rounded-xl border border-white/5 bg-slate-950/40 flex flex-col justify-between h-full">
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/20">
-                                    Jira Agile API
-                                  </span>
-                                  <span className="text-[8px] text-slate-500 font-mono">
-                                    ONA Network Graph
-                                  </span>
-                                </div>
-                                <h4 className="text-xs font-bold text-white mb-1.5 uppercase">
-                                  Jira Ticket & Assignee sync
-                                </h4>
-                                <p className="text-[10px] text-slate-400 leading-relaxed mb-3">
-                                  Captures pull request reviews and task
-                                  activities between developers, dynamically
-                                  building ONA spring-physics link weights in
-                                  real-time.
-                                </p>
+                              <div className="p-3.5 bg-black/60 text-emerald-400 select-all border-b border-white/5 whitespace-pre overflow-x-auto">
+{`$ curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: ${generatedKey || "aur_your_secure_ingestion_api_token"}" \\
+  -d '{"action": "sync", "employee_email": "${employeeEmail}"}'`}
                               </div>
 
-                              <div className="space-y-2 mt-auto">
-                                <div className="p-2 bg-black/60 rounded-lg text-[9px] font-mono text-slate-300 select-all truncate">
-                                  {`${API_BASE_URL}/api/v1/integrations/jira`}
-                                </div>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(
-                                        `${API_BASE_URL}/api/v1/integrations/jira`,
-                                      );
-                                      showToast(
-                                        "Jira Ingestion Endpoint copied!",
-                                        "success",
-                                      );
-                                    }}
-                                    className="flex-1 h-9 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-[10px] font-bold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer"
-                                  >
-                                    <Copy size={11} /> Copy URL
-                                  </button>
-                                  <button
-                                    onClick={() => handleSimulateIngest("jira")}
-                                    disabled={simulatingWebhook === "jira"}
-                                    className="flex-1 h-9 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
-                                  >
-                                    {simulatingWebhook === "jira" ? (
-                                      <RefreshCw
-                                        size={11}
-                                        className="animate-spin"
-                                      />
-                                    ) : (
-                                      <Play size={11} />
-                                    )}
-                                    Simulate Event
-                                  </button>
-                                </div>
+                              {/* Native JS Fetch Example */}
+                              <div className="bg-slate-900 px-4 py-2 text-[9px] uppercase tracking-wider text-slate-400 font-bold border-b border-white/5 flex items-center justify-between">
+                                <span>JavaScript / Node.js Native Fetch Snippet</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const snippet = `// Direct REST Ingestion (Standard HTTP Fetch)\nconst response = await fetch("${API_BASE_URL}/api/v1/integrations/jira", {\n  method: "POST",\n  headers: {\n    "Content-Type": "application/json",\n    "X-API-Key": "${generatedKey || "aur_your_secure_ingestion_api_token"}",\n    "Idempotency-Key": "evt_" + Date.now()\n  },\n  body: JSON.stringify({\n    action: "sync",\n    employee_email: "${employeeEmail}",\n    metrics: { sentiment_score: 0.85, message_count: 142 }\n  })\n});\nconst result = await response.json();\nconsole.log("Ingestion Status:", result);`;
+                                    navigator.clipboard.writeText(snippet);
+                                    showToast("Fetch snippet copied!", "success");
+                                  }}
+                                  className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-[9px] cursor-pointer"
+                                >
+                                  Copy Snippet
+                                </button>
                               </div>
-                            </div>
-
-                            {/* Card 2: SLACK */}
-                            <div className="p-4 rounded-xl border border-white/5 bg-slate-950/40 flex flex-col justify-between h-full">
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/20">
-                                    Slack Morale API
-                                  </span>
-                                  <span className="text-[8px] text-slate-500 font-mono">
-                                    Cox Attrition Curve
-                                  </span>
-                                </div>
-                                <h4 className="text-xs font-bold text-white mb-1.5 uppercase">
-                                  Slack channel Sentiment score
-                                </h4>
-                                <p className="text-[10px] text-slate-400 leading-relaxed mb-3">
-                                  Ingests message sentiments, dynamically
-                                  shifting employee hazard ratios, survival
-                                  timelines, and risk indicators automatically
-                                  in-memory.
-                                </p>
-                              </div>
-
-                              <div className="space-y-2 mt-auto">
-                                <div className="p-2 bg-black/60 rounded-lg text-[9px] font-mono text-slate-300 select-all truncate">
-                                  {`${API_BASE_URL}/api/v1/integrations/slack`}
-                                </div>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(
-                                        `${API_BASE_URL}/api/v1/integrations/slack`,
-                                      );
-                                      showToast(
-                                        "Slack Ingestion Endpoint copied!",
-                                        "success",
-                                      );
-                                    }}
-                                    className="flex-1 h-9 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-[10px] font-bold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer"
-                                  >
-                                    <Copy size={11} /> Copy URL
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleSimulateIngest("slack")
-                                    }
-                                    disabled={simulatingWebhook === "slack"}
-                                    className="flex-1 h-9 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
-                                  >
-                                    {simulatingWebhook === "slack" ? (
-                                      <RefreshCw
-                                        size={11}
-                                        className="animate-spin"
-                                      />
-                                    ) : (
-                                      <Play size={11} />
-                                    )}
-                                    Simulate Event
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Card 3: WORKDAY */}
-                            <div className="p-4 rounded-xl border border-white/5 bg-slate-950/40 flex flex-col justify-between h-full">
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/20">
-                                    Workday HRIS
-                                  </span>
-                                  <span className="text-[8px] text-slate-500 font-mono">
-                                    Directory Sync
-                                  </span>
-                                </div>
-                                <h4 className="text-xs font-bold text-white mb-1.5 uppercase">
-                                  Workday automated Directory Sync
-                                </h4>
-                                <p className="text-[10px] text-slate-400 leading-relaxed mb-3">
-                                  Connects directly to employee directories.
-                                  Promotes, hires, or updates developers and
-                                  skill matrices transactionally with zero
-                                  manual clicks.
-                                </p>
-                              </div>
-
-                              <div className="space-y-2 mt-auto">
-                                <div className="p-2 bg-black/60 rounded-lg text-[9px] font-mono text-slate-300 select-all truncate">
-                                  {`${API_BASE_URL}/api/v1/integrations/workday`}
-                                </div>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(
-                                        `${API_BASE_URL}/api/v1/integrations/workday`,
-                                      );
-                                      showToast(
-                                        "Workday Ingestion Endpoint copied!",
-                                        "success",
-                                      );
-                                    }}
-                                    className="flex-1 h-9 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-[10px] font-bold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer"
-                                  >
-                                    <Copy size={11} /> Copy URL
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleSimulateIngest("workday")
-                                    }
-                                    disabled={simulatingWebhook === "workday"}
-                                    className="flex-1 h-9 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
-                                  >
-                                    {simulatingWebhook === "workday" ? (
-                                      <RefreshCw
-                                        size={11}
-                                        className="animate-spin"
-                                      />
-                                    ) : (
-                                      <Play size={11} />
-                                    )}
-                                    Simulate Event
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* SECTION 3: INTEGRATION DELIVERY DASHBOARD */}
-                        <div className="premium-card p-5 border border-white/5 bg-[#0a1222]/40 rounded-2xl text-left">
-                          <div className="flex items-center gap-2 mb-4">
-                            <Activity size={16} className="text-cyan-400" />
-                            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                              Integration Delivery Dashboard
-                            </h3>
-                          </div>
-
-                          <p className="text-[10px] text-slate-400 leading-relaxed mb-4">
-                            View recent tenant-scoped ingestion logs and webhook
-                            events with retry and idempotency state. Requires
-                            admin access for full audit visibility.
-                          </p>
-
-                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
-                            <div className="rounded-2xl border border-white/5 bg-slate-950/60 p-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <div>
-                                  <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">
-                                    Recent Logs
-                                  </p>
-                                  <p className="text-[10px] text-slate-500">
-                                    Last 20 audit entries
-                                  </p>
-                                </div>
-                                {loadingLogs && (
-                                  <RefreshCw
-                                    size={14}
-                                    className="text-cyan-400 animate-spin"
-                                  />
-                                )}
-                              </div>
-                              <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                                {integrationLogs.length === 0 ? (
-                                  <div className="text-[10px] text-slate-500">
-                                    No logs available for this tenant or admin
-                                    session.
-                                  </div>
-                                ) : (
-                                  integrationLogs.slice(0, 8).map((entry) => (
-                                    <div
-                                      key={entry.id}
-                                      className="rounded-xl border border-white/10 bg-[#08111e]/90 p-3 text-[10px] text-slate-300"
-                                    >
-                                      <div className="font-bold text-slate-100 truncate">
-                                        {entry.integration_name.toUpperCase()}
-                                      </div>
-                                      <div className="text-slate-400 truncate">
-                                        {entry.details}
-                                      </div>
-                                      <div className="text-[9px] text-slate-500 mt-2 flex items-center justify-between">
-                                        <span>
-                                          {new Date(
-                                            entry.created_at,
-                                          ).toLocaleString()}
-                                        </span>
-                                        <span
-                                          className={`px-2 py-0.5 rounded ${entry.status === "success" ? "bg-emerald-500/10 text-emerald-300" : "bg-rose-500/10 text-rose-300"}`}
-                                        >
-                                          {entry.status}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="rounded-2xl border border-white/5 bg-slate-950/60 p-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <div>
-                                  <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">
-                                    Webhook Events
-                                  </p>
-                                  <p className="text-[10px] text-slate-500">
-                                    Delivery status & retries
-                                  </p>
-                                </div>
-                                {loadingEvents && (
-                                  <RefreshCw
-                                    size={14}
-                                    className="text-cyan-400 animate-spin"
-                                  />
-                                )}
-                              </div>
-                              <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                                {webhookEvents.length === 0 ? (
-                                  <div className="text-[10px] text-slate-500">
-                                    No webhook delivery events found for this
-                                    tenant.
-                                  </div>
-                                ) : (
-                                  webhookEvents.slice(0, 8).map((event) => (
-                                    <div
-                                      key={event.id}
-                                      className="rounded-xl border border-white/10 bg-[#08111e]/90 p-3 text-[10px] text-slate-300"
-                                    >
-                                      <div className="font-bold text-slate-100 truncate">
-                                        {event.integration_name.toUpperCase()} •{" "}
-                                        {event.endpoint}
-                                      </div>
-                                      <div className="text-slate-400 truncate">
-                                        Idempotency:{" "}
-                                        {event.idempotency_key || "none"}
-                                      </div>
-                                      <div className="text-[9px] text-slate-500 mt-2 flex items-center justify-between">
-                                        <span>{event.status}</span>
-                                        <span>
-                                          {event.attempts} attempt
-                                          {event.attempts === 1 ? "" : "s"}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* SECTION 4: DEVELOPER SDK GUIDE */}
-                        <div className="premium-card p-5 border border-white/5 bg-[#0a1222]/40 rounded-2xl text-left">
-                          <div className="flex items-center gap-2 mb-4">
-                            <Code size={16} className="text-cyan-400" />
-                            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                              Aurelinx Developer SDK Setup Guide
-                            </h3>
-                          </div>
-
-                          <p className="text-[10px] text-slate-400 leading-relaxed mb-4">
-                            Integrate your enterprise backend pipeline directly
-                            to feed Aurelinx. You can import our library into
-                            B2C/B2B services to push telemetry events instantly.
-                          </p>
-
-                          <div className="rounded-xl border border-white/10 bg-slate-950 overflow-hidden flex flex-col font-mono text-[10px] text-slate-300">
-                            {/* CLI installation */}
-                            <div className="bg-slate-900 px-4 py-2 text-[9px] uppercase tracking-wider text-slate-400 font-bold border-b border-white/5 flex items-center justify-between">
-                              <span>Terminal (Package Installation)</span>
-                              <span className="text-cyan-400">
-                                Node / PyPI Ready
-                              </span>
-                            </div>
-                            <div className="p-3.5 bg-black/60 text-emerald-400 select-all border-b border-white/5">
-                              $ npm install @aurelinx/intelligence-sdk --save
-                            </div>
-
-                            {/* SDK code example */}
-                            <div className="bg-slate-900 px-4 py-2 text-[9px] uppercase tracking-wider text-slate-400 font-bold border-b border-white/5">
-                              Javascript Integration Snippet
-                            </div>
-                            <div className="p-4 bg-slate-950/80 overflow-x-auto whitespace-pre leading-relaxed select-all text-slate-300">
-                              {`import AurelinxSDK from '@aurelinx/intelligence-sdk';
-
-const aurelinx = new AurelinxSDK({
-  apiKey: "${generatedKey || "aur_your_secure_ingestion_api_token"}",
-  endpoint: "${API_BASE_URL}/api/v1",
+                              <div className="p-4 bg-slate-950/80 overflow-x-auto whitespace-pre leading-relaxed select-all text-slate-300">
+{`// Native REST API Integration (Zero External SDK Dependencies)
+const response = await fetch("${API_BASE_URL}/api/v1/integrations/jira", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "${generatedKey || "aur_your_secure_ingestion_api_token"}",
+    "Idempotency-Key": "evt_" + Date.now()
+  },
+  body: JSON.stringify({
+    action: "sync",
+    employee_email: "${employeeEmail}",
+    metrics: { sentiment_score: 0.85, message_count: 142 }
+  })
 });
-
-// 1. Ingest Workday HRIS directories automatically
-await aurelinx.syncEmployee({
-  action: "hire",
-  employee: {
-    full_name: "Silas Vance",
-    email: "${employeeEmail}",
-    department: "Engineering",
-    role: "Senior Lead Architect",
-    skills: [{ name: "Python", level: 5 }, { name: "FastAPI", level: 4 }]
-  }
-});
-
-// 2. Feed Slack sentiment metrics dynamically to Attrition Cox Curves
-await aurelinx.pushSentimentMetric({
-  email: "${employeeEmail}",
-  sentiment_score: 0.85,
-  message_count: 142
-});`}
+const result = await response.json();
+console.log("Ingestion Status:", result);`}
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </motion.div>
                   ) : activeCategory === "LLM" && !selectedConnection ? (
