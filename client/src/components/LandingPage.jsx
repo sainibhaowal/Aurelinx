@@ -219,18 +219,24 @@ const PLATFORM_MODULES = [
 /* ─────────────────────────────────────────
    HELPER COMPONENTS
 ───────────────────────────────────────── */
-const GlassCard = ({ children, className = "", style = {} }) => (
-  <div
+const GlassCard = ({ children, className = "", style = {}, delay = 0 }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 30 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, amount: 0.12 }}
+    transition={{ duration: 0.6, delay, ease: [0.16, 1, 0.3, 1] }}
+    whileHover={{ y: -4, transition: { type: "spring", stiffness: 350, damping: 25 } }}
     className={`rounded-[22px] ${className}`}
     style={{
       background: "rgba(255,255,255,0.025)",
       border: "1px solid rgba(255,255,255,0.07)",
       backdropFilter: "blur(14px)",
+      willChange: "transform, opacity",
       ...style,
     }}
   >
     {children}
-  </div>
+  </motion.div>
 );
 
 const SectionLabel = ({ children }) => (
@@ -268,7 +274,7 @@ const Tag = ({ children }) => (
 /* ─────────────────────────────────────────
    CONNECTOR TILE
 ───────────────────────────────────────── */
-const ConnectorTile = ({ name, type, status }) => {
+const ConnectorTile = ({ name, type, status, index = 0 }) => {
   const statusStyle = {
     active: {
       color: "#6ee7b7",
@@ -294,29 +300,19 @@ const ConnectorTile = ({ name, type, status }) => {
   const s = statusStyle[String(status).toLowerCase()] || statusStyle.supported;
 
   return (
-    <div
-      className="group relative overflow-hidden rounded-[18px] px-5 py-5 transition-all duration-300"
-      style={{
-        background: "rgba(255,255,255,0.02)",
-        border: "1px solid rgba(255,255,255,0.07)",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)";
-        e.currentTarget.style.transform = "translateY(-2px)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
-        e.currentTarget.style.transform = "translateY(0)";
-      }}
+    <motion.div
+      initial={{ opacity: 0, y: 25 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.15 }}
+      transition={{ duration: 0.5, delay: (index % 3) * 0.08, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{ scale: 1.02, y: -4, transition: { type: "spring", stiffness: 400, damping: 25 } }}
+      className="group relative overflow-hidden rounded-[18px] px-5 py-5 border border-white/10 bg-white/[0.02] hover:border-cyan-400/40 hover:bg-cyan-500/[0.03] transition-colors duration-300 shadow-xl"
+      style={{ willChange: "transform, opacity" }}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
-            className="flex h-10 w-10 flex-none items-center justify-center rounded-xl"
-            style={{
-              background: "rgba(103,232,249,0.06)",
-              border: "1px solid rgba(103,232,249,0.15)",
-            }}
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shadow-[0_0_12px_rgba(103,232,249,0.15)] group-hover:scale-110 transition-transform duration-300"
           >
             <span
               className="text-[10px] font-black uppercase tracking-widest"
@@ -326,7 +322,7 @@ const ConnectorTile = ({ name, type, status }) => {
             </span>
           </div>
           <div>
-            <div className="text-sm font-semibold text-white">{name}</div>
+            <div className="text-sm font-semibold text-white group-hover:text-cyan-200 transition-colors">{name}</div>
             <div
               className="mt-0.5 text-[10px] uppercase tracking-widest"
               style={{ color: "rgba(148,163,184,0.5)" }}
@@ -346,7 +342,7 @@ const ConnectorTile = ({ name, type, status }) => {
           {status}
         </span>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -1624,43 +1620,35 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           </div>
 
           <div className="mx-auto mt-12 grid max-w-[1600px] gap-5 sm:grid-cols-2">
-            {PLATFORM_MODULES.map((mod) => {
+            {PLATFORM_MODULES.map((mod, idx) => {
               const Icon = mod.icon;
               return (
-                <div
+                <motion.div
                   key={mod.title}
-                  className="group rounded-[20px] p-6 transition-all duration-300"
-                  style={{
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(255,255,255,0.07)",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor =
-                      "rgba(255,255,255,0.12)";
-                    e.currentTarget.style.background =
-                      "rgba(255,255,255,0.035)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor =
-                      "rgba(255,255,255,0.07)";
-                    e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-                  }}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.15 }}
+                  transition={{ duration: 0.5, delay: (idx % 2) * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                  whileHover={{ y: -5, scale: 1.01, transition: { type: "spring", stiffness: 350, damping: 25 } }}
+                  className="group rounded-[20px] p-6 border border-white/10 bg-white/[0.02] hover:border-cyan-400/30 hover:bg-white/[0.04] transition-colors duration-300 backdrop-blur-xl shadow-xl"
+                  style={{ willChange: "transform, opacity" }}
                 >
                   <div
-                    className="flex h-11 w-11 items-center justify-center rounded-xl transition-colors"
+                    className="flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110"
                     style={{
-                      background: `${mod.accent}0d`,
-                      border: `1px solid ${mod.accent}25`,
+                      background: `${mod.accent}15`,
+                      border: `1px solid ${mod.accent}35`,
+                      boxShadow: `0 0 16px ${mod.accent}20`,
                     }}
                   >
                     <Icon className="h-5 w-5" style={{ color: mod.accent }} />
                   </div>
-                  <h3 className="mt-4 text-base font-bold text-white">
+                  <h3 className="mt-4 text-base font-bold text-white group-hover:text-cyan-200 transition-colors">
                     {mod.title}
                   </h3>
                   <p
                     className="mt-2 text-[13px] leading-relaxed"
-                    style={{ color: "rgba(148,163,184,0.6)" }}
+                    style={{ color: "rgba(148,163,184,0.65)" }}
                   >
                     {mod.body}
                   </p>
@@ -1669,7 +1657,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       <Tag key={t}>{t}</Tag>
                     ))}
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>
