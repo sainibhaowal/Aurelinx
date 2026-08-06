@@ -565,7 +565,7 @@ const App = () => {
             </div>
           </motion.aside>
 
-          <main className={`workspace-main-scale flex-1 h-full min-h-0 relative z-10 custom-scrollbar ${activeTab === "intelligence" ? "p-0 overflow-hidden" : activeTab === "enterprise" ? "p-3 md:p-5 lg:p-6 overflow-hidden flex flex-col" : "p-3 md:p-5 lg:p-6 overflow-y-auto"}`}>
+          <main className={`workspace-main-scale flex-1 h-full min-h-0 relative z-10 custom-scrollbar ${activeTab === "intelligence" ? "p-0 overflow-hidden" : activeTab === "intel-center" || activeTab === "enterprise" ? "p-3 md:p-5 lg:p-6 overflow-hidden flex flex-col" : "p-3 md:p-5 lg:p-6 overflow-y-auto"}`}>
             <Suspense fallback={<LoadingScreen label={`Loading ${activeTab}`} />}>
               <AnimatePresence mode="wait">
                 <motion.div
@@ -574,7 +574,7 @@ const App = () => {
                   initial="hidden"
                   animate="visible"
                   exit="hidden"
-                  className={`relative min-h-0 flex flex-col ${activeTab === "intelligence" || activeTab === "enterprise" ? "h-full" : "h-auto"}`}
+                  className={`relative min-h-0 flex flex-col ${activeTab === "intelligence" || activeTab === "intel-center" || activeTab === "enterprise" ? "h-full" : "h-auto"}`}
                 >
                   {activeTab === "dashboard" && (
                     <>
