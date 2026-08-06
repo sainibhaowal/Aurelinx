@@ -169,9 +169,18 @@ const SentimentPulseView = () => {
   const lowSentiment = lowSentimentMatches;
   const lowRetention = lowRetentionMatches;
   const departmentBreakdown = departments.map((department) => {
-    const rows = visibleEmployees.filter((employee) => employee.department === department);
-    const risk = rows.filter((employee) => employee.is_at_risk).length;
-    return { department, total: rows.length, risk, riskPct: rows.length ? (risk / rows.length) * 100 : 0, sentiment: rows.length ? rows.reduce((sum, row) => sum + Number(row.sentiment_score || 0), 0) / rows.length : 0 };
+    const allDeptRows = employeeRecords.filter((employee) => employee.department === department);
+    const risk = allDeptRows.filter((employee) => employee.is_at_risk).length;
+    const sentiment = allDeptRows.length
+      ? allDeptRows.reduce((sum, row) => sum + Number(row.sentiment_score || 0), 0) / allDeptRows.length
+      : 0;
+    return {
+      department,
+      total: allDeptRows.length,
+      risk,
+      riskPct: allDeptRows.length ? (risk / allDeptRows.length) * 100 : 0,
+      sentiment,
+    };
   }).filter((row) => row.total > 0);
 
   const exportSentimentReport = async (format = "pdf") => {
@@ -381,8 +390,8 @@ const SentimentPulseView = () => {
         Coverage is a data-volume indicator, not statistical confidence. Velocity compares the current database snapshot with the previous stream snapshot; it remains zero when records have not changed.
       </p>
 
-      <div className="mt-10 grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-6">
-        <section className="premium-card p-5">
+      <div className="mt-10 grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-6 items-stretch">
+        <section className="premium-card p-5 flex flex-col justify-between">
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>
               <h3 className="text-sm font-bold text-slate-100">Where risk is concentrated</h3>
@@ -401,21 +410,42 @@ const SentimentPulseView = () => {
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.08]" title={`${row.riskPct.toFixed(1)}% at risk`}>
                     <div className="h-full rounded-full bg-gradient-to-r from-cyan-400/80 to-rose-400/80" style={{ width: `${Math.min(100, row.riskPct)}%` }} />
                   </div>
-                  <span className="w-16 text-right text-[11px] font-semibold text-cyan-200">{row.sentiment.toFixed(2)} sentiment</span>
+                  <span className="shrink-0 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-0.5 text-[10px] font-bold text-cyan-200 shadow-[0_0_8px_rgba(34,211,238,0.12)]">
+                    {row.sentiment.toFixed(2)} sentiment
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         </section>
-        <section className="premium-card p-5">
-          <div className="mb-5">
-            <h3 className="text-sm font-bold text-slate-100">How to read this page</h3>
-            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">The page separates stored facts from calculations so a reviewer can trace every conclusion.</p>
-          </div>
-          <div className="space-y-4 text-xs leading-relaxed">
-            <div className="border-l-2 border-cyan-300/60 pl-3"><div className="font-semibold text-cyan-200">Observed record fields</div><p className="mt-1 text-slate-400">Sentiment score, retention probability, department, and policy-risk flag stored on each employee record.</p></div>
-            <div className="border-l-2 border-amber-300/60 pl-3"><div className="font-semibold text-amber-200">Derived indicators</div><p className="mt-1 text-slate-400">Burnout risk, concentration balance, retention-sentiment index, and priority level calculated from observed fields.</p></div>
-            <div className="border-l-2 border-violet-300/60 pl-3"><div className="font-semibold text-violet-200">Separate candidate context</div><p className="mt-1 text-slate-400">{candidateCount ?? "—"} candidate records use match and candidate sentiment values. They are not included in employee morale or at-risk totals.</p></div>
+        <section className="premium-card p-5 flex flex-col justify-between">
+          <div>
+            <div className="mb-5">
+              <h3 className="text-sm font-bold text-slate-100">How to read this page</h3>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">The page separates stored facts from calculations so a reviewer can trace every conclusion.</p>
+            </div>
+            <div className="space-y-4 text-xs leading-relaxed">
+              <div className="border-l-2 border-cyan-300/60 pl-3">
+                <div className="font-semibold text-cyan-200">Observed record fields</div>
+                <p className="mt-1 text-slate-400">Sentiment score, retention probability, department, and policy-risk flag stored on each employee record.</p>
+              </div>
+              <div className="border-l-2 border-amber-300/60 pl-3">
+                <div className="font-semibold text-amber-200">Derived indicators</div>
+                <p className="mt-1 text-slate-400">Burnout risk, concentration balance, retention-sentiment index, and priority level calculated from observed fields.</p>
+              </div>
+              <div className="border-l-2 border-violet-300/60 pl-3">
+                <div className="font-semibold text-violet-200">Separate candidate context</div>
+                <p className="mt-1 text-slate-400">{candidateCount ?? "—"} candidate records use match and candidate sentiment values. They are not included in employee morale or at-risk totals.</p>
+              </div>
+              <div className="border-l-2 border-emerald-300/60 pl-3">
+                <div className="font-semibold text-emerald-200">Real-time Telemetry Stream</div>
+                <p className="mt-1 text-slate-400">Live SSE events stream sentiment index shifts and risk flag alerts without forcing manual page refreshes.</p>
+              </div>
+              <div className="border-l-2 border-rose-300/60 pl-3">
+                <div className="font-semibold text-rose-200">Threshold Benchmarks</div>
+                <p className="mt-1 text-slate-400">Employees below 0.45 sentiment score or 0.55 retention probability are highlighted in the evidence panels below for review.</p>
+              </div>
+            </div>
           </div>
         </section>
       </div>
