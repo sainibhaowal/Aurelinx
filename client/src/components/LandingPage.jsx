@@ -847,12 +847,13 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           </div>
 
           {/* ── LIVE PREVIEW GRID ── */}
-          <div className="mx-auto mt-14 grid max-w-[1600px] gap-5 lg:grid-cols-[260px_1fr_230px]">
+          <div className="mx-auto mt-14 grid max-w-[1600px] gap-5 md:grid-cols-2 lg:grid-cols-[260px_1fr_230px]">
             {/* LEFT — Workspace streams */}
             <motion.div
               initial={{ opacity: 0, x: -14 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.45, delay: 0.22 }}
+              className="md:col-span-1"
             >
               <GlassCard className="p-5 h-full">
                 <div className="flex items-center justify-between">
@@ -918,6 +919,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.45, delay: 0.27 }}
+              className="md:col-span-1"
             >
               <GlassCard className="p-5 h-full flex flex-col">
                 {/* Card header */}
@@ -1131,6 +1133,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               initial={{ opacity: 0, x: 14 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.45, delay: 0.27 }}
+              className="md:col-span-2 lg:col-span-1"
             >
               <GlassCard className="p-5 h-full">
                 <div
@@ -1164,7 +1167,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     high-isolation schemas.
                   </p>
                 </div>
-                <div className="mt-4 space-y-2.5">
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-2.5">
                   {displayStats.map((stat) => (
                     <div
                       key={stat.label}
@@ -1217,7 +1220,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           </div>
 
           {/* Console layout */}
-          <div className="mx-auto mt-12 grid max-w-[1600px] gap-5 lg:grid-cols-[360px_1fr]">
+          <div className="mx-auto mt-12 grid max-w-[1600px] gap-5 md:grid-cols-[280px_1fr] lg:grid-cols-[360px_1fr]">
             {/* Scenario panel */}
             <div className="space-y-3">
               <div
