@@ -132,7 +132,7 @@ const SettingsWorkspaceView = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-4xl space-y-8 pb-12">
       {/* ── Header ── */}
       <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
@@ -194,7 +194,7 @@ const SettingsWorkspaceView = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.22 }}
-            className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]"
+            className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]"
           >
             {/* Left — profile card */}
             <GlassCard className="p-6">
