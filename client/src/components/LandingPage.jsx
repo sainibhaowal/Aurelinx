@@ -351,32 +351,34 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
 ───────────────────────────────────────── */
 const MiniSignal = ({ index, active, label, value }) => (
   <div
-    className="flex items-center justify-between rounded-[14px] px-3.5 py-3 transition-all duration-300"
+    className="flex flex-col gap-1 rounded-[14px] px-3.5 py-2.5 transition-all duration-300 min-w-0"
     style={{
-      background: active ? "rgba(103,232,249,0.05)" : "rgba(255,255,255,0.02)",
-      border: `1px solid ${active ? "rgba(103,232,249,0.2)" : "rgba(255,255,255,0.06)"}`,
+      background: active ? "rgba(103,232,249,0.06)" : "rgba(255,255,255,0.02)",
+      border: `1px solid ${active ? "rgba(103,232,249,0.25)" : "rgba(255,255,255,0.06)"}`,
     }}
   >
-    <div className="flex items-center gap-3">
-      <span
-        className={`h-2 w-2 flex-none rounded-full ${active ? "animate-pulse" : ""}`}
-        style={{
-          background: active ? "#67e8f9" : "rgba(255,255,255,0.15)",
-          boxShadow: active ? "0 0 10px rgba(103,232,249,0.7)" : "none",
-        }}
-      />
-      <div>
-        <div
-          className="text-[9px] font-bold uppercase tracking-[0.2em]"
-          style={{ color: "rgba(148,163,184,0.4)" }}
+    <div className="flex items-center justify-between gap-2 min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
+        <span
+          className={`h-2 w-2 flex-none rounded-full ${active ? "animate-pulse" : ""}`}
+          style={{
+            background: active ? "#67e8f9" : "rgba(255,255,255,0.2)",
+            boxShadow: active ? "0 0 10px rgba(103,232,249,0.8)" : "none",
+          }}
+        />
+        <span
+          className="text-[9px] font-mono font-bold uppercase tracking-[0.2em]"
+          style={{ color: active ? "#67e8f9" : "rgba(148,163,184,0.5)" }}
         >
           0{index + 1}
-        </div>
-        <div className="text-sm font-semibold text-white">{label}</div>
+        </span>
       </div>
+      <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-400 truncate max-w-[130px]" title={value}>
+        {value}
+      </span>
     </div>
-    <div className="text-xs" style={{ color: "rgba(148,163,184,0.5)" }}>
-      {value}
+    <div className="text-xs font-extrabold text-white truncate" title={label}>
+      {label}
     </div>
   </div>
 );
@@ -935,14 +937,15 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     </div>
                   </div>
                   <span
-                    className="rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-wider"
+                    className="rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5"
                     style={{
                       background: "rgba(110,231,183,0.08)",
                       border: "1px solid rgba(110,231,183,0.2)",
                       color: "#6ee7b7",
                     }}
                   >
-                    SRE: Healthy
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Gateway: 99.99% Online</span>
                   </span>
                 </div>
 
@@ -1147,14 +1150,11 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     border: "1px solid rgba(255,255,255,0.06)",
                   }}
                 >
-                  <div
-                    className="text-[9px] font-bold uppercase tracking-[0.2em]"
-                    style={{ color: "rgba(148,163,184,0.4)" }}
-                  >
-                    Tenant Isolation
+                  <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-400">
+                    Tenant Data Isolation
                   </div>
-                  <div className="mt-2 text-2xl font-black text-white">
-                    default
+                  <div className="mt-2 text-lg font-extrabold text-white uppercase tracking-wider">
+                    Zero-Trust Partition
                   </div>
                   <p
                     className="mt-1.5 text-xs leading-relaxed"
