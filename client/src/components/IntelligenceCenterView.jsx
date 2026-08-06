@@ -801,78 +801,75 @@ const IntelligenceCenterView = () => {
                     </span>
                   </div>
 
-                  {/* Middle Scrollable Content */}
-                  <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5">
-                    {/* Skill Add Input */}
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                          Skill Node
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. PyTorch, React, FastAPI"
-                          value={newSkillName}
-                          onChange={(e) => setNewSkillName(e.target.value)}
-                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 text-xs text-white placeholder-slate-600 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                          Min Proficiency
-                        </label>
-                        <PremiumSelect
-                          value={newSkillLevel}
-                          onChange={(e) =>
-                            setNewSkillLevel(Number(e.target.value))
-                          }
-                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
-                        >
-                          {[1, 2, 3, 4, 5].map((v) => (
-                            <option key={v} value={v}>
-                              Lvl {v}
-                            </option>
-                          ))}
-                        </PremiumSelect>
-                      </div>
-                      <button
-                        onClick={addSkillMatchReq}
-                        className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-300/20 bg-indigo-500/90 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(99,102,241,.18)] transition hover:bg-indigo-400"
+                  {/* Top Form Inputs (Fixed) */}
+                  <div className="space-y-3 px-5 pt-4 pb-2 shrink-0">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
+                        Skill Node
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. PyTorch, React, FastAPI"
+                        value={newSkillName}
+                        onChange={(e) => setNewSkillName(e.target.value)}
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white placeholder-slate-600 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
+                        Min Proficiency
+                      </label>
+                      <PremiumSelect
+                        value={newSkillLevel}
+                        onChange={(e) =>
+                          setNewSkillLevel(Number(e.target.value))
+                        }
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
                       >
-                        <Plus size={14} /> Add Skill requirement
-                      </button>
+                        {[1, 2, 3, 4, 5].map((v) => (
+                          <option key={v} value={v}>
+                            Lvl {v}
+                          </option>
+                        ))}
+                      </PremiumSelect>
                     </div>
+                    <button
+                      onClick={addSkillMatchReq}
+                      className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-300/20 bg-indigo-500/90 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(99,102,241,.18)] transition hover:bg-indigo-400"
+                    >
+                      <Plus size={14} /> Add Skill requirement
+                    </button>
+                  </div>
 
-                    {/* List of current targets */}
-                    <div className="space-y-2 border-t border-white/10 pt-4">
-                      {matchSkillsInput.map((skill, idx) => (
-                        <div
-                          key={idx}
-                          className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 transition hover:border-indigo-300/30 hover:bg-indigo-300/[0.06]"
+                  {/* Internal Scrollable Skill List Box */}
+                  <div className="flex-1 overflow-y-auto min-h-[120px] custom-scrollbar px-5 py-2 space-y-2">
+                    {matchSkillsInput.map((skill, idx) => (
+                      <div
+                        key={idx}
+                        className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2 transition hover:border-indigo-300/30 hover:bg-indigo-300/[0.06]"
+                      >
+                        <div className="text-xs">
+                          <span className="font-bold text-white">
+                            {skill.name}
+                          </span>
+                          <span className="ml-2 rounded-full bg-indigo-300/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-200">
+                            L{skill.level}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => removeSkillMatchReq(idx)}
+                          aria-label={`Remove ${skill.name}`}
+                          className="rounded-md p-1 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300"
                         >
-                          <div className="text-xs">
-                            <span className="font-bold text-white">
-                              {skill.name}
-                            </span>
-                            <span className="ml-2 rounded-full bg-indigo-300/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-200">
-                              L{skill.level}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => removeSkillMatchReq(idx)}
-                            aria-label={`Remove ${skill.name}`}
-                            className="rounded-md p-1 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      ))}
-                      {matchSkillsInput.length === 0 && (
-                        <div className="text-xs text-slate-500 text-center py-4">
-                          No skills requirements added yet.
-                        </div>
-                      )}
-                    </div>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                    {matchSkillsInput.length === 0 && (
+                      <div className="text-xs text-slate-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
+                        No skills requirements added yet.
+                      </div>
+                    )}
                   </div>
 
                   {/* Fixed Footer */}
@@ -1205,10 +1202,10 @@ const IntelligenceCenterView = () => {
                     </p>
                   </div>
 
-                  {/* Middle Scrollable Content */}
-                  <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4">
+                  {/* Top Form Inputs (Fixed) */}
+                  <div className="space-y-3 px-5 pt-4 pb-2 shrink-0">
                     <div>
-                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1.5 block">
+                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
                         Budget Cap (CFO Limit)
                       </label>
                       <div className="relative">
@@ -1219,12 +1216,12 @@ const IntelligenceCenterView = () => {
                           onChange={(e) =>
                             setTeamBudget(Number(e.target.value))
                           }
-                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 py-2.5 pl-9 pr-3 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
+                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 py-2 pl-9 pr-3 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1.5 block">
+                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
                         Max Team Size
                       </label>
                       <input
@@ -1233,16 +1230,16 @@ const IntelligenceCenterView = () => {
                         max="6"
                         value={teamSize}
                         onChange={(e) => setTeamSize(Number(e.target.value))}
-                        className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
                       />
                     </div>
 
-                    {/* Skills Requirements */}
+                    {/* Skills Add Bar (Fixed) */}
                     <div>
-                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-2 block">
+                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1.5 block">
                         Skill Matrix Demands
                       </label>
-                      <div className="mb-3 flex gap-2">
+                      <div className="flex gap-2">
                         <input
                           type="text"
                           id="team-skill-name"
@@ -1267,46 +1264,53 @@ const IntelligenceCenterView = () => {
                           Add
                         </button>
                       </div>
-                      <div className="space-y-2">
-                        {teamSkillsInput.map((skill, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2 text-xs"
-                          >
-                            <span className="text-white font-bold">
-                              {skill.name}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <PremiumSelect
-                                value={skill.level}
-                                onChange={(e) => {
-                                  const next = [...teamSkillsInput];
-                                  next[idx].level = Number(e.target.value);
-                                  setTeamSkillsInput(next);
-                                }}
-                                className="bg-slate-950 border border-white/5 rounded px-1.5 py-0.5 text-[10px] text-white focus:outline-none"
-                              >
-                                {[1, 2, 3, 4, 5].map((v) => (
-                                  <option key={v} value={v}>
-                                    L{v}
-                                  </option>
-                                ))}
-                              </PremiumSelect>
-                              <button
-                                onClick={() =>
-                                  setTeamSkillsInput(
-                                    teamSkillsInput.filter((_, i) => i !== idx),
-                                  )
-                                }
-                                className="text-rose-400 text-xs"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
                     </div>
+                  </div>
+
+                  {/* Internal Scrollable Skill List Box */}
+                  <div className="flex-1 overflow-y-auto min-h-[120px] custom-scrollbar px-5 py-2 space-y-2">
+                    {teamSkillsInput.map((skill, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2 text-xs"
+                      >
+                        <span className="text-white font-bold">
+                          {skill.name}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <PremiumSelect
+                            value={skill.level}
+                            onChange={(e) => {
+                              const next = [...teamSkillsInput];
+                              next[idx].level = Number(e.target.value);
+                              setTeamSkillsInput(next);
+                            }}
+                            className="bg-slate-950 border border-white/5 rounded px-1.5 py-0.5 text-[10px] text-white focus:outline-none"
+                          >
+                            {[1, 2, 3, 4, 5].map((v) => (
+                              <option key={v} value={v}>
+                                L{v}
+                              </option>
+                            ))}
+                          </PremiumSelect>
+                          <button
+                            onClick={() =>
+                              setTeamSkillsInput(
+                                teamSkillsInput.filter((_, i) => i !== idx),
+                              )
+                            }
+                            className="text-rose-400 text-xs"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {teamSkillsInput.length === 0 && (
+                      <div className="text-xs text-slate-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
+                        No skill demands added yet.
+                      </div>
+                    )}
                   </div>
 
                   {/* Fixed Footer */}
