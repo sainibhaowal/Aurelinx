@@ -801,90 +801,95 @@ const IntelligenceCenterView = () => {
                     </span>
                   </div>
 
-                  {/* Skill Add Input */}
-                  <div className="space-y-3 px-5 pt-5">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                        Skill Node
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. PyTorch, React, FastAPI"
-                        value={newSkillName}
-                        onChange={(e) => setNewSkillName(e.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 text-xs text-white placeholder-slate-600 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                        Min Proficiency
-                      </label>
-                      <PremiumSelect
-                        value={newSkillLevel}
-                        onChange={(e) =>
-                          setNewSkillLevel(Number(e.target.value))
-                        }
-                        className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
-                      >
-                        {[1, 2, 3, 4, 5].map((v) => (
-                          <option key={v} value={v}>
-                            Lvl {v}
-                          </option>
-                        ))}
-                      </PremiumSelect>
-                    </div>
-                    <button
-                      onClick={addSkillMatchReq}
-                      className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-300/20 bg-indigo-500/90 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(99,102,241,.18)] transition hover:bg-indigo-400"
-                    >
-                      <Plus size={14} /> Add Skill requirement
-                    </button>
-                  </div>
-
-                  {/* List of current targets */}
-                  <div className="mx-5 mt-5 max-h-[180px] space-y-2 overflow-y-auto border-t border-white/10 pt-3 custom-scrollbar">
-                    {matchSkillsInput.map((skill, idx) => (
-                      <div
-                        key={idx}
-                        className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 transition hover:border-indigo-300/30 hover:bg-indigo-300/[0.06]"
-                      >
-                        <div className="text-xs">
-                          <span className="font-bold text-white">
-                            {skill.name}
-                          </span>
-                          <span className="ml-2 rounded-full bg-indigo-300/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-200">
-                            L{skill.level}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => removeSkillMatchReq(idx)}
-                          aria-label={`Remove ${skill.name}`}
-                          className="rounded-md p-1 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300"
+                  {/* Middle Scrollable Content */}
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5">
+                    {/* Skill Add Input */}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
+                          Skill Node
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. PyTorch, React, FastAPI"
+                          value={newSkillName}
+                          onChange={(e) => setNewSkillName(e.target.value)}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 text-xs text-white placeholder-slate-600 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
+                          Min Proficiency
+                        </label>
+                        <PremiumSelect
+                          value={newSkillLevel}
+                          onChange={(e) =>
+                            setNewSkillLevel(Number(e.target.value))
+                          }
+                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
                         >
-                          <Trash2 size={12} />
-                        </button>
+                          {[1, 2, 3, 4, 5].map((v) => (
+                            <option key={v} value={v}>
+                              Lvl {v}
+                            </option>
+                          ))}
+                        </PremiumSelect>
                       </div>
-                    ))}
-                    {matchSkillsInput.length === 0 && (
-                      <div className="text-xs text-slate-500 text-center py-4">
-                        No skills requirements added yet.
-                      </div>
-                    )}
+                      <button
+                        onClick={addSkillMatchReq}
+                        className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-300/20 bg-indigo-500/90 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(99,102,241,.18)] transition hover:bg-indigo-400"
+                      >
+                        <Plus size={14} /> Add Skill requirement
+                      </button>
+                    </div>
+
+                    {/* List of current targets */}
+                    <div className="space-y-2 border-t border-white/10 pt-4">
+                      {matchSkillsInput.map((skill, idx) => (
+                        <div
+                          key={idx}
+                          className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 transition hover:border-indigo-300/30 hover:bg-indigo-300/[0.06]"
+                        >
+                          <div className="text-xs">
+                            <span className="font-bold text-white">
+                              {skill.name}
+                            </span>
+                            <span className="ml-2 rounded-full bg-indigo-300/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-200">
+                              L{skill.level}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => removeSkillMatchReq(idx)}
+                            aria-label={`Remove ${skill.name}`}
+                            className="rounded-md p-1 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      ))}
+                      {matchSkillsInput.length === 0 && (
+                        <div className="text-xs text-slate-500 text-center py-4">
+                          No skills requirements added yet.
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <button
-                    onClick={triggerSkillMatch}
-                    disabled={matchingLoading || matchSkillsInput.length === 0}
-                    className="mx-5 mb-5 mt-5 inline-flex h-11 w-[calc(100%-2.5rem)] cursor-pointer items-center justify-center gap-2 rounded-xl border border-cyan-300/50 bg-cyan-300/[0.07] text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200 transition hover:bg-cyan-300/[0.14] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Search size={14} />{" "}
-                    {matchingLoading
-                      ? "Graph Traversing..."
-                      : "Solve Adjacencies"}
-                  </button>
+                  {/* Fixed Footer */}
+                  <div className="border-t border-white/10 p-5 space-y-3 bg-slate-950/40 shrink-0">
+                    <button
+                      onClick={triggerSkillMatch}
+                      disabled={matchingLoading || matchSkillsInput.length === 0}
+                      className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-cyan-300/50 bg-cyan-300/[0.07] text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200 transition hover:bg-cyan-300/[0.14] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Search size={14} />{" "}
+                      {matchingLoading
+                        ? "Graph Traversing..."
+                        : "Solve Adjacencies"}
+                    </button>
 
-                  {(skillMatchStatus === "running" || skillMatchStatus === "complete" || skillMatchStatus === "error") && (
-                    <div className="border-t border-white/10 bg-black/10 px-5 py-4" aria-live="polite">
+                    {(skillMatchStatus === "running" || skillMatchStatus === "complete" || skillMatchStatus === "error") && (
+                      <div className="pt-2 border-t border-white/10" aria-live="polite">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                           Solver request status
@@ -905,6 +910,7 @@ const IntelligenceCenterView = () => {
                     </div>
                   )}
                 </div>
+              </div>
               </div>
 
               {/* Right Output */}
@@ -1199,8 +1205,8 @@ const IntelligenceCenterView = () => {
                     </p>
                   </div>
 
-                  {/* Inputs */}
-                  <div className="space-y-4 px-5 py-5">
+                  {/* Middle Scrollable Content */}
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4">
                     <div>
                       <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1.5 block">
                         Budget Cap (CFO Limit)
@@ -1303,16 +1309,19 @@ const IntelligenceCenterView = () => {
                     </div>
                   </div>
 
-                  <button
-                    onClick={triggerTeamOptimize}
-                    disabled={optimizingLoading || teamSkillsInput.length === 0}
-                    className="mt-6 inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-indigo-600 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_28px_rgba(79,70,229,.22)] transition hover:from-primary/90 hover:to-indigo-500/90 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Play size={14} />{" "}
-                    {optimizingLoading
-                      ? "Simulated Annealing Run..."
-                      : "Find Mathematically Perfect Team"}
-                  </button>
+                  {/* Fixed Footer */}
+                  <div className="border-t border-white/10 p-5 bg-slate-950/40 shrink-0">
+                    <button
+                      onClick={triggerTeamOptimize}
+                      disabled={optimizingLoading || teamSkillsInput.length === 0}
+                      className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-indigo-600 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_28px_rgba(79,70,229,.22)] transition hover:from-primary/90 hover:to-indigo-500/90 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Play size={14} />{" "}
+                      {optimizingLoading
+                        ? "Simulated Annealing Run..."
+                        : "Find Mathematically Perfect Team"}
+                    </button>
+                  </div>
                 </div>
               </div>
 
