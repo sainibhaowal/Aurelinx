@@ -1267,7 +1267,7 @@ const IntelligenceCenterView = () => {
                           Add
                         </button>
                       </div>
-                      <div className="space-y-1.5 max-h-[140px] overflow-y-auto custom-scrollbar">
+                      <div className="space-y-2">
                         {teamSkillsInput.map((skill, idx) => (
                           <div
                             key={idx}
