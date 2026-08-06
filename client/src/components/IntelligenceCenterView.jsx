@@ -705,7 +705,7 @@ const IntelligenceCenterView = () => {
   const highlightNodes = getHighlightPathNodes();
 
   return (
-    <div className="min-h-full pb-10">
+    <div className="flex flex-col min-h-full pb-12">
       {/* Top Header */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-white/5 pb-6">
         <div className="flex-1 flex items-start justify-between">
@@ -770,7 +770,7 @@ const IntelligenceCenterView = () => {
       </div>
 
       {/* TABS CONTAINER */}
-      <div className="relative">
+      <div className="relative flex-1 flex flex-col min-h-[calc(100vh-280px)]">
         <AnimatePresence mode="wait">
           {/* TAB 1: SKILL GRAPH DIJKSTRA MATCH */}
           {activeSubTab === "skill-match" && (
@@ -779,7 +779,7 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-start lg:grid-cols-[360px_1fr] gap-6 text-left"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-[600px]"
             >
               {/* Left Settings */}
               <div className="space-y-6">
@@ -908,7 +908,7 @@ const IntelligenceCenterView = () => {
               </div>
 
               {/* Right Output */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20">
+              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 flex flex-col justify-between flex-1 min-h-[580px] h-full">
                 <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
                   <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
                     Semantic Matching Matrix & Path Analysis
@@ -919,7 +919,7 @@ const IntelligenceCenterView = () => {
                 </div>
 
                 {matchResults.length > 0 ? (
-                  <div className="grid grid-cols-1 xl:grid-cols-[250px_1fr] gap-6">
+                  <div className="grid grid-cols-1 xl:grid-cols-[250px_1fr] gap-6 flex-1">
                     {/* Left list of employees */}
                     <div className="space-y-2 border-r border-white/5 pr-4">
                       {matchResults.map((result) => (
