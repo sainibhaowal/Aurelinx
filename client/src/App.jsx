@@ -440,8 +440,9 @@ const App = () => {
               </button>
             )}
             <div
-              data-tauri-drag-region
-              className={`h-14 px-2 mb-2 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start"} cursor-move ${isSidebarCollapsed ? "max-md:invisible" : ""}`}
+              onClick={() => navigate("/")}
+              className={`h-14 px-2 mb-2 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start"} cursor-pointer hover:opacity-80 transition-opacity ${isSidebarCollapsed ? "max-md:invisible" : ""}`}
+              title="Go to Landing Page"
             >
               <AurelinxLogo collapsed={isSidebarCollapsed} size={24} />
             </div>

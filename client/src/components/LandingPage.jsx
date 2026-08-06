@@ -614,7 +614,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
   ───────────────────────────────────────── */
   return (
     <div
-      className="relative min-h-screen overflow-x-hidden overflow-y-auto text-slate-100"
+      className="relative h-screen w-full overflow-x-hidden overflow-y-auto text-slate-100 scroll-smooth"
       style={{ background: "#07111f" }}
     >
       {/* ── AMBIENT BACKGROUND ── */}
@@ -656,7 +656,14 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             }}
           >
             {/* Logo */}
-            <div className="flex items-center gap-3 select-none">
+            <div
+              onClick={() => {
+                const el = document.getElementById("section-0");
+                if (el) el.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="flex items-center gap-3 select-none cursor-pointer hover:opacity-80 transition-opacity"
+              title="Scroll to Top"
+            >
               <div
                 className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl"
               >
