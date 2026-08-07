@@ -1748,6 +1748,20 @@ const IntelligenceCenterView = () => {
                                   <line x1="0" y1="75" x2="100" y2="75" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
                                   <line x1="0" y1="100" x2="100" y2="100" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
 
+                                  {/* Laser Crosshair Line on hover */}
+                                  {hoveredSurvMonth !== null && (
+                                    <line
+                                      x1={(hoveredSurvMonth / 11) * 100}
+                                      y1="0"
+                                      x2={(hoveredSurvMonth / 11) * 100}
+                                      y2="100"
+                                      stroke="#38bdf8"
+                                      strokeWidth="1.5"
+                                      strokeDasharray="3 3"
+                                      vectorEffect="non-scaling-stroke"
+                                    />
+                                  )}
+
                                   {/* Survival Area */}
                                   {simulatedForecast.length > 0 && (
                                     <>
@@ -1796,7 +1810,7 @@ const IntelligenceCenterView = () => {
                                         onMouseLeave={() => setHoveredSurvMonth(null)}
                                         className="h-full flex-1 cursor-pointer relative group flex justify-center items-center"
                                       >
-                                        <div className={`w-2 h-2 rounded-full transition-all ${hoveredSurvMonth === i ? "bg-white scale-150 shadow-[0_0_10px_#818cf8]" : S_t < 0.5 ? "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.6)]" : "bg-indigo-400/80 group-hover:scale-125"}`} />
+                                        <div className={`w-2 h-2 rounded-full transition-all ${hoveredSurvMonth === i ? "bg-white scale-150 shadow-[0_0_10px_#38bdf8]" : S_t < 0.5 ? "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.6)]" : "bg-indigo-400/80 group-hover:scale-125"}`} />
                                       </div>
                                     );
                                   })}
@@ -1806,7 +1820,7 @@ const IntelligenceCenterView = () => {
                               {/* Bottom X-Axis Month Ticks */}
                               <div className="pl-20 pr-4 flex justify-between items-center text-[9px] font-mono text-slate-400 border-t border-white/5 pt-1">
                                 {simulatedForecast.map((f, i) => (
-                                  <span key={i} className={`px-0.5 ${hoveredSurvMonth === i ? "text-indigo-300 font-bold" : ""}`}>
+                                  <span key={i} className={`px-0.5 transition-all ${hoveredSurvMonth === i ? "text-cyan-300 font-bold scale-110" : ""}`}>
                                     M{i + 1}
                                   </span>
                                 ))}
@@ -1822,10 +1836,31 @@ const IntelligenceCenterView = () => {
                                     </span>
                                   </div>
                                   <div className="text-slate-300">Survival Probability: <strong className="text-white font-mono">{(simulatedForecast[hoveredSurvMonth].survival_probability * 100).toFixed(1)}%</strong></div>
-                                  <div className="text-slate-300">Cumulative Tenure: <strong className="text-indigo-300 font-mono">{simulatedForecast[hoveredSurvMonth].projected_tenure} Months</strong></div>
+                                  <div className="text-slate-300">Cumulative Tenure: <strong className="text-indigo-300 font-mono">{(simulatedForecast[hoveredSurvMonth].projected_tenure ?? ((selectedAttritionEmp?.tenure_months ?? 12) + (hoveredSurvMonth + 1)))} Months</strong></div>
                                   <div className="text-slate-300">Hazard Ratio Multiplier: <strong className="text-rose-300 font-mono">x{simulatedHazardRatio.toFixed(2)}</strong></div>
                                 </div>
                               )}
+                            </div>
+
+                            {/* Permanent Month Milestone Summary Grid (Visible without hovering!) */}
+                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+                              {simulatedForecast.filter((_, idx) => idx % 2 === 1 || idx === 0 || idx === 11).map((f) => {
+                                const mIdx = f.month - 1;
+                                const S_t = f.survival_probability;
+                                return (
+                                  <div
+                                    key={f.month}
+                                    onMouseEnter={() => setHoveredSurvMonth(mIdx)}
+                                    onMouseLeave={() => setHoveredSurvMonth(null)}
+                                    className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${hoveredSurvMonth === mIdx ? "border-cyan-400 bg-cyan-500/10 shadow-[0_0_12px_rgba(56,189,248,0.25)]" : "border-white/5 bg-slate-950/60 hover:border-white/10"}`}
+                                  >
+                                    <div className="text-[9px] uppercase font-bold text-slate-400">Month {f.month}</div>
+                                    <div className={`text-xs font-black mt-0.5 ${S_t > 0.75 ? "text-emerald-400" : S_t > 0.5 ? "text-amber-400" : "text-rose-400"}`}>
+                                      {(S_t * 100).toFixed(1)}%
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                         </div>
 
