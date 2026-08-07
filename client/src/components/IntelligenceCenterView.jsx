@@ -1042,7 +1042,7 @@ const IntelligenceCenterView = () => {
                             </div>
 
                             {/* visual DAG map */}
-                            <div className={`${graphExpanded ? "fixed inset-3 z-[90] flex flex-col rounded-2xl border border-cyan-300/25 bg-[#020617]/[0.98] p-4 shadow-[0_24px_90px_rgba(0,0,0,.65)] backdrop-blur-2xl md:inset-8 md:p-6" : "relative rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between"}`} onClick={(event) => event.stopPropagation()}>
+                            <div className={`${graphExpanded ? "fixed inset-3 z-[90] flex flex-col rounded-2xl border border-cyan-300/25 bg-[#020617]/[0.98] p-4 shadow-[0_24px_90px_rgba(0,0,0,.65)] backdrop-blur-2xl md:inset-8 md:p-6" : "relative rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between flex-1 h-full min-h-[300px]"}`} onClick={(event) => event.stopPropagation()}>
                               <div>
                                 <div className="mb-2 flex items-start justify-between gap-3">
                                   <div>
@@ -1417,8 +1417,8 @@ const IntelligenceCenterView = () => {
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">
+                        <div className="space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+                          <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1 shrink-0">
                             Assembly Roster
                           </div>
                           {optimizedTeam.optimized_team.map((emp) => (
@@ -1493,7 +1493,7 @@ const IntelligenceCenterView = () => {
                         </div>
 
                         {/* Skill Coverage details */}
-                        <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
+                        <div className="rounded-xl border border-white/5 bg-slate-950 p-4 flex-1 flex flex-col justify-between">
                           <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500 mb-2">
                             Total Skill coverage
                           </div>
@@ -1545,13 +1545,12 @@ const IntelligenceCenterView = () => {
               className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 h-full min-h-0"
             >
               {/* Left Employee list */}
-              <div className="premium-card h-full p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col justify-between">
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2">
-                    Employee Registry Attrition Hazard
-                  </h3>
+              <div className="premium-card h-full p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col overflow-hidden">
+                <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2 shrink-0">
+                  Employee Registry Attrition Hazard
+                </h3>
 
-                  <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar pr-1">
+                <div className="space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
                   {attritionLoading ? (
                     <div className="text-xs text-slate-500 text-center py-8">
                       Loading hazard computations...
@@ -1584,12 +1583,11 @@ const IntelligenceCenterView = () => {
                   )}
                 </div>
               </div>
-            </div>
 
               {/* Right Survival Analysis Details */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full flex flex-col justify-between overflow-hidden">
+              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full flex flex-col overflow-hidden">
                 {selectedAttritionEmp ? (
-                  <div className="space-y-6">
+                  <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar space-y-6 pr-1">
                     <div className="flex items-center justify-between border-b border-white/5 pb-3">
                       <div>
                         <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
