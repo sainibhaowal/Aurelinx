@@ -1457,37 +1457,58 @@ const IntelligenceCenterView = () => {
                           </div>
 
                           {/* Simulated SVG Graph showing annealing energy curve */}
-                          <div className="h-28 w-full border-b border-l border-white/5 relative bg-black/20 rounded">
+                          <div className="h-32 w-full border border-white/10 relative bg-slate-950/60 rounded-xl overflow-hidden p-1">
                             <svg
                               className="absolute inset-0 h-full w-full pointer-events-none"
                               viewBox="0 0 100 100"
                               preserveAspectRatio="none"
                             >
-                              <polyline
-                                fill="none"
-                                stroke="#2dd4bf"
-                                strokeWidth="2.5"
-                                points={annealingHistory
-                                  .map((h, i, arr) => {
-                                    const x = (i / (arr.length - 1)) * 100;
-                                    const energies = arr.map(
-                                      (item) => item.energy,
-                                    );
-                                    const minE = Math.min(...energies);
-                                    const maxE = Math.max(...energies);
-                                    const range = maxE - minE || 1;
-                                    const y =
-                                      90 - ((h.energy - minE) / range) * 80;
-                                    return `${x},${y}`;
-                                  })
-                                  .join(" ")}
-                              />
+                              <defs>
+                                <linearGradient id="annealGrad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.35" />
+                                  <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0.0" />
+                                </linearGradient>
+                              </defs>
+                              {/* Grid lines */}
+                              <line x1="0" y1="25" x2="100" y2="25" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                              <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                              <line x1="0" y1="75" x2="100" y2="75" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+
+                              {(() => {
+                                const history = annealingHistory.length > 0 ? annealingHistory : Array(10).fill({ step: 0, energy: 1 });
+                                const energies = history.map((item) => item.energy);
+                                const minE = Math.min(...energies);
+                                const maxE = Math.max(...energies);
+                                const range = maxE - minE || 1;
+                                const pts = history.map((h, i, arr) => {
+                                  const x = (i / Math.max(arr.length - 1, 1)) * 100;
+                                  const y = 88 - ((h.energy - minE) / range) * 76;
+                                  return `${x},${y}`;
+                                });
+                                const pointsStr = pts.join(" ");
+                                const areaPointsStr = `0,100 ${pointsStr} 100,100`;
+
+                                return (
+                                  <>
+                                    <polygon fill="url(#annealGrad)" points={areaPointsStr} />
+                                    <polyline
+                                      fill="none"
+                                      stroke="#2dd4bf"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      vectorEffect="non-scaling-stroke"
+                                      points={pointsStr}
+                                    />
+                                  </>
+                                );
+                              })()}
                             </svg>
-                            <div className="absolute right-2 bottom-1 text-[8px] text-slate-600 uppercase font-mono">
-                              Cooling Step
+                            <div className="absolute right-2 bottom-1 text-[8px] text-slate-500 uppercase font-mono tracking-wider">
+                              Cooling Step ➔
                             </div>
-                            <div className="absolute left-2 top-1 text-[8px] text-slate-600 uppercase font-mono">
-                              Energy Metric
+                            <div className="absolute left-2 top-1 text-[8px] text-slate-500 uppercase font-mono tracking-wider">
+                              Energy Metric ↓
                             </div>
                           </div>
                         </div>
@@ -1619,44 +1640,58 @@ const IntelligenceCenterView = () => {
                             </span>
                           </div>
 
-                          <div className="h-64 w-full relative border-b border-l border-white/5 bg-black/20 rounded">
-                            <svg
-                              className="absolute inset-0 h-full w-full pointer-events-none"
-                              viewBox="0 0 100 100"
-                              preserveAspectRatio="none"
-                            >
-                              {/* Draw survival area */}
-                              <path
-                                fill="rgba(99, 102, 241, 0.05)"
-                                stroke="none"
-                                d={
-                                  `M 0,${100 - (simulatedForecast[0]?.survival_probability * 100 || 100)} ` +
-                                  simulatedForecast
+                            <div className="h-64 w-full relative border border-white/10 bg-slate-950/60 rounded-xl overflow-hidden p-1">
+                              <svg
+                                className="absolute inset-0 h-full w-full pointer-events-none"
+                                viewBox="0 0 100 100"
+                                preserveAspectRatio="none"
+                              >
+                                <defs>
+                                  <linearGradient id="survGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.35" />
+                                    <stop offset="100%" stopColor="#6366f1" stopOpacity="0.0" />
+                                  </linearGradient>
+                                </defs>
+                                {/* Grid lines */}
+                                <line x1="0" y1="25" x2="100" y2="25" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                <line x1="0" y1="75" x2="100" y2="75" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+
+                                {/* Draw survival area */}
+                                <path
+                                  fill="url(#survGrad)"
+                                  stroke="none"
+                                  d={
+                                    `M 0,${100 - (simulatedForecast[0]?.survival_probability * 100 || 100)} ` +
+                                    simulatedForecast
+                                      .map((f, i) => {
+                                        const x = (i / 11) * 100;
+                                        const y =
+                                          100 - f.survival_probability * 100;
+                                        return `L ${x},${y}`;
+                                      })
+                                      .join(" ") +
+                                    ` L 100,100 L 0,100 Z`
+                                  }
+                                />
+                                {/* Draw survival line */}
+                                <polyline
+                                  fill="none"
+                                  stroke="#6366f1"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  vectorEffect="non-scaling-stroke"
+                                  points={simulatedForecast
                                     .map((f, i) => {
                                       const x = (i / 11) * 100;
                                       const y =
                                         100 - f.survival_probability * 100;
-                                      return `L ${x},${y}`;
+                                      return `${x},${y}`;
                                     })
-                                    .join(" ") +
-                                  ` L 100,100 L 0,100 Z`
-                                }
-                              />
-                              {/* Draw survival line */}
-                              <polyline
-                                fill="none"
-                                stroke="#6366f1"
-                                strokeWidth="3"
-                                points={simulatedForecast
-                                  .map((f, i) => {
-                                    const x = (i / 11) * 100;
-                                    const y =
-                                      100 - f.survival_probability * 100;
-                                    return `${x},${y}`;
-                                  })
-                                  .join(" ")}
-                              />
-                            </svg>
+                                    .join(" ")}
+                                />
+                              </svg>
                             <div className="absolute left-2 top-2 text-[8px] text-slate-500 font-mono">
                               100% S(t)
                             </div>
