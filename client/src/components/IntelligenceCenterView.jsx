@@ -911,8 +911,8 @@ const IntelligenceCenterView = () => {
               </div>
 
               {/* Right Output */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full flex flex-col justify-between overflow-hidden">
-                <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
+              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 shrink-0">
                   <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
                     Semantic Matching Matrix & Path Analysis
                   </h3>
@@ -922,9 +922,9 @@ const IntelligenceCenterView = () => {
                 </div>
 
                 {matchResults.length > 0 ? (
-                  <div className="grid grid-cols-1 xl:grid-cols-[250px_1fr] gap-6 flex-1">
+                  <div className="grid grid-cols-1 xl:grid-cols-[250px_1fr] gap-6 flex-1 min-h-0 overflow-hidden">
                     {/* Left list of employees */}
-                    <div className="space-y-2 border-r border-white/5 pr-4">
+                    <div className="space-y-2 border-r border-white/5 pr-4 overflow-y-auto custom-scrollbar">
                       {matchResults.map((result) => (
                         <button
                           key={result.employee_id}
@@ -955,7 +955,7 @@ const IntelligenceCenterView = () => {
                     </div>
 
                     {/* Right Dijkstra Path Details */}
-                    <div className="space-y-6">
+                    <div className="space-y-6 overflow-y-auto custom-scrollbar flex-1 min-h-0 pr-1">
                       {(() => {
                         const activeMatch = matchResults.find(
                           (r) => r.employee_id === activeMatchEmployeeId,
@@ -1330,16 +1330,17 @@ const IntelligenceCenterView = () => {
               </div>
 
               {/* Right Graph/Output */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full flex flex-col justify-between overflow-hidden">
-                <div>
-                  <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
-                    <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
-                      Optimization Assembly Results
-                    </h3>
-                    <span className="text-[10px] text-slate-500">
-                      Metropolis Hastings Simulated Annealing
-                    </span>
-                  </div>
+              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 shrink-0">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
+                    Optimization Assembly Results
+                  </h3>
+                  <span className="text-[10px] text-slate-500">
+                    Metropolis Hastings Simulated Annealing
+                  </span>
+                </div>
+
+                <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar space-y-4">
 
                   {/* ANNEALING STATUS ACTIVE PANEL */}
                   {annealingStatus === "running" && (
