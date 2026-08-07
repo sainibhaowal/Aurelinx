@@ -1498,11 +1498,13 @@ const IntelligenceCenterView = () => {
                                         <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
                                         <line x1="0" y1="90" x2="100" y2="90" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
 
-                                        {/* Area polygon */}
+                                        {/* Area polygon & crisp line */}
                                         {(() => {
                                           const pts = history.map((h, i, arr) => {
                                             const x = (i / Math.max(arr.length - 1, 1)) * 100;
-                                            const y = 88 - ((h.energy - minE) / range) * 76;
+                                            const norm = range === 0 ? 0.5 : (h.energy - minE) / range;
+                                            // minE (best optimal state) is at y=15 (top), maxE (worst initial state) is at y=85 (bottom)
+                                            const y = 15 + norm * 70;
                                             return `${x},${y}`;
                                           });
                                           const pointsStr = pts.join(" ");
@@ -1510,6 +1512,20 @@ const IntelligenceCenterView = () => {
 
                                           return (
                                             <>
+                                              {/* Laser Crosshair Line on hover */}
+                                              {hoveredAnnealIndex !== null && (
+                                                <line
+                                                  x1={(hoveredAnnealIndex / Math.max(history.length - 1, 1)) * 100}
+                                                  y1="0"
+                                                  x2={(hoveredAnnealIndex / Math.max(history.length - 1, 1)) * 100}
+                                                  y2="100"
+                                                  stroke="#2dd4bf"
+                                                  strokeWidth="1.5"
+                                                  strokeDasharray="3 3"
+                                                  vectorEffect="non-scaling-stroke"
+                                                />
+                                              )}
+
                                               <polygon fill="url(#annealGradHigh)" points={areaPointsStr} />
                                               <polyline
                                                 fill="none"
@@ -1526,14 +1542,14 @@ const IntelligenceCenterView = () => {
                                                 <g>
                                                   <circle
                                                     cx={(bestIndex / Math.max(history.length - 1, 1)) * 100}
-                                                    cy={88 - ((history[bestIndex].energy - minE) / range) * 76}
+                                                    cy={15 + (range === 0 ? 0.5 : (history[bestIndex].energy - minE) / range) * 70}
                                                     r="5"
                                                     fill="#10b981"
                                                     className="animate-ping opacity-75"
                                                   />
                                                   <circle
                                                     cx={(bestIndex / Math.max(history.length - 1, 1)) * 100}
-                                                    cy={88 - ((history[bestIndex].energy - minE) / range) * 76}
+                                                    cy={15 + (range === 0 ? 0.5 : (history[bestIndex].energy - minE) / range) * 70}
                                                     r="4"
                                                     fill="#10b981"
                                                     stroke="#ffffff"
