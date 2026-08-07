@@ -1526,38 +1526,16 @@ const IntelligenceCenterView = () => {
                                                 />
                                               )}
 
-                                              <polygon fill="url(#annealGradHigh)" points={areaPointsStr} />
+                                              {/* Clean SVG Polyline */}
                                               <polyline
                                                 fill="none"
                                                 stroke="#2dd4bf"
-                                                strokeWidth="2.5"
+                                                strokeWidth="2"
                                                 strokeLinecap="round"
                                                 strokeLinejoin="round"
                                                 vectorEffect="non-scaling-stroke"
                                                 points={pointsStr}
                                               />
-
-                                              {/* Best minimum energy highlight marker */}
-                                              {bestIndex >= 0 && (
-                                                <g>
-                                                  <circle
-                                                    cx={(bestIndex / Math.max(history.length - 1, 1)) * 100}
-                                                    cy={15 + (range === 0 ? 0.5 : (history[bestIndex].energy - minE) / range) * 70}
-                                                    r="5"
-                                                    fill="#10b981"
-                                                    className="animate-ping opacity-75"
-                                                  />
-                                                  <circle
-                                                    cx={(bestIndex / Math.max(history.length - 1, 1)) * 100}
-                                                    cy={15 + (range === 0 ? 0.5 : (history[bestIndex].energy - minE) / range) * 70}
-                                                    r="4"
-                                                    fill="#10b981"
-                                                    stroke="#ffffff"
-                                                    strokeWidth="1.5"
-                                                    vectorEffect="non-scaling-stroke"
-                                                  />
-                                                </g>
-                                              )}
                                             </>
                                           );
                                         })()}
