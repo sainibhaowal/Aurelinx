@@ -1461,123 +1461,121 @@ const IntelligenceCenterView = () => {
                           {/* High-Precision Interactive SVG Convergence Chart */}
                           <div className="space-y-2">
                             <div className="relative h-44 w-full rounded-xl border border-white/10 bg-slate-950/80 p-3 shadow-inner flex flex-col justify-between overflow-hidden">
-                              {/* Y-Axis Value Labels (Left) */}
                               {(() => {
-                                const history = annealingHistory.length > 0 ? annealingHistory : Array(10).fill({ step: 0, energy: 1, coverage: 0 });
-                                const energies = history.map((item) => item.energy);
-                                const minE = Math.min(...energies);
-                                const maxE = Math.max(...energies);
-                                const range = maxE - minE || 1;
-                                const bestIndex = history.findIndex((h) => h.energy === minE);
+                                 const history = annealingHistory.length > 0 ? annealingHistory : Array(10).fill({ step: 0, energy: 0, coverage: 0 });
+                                 const energies = history.map((item) => Number(item.energy) || 0);
+                                 const minE = Math.min(...energies);
+                                 const maxE = Math.max(...energies);
+                                 const range = maxE - minE || 1;
+                                 const bestIndex = history.findIndex((h) => Number(h.energy) === minE);
 
-                                return (
-                                  <>
-                                    {/* Left Y-Axis numeric labels */}
-                                    <div className="absolute left-2 top-2 bottom-6 flex flex-col justify-between text-[9px] font-mono text-slate-400 z-10 pointer-events-none">
-                                      <span className="bg-slate-900/80 px-1 rounded border border-white/5">E: {maxE.toFixed(2)}</span>
-                                      <span className="bg-slate-900/80 px-1 rounded border border-white/5">E: {((maxE + minE) / 2).toFixed(2)}</span>
-                                      <span className="bg-slate-900/80 px-1 rounded border border-emerald-500/20 text-emerald-400 font-bold">E: {minE.toFixed(2)} (Best)</span>
-                                    </div>
+                                 return (
+                                   <>
+                                     {/* Left Y-Axis numeric labels: Max E (Worst) at bottom, Min E (Best) at top */}
+                                     <div className="absolute left-2 top-2 bottom-6 flex flex-col justify-between text-[9px] font-mono text-slate-400 z-10 pointer-events-none">
+                                       <span className="bg-slate-900/80 px-1 rounded border border-emerald-500/20 text-emerald-400 font-bold">E: {minE.toFixed(2)} (Best)</span>
+                                       <span className="bg-slate-900/80 px-1 rounded border border-white/5">E: {((maxE + minE) / 2).toFixed(2)}</span>
+                                       <span className="bg-slate-900/80 px-1 rounded border border-white/5">E: {maxE.toFixed(2)} (Initial)</span>
+                                     </div>
 
-                                    {/* SVG Graphic Canvas */}
-                                    <div className="relative flex-1 w-full pl-16 pr-4 pt-1 pb-1">
-                                      <svg
-                                        className="h-full w-full overflow-visible"
-                                        viewBox="0 0 100 100"
-                                        preserveAspectRatio="none"
-                                      >
-                                        <defs>
-                                          <linearGradient id="annealGradHigh" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.4" />
-                                            <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0.0" />
-                                          </linearGradient>
-                                        </defs>
+                                     {/* SVG Graphic Canvas */}
+                                     <div className="relative flex-1 w-full pl-20 pr-4 pt-1 pb-1">
+                                       <svg
+                                         className="h-full w-full overflow-visible"
+                                         viewBox="0 0 100 100"
+                                         preserveAspectRatio="none"
+                                       >
+                                         <defs>
+                                           <linearGradient id="annealGradHigh" x1="0" y1="0" x2="0" y2="1">
+                                             <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.4" />
+                                             <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0.0" />
+                                           </linearGradient>
+                                         </defs>
 
-                                        {/* Grid lines */}
-                                        <line x1="0" y1="10" x2="100" y2="10" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-                                        <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-                                        <line x1="0" y1="90" x2="100" y2="90" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                         {/* Grid lines */}
+                                         <line x1="0" y1="10" x2="100" y2="10" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                         <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                         <line x1="0" y1="90" x2="100" y2="90" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
 
-                                        {/* Area polygon & crisp line */}
-                                        {(() => {
-                                          const pts = history.map((h, i, arr) => {
-                                            const x = (i / Math.max(arr.length - 1, 1)) * 100;
-                                            const norm = range === 0 ? 0.5 : (h.energy - minE) / range;
-                                            // minE (best optimal state) is at y=15 (top), maxE (worst initial state) is at y=85 (bottom)
-                                            const y = 15 + norm * 70;
-                                            return `${x},${y}`;
-                                          });
-                                          const pointsStr = pts.join(" ");
-                                          const areaPointsStr = `0,100 ${pointsStr} 100,100`;
+                                         {/* Area polygon & crisp line */}
+                                         {(() => {
+                                           const pts = history.map((h, i, arr) => {
+                                             const x = (i / Math.max(arr.length - 1, 1)) * 100;
+                                             // Standard optimization plot: minE (best) maps to top (y=15), maxE (worst) maps to bottom (y=85)
+                                             const norm = (h.energy - minE) / range;
+                                             const y = 15 + norm * 70;
+                                             return `${x},${y}`;
+                                           });
+                                           const pointsStr = pts.join(" ");
 
-                                          return (
-                                            <>
-                                              {/* Laser Crosshair Line on hover */}
-                                              {hoveredAnnealIndex !== null && (
-                                                <line
-                                                  x1={(hoveredAnnealIndex / Math.max(history.length - 1, 1)) * 100}
-                                                  y1="0"
-                                                  x2={(hoveredAnnealIndex / Math.max(history.length - 1, 1)) * 100}
-                                                  y2="100"
-                                                  stroke="#2dd4bf"
-                                                  strokeWidth="1.5"
-                                                  strokeDasharray="3 3"
-                                                  vectorEffect="non-scaling-stroke"
-                                                />
-                                              )}
+                                           return (
+                                             <>
+                                               {/* Laser Crosshair Line on hover */}
+                                               {hoveredAnnealIndex !== null && (
+                                                 <line
+                                                   x1={(hoveredAnnealIndex / Math.max(history.length - 1, 1)) * 100}
+                                                   y1="0"
+                                                   x2={(hoveredAnnealIndex / Math.max(history.length - 1, 1)) * 100}
+                                                   y2="100"
+                                                   stroke="#2dd4bf"
+                                                   strokeWidth="1.5"
+                                                   strokeDasharray="3 3"
+                                                   vectorEffect="non-scaling-stroke"
+                                                 />
+                                               )}
 
-                                              {/* Clean SVG Polyline */}
-                                              <polyline
-                                                fill="none"
-                                                stroke="#2dd4bf"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                vectorEffect="non-scaling-stroke"
-                                                points={pointsStr}
-                                              />
-                                            </>
-                                          );
-                                        })()}
-                                      </svg>
+                                               {/* Clean SVG Polyline */}
+                                               <polyline
+                                                 fill="none"
+                                                 stroke="#2dd4bf"
+                                                 strokeWidth="2.5"
+                                                 strokeLinecap="round"
+                                                 strokeLinejoin="round"
+                                                 vectorEffect="non-scaling-stroke"
+                                                 points={pointsStr}
+                                               />
+                                             </>
+                                           );
+                                         })()}
+                                       </svg>
 
-                                      {/* Interactive node hover triggers */}
-                                      <div className="absolute inset-0 pl-16 pr-4 pt-1 pb-1 flex justify-between items-center pointer-events-auto">
-                                        {history.map((h, i, arr) => (
-                                          <div
-                                            key={i}
-                                            onMouseEnter={() => setHoveredAnnealIndex(i)}
-                                            onMouseLeave={() => setHoveredAnnealIndex(null)}
-                                            className="h-full flex-1 cursor-pointer relative group flex justify-center items-center"
-                                          >
-                                            <div className={`w-1.5 h-1.5 rounded-full transition-all ${i === hoveredAnnealIndex ? "bg-white scale-150 shadow-[0_0_8px_#2dd4bf]" : i === bestIndex ? "bg-emerald-400" : "bg-teal-500/40 opacity-0 group-hover:opacity-100"}`} />
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
+                                       {/* Interactive node hover triggers */}
+                                       <div className="absolute inset-0 pl-20 pr-4 pt-1 pb-1 flex justify-between items-center pointer-events-auto">
+                                         {history.map((h, i, arr) => (
+                                           <div
+                                             key={i}
+                                             onMouseEnter={() => setHoveredAnnealIndex(i)}
+                                             onMouseLeave={() => setHoveredAnnealIndex(null)}
+                                             className="h-full flex-1 cursor-pointer relative group flex justify-center items-center"
+                                           >
+                                             <div className={`w-1.5 h-1.5 rounded-full transition-all ${i === hoveredAnnealIndex ? "bg-white scale-150 shadow-[0_0_8px_#2dd4bf]" : i === bestIndex ? "bg-emerald-400" : "bg-teal-500/40 opacity-0 group-hover:opacity-100"}`} />
+                                           </div>
+                                         ))}
+                                       </div>
+                                     </div>
 
-                                    {/* Bottom X-Axis Step Labels */}
-                                    <div className="pl-16 pr-4 flex justify-between items-center text-[9px] font-mono text-slate-500 border-t border-white/5 pt-1">
-                                      <span>Step 0</span>
-                                      <span>Step {Math.floor((history.length - 1) * 0.25)}</span>
-                                      <span>Step {Math.floor((history.length - 1) * 0.5)}</span>
-                                      <span>Step {Math.floor((history.length - 1) * 0.75)}</span>
-                                      <span>Step {history.length - 1} (Final)</span>
-                                    </div>
+                                     {/* Bottom X-Axis Step Labels */}
+                                     <div className="pl-20 pr-4 flex justify-between items-center text-[9px] font-mono text-slate-500 border-t border-white/5 pt-1">
+                                       <span>Step 0</span>
+                                       <span>Step {Math.floor((history.length - 1) * 0.25)}</span>
+                                       <span>Step {Math.floor((history.length - 1) * 0.5)}</span>
+                                       <span>Step {Math.floor((history.length - 1) * 0.75)}</span>
+                                       <span>Step {history.length - 1} (Final)</span>
+                                     </div>
 
-                                    {/* Active Hover Tooltip Box */}
-                                    {hoveredAnnealIndex !== null && history[hoveredAnnealIndex] && (
-                                      <div className="absolute top-2 right-2 z-20 rounded-xl border border-teal-400/30 bg-slate-950/90 p-2.5 shadow-2xl backdrop-blur-md text-[10px] space-y-1">
-                                        <div className="font-bold text-teal-300 flex items-center gap-1">
-                                          <span>Step #{history[hoveredAnnealIndex].step ?? hoveredAnnealIndex}</span>
-                                          {hoveredAnnealIndex === bestIndex && <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 rounded border border-emerald-500/30">Global Min</span>}
-                                        </div>
-                                        <div className="text-slate-300">Energy Metric: <strong className="text-white font-mono">{Number(history[hoveredAnnealIndex].energy).toFixed(4)}</strong></div>
-                                        <div className="text-slate-300">Coverage: <strong className="text-cyan-300 font-mono">{Number(history[hoveredAnnealIndex].coverage ?? 0).toFixed(1)}%</strong></div>
-                                      </div>
-                                    )}
-                                  </>
-                                );
+                                     {/* Active Hover Tooltip Box */}
+                                     {hoveredAnnealIndex !== null && history[hoveredAnnealIndex] && (
+                                       <div className="absolute top-2 right-2 z-20 rounded-xl border border-teal-400/30 bg-slate-950/90 p-2.5 shadow-2xl backdrop-blur-md text-[10px] space-y-1">
+                                         <div className="font-bold text-teal-300 flex items-center gap-1">
+                                           <span>Step #{history[hoveredAnnealIndex].step ?? hoveredAnnealIndex}</span>
+                                           {hoveredAnnealIndex === bestIndex && <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 rounded border border-emerald-500/30">Global Min</span>}
+                                         </div>
+                                         <div className="text-slate-300">Energy Metric: <strong className="text-white font-mono">{Number(history[hoveredAnnealIndex].energy).toFixed(4)}</strong></div>
+                                         <div className="text-slate-300">Coverage: <strong className="text-cyan-300 font-mono">{Number(history[hoveredAnnealIndex].coverage ?? 0).toFixed(1)}%</strong></div>
+                                       </div>
+                                     )}
+                                   </>
+                                 );
                               })()}
                             </div>
                           </div>
