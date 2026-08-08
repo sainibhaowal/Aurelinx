@@ -1571,9 +1571,7 @@ const IntelligenceCenterView = () => {
                             const globalBest = Math.max(...energies);
                             const bestIndex = energies.indexOf(globalBest);
                             const finalIsBest = bestIndex === n - 1;
-                            const covAreaPts = `0,84 ${cPts
-                              .map((p) => `${p.x},${p.y}`)
-                              .join(" ")} 100,84`;
+                            /* coverage area is rendered as a smooth closed path in JSX */
                             const budgetY = yK(budgetCap);
 
                             const fmtMoney = (v) => {
@@ -1586,6 +1584,24 @@ const IntelligenceCenterView = () => {
                             const stepAt = (frac) =>
                               steps[Math.round((n - 1) * frac)] ??
                               steps[n - 1];
+                            const smoothPath = (pts) => {
+                              if (pts.length < 2) {
+                                return pts.length ? `M ${pts[0].x},${pts[0].y}` : "";
+                              }
+                              let d = `M ${pts[0].x},${pts[0].y}`;
+                              for (let i = 0; i < pts.length - 1; i++) {
+                                const p0 = pts[i - 1] || pts[i];
+                                const p1 = pts[i];
+                                const p2 = pts[i + 1];
+                                const p3 = pts[i + 2] || p2;
+                                const c1x = p1.x + (p2.x - p0.x) / 6;
+                                const c1y = p1.y + (p2.y - p0.y) / 6;
+                                const c2x = p2.x - (p3.x - p1.x) / 6;
+                                const c2y = p2.y - (p3.y - p1.y) / 6;
+                                d += ` C ${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}`;
+                              }
+                              return d;
+                            };
                             const barW = Math.max(0.85, (100 / n) * 0.8);
                             const hovered = hoveredAnnealIndex;
 
@@ -1681,6 +1697,14 @@ const IntelligenceCenterView = () => {
                                               stopOpacity="0.0"
                                             />
                                           </linearGradient>
+                                          <filter id="glowEmerald" x="-30%" y="-30%" width="160%" height="160%">
+                                            <feGaussianBlur stdDeviation="1.5" result="blur" />
+                                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                                          </filter>
+                                          <filter id="glowTeal" x="-30%" y="-30%" width="160%" height="160%">
+                                            <feGaussianBlur stdDeviation="1.5" result="blur" />
+                                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                                          </filter>
                                         </defs>
 
                                         {/* Horizontal gridlines at every energy tick */}
@@ -1717,48 +1741,72 @@ const IntelligenceCenterView = () => {
                                           vectorEffect="non-scaling-stroke"
                                         />
 
-                                        {/* Coverage area + line (right axis) */}
-                                        <polygon
-                                          points={covAreaPts}
+                                        {/* Coverage area (smooth closed path) + line (right axis) */}
+                                        <path
+                                          d={`M 0,84 ${cPts[0].x},${cPts[0].y} ${smoothPath(cPts).slice(2)} L 100,84 Z`}
                                           fill="url(#annealCovArea)"
                                         />
-                                        <polyline
+                                        <path
+                                          d={smoothPath(cPts)}
+                                          fill="none"
+                                          stroke="#818cf8"
+                                          strokeWidth="4"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          opacity="0.18"
+                                          vectorEffect="non-scaling-stroke"
+                                        />
+                                        <path
+                                          d={smoothPath(cPts)}
                                           fill="none"
                                           stroke="#818cf8"
                                           strokeWidth="1.5"
                                           strokeLinecap="round"
                                           strokeLinejoin="round"
                                           vectorEffect="non-scaling-stroke"
-                                          points={cPts
-                                            .map((p) => `${p.x},${p.y}`)
-                                            .join(" ")}
                                         />
 
-                                        {/* Best-so-far dashed line */}
-                                        <polyline
+                                        {/* Best-so-far dashed line (smooth) */}
+                                        <path
+                                          d={smoothPath(bPts)}
                                           fill="none"
                                           stroke="#34d399"
-                                          strokeWidth="1.5"
+                                          strokeWidth="4.5"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          opacity="0.14"
+                                          vectorEffect="non-scaling-stroke"
+                                        />
+                                        <path
+                                          d={smoothPath(bPts)}
+                                          fill="none"
+                                          stroke="#34d399"
+                                          strokeWidth="1.6"
                                           strokeDasharray="4 3"
                                           strokeLinecap="round"
                                           strokeLinejoin="round"
                                           vectorEffect="non-scaling-stroke"
-                                          points={bPts
-                                            .map((p) => `${p.x},${p.y}`)
-                                            .join(" ")}
                                         />
 
-                                        {/* Energy line */}
-                                        <polyline
+                                        {/* Energy line (smooth with soft halo) */}
+                                        <path
+                                          d={smoothPath(ePts)}
+                                          fill="none"
+                                          stroke="#2dd4bf"
+                                          strokeWidth="6"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          opacity="0.16"
+                                          vectorEffect="non-scaling-stroke"
+                                        />
+                                        <path
+                                          d={smoothPath(ePts)}
                                           fill="none"
                                           stroke="#2dd4bf"
                                           strokeWidth="2"
                                           strokeLinecap="round"
                                           strokeLinejoin="round"
                                           vectorEffect="non-scaling-stroke"
-                                          points={ePts
-                                            .map((p) => `${p.x},${p.y}`)
-                                            .join(" ")}
                                         />
 
                                         {/* Laser crosshair on hover */}
@@ -1775,7 +1823,7 @@ const IntelligenceCenterView = () => {
                                           />
                                         )}
 
-                                        {/* Energy step dots */}
+                                        {/* Energy step nodes (rounded with soft glow) */}
                                         {ePts.map((p, idx) => (
                                           <circle
                                             key={idx}
@@ -1783,22 +1831,29 @@ const IntelligenceCenterView = () => {
                                             cy={p.y}
                                             r={
                                               idx === bestIndex
-                                                ? "4"
+                                                ? "4.2"
                                                 : idx === hovered
-                                                  ? "3"
-                                                  : "2"
+                                                  ? "3.2"
+                                                  : "2.2"
                                             }
                                             fill={
                                               idx === bestIndex
                                                 ? "#34d399"
                                                 : "#2dd4bf"
                                             }
+                                            filter={
+                                              idx === bestIndex
+                                                ? "url(#glowEmerald)"
+                                                : "url(#glowTeal)"
+                                            }
                                             stroke={
                                               idx === bestIndex
                                                 ? "#ffffff"
-                                                : "none"
+                                                : idx === hovered
+                                                  ? "rgba(255,255,255,0.9)"
+                                                  : "rgba(255,255,255,0.35)"
                                             }
-                                            strokeWidth="1"
+                                            strokeWidth="0.7"
                                             vectorEffect="non-scaling-stroke"
                                           />
                                         ))}
@@ -1842,6 +1897,36 @@ const IntelligenceCenterView = () => {
                                         viewBox="0 0 100 100"
                                         preserveAspectRatio="none"
                                       >
+                                        <defs>
+                                          <linearGradient
+                                            id="annealBarGrad"
+                                            x1="0"
+                                            y1="0"
+                                            x2="0"
+                                            y2="1"
+                                          >
+                                            <stop
+                                              offset="0%"
+                                              stopColor="#67e8f9"
+                                              stopOpacity="0.95"
+                                            />
+                                            <stop
+                                              offset="100%"
+                                              stopColor="#0891b2"
+                                              stopOpacity="0.9"
+                                            />
+                                          </linearGradient>
+                                          <filter id="glowAmber" x="-30%" y="-30%" width="160%" height="160%">
+                                            <feGaussianBlur in="SourceAlpha" stdDeviation="0.35" result="blur" />
+                                            <feFlood floodColor="#fbbf24" floodOpacity="0.9" result="c" />
+                                            <feComposite in="c" in2="blur" operator="in" result="glow" />
+                                            <feMerge>
+                                              <feMergeNode in="glow" />
+                                              <feMergeNode in="SourceGraphic" />
+                                            </feMerge>
+                                          </filter>
+                                        </defs>
+
                                         {/* Cost gridlines */}
                                         {costTicks.map((t) => (
                                           <line
@@ -1877,7 +1962,7 @@ const IntelligenceCenterView = () => {
                                           vectorEffect="non-scaling-stroke"
                                         />
 
-                                        {/* Cost bars per step */}
+                                        {/* Cost bars per step (rounded, gradient) */}
                                         {costs.map((c, i) => (
                                           <rect
                                             key={`bar-${i}`}
@@ -1885,37 +1970,54 @@ const IntelligenceCenterView = () => {
                                             y={yK(c)}
                                             width={barW}
                                             height={84 - yK(c)}
-                                            fill="#22d3ee"
-                                            opacity={hovered === i ? 1 : 0.45}
+                                            rx="1.6"
+                                            ry="1.6"
+                                            fill="url(#annealBarGrad)"
+                                            opacity={hovered === i ? 1 : 0.55}
                                             stroke={
                                               hovered === i
                                                 ? "#ffffff"
                                                 : "none"
                                             }
-                                            strokeWidth="0.4"
+                                            strokeWidth="0.6"
                                             vectorEffect="non-scaling-stroke"
                                           />
                                         ))}
 
-                                        {/* Temperature line (right axis) */}
-                                        <polyline
+                                        {/* Temperature curve (smooth) with rounded glowing nodes */}
+                                        <path
+                                          d={smoothPath(tPts)}
                                           fill="none"
                                           stroke="#fbbf24"
-                                          strokeWidth="1.5"
+                                          strokeWidth="4.5"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          opacity="0.16"
+                                          vectorEffect="non-scaling-stroke"
+                                        />
+                                        <path
+                                          d={smoothPath(tPts)}
+                                          fill="none"
+                                          stroke="#fbbf24"
+                                          strokeWidth="1.6"
                                           strokeLinecap="round"
                                           strokeLinejoin="round"
                                           vectorEffect="non-scaling-stroke"
-                                          points={tPts
-                                            .map((p) => `${p.x},${p.y}`)
-                                            .join(" ")}
                                         />
                                         {tPts.map((p, idx) => (
                                           <circle
                                             key={`td-${idx}`}
                                             cx={p.x}
                                             cy={p.y}
-                                            r="1.2"
-                                            fill="#fbbf24"
+                                            r={hovered === idx ? "2.4" : "1.7"}
+                                            fill="#fde68a"
+                                            filter="url(#glowAmber)"
+                                            stroke={
+                                              hovered === idx
+                                                ? "#ffffff"
+                                                : "none"
+                                            }
+                                            strokeWidth="0.6"
                                             vectorEffect="non-scaling-stroke"
                                           />
                                         ))}
