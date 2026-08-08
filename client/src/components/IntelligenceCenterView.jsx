@@ -1630,7 +1630,7 @@ const IntelligenceCenterView = () => {
                                     Budget cap
                                   </span>
                                 </div>
-                                <div className="relative mt-28">
+                                <div className="relative mt-2">
                                   {/* ===== MAIN CHART: Energy + Best-so-far (left) + Coverage (right) ===== */}
                                   <div className="relative h-56 w-full rounded-lg border border-white/10 bg-slate-950/80 overflow-hidden">
                                     {/* Y-axis energy tick labels */}
@@ -2024,15 +2024,15 @@ const IntelligenceCenterView = () => {
                                       ))}
                                     </div>
 
-                                    {/* Floating Hover Visor Tooltip Box - Positioned Entirely ABOVE the Graph Canvas (Zero Obscuration) */}
+                                    {/* Smart Opposite-Corner Hover Tooltip Box (Zero Obscuration & Zero Extra Gap) */}
                                     {hovered !== null && history[hovered] && (() => {
                                       const hx = xPos(hovered);
+                                      const isRightHalf = hx > 50;
                                       return (
                                         <div
-                                          className="absolute -top-[115px] z-30 rounded-xl border border-teal-400/50 bg-slate-950/95 p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.9)] backdrop-blur-md text-[10.5px] space-y-1 pointer-events-none transition-all duration-100 ease-out min-w-[170px]"
-                                          style={{
-                                            left: `clamp(0px, calc(${hx}% - 85px), calc(100% - 170px))`
-                                          }}
+                                          className={`absolute top-2 z-30 rounded-xl border border-teal-400/40 bg-slate-950/90 p-2.5 shadow-[0_10px_25px_rgba(0,0,0,0.8)] backdrop-blur-md text-[10.5px] space-y-1 pointer-events-none transition-all duration-150 ease-out min-w-[165px] ${
+                                            isRightHalf ? "left-16" : "right-14"
+                                          }`}
                                         >
                                           <div className="font-bold text-teal-300 flex items-center justify-between gap-1 border-b border-white/10 pb-1">
                                             <span className="flex items-center gap-1">
