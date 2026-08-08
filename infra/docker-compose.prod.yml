@@ -63,6 +63,7 @@ services:
       PYTHONPATH: /app
       CHAT_UPLOAD_ROOT: ${CHAT_UPLOAD_ROOT:-/app/data/chat}
       ANTIGRAVITY_STATE_DIR: ${ANTIGRAVITY_STATE_DIR:-/app/data/antigravity}
+      AURELINX_AGENT_RUNTIME: ${AURELINX_AGENT_RUNTIME:-builtin}
     depends_on:
       postgres:
         condition: service_healthy
