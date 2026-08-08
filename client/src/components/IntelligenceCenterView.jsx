@@ -2026,19 +2026,19 @@ const IntelligenceCenterView = () => {
                                     ))}
                                   </div>
 
-                                  {/* Active Hover Tooltip Box - Follows Cursor Side-by-Side */}
-                                  {hovered !== null && history[hovered] && (() => {
-                                    const hx = xPos(hovered);
-                                    const isRightHalf = hx > 58;
-                                    return (
-                                      <div
-                                        className="absolute top-3 z-30 rounded-xl border border-teal-400/40 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-md text-[11px] space-y-1.5 pointer-events-none transition-all duration-100 ease-out min-w-[175px]"
-                                        style={
-                                          isRightHalf
-                                            ? { right: `${Math.max(2, 100 - hx + 3)}%` }
-                                            : { left: `${Math.max(2, hx + 3)}%` }
-                                        }
-                                      >
+                                  {/* Active Hover Tooltip Box - Follows Cursor Side-by-Side with 20px Clear Gap */}
+                                   {hovered !== null && history[hovered] && (() => {
+                                     const hx = xPos(hovered);
+                                     const isRightHalf = hx > 50;
+                                     return (
+                                       <div
+                                         className="absolute top-2 z-30 rounded-xl border border-teal-400/40 bg-slate-950/90 p-2.5 shadow-2xl backdrop-blur-md text-[10.5px] space-y-1 pointer-events-none transition-all duration-100 ease-out min-w-[170px]"
+                                         style={
+                                           isRightHalf
+                                             ? { left: `calc(${hx}% - 185px)` }
+                                             : { left: `calc(${hx}% + 20px)` }
+                                         }
+                                       >
                                         <div className="font-bold text-teal-300 flex items-center justify-between gap-1 border-b border-white/10 pb-1">
                                           <span className="flex items-center gap-1">
                                             Step #
