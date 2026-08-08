@@ -2051,23 +2051,93 @@ const IntelligenceCenterView = () => {
                                       </svg>
                                     </div>
                                   </div>
-
                                   {/* Hover overlay spanning both charts */}
-                                  <div className="absolute inset-0 ml-14 mr-11 flex justify-between items-stretch pointer-events-auto">
-                                    {history.map((h, i) => (
-                                      <div
-                                        key={i}
-                                        onMouseEnter={() =>
-                                          setHoveredAnnealIndex(i)
-                                        }
-                                        onMouseLeave={() =>
-                                            setHoveredAnnealIndex(null)
-                                        }
-                                        className="flex-1 h-full cursor-pointer relative group"
-                                      />
-                                    ))}
+                                    <div className="absolute inset-0 ml-14 mr-11 flex justify-between items-stretch pointer-events-auto">
+                                      {history.map((h, i) => (
+                                        <div
+                                          key={i}
+                                          onMouseEnter={() =>
+                                            setHoveredAnnealIndex(i)
+                                          }
+                                          onMouseLeave={() =>
+                                              setHoveredAnnealIndex(null)
+                                          }
+                                          className="flex-1 h-full cursor-pointer relative group"
+                                        />
+                                      ))}
+                                    </div>
+
+                                    {/* Floating Hover Tooltip Box - Flanked 36px Away Side-by-Side (Zero Crosshair Obscuration) */}
+                                    {hovered !== null && history[hovered] && (() => {
+                                      const hx = xPos(hovered);
+                                      const isRightHalf = hx > 50;
+                                      return (
+                                        <div
+                                          className="absolute top-2 z-30 rounded-xl border border-teal-400/40 bg-slate-950/80 p-2.5 shadow-[0_10px_25px_rgba(0,0,0,0.8)] backdrop-blur-md text-[10.5px] space-y-1 pointer-events-none transition-all duration-100 ease-out min-w-[165px]"
+                                          style={
+                                            isRightHalf
+                                              ? { left: `calc(${hx}% - 195px)` }
+                                              : { left: `calc(${hx}% + 36px)` }
+                                          }
+                                        >
+                                          <div className="font-bold text-teal-300 flex items-center justify-between gap-1 border-b border-white/10 pb-1">
+                                            <span className="flex items-center gap-1">
+                                              Step #
+                                              {history[hovered].step ??
+                                                hovered}
+                                            </span>
+                                            {hovered === bestIndex && (
+                                              <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30 font-semibold">
+                                                Optimal Best
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-slate-300 flex justify-between gap-3">
+                                            <span>Temperature:</span>
+                                            <strong className="text-amber-300 font-mono">
+                                              {Number(
+                                                history[hovered].temperature,
+                                              ).toFixed(3)}
+                                            </strong>
+                                          </div>
+                                          <div className="text-slate-300 flex justify-between gap-3">
+                                            <span>Energy E(x):</span>
+                                            <strong className="text-teal-300 font-mono">
+                                              {Number(
+                                                history[hovered].energy,
+                                              ).toFixed(4)}
+                                            </strong>
+                                          </div>
+                                          <div className="text-slate-300 flex justify-between gap-3">
+                                            <span>Best-so-far E*:</span>
+                                            <strong className="text-emerald-400 font-mono">
+                                              {Number(
+                                                history[hovered].best_energy ??
+                                                  history[hovered].energy,
+                                              ).toFixed(4)}
+                                            </strong>
+                                          </div>
+                                          <div className="text-slate-300 flex justify-between gap-3">
+                                            <span>Skill Coverage:</span>
+                                            <strong className="text-indigo-300 font-mono">
+                                              {Number(
+                                                history[hovered].coverage ?? 0,
+                                              ).toFixed(1)}
+                                              %
+                                            </strong>
+                                          </div>
+                                          <div className="text-slate-300 flex justify-between gap-3 border-t border-white/5 pt-1">
+                                            <span>Team Cost:</span>
+                                            <strong className="text-cyan-300 font-mono">
+                                              {fmtMoney(
+                                                history[hovered].cost ?? 0,
+                                              )}
+                                            </strong>
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
-                                </div>
 
                                 {/* X-Axis Step Ticks (real step numbers) */}
                                 <div className="ml-14 mr-11 mt-2 flex justify-between items-center text-[10px] font-mono text-slate-400 border-t border-white/10 pt-2">
