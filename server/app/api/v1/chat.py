@@ -3252,7 +3252,8 @@ async def _stream_true_agent_loop(
                 if token == "<think>":
                     if not reasoning_active:
                         reasoning_active = True
-                        reasoning_frame = emit(
+                        reasoning_frame = emit_workflow_event(
+                            workflow_run.id,
                             "model_reasoning",
                             "planning",
                             "The execution model started provider-reported reasoning",
@@ -3263,8 +3264,9 @@ async def _stream_true_agent_loop(
                                 "model": request.model or "provider_default",
                             },
                         )
-                        reasoning_event_id = events[-1]["event_id"]
-                        yield reasoning_frame
+                        reasoning_event_id = reasoning_frame["event_id"]
+                        events.append(reasoning_frame)
+                        yield f"event: agent_step\ndata: {_json_dumps(reasoning_frame)}\n\n"
                     continue
                 if token == "</think>":
                     if reasoning_active:
@@ -3604,7 +3606,8 @@ async def _stream_true_agent_loop(
                 if token == "<think>":
                     if not reasoning_active:
                         reasoning_active = True
-                        reasoning_frame = emit(
+                        reasoning_frame = emit_workflow_event(
+                            workflow_run.id,
                             "model_reasoning",
                             "response",
                             "The answer model started provider-reported reasoning",
@@ -3614,10 +3617,11 @@ async def _stream_true_agent_loop(
                                 "model": request.model or "provider_default",
                             },
                         )
-                        reasoning_event_id = events[-1]["event_id"]
-                        yield reasoning_frame
+                        reasoning_event_id = reasoning_frame["event_id"]
+                        events.append(reasoning_frame)
+                        yield f"event: agent_step\ndata: {_json_dumps(reasoning_frame)}\n\n"
                     continue
-                if token == "</think>":
+                if token == " response":
                     if reasoning_active:
                         reasoning_active = False
                         yield emit(
