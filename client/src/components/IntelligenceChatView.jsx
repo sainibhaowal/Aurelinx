@@ -878,6 +878,11 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
                     <span className={`text-xs font-medium leading-relaxed ${statusColor}`}>
                       {status === "completed" ? "✓ " : status === "running" ? "● " : ""}{message}
                     </span>
+                    {status === "running" && step.type === "model_reasoning" && (
+                      <span className="flex items-center gap-1 text-[9px] font-mono text-cyan-400">
+                        <span className="animate-pulse">⚡</span> thinking live
+                      </span>
+                    )}
                     {isToolExecution && (
                       <span className="flex-shrink-0 rounded-full border border-white/10 bg-white/[0.03] px-1.5 py-0.5 text-[9px] font-mono text-slate-500">
                         {status === "running" ? `${durationLabel} elapsed` : durationLabel}
@@ -889,6 +894,13 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
                   </span>
                 </div>
 
+                {/* Live tool progress strip while a tool executes */}
+                {status === "running" && isToolExecution && (
+                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-800">
+                    <span className="block h-full w-2/5 animate-pulse rounded-full bg-gradient-to-r from-cyan-400 to-teal-300" />
+                  </div>
+                )}
+
                 {/* 4. Live Chain of Thought Telemetry Drawer */}
                 {step.type === "model_reasoning" && (
                   <div className="mt-1.5 rounded border border-cyan-500/20 bg-slate-950/60 p-2 text-[10px] text-slate-300">
@@ -898,7 +910,13 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
                       onClick={() => setExpandedId((current) => current === `${id}:thinking` ? null : `${id}:thinking`)}
                     >
                       <span>🧠 CHAIN OF THOUGHT TELEMETRY {isThinkingExpanded ? "⌃" : "⌄"}</span>
-                      <span>{step.result_summary?.characters || 0} chars · {formatDuration(stepDuration(step))}</span>
+                      {status === "running" ? (
+                        <span className="animate-pulse text-cyan-300">
+                          {(step.result_summary?.characters || 0)} chars · streaming live
+                        </span>
+                      ) : (
+                        <span>{step.result_summary?.characters || 0} chars · {formatDuration(stepDuration(step))}</span>
+                      )}
                     </button>
                     {isThinkingExpanded && (
                       <div className="mt-2 grid grid-cols-2 gap-1.5 text-[9px] text-slate-400 sm:grid-cols-3">
