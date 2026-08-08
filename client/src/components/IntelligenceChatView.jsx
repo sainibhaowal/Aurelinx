@@ -298,8 +298,15 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
   // A streamed <think> block is telemetry, not answer content. The live
   // timeline shows whether the provider entered/exited reasoning, so do not
   // create a second fake reasoning card here.
-  const visibleContent = parsed.thinking ? parsed.content : rawText;
-  if (!visibleContent || (isBusy && parsed.thinking && !parsed.content)) return null;
+  // During active streaming: if <think> opened but </think> not yet closed,
+  // parsed.content is "" — but any text BEFORE <think> should still show.
+  const preThinkContent = (() => {
+    if (!rawText) return "";
+    const thinkStart = rawText.indexOf("<think>");
+    return thinkStart > 0 ? rawText.slice(0, thinkStart).trim() : "";
+  })();
+  const visibleContent = parsed.thinking ? (parsed.content || preThinkContent) : rawText;
+  if (!visibleContent) return null;
 
   return (
     <div className="mt-2 min-w-0 w-full overflow-hidden pt-2">
@@ -661,7 +668,18 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
   const mergedSteps = useMemo(() => {
     const visible = deterministicSteps.filter((step) => {
       if (step.tool === "conversation.context") return false;
-      if (["workflow_started", "agent_started", "validation_completed", "workflow_completed", "final_response_completed", "final_response_started", "agent_decision"].includes(step.type)) return false;
+      if ([
+        "workflow_started",
+        "agent_started",
+        "validation_completed",
+        "workflow_completed",
+        "final_response_completed",
+        "final_response_started",
+        "agent_decision",
+        "controller_call",
+        "controller_output_normalized",
+        "controller_output_repaired"
+      ].includes(step.type)) return false;
       if (step.type === "workflow_failed" && deterministicSteps.some((item) => item.type === "agent_failed")) return false;
       return true;
     });
@@ -775,230 +793,138 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
   }), [mergedSteps]);
 
   return (
-    <div className="flex flex-col gap-2 my-2">
-      {/* 2. Enterprise Telemetry & Policy Header */}
-      <div className="rounded-lg border border-cyan-500/20 bg-slate-950/70 p-2.5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-500" />
-            </span>
-            <span className="text-[11px] font-bold tracking-wider text-slate-200">
-              AURELINX AGENT RUNTIME
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-[10px]">
-            <span className="text-slate-400">⚡ <strong className="font-mono text-cyan-300">{telemetry.latency}</strong></span>
-            <span className="text-slate-400">🚀 <strong className="font-mono text-cyan-300">{telemetry.throughput} tok/s</strong></span>
-            <span className="text-slate-400">🛡️ <strong className="text-emerald-300">RBAC + Approval Gates</strong></span>
-          </div>
-        </div>
-
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] text-slate-400">
-          <span className="uppercase tracking-wider text-slate-500">Active Runtime</span>
-          <span className="font-mono text-cyan-300">Native Agent Loop · Live Model + Dynamic Tools</span>
-          <span className="text-slate-600">{telemetry.status}</span>
-        </div>
-
-        {/* 5. Filter Chips */}
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <div className="flex gap-1">
-            {[
-              { id: "all", label: `All Events (${filterCounts.all})` },
-              { id: "queries", label: `Database Queries (${filterCounts.queries})` },
-              { id: "mutations", label: `Mutations (${filterCounts.mutations})` },
-              { id: "errors", label: `Errors (${filterCounts.errors})` },
-              { id: "reasoning", label: `Reasoning (${filterCounts.reasoning})` },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={`rounded px-2 py-0.5 text-[9px] font-medium transition-colors ${
-                  filterTab === tab.id
-                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-                onClick={() => setFilterTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            className="text-[9px] uppercase tracking-wider text-cyan-400/80 hover:text-cyan-300"
-            onClick={() => setExpandedAll((current) => !current)}
-          >
-            {expandedAll ? "Collapse" : "Expand"}
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col gap-1 my-2">
 
       {/* Steps List */}
-      <div className="space-y-1.5 max-h-[32rem] overflow-y-auto pr-1">
+      <div className="flex flex-col gap-1 font-mono text-[12px] text-slate-300">
         {filteredSteps.map((step, index) => {
           const id = step.event_id || `${step.type}-${index}`;
           const status = step.status || "running";
           const isError = status === "failed" || status === "blocked";
-          const statusColor = status === "completed"
-            ? "text-emerald-300"
-            : isError
-              ? "text-rose-300"
-                : status === "waiting"
-                  ? "text-amber-300"
-                  : "text-cyan-300";
-          const message = naturalStepDetail(step);
-          const toolName = toolNameForStep(step);
           const isToolExecution = step.type === "tool_execution";
-          const isExpanded = expandedAll || expandedId === `${id}:payload`;
-          const isInputExpanded = expandedAll || expandedId === `${id}:input`;
-          const isOutputExpanded = expandedAll || expandedId === `${id}:output`;
-          const isThinkingExpanded = expandedAll || expandedId === `${id}:thinking`;
-          const durationLabel = formatDuration(stepDuration(step));
+          const isReasoning = step.type === "model_reasoning";
+          const duration = stepDuration(step);
+          const durationLabel = formatDuration(duration);
+          const toolName = toolNameForStep(step);
+
+          const isExpanded = expandedAll || expandedId === id;
+
+          let displayTitle = step.message || step.type;
+          if (isReasoning) {
+            displayTitle = status === "running"
+              ? `Thinking... ${durationLabel}`
+              : `Thought for ${durationLabel}`;
+          } else if (isToolExecution) {
+            const matches = step.result?.returned ?? step.result?.matches_found ?? (Array.isArray(step.result?.matches) ? step.result.matches.length : null);
+            const matchSuffix = matches != null ? ` (${matches} matches)` : "";
+            displayTitle = `${toolName}${matchSuffix}`;
+          }
 
           return (
-            <div key={id} className="relative flex items-start gap-2.5 rounded-lg border border-white/5 bg-slate-900/40 p-2 text-left">
-              <div className="relative z-10 mt-0.5 flex-shrink-0">
-                <span className={`h-5 w-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold border ${
-                  status === "completed" ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-300" :
-                  isError ? "bg-rose-500/20 border-rose-400/60 text-rose-300" :
-                  status === "waiting" ? "bg-amber-500/20 border-amber-400/60 text-amber-300" :
-                  "bg-cyan-500/20 border-cyan-400/60 text-cyan-300 animate-pulse"
-                }`}>
-                  {status === "completed" ? "✓" : isError ? "!" : status === "waiting" ? "…" : "●"}
+            <div key={id} className="group flex flex-col min-w-0">
+              <button
+                type="button"
+                onClick={() => setExpandedId((current) => current === id ? null : id)}
+                className="flex items-center gap-2 py-0.5 px-1 rounded hover:bg-white/[0.04] transition-colors cursor-pointer text-left w-full border border-transparent hover:border-white/5 select-none"
+              >
+                {/* Chevron Arrow Icon */}
+                <span className="text-slate-500 group-hover:text-cyan-300 transition-colors text-[11px] w-3 flex-shrink-0 font-bold">
+                  {isExpanded ? "⌄" : "›"}
                 </span>
-              </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className={`text-xs font-medium leading-relaxed ${statusColor}`}>
-                      {status === "completed" && !isToolExecution && step.type !== "model_reasoning" ? "✓ " : status === "running" ? "● " : ""}{message}
-                      {step.type === "model_reasoning" && (
-                        <span className="font-mono text-slate-400">: {durationLabel}</span>
-                      )}
-                    </span>
-                    {status === "running" && step.type === "model_reasoning" && (
-                      <span className="flex items-center gap-1 text-[9px] font-mono text-cyan-400">
-                        <span className="animate-pulse">⚡</span>
-                        thinking live · {durationLabel} elapsed · {(step.result_summary?.characters || 0)} chars
-                      </span>
-                    )}
-                    {isToolExecution && (
-                      <span className="flex-shrink-0 rounded-full border border-white/10 bg-white/[0.03] px-1.5 py-0.5 text-[9px] font-mono text-slate-500">
-                        {status === "running" ? `${durationLabel} elapsed` : durationLabel}
-                      </span>
-                    )}
-                  </div>
-                  <span className="flex-shrink-0 text-[9px] font-mono text-slate-500">
-                    {workflowTime(step.created_at)}
-                  </span>
-                </div>
-
-                {/* Live tool progress strip while a tool executes */}
-                {status === "running" && isToolExecution && (
-                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-800">
-                    <span className="block h-full w-2/5 animate-pulse rounded-full bg-gradient-to-r from-cyan-400 to-teal-300" />
-                  </div>
-                )}
-
-                {/* 4. Live Chain of Thought Telemetry Drawer */}
-                {step.type === "model_reasoning" && (
-                  <div className="mt-1.5 rounded border border-cyan-500/20 bg-slate-950/60 p-2 text-[10px] text-slate-300">
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between font-mono text-[9px] text-cyan-400"
-                      onClick={() => setExpandedId((current) => current === `${id}:thinking` ? null : `${id}:thinking`)}
-                    >
-                      <span>🧠 CHAIN OF THOUGHT TELEMETRY {isThinkingExpanded ? "⌃" : "⌄"}</span>
-                      {status === "running" ? (
-                        <span className="animate-pulse text-cyan-300">
-                          {(step.result_summary?.characters || 0)} chars · streaming live
-                        </span>
-                      ) : (
-                        <span>{step.result_summary?.characters || 0} chars · {formatDuration(stepDuration(step))}</span>
-                      )}
-                    </button>
-                    {isThinkingExpanded && (
-                      <div className="mt-2 grid grid-cols-2 gap-1.5 text-[9px] text-slate-400 sm:grid-cols-3">
-                        <span className="rounded bg-white/[0.03] px-1.5 py-1">Characters <b className="text-cyan-300">{step.result_summary?.characters || 0}</b></span>
-                        <span className="rounded bg-white/[0.03] px-1.5 py-1">Duration <b className="text-cyan-300">{formatDuration(stepDuration(step))}</b></span>
-                        <span className="rounded bg-white/[0.03] px-1.5 py-1">Token estimate <b className="text-cyan-300">{Math.max(0, Math.round((step.result_summary?.characters || 0) / 4))}</b></span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 3. Rich Visual Artifact Cards */}
-                {step.type === "tool_execution" && (
-                  <RenderToolResultCard
-                    toolName={toolName}
-                    result={step.result}
-                    inputArgs={step.safe_input}
-                    status={status}
-                  />
-                )}
-
-                <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                  {isToolExecution ? (
-                    <>
-                      <button
-                        type="button"
-                        className={`rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-wider ${isInputExpanded ? "border-cyan-500/40 text-cyan-300" : "border-white/10 text-slate-500 hover:text-cyan-300"}`}
-                        onClick={() => setExpandedId((current) => current === `${id}:input` ? null : `${id}:input`)}
-                      >
-                        {isInputExpanded ? "Hide input" : "Input parameters"}
-                      </button>
-                      <button
-                        type="button"
-                        className={`rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-wider ${isOutputExpanded ? "border-emerald-500/40 text-emerald-300" : "border-white/10 text-slate-500 hover:text-emerald-300"}`}
-                        onClick={() => setExpandedId((current) => current === `${id}:output` ? null : `${id}:output`)}
-                      >
-                        {isOutputExpanded ? "Hide output" : "Output metadata"}
-                      </button>
-                    </>
+                {/* Status Indicator Icon */}
+                <span className="flex-shrink-0 text-[11px]">
+                  {status === "completed" ? (
+                    <span className="text-emerald-400 font-bold">✓</span>
+                  ) : isError ? (
+                    <span className="text-rose-400 font-bold">✕</span>
+                  ) : status === "waiting" ? (
+                    <span className="text-amber-400 font-bold">⏱</span>
                   ) : (
-                    <button
-                      type="button"
-                      className="text-[9px] uppercase tracking-wider text-slate-500 hover:text-cyan-300"
-                      onClick={() => setExpandedId((current) => current === `${id}:payload` ? null : `${id}:payload`)}
-                    >
-                      {isExpanded ? "Hide payload" : "Show payload"}
-                    </button>
+                    <span className="text-cyan-400 animate-pulse font-bold">●</span>
                   )}
-                  {step.duration_ms != null && <span className="text-[9px] font-mono text-slate-600">· {durationLabel}</span>}
+                </span>
+
+                {/* Main Label */}
+                <span
+                  className={`truncate font-medium ${
+                    isError
+                      ? "text-rose-300"
+                      : status === "running"
+                      ? "text-cyan-300"
+                      : isReasoning
+                      ? "text-slate-400"
+                      : "text-slate-200"
+                  }`}
+                >
+                  {displayTitle}
+                </span>
+
+                {/* Timing Badge */}
+                {duration > 0 && !isReasoning && (
+                  <span className="ml-auto flex-shrink-0 text-[10px] font-mono text-slate-500 bg-white/[0.03] px-1.5 py-0.5 rounded border border-white/5">
+                    {durationLabel}
+                  </span>
+                )}
+              </button>
+
+              {/* Expanded Details Drawer */}
+              {isExpanded && (
+                <div className="ml-5 mt-1 mb-2 p-2.5 rounded-lg border border-white/10 bg-slate-950/90 text-[11px] text-slate-300 space-y-2">
+                  {isReasoning ? (
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-cyan-400 font-semibold border-b border-white/5 pb-1">
+                        <span>Reasoning Telemetry</span>
+                        <span>{step.result_summary?.characters || 0} chars · {durationLabel}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 pt-1">
+                        <div>Characters: <strong className="text-cyan-300">{step.result_summary?.characters || 0}</strong></div>
+                        <div>Duration: <strong className="text-cyan-300">{durationLabel}</strong></div>
+                        <div>Estimated Tokens: <strong className="text-cyan-300">{Math.round((step.result_summary?.characters || 0) / 4)}</strong></div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {step.safe_input && (
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold mb-1">Input Parameters</div>
+                          <pre className="p-2 rounded bg-black/40 border border-white/5 font-mono text-[10px] text-slate-300 overflow-x-auto whitespace-pre-wrap break-words max-h-40">
+                            {displayPayload(step.safe_input)}
+                          </pre>
+                        </div>
+                      )}
+                      {(step.result || step.output_metadata || step.result_summary) && (
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold mb-1">Output Metadata</div>
+                          <pre className="p-2 rounded bg-black/40 border border-white/5 font-mono text-[10px] text-slate-300 overflow-x-auto whitespace-pre-wrap break-words max-h-40">
+                            {displayPayload(step.result || step.output_metadata || step.result_summary)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Human Approval Action Buttons */}
+                  {step.type === "approval_required" && step.result_summary?.approval_id && onApproval && (
+                    <div className="flex gap-2 pt-2 border-t border-white/10">
+                      <button
+                        type="button"
+                        className="px-3 py-1 rounded bg-emerald-500/20 border border-emerald-500/40 text-[11px] text-emerald-300 hover:bg-emerald-500/30 transition-colors font-sans font-medium"
+                        onClick={() => onApproval("approve", step)}
+                      >
+                        ✓ Approve exact action
+                      </button>
+                      <button
+                        type="button"
+                        className="px-3 py-1 rounded bg-rose-500/20 border border-rose-500/40 text-[11px] text-rose-300 hover:bg-rose-500/30 transition-colors font-sans font-medium"
+                        onClick={() => onApproval("reject", step)}
+                      >
+                        ✕ Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
-
-                {isToolExecution && isInputExpanded && (
-                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-cyan-500/15 bg-slate-950/90 p-2 text-left font-mono text-[9px] leading-relaxed text-slate-400 whitespace-pre-wrap break-words">
-                    {displayPayload(step.safe_input)}
-                  </pre>
-                )}
-
-                {isToolExecution && isOutputExpanded && (
-                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-emerald-500/15 bg-slate-950/90 p-2 text-left font-mono text-[9px] leading-relaxed text-slate-400 whitespace-pre-wrap break-words">
-                    {displayPayload(step.output_metadata || step.result)}
-                  </pre>
-                )}
-
-                {!isToolExecution && isExpanded && (
-                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-cyan-500/15 bg-slate-950/90 p-2 text-left font-mono text-[9px] leading-relaxed text-slate-400 whitespace-pre-wrap break-words">
-                    {displayPayload(step.result || step.safe_input || step)}
-                  </pre>
-                )}
-
-                {step.type === "approval_required" && step.result_summary?.approval_id && onApproval && (
-                  <div className="flex gap-2 mt-2">
-                    <button type="button" className="px-2.5 py-1 rounded border border-emerald-500/30 text-[10px] text-emerald-300 hover:bg-emerald-500/10" onClick={() => onApproval("approve", step)}>
-                      Approve exact action
-                    </button>
-                    <button type="button" className="px-2.5 py-1 rounded border border-rose-500/30 text-[10px] text-rose-300 hover:bg-rose-500/10" onClick={() => onApproval("reject", step)}>
-                      Reject
-                    </button>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           );
         })}
@@ -1598,8 +1524,14 @@ const IntelligenceChatView = () => {
                         <span>{streamText.length} characters received</span>
                       </div>
                     )}
-                    <div className="text-sm">
+                    <div className="text-sm relative">
                       <ThinkingMessageContent text={streamText} isBusy={busy} />
+                      {busy && streamText && (
+                        <span
+                          className="inline-block w-[2px] h-[1em] ml-0.5 align-middle bg-cyan-400 rounded-sm"
+                          style={{ animation: "blink-cursor 0.8s step-end infinite" }}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
