@@ -1380,7 +1380,7 @@ async def _llm_stream_response(
             )
         else:
             output = run.get("output", [])
-            tool_summary_lines.append(f"- {tool_name}: {json.dumps(output)}")
+            tool_summary_lines.append(f"- {tool_name}: {json.dumps(output, default=str)}")
 
     integrations = tool_ctx.get("integration_connections", [])
     compliance = tool_ctx.get("compliance_policies", [])
@@ -1407,9 +1407,9 @@ async def _llm_stream_response(
             f"--- WORKSPACE SNAPSHOT ---\n{workspace_block}\n"
             f"--- ATTACHMENT/FILE CONTENT ---\n{attachment_ctx}\n"
             f"--- LIVE TOOL DATA ---\n{tool_block}\n"
-            f"Active integrations: {json.dumps(integrations)}\n"
-            f"Compliance policies: {json.dumps(compliance)}\n"
-            f"Mutation log: {json.dumps(mutations)}\n"
+            f"Active integrations: {json.dumps(integrations, default=str)}\n"
+            f"Compliance policies: {json.dumps(compliance, default=str)}\n"
+            f"Mutation log: {json.dumps(mutations, default=str)}\n"
             f"User RBAC role: {rbac}\n"
             "--- END TOOL DATA ---\n\n"
             "Using the data above, answer the user's request clearly in Markdown. "
@@ -1684,7 +1684,7 @@ async def _llm_response(
             )
         else:
             output = run.get("output", [])
-            tool_summary_lines.append(f"- {tool_name}: {json.dumps(output)}")
+            tool_summary_lines.append(f"- {tool_name}: {json.dumps(output, default=str)}")
 
     integrations = tool_ctx.get("integration_connections", [])
     compliance = tool_ctx.get("compliance_policies", [])
@@ -1705,9 +1705,9 @@ async def _llm_response(
             f"--- WORKSPACE SNAPSHOT ---\n{workspace_block}\n"
             f"--- ATTACHMENT/FILE CONTENT ---\n{attachment_ctx}\n"
             f"--- LIVE TOOL DATA ---\n{tool_block}\n"
-            f"Active integrations: {json.dumps(integrations)}\n"
-            f"Compliance policies: {json.dumps(compliance)}\n"
-            f"Mutation log: {json.dumps(mutations)}\n"
+            f"Active integrations: {json.dumps(integrations, default=str)}\n"
+            f"Compliance policies: {json.dumps(compliance, default=str)}\n"
+            f"Mutation log: {json.dumps(mutations, default=str)}\n"
             f"User RBAC role: {rbac}\n"
             "--- END TOOL DATA ---\n\n"
             "Using the data above, answer the user's request clearly in Markdown. "
@@ -2841,6 +2841,12 @@ def _execute_agent_tool(
         ).all()
         query = str(arguments.get("query") or user_text)[:12000]
 
+        base_tool = (tool_name or "").rsplit(".", 1)[-1].strip().lower()
+        if base_tool == "analyze":
+            base_tool = "analyse"
+        if base_tool in AGENT_TOOL_CATALOG:
+            tool_name = base_tool
+
         if tool_name == "search":
             requested_limit = max(1, min(int(arguments.get("limit", 20)), 200))
             offset = max(0, int(arguments.get("offset", 0)))
@@ -3517,6 +3523,21 @@ async def _stream_true_agent_loop(
         duration_ms=0,
     )
 
+    overview_markers = [
+        "what does aurelinx know", "what do you know", "what do we know",
+        "cover every module", "everything you know", "whole system", "full picture",
+        "every module", "explain the system", "company overview", "operations overview",
+        "what is going on", "knows everything", "tell me everything",
+    ]
+    user_text_lc = (request.content or "").lower()
+    overview_hint = ""
+    if any(m in user_text_lc for m in overview_markers):
+        overview_hint = (
+            " IMPORTANT: this is a whole-company overview question. Start with the analyse tool "
+            "(not search) — its result contains verified counts, current values, and formulas for "
+            "every module; follow with observe or search/read only if specific records are needed."
+        )
+
     controller_system = (
         "You are the Aurelinx LLM execution controller. Return ONLY one valid JSON object. "
         "You must choose one next action, never multiple actions. Do not reveal chain-of-thought. "
@@ -3527,6 +3548,7 @@ async def _stream_true_agent_loop(
         "Allowed actions: tool, respond, approval_required. Allowed tools: "
         + ", ".join(AGENT_TOOL_CATALOG.keys())
         + "."
+        + overview_hint
     )
 
     controller_answer = ""
@@ -3619,15 +3641,15 @@ async def _stream_true_agent_loop(
             )
 
         try:
-            for attempt_round in range(1, 4):
+            for attempt_round in range(1, 5):
                 try:
                     async for sse in controller_turn_attempt():
                         yield sse
                     break
                 except Exception as exc:
-                    if attempt_round < 3 and _transient_provider_error(exc):
-                        logger.warning(f"[chat] transient controller failure on attempt {attempt_round}/3, retrying: {exc}")
-                        await asyncio.sleep(0.8 * attempt_round)
+                    if attempt_round < 4 and _transient_provider_error(exc):
+                        logger.warning(f"[chat] transient controller failure on attempt {attempt_round}/4, retrying: {exc}")
+                        await asyncio.sleep(min(24, 4 * attempt_round))
                         continue
                     raise
         except Exception as exc:
@@ -3933,7 +3955,7 @@ async def _stream_true_agent_loop(
                 yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
                 await asyncio.sleep(0.012)
         else:
-            for attempt_round in range(1, 4):
+            for attempt_round in range(1, 5):
                 reasoning_active = False
                 reasoning_event_chars = 0
                 reasoning_event_id = None
@@ -4007,12 +4029,12 @@ async def _stream_true_agent_loop(
                             result_summary={"characters": reasoning_event_chars},
                             error_code=_provider_error_code(exc),
                         )
-                    if attempt_round < 3 and _transient_provider_error(exc):
-                        logger.warning(f"[chat] transient provider failure on attempt {attempt_round}/3, retrying: {exc}")
+                    if attempt_round < 4 and _transient_provider_error(exc):
+                        logger.warning(f"[chat] transient provider failure on attempt {attempt_round}/4, retrying: {exc}")
                         assistant_text = assistant_text[:content_before_attempt]
-                        await asyncio.sleep(0.8 * attempt_round)
+                        await asyncio.sleep(min(24, 4 * attempt_round))
                         continue
-                    logger.warning(f"[chat] final answer stream failed on attempt {attempt_round}/3: {exc}")
+                    logger.warning(f"[chat] final answer stream failed on attempt {attempt_round}/4: {exc}")
                     raise
     except Exception as exc:
         last_err = str(exc)
