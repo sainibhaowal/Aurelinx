@@ -19,7 +19,7 @@ import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import String, func, or_
 from sqlmodel import Session, select
 
 from app.core.config import settings
@@ -1864,62 +1864,55 @@ def _is_casual_chat(user_text: str) -> bool:
 
 
 AGENT_TOOL_CATALOG = {
-    "employee.search": "Search verified employee records using a natural-language query.",
-    "candidate.search": "Search verified candidate records using a natural-language query.",
-    "database.overview": "Count verified records in the Aurelinx database and list available record sections.",
-    "dashboard.snapshot": "Calculate current workforce totals, risk, morale, and department metrics.",
-    "workspace.snapshot": "Retrieve the relevant verified workspace section for analytics, integrations, policy, or operations.",
-    "document.csv_ingest": "Parse and validate an attached CSV file; only use when an attachment is present.",
-    "data.mutate": "Create or update one explicitly requested employee, candidate, or integration record. Admin only.",
-    "data.verify": "Read back a previously committed mutation to verify the exact database state.",
+    "search": "Find any records in the entire Aurelinx system: employees, candidates, skills, integrations, policies, chat messages, attachments, workflow runs. Detects the entity from the query. Returns verified matches.",
+    "read": "Read any record end to end by entity and identifier (email, name, or id). Returns the full safe record. Reads never mutate.",
+    "modify": "Modify one record end to end: entity, identifier, and explicit field updates. Commits the change and reads the record back to verify. Admin only.",
+    "write": "Create one new record: entity plus required field data. Admin only.",
+    "delete": "Prepare a deletion of one record (entity and exact identifier). Deletion NEVER executes automatically; it always returns an approval spec that requires an authorized human to approve the exact action.",
+    "analyse": "Analyse anything end to end: records, chat and input/output, database values and properties, sentiment, analytics, workflows, intelligence center, and data operations. Returns a structured analysis for the answer model.",
+    "observe": "Observe the current system state, detect patterns, symptoms, and anomalies, learn from prior observations, predict, and return an observation bundle for the answer model.",
 }
 
 
 def _agent_tool_label(tool_name: str) -> str:
     return {
-        "employee.search": "employee directory",
-        "candidate.search": "candidate directory",
-        "database.overview": "verified database records",
-        "dashboard.snapshot": "workforce analytics",
-        "workspace.snapshot": "workspace records",
-        "document.csv_ingest": "the attached CSV file",
-        "data.mutate": "the requested data change",
-        "data.verify": "the saved record",
+        "search": "system records",
+        "read": "the requested record",
+        "modify": "the requested data change",
+        "write": "the new record",
+        "delete": "the requested deletion",
+        "analyse": "deep analysis",
+        "observe": "system observation",
     }.get(tool_name, tool_name.replace(".", " "))
 
 
 def _agent_tool_result_message(tool_name: str, result: Dict[str, Any]) -> str:
     if result.get("blocked"):
         return f"I could not run {_agent_tool_label(tool_name)} because policy blocked it."
-    if tool_name in {"employee.search", "candidate.search"}:
-        return f"I found {len(result.get('matches', []))} matching record(s) in {_agent_tool_label(tool_name)}."
-    if tool_name == "data.mutate":
+    if tool_name == "search":
+        return f"I searched the system and found {result.get('returned', 0)} matching record(s)."
+    if tool_name == "read":
+        return "I read the requested record."
+    if tool_name == "modify":
         mutation = result.get("result") or {}
-        if mutation.get("updated"):
-            return "The requested data change was committed. I will read it back before finishing."
-        if mutation.get("actions"):
-            return "The data-change step completed with policy results that need to be reviewed."
-    if tool_name == "data.verify":
-        verification = result.get("result") or {}
         return (
-            "I read the saved record back and verification passed."
-            if verification.get("verified")
-            else "I read the saved record back, but verification did not pass."
+            "The requested modification was committed and read back for verification."
+            if mutation.get("updated")
+            else "The modification completed without changes to report."
         )
-    if tool_name == "database.overview":
-        counts = result.get("record_counts") or {}
-        primary_total = result.get("primary_record_total")
-        all_rows_total = result.get("all_table_rows_total")
+    if tool_name == "write":
+        created = result.get("result") or {}
         return (
-            f"I verified the database overview: {primary_total} primary employee/candidate records; "
-            f"{all_rows_total} total rows including supporting skills and experience tables."
+            f"The new {created.get('entity', 'record')} was created and verified."
+            if created.get("created")
+            else "The write completed with no committed record."
         )
-    if tool_name == "dashboard.snapshot":
-        return "I calculated the current workforce analytics snapshot."
-    if tool_name == "workspace.snapshot":
-        return "I loaded the relevant workspace records."
-    if tool_name == "document.csv_ingest":
-        return "I parsed and validated the attached CSV file."
+    if tool_name == "delete":
+        return "The deletion was prepared and requires an authorized human approval to execute."
+    if tool_name == "analyse":
+        return "The analysis completed across the requested scope."
+    if tool_name == "observe":
+        return "The observation completed; patterns and predictions are ready."
     return f"The {_agent_tool_label(tool_name)} step completed."
 
 
@@ -1989,12 +1982,16 @@ def _parse_agent_decision(raw_text: str, request_text: str = "") -> Dict[str, An
         return {"action": "invalid", "error": "Unsupported controller action"}
     if action == "tool":
         tool = str(payload.get("tool", "")).strip().replace("_", ".")
-        tool = {
-            "database.summary": "database.overview",
-            "database.count": "database.overview",
-            "employee.search": "employee.search",
-            "candidate.search": "candidate.search",
-        }.get(tool, tool)
+        legacy_aliases = {
+            "database.summary": "analyse",
+            "database.count": "analyse",
+            "database.overview": "analyse",
+            "employee.search": "search",
+            "candidate.search": "search",
+            "data.mutate": "modify",
+            "data.verify": "analyse",
+        }
+        tool = legacy_aliases.get(tool, tool)
         if tool not in AGENT_TOOL_CATALOG:
             return {"action": "invalid", "error": f"Unsupported tool: {tool}"}
         args = payload.get("arguments") or payload.get("args") or {}
@@ -2030,14 +2027,21 @@ def _agent_controller_prompt(
         "You are the Aurelinx execution controller. Choose exactly one next action and return ONLY valid JSON.\n"
         "You are not the private chain-of-thought writer. Do not expose chain-of-thought.\n"
         "Allowed JSON shapes:\n"
-        '{"action":"tool","tool":"employee.search","arguments":{"query":"..."},"message":"short natural progress sentence shown in the activity timeline"}\n'
+        '{"action":"tool","tool":"search","arguments":{"query":"..."},"message":"short natural progress sentence shown in the activity timeline"}\n'
+        '{"action":"tool","tool":"read","arguments":{"entity":"employee","identifier":"..."}}\n'
+        '{"action":"tool","tool":"modify","arguments":{"entity":"employee","identifier":"...","fields":{"field":"new value"}}}\n'
+        '{"action":"tool","tool":"write","arguments":{"entity":"employee","data":{"field":"value"}}}\n'
+        '{"action":"tool","tool":"delete","arguments":{"entity":"employee","identifier":"..."}}\n'
+        '{"action":"tool","tool":"analyse","arguments":{"scope":"..."}}\n'
+        '{"action":"tool","tool":"observe"}\n'
         '{"action":"respond","message":"short natural progress sentence shown before the answer","answer":"final user-facing answer for a conversation-only request"}\n'
         '{"action":"approval_required","message":"explain why admin approval is required"}\n'
         "Rules:\n"
         "- Select at most one tool per turn, then wait for its result.\n"
-        "- Employee/candidate searches run against the full database; use arguments.limit up to 500 and arguments.offset for additional batches.\n"
+        "- Search/read/analyse cover all workspace entities; use arguments.entity and arguments.query; limit up to 200.\n"
         "- Use live tools for Aurelinx workspace facts; do not guess records or metrics.\n"
-        "- Never select data.mutate for a delete/remove request; select approval_required instead.\n"
+        "- For any delete/remove request run the delete tool first, then when it returns its approval spec choose approval_required so an authorized human approves the exact action. Deletion never executes automatically.\n"
+        "- modify/write/delete are admin-only; members may only search, read, analyse, and observe.\n"
         f"- Current user role: {'admin' if current_user.is_admin else 'member'}.\n"
         f"- Attached files available: {has_attachments}.\n"
         f"Available tools:\n{catalog}\n\n"
@@ -2048,6 +2052,494 @@ def _agent_controller_prompt(
     )
 
 
+def _unique_user_id(record) -> str:
+    return str(getattr(record, "id", getattr(record, "email", "unknown")))
+
+
+# ============================================================
+# Dynamic tool engines (search / read / modify / write /
+# delete-with-approval / analyse / observe)
+# ============================================================
+
+# Entity registry: stable names, model classes, keys, and column policy.
+# secret_cols are NEVER returned by read/search/analyse engines.
+_DELETE_KEYWORDS = {"delete", "remove", "purge", "erase", "drop", "clear", "destroy"}
+
+_TOOL_ENTITIES = {
+    "employee": {
+        "model": EmployeeTable,
+        "search_cols": ["full_name", "email", "role", "department"],
+        "identifiers": ["email", "full_name", "id"],
+        "secret_cols": [],
+    },
+    "candidate": {
+        "model": CandidateTable,
+        "search_cols": ["full_name", "email", "role", "department"],
+        "identifiers": ["email", "full_name", "id"],
+        "secret_cols": [],
+    },
+    "skill": {
+        "model": SkillTable,
+        "search_cols": ["name"],
+        "identifiers": ["name", "id"],
+        "secret_cols": [],
+    },
+    "experience": {
+        "model": ExperienceTable,
+        "search_cols": ["company", "position"],
+        "identifiers": ["id"],
+        "secret_cols": [],
+    },
+    "message": {
+        "model": ChatMessageTable,
+        "search_cols": ["content"],
+        "identifiers": ["id"],
+        "secret_cols": [],
+    },
+    "attachment": {
+        "model": ChatAttachmentTable,
+        "search_cols": ["original_name"],
+        "identifiers": ["id"],
+        "secret_cols": ["file_path"],
+    },
+    "integration": {
+        "model": IntegrationConnectionTable,
+        "search_cols": ["name", "provider", "source_type"],
+        "identifiers": ["name", "id"],
+        "secret_cols": ["api_key"],
+    },
+    "policy": {
+        "model": CompliancePolicyTable,
+        "search_cols": ["policy_name", "region"],
+        "identifiers": ["policy_name", "id"],
+        "secret_cols": [],
+    },
+    "intervention": {
+        "model": InterventionTable,
+        "search_cols": ["title"],
+        "identifiers": ["title", "id"],
+        "secret_cols": [],
+    },
+}
+
+_ENTITY_ALIASES = {
+    "employees": "employee",
+    "staff": "employee",
+    "worker": "employee",
+    "personnel": "employee",
+    "candidates": "candidate",
+    "applicant": "candidate",
+    "applicants": "candidate",
+    "skills": "skill",
+    "experiences": "experience",
+    "messages": "message",
+    "chat": "message",
+    "attachments": "attachment",
+    "file": "attachment",
+    "integrations": "integration",
+    "connection": "integration",
+    "connections": "integration",
+    "policies": "policy",
+    "policy": "policy",
+    "interventions": "intervention",
+    "title": "intervention",
+}
+
+
+def _normalize_entity(raw: Any) -> str:
+    raw_str = str(raw or "").strip().lower()
+    if raw_str in _TOOL_ENTITIES:
+        return raw_str
+    if raw_str in _ENTITY_ALIASES:
+        return _ENTITY_ALIASES[raw_str]
+    for name in _TOOL_ENTITIES:
+        if name in raw_str:
+            return name
+    return ""
+
+
+def _safe_row(record) -> Dict[str, Any]:
+    """One record as a JSON-safe dict with secret columns removed."""
+    if record is None:
+        return {}
+    entity = None
+    for name, spec in _TOOL_ENTITIES.items():
+        if isinstance(record, spec["model"]):
+            entity = name
+            break
+    secrets = set(_TOOL_ENTITIES.get(entity, {}).get("secret_cols", []))
+    out: Dict[str, Any] = {}
+    for column in record.__table__.columns:
+        key = column.name
+        if key in secrets:
+            out[key] = "[redacted]"
+            continue
+        value = getattr(record, key, None)
+        if isinstance(value, datetime):
+            value = value.isoformat() if value else None
+        out[key] = value
+    return out
+
+
+def _safe_rows(records) -> List[Dict[str, Any]]:
+    return [_safe_row(record) for record in records]
+
+
+def _resolve_definition(entity: str, db: Session) -> Optional[Dict[str, Any]]:
+    spec = _TOOL_ENTITIES.get(entity)
+    if not spec:
+        return None
+    # Only offer entities the caller may actually interact with. Skills and
+    # experiences are always resolved through their owning record.
+    return spec
+
+
+def _match_records(
+    db: Session, spec: Dict[str, Any], query: str, limit: int, offset: int
+) -> List[Any]:
+    """Dynamic ILIKE search across an entity's safe columns."""
+    model = spec["model"]
+    conditions = []
+    for col in spec["search_cols"]:
+        column = getattr(model, col, None)
+        if column is not None:
+            conditions.append(column.ilike(f"%{query}%"))
+    statement = select(model)
+    if conditions:
+        statement = statement.where(or_(*conditions))
+    return db.exec(statement.order_by(getattr(model, "created_at", None) or getattr(model, "id", None)).limit(limit).offset(offset)).all()
+
+
+def _records_by_identifier(
+    db: Session, spec: Dict[str, Any], identifier: str
+) -> List[Any]:
+    model = spec["model"]
+    identifier = (identifier or "").strip()
+    conditions = []
+    for key in spec["identifiers"]:
+        column = getattr(model, key, None)
+        if column is None:
+            continue
+        if "uuid" in str(column.type).lower():
+            conditions.append(func.cast(column, String) == identifier)
+        else:
+            conditions.append(column == identifier)
+    if not conditions:
+        return []
+    return db.exec(select(model).where(or_(*conditions)).limit(25)).all()
+
+
+def _modify_column(entity: str, field: str) -> Optional[Any]:
+    """Return the ORM column for a modifiable field, or None if not allowed."""
+    spec = _TOOL_ENTITIES.get(entity)
+    if not spec or field in spec.get("secret_cols", []) or field == "id":
+        return None
+    model = spec["model"]
+    column = getattr(model, field, None)
+    return column
+
+
+def _prepare_delete_spec(
+    entity: str, identifier: str, user_text: str
+) -> Dict[str, Any]:
+    return {
+        "entity": entity,
+        "identifier": identifier,
+        "request": (user_text or "")[:2000],
+    }
+
+
+def _analyse_engine(
+    db: Session,
+    scope: str,
+    query: str,
+    session_id: str,
+    attachments: List[Any],
+    current_user: TokenData,
+) -> Dict[str, Any]:
+    """Analyse the full application: records, chat, values, sentiment,
+    analytics, intel, workflows, and data operations. Returns a structured
+    analysis bundle the answer model turns into a user answer."""
+    analysis: Dict[str, Any] = {"scope": scope or "system"}
+
+    analysis["record_counts"] = _record_counts(db)
+    account = {}
+    try:
+        account = _compute_dashboard_snapshot(db)
+    except Exception:
+        account = {}
+    analysis["workforce_analytics"] = account
+
+    try:
+        analysis["workspace"] = _workspace_snapshot(db, query)
+    except Exception:
+        analysis["workspace"] = {}
+
+    sentiment_employees = db.exec(
+        select(EmployeeTable).where(EmployeeTable.sentiment_score.isnot(None))
+    ).all()
+    sentiment_candidates = db.exec(
+        select(CandidateTable).where(CandidateTable.sentiment_score.isnot(None))
+    ).all()
+    employees_scores = [row.sentiment_score for row in sentiment_employees]
+    candidates_scores = [row.sentiment_score for row in sentiment_candidates]
+    all_scores = employees_scores + candidates_scores
+    analysis["sentiment"] = {
+        "employee_count": len(employees_scores),
+        "candidate_count": len(candidates_scores),
+        "average_sentiment": round(sum(all_scores) / len(all_scores), 3) if all_scores else None,
+        "low_sentiment_employees": [
+            {"name": row.full_name, "email": row.email, "sentiment": row.sentiment_score}
+            for row in sentiment_employees
+            if (row.sentiment_score or 0) < 0.4
+        ][:10],
+    }
+
+    risk_rows = db.exec(select(EmployeeTable).where(EmployeeTable.is_at_risk == True)).all()  # noqa: E712
+    analysis["risk"] = {
+        "at_risk_total": len(risk_rows),
+        "at_risk": [
+            {"name": row.full_name, "email": row.email, "role": row.role, "department": row.department}
+            for row in risk_rows[:15]
+        ],
+    }
+
+    # Conversation/intelligence center input-output: recent chat turns and
+    # workflows for this user session.
+    recent_messages = db.exec(
+        select(ChatMessageTable)
+        .where(ChatMessageTable.session_id == str(session_id))
+        .order_by(ChatMessageTable.created_at.desc())
+        .limit(30)
+    ).all()
+    analysis["conversation"] = {
+        "recent_messages": [
+            {"role": row.role, "content": (row.content or "")[:400]}
+            for row in reversed(recent_messages)
+        ],
+        "user_role": "admin" if current_user.is_admin else "member",
+    }
+
+    # Data operations: workflows and approvals.
+    try:
+        recent_runs = db.exec(
+            select(WorkflowRunTable)
+            .where(WorkflowRunTable.session_id == str(session_id))
+            .order_by(WorkflowRunTable.created_at.desc())
+            .limit(10)
+        ).all()
+        analysis["data_operations"] = {
+            "runs": [
+                {
+                    "status": run.status,
+                    "phase": run.current_phase,
+                    "created_at": run.created_at.isoformat() if run.created_at else None,
+                }
+                for run in recent_runs
+            ],
+            "active_approvals": len(
+                db.exec(
+                    select(WorkflowApprovalTable).where(WorkflowApprovalTable.status == "pending")
+                ).all()
+            ),
+        }
+    except Exception:
+        analysis["data_operations"] = {}
+
+    return analysis
+
+
+def _observe_engine(
+    db: Session,
+    query: str,
+    session_id: str,
+    attachments: List[Any],
+    current_user: TokenData,
+    prior_observations: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Observation cycle: capture current state, compare with prior
+    observations, detect symptoms/patterns/deltas, predict, then let the LLM
+    answer from the observation bundle."""
+    analysis = _analyse_engine(db, "observe", query, session_id, attachments, current_user)
+    employees = db.exec(select(EmployeeTable)).all()
+    candidates = db.exec(select(CandidateTable)).all()
+
+    high_risk = [row for row in employees if row.is_at_risk]
+    low_sentiment = [row for row in employees if (row.sentiment_score or 0) < 0.4]
+    missing_salary = [row for row in employees if row.salary is None]
+    observations = {
+        "analysis": analysis,
+        "patterns": {
+            "at_risk_ratio": round(len(high_risk) / len(employees), 3) if employees else None,
+            "low_sentiment_ratio": round(len(low_sentiment) / len(employees), 3) if employees else None,
+            "records_without_salary": len(missing_salary),
+            "employees_total": len(employees),
+            "candidates_total": len(candidates),
+            "risk_concentration": {
+                dept: sum(1 for row in high_risk if row.department == dept)
+                for dept in sorted({row.department for row in employees})
+            },
+        },
+        "symptoms": [],
+        "predictions": [],
+        "prior_observations_seen": len(prior_observations or []),
+    }
+
+    if missing_salary:
+        observations["symptoms"].append(
+            "salary data is incomplete; compensation analytics will use role estimates"
+        )
+    if high_risk:
+        observations["symptoms"].append(f"{len(high_risk)} employee(s) flagged at risk of attrition")
+    if low_sentiment:
+        observations["symptoms"].append(
+            f"{len(low_sentiment)} employee(s) below the 0.4 sentiment threshold"
+        )
+    if candidates and not low_sentiment:
+        observations["symptoms"].append("candidate pipeline healthy but not validated for sentiment")
+
+    previous = (prior_observations or [])[-1] if prior_observations else None
+    current_at_risk = len(high_risk)
+    observations["patterns"]["employee_at_risk_total"] = current_at_risk
+    if previous and previous.get("patterns", {}).get("employee_at_risk_total") is not None:
+        delta = current_at_risk - previous["patterns"]["employee_at_risk_total"]
+        observations["symptoms"].append(
+            f"at-risk workforce {'increased' if delta > 0 else 'decreased'} by {abs(delta)} since last observation"
+        )
+
+    observations["prediction"] = {
+        "attention_needed": "yes" if high_risk or low_sentiment else "no",
+        "likely_next": (
+            "attrition risk conversation when high-risk or low-sentiment clusters persist"
+            if high_risk or low_sentiment
+            else "stable working state"
+        ),
+        "recommended_action": (
+            "schedule retention review and coverage checks for observed clusters"
+            if high_risk or low_sentiment
+            else "no immediate action required"
+        ),
+    }
+    return observations
+
+
+def _apply_structured_modify(
+    db: Session,
+    entity: str,
+    spec: Dict[str, Any],
+    identifier: str,
+    fields: Dict[str, Any],
+    user_text: str,
+) -> Dict[str, Any]:
+    """Modify records by exact identifier with an explicit field whitelist."""
+    targets = _records_by_identifier(db, spec, identifier)
+    if not targets:
+        return {"tool": "modify", "blocked": True, "reason": f"No {entity} matched {identifier}"}
+    if len(targets) > 1:
+        return {
+            "tool": "modify",
+            "blocked": True,
+            "reason": f"Identifier {identifier} matched multiple {entity} records; use an exact email or id",
+        }
+
+    record = targets[0]
+    allowed_field_updates = 0
+    changed: Dict[str, Any] = {}
+    for field, value in (fields or {}).items():
+        column = _modify_column(entity, str(field))
+        if column is None:
+            continue
+        if str(field).lower() in _DELETE_KEYWORDS:
+            continue
+        allowed_field_updates += 1
+        previous = getattr(record, str(field), None)
+        if isinstance(value, str) and value.strip():
+            value = value.strip()
+        if field == "is_at_risk":
+            value = bool(value)
+        if field in {"sentiment_score", "retention_prob", "match_score", "salary"}:
+            try:
+                value = float(value) if field != "salary" else int(value)
+            except (TypeError, ValueError):
+                continue
+        setattr(record, str(field), value)
+        changed[str(field)] = {"from": previous, "to": value}
+    if not allowed_field_updates:
+        return {"tool": "modify", "blocked": True, "reason": "No modifiable field was provided"}
+
+    if "updated_at" in record.__table__.columns:
+        record.updated_at = datetime.utcnow()
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return {
+        "tool": "modify",
+        "result": {
+            "updated": True,
+            "entity": entity,
+            "identifier": identifier,
+            "changes": changed,
+            "record": _safe_row(record),
+        },
+    }
+
+
+def _apply_agent_write(
+    db: Session, entity: str, spec: Dict[str, Any], data: Dict[str, Any]
+) -> Dict[str, Any]:
+    model = spec["model"]
+    if entity == "employee":
+        if not data.get("email") or not data.get("full_name"):
+            return {"tool": "write", "blocked": True, "reason": "write requires at least full_name and email"}
+        exists = db.exec(select(EmployeeTable).where(EmployeeTable.email == data["email"])).first()
+        if exists:
+            return {"tool": "write", "blocked": True, "reason": "An employee with this email already exists"}
+        record = EmployeeTable(
+            full_name=str(data["full_name"]).strip(),
+            email=str(data["email"]).strip().lower(),
+            department=str(data.get("department") or "General").strip(),
+            role=str(data.get("role") or "Employee").strip(),
+            sentiment_score=float(data.get("sentiment_score") or 0.5),
+            is_at_risk=bool(data.get("is_at_risk")) if "is_at_risk" not in data else data.get("is_at_risk"),
+            salary=int(data["salary"]) if data.get("salary") is not None else None,
+            join_date=datetime.utcnow(),
+        )
+    elif entity == "candidate":
+        if not data.get("email") or not data.get("full_name"):
+            return {"tool": "write", "blocked": True, "reason": "write requires at least full_name and email"}
+        exists = db.exec(select(CandidateTable).where(CandidateTable.email == data["email"])).first()
+        if exists:
+            return {"tool": "write", "blocked": True, "reason": "A candidate with this email already exists"}
+        record = CandidateTable(
+            full_name=str(data["full_name"]).strip(),
+            email=str(data["email"]).strip().lower(),
+            department=str(data.get("department") or "Engineering").strip(),
+            role=str(data.get("role") or "Candidate").strip(),
+            sentiment_score=float(data.get("sentiment_score") or 0.5),
+            match_score=float(data.get("match_score") or 0.85),
+            salary=int(data["salary"]) if data.get("salary") is not None else None,
+        )
+    elif entity == "intervention":
+        record = InterventionTable(
+            title=str(data.get("title") or data.get("name") or "New intervention").strip(),
+            priority=str(data.get("priority") or "medium").strip().lower()
+            if str(data.get("priority") or "medium").strip().lower() in {"low", "medium", "high", "critical"}
+            else "medium",
+            target_scope=str(data.get("target_scope") or "org").strip(),
+            description=str(data.get("description") or "").strip() or None,
+        )
+    else:
+        return {"tool": "write", "blocked": True, "reason": f"write is not supported for {entity}"}
+
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return {
+        "tool": "write",
+        "result": {"created": True, "entity": entity, "record": _safe_row(record)},
+    }
+
+
 def _execute_agent_tool(
     tool_name: str,
     arguments: Dict[str, Any],
@@ -2056,77 +2548,112 @@ def _execute_agent_tool(
     session_id: str,
     mutation_state: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Execute exactly one allowlisted tool in an isolated DB session."""
+    """Execute exactly one supported dynamic tool in an isolated DB session."""
     with Session(engine) as db:
         attachments = db.exec(
             select(ChatAttachmentTable).where(ChatAttachmentTable.session_id == str(session_id))
         ).all()
         query = str(arguments.get("query") or user_text)[:12000]
-        if tool_name == "employee.search":
-            requested_limit = max(1, min(int(arguments.get("limit", 8)), 500))
+
+        if tool_name == "search":
+            requested_limit = max(1, min(int(arguments.get("limit", 20)), 200))
             offset = max(0, int(arguments.get("offset", 0)))
-            rows = _search_employees(db, query, limit=requested_limit, offset=offset)
+            entity_hint = _normalize_entity(arguments.get("entity"))
+            groups: List[Dict[str, Any]] = []
+            entities = [entity_hint] if entity_hint else list(_TOOL_ENTITIES.keys())
+            for entity in entities:
+                spec = _TOOL_ENTITIES[entity]
+                try:
+                    matches = _match_records(db, spec, query, requested_limit, offset)
+                except Exception:
+                    matches = []
+                if matches:
+                    groups.append({"entity": entity, "matches": _safe_rows(matches)})
+                if len(groups) >= 5:
+                    break
+            return {"tool": tool_name, "groups": groups, "returned": sum(len(g["matches"]) for g in groups)}
+
+        if tool_name == "read":
+            entity = _normalize_entity(arguments.get("entity") or arguments.get("type") or "employee")
+            spec = _TOOL_ENTITIES.get(entity)
+            if not spec:
+                return {"tool": tool_name, "blocked": True, "reason": f"Unknown entity: {entity}"}
+            identifier = str(arguments.get("identifier") or arguments.get("id") or arguments.get("email") or "")[:500]
+            limit = max(1, min(int(arguments.get("limit", 10)), 50))
+            records = _records_by_identifier(db, spec, identifier)[:limit]
             return {
                 "tool": tool_name,
-                "offset": offset,
-                "limit": requested_limit,
-                "returned": len(rows),
-                "has_more": len(rows) == requested_limit,
-                "matches": [
-                    {"name": row.full_name, "email": row.email, "role": row.role, "department": row.department, "risk": row.is_at_risk}
-                    for row in rows
-                ],
+                "entity": entity,
+                "returned": len(records),
+                "records": _safe_rows(records),
             }
-        if tool_name == "candidate.search":
-            requested_limit = max(1, min(int(arguments.get("limit", 8)), 500))
-            offset = max(0, int(arguments.get("offset", 0)))
-            rows = _search_candidates(db, query, limit=requested_limit, offset=offset)
-            return {
-                "tool": tool_name,
-                "offset": offset,
-                "limit": requested_limit,
-                "returned": len(rows),
-                "has_more": len(rows) == requested_limit,
-                "matches": [
-                    {"name": row.full_name, "email": row.email, "role": row.role, "department": row.department, "match_score": row.match_score}
-                    for row in rows
-                ],
-            }
-        if tool_name == "database.overview":
-            record_counts = _record_counts(db)
-            primary_record_counts = {
-                "employees": record_counts.get("employees", 0),
-                "candidates": record_counts.get("candidates", 0),
-            }
-            return {
-                "tool": tool_name,
-                "record_counts": record_counts,
-                "primary_record_counts": primary_record_counts,
-                "primary_record_total": sum(primary_record_counts.values()),
-                "all_table_rows_total": sum(record_counts.values()),
-                "sections": [
-                    "employees",
-                    "candidates",
-                    "skills",
-                    "experience",
-                    "integrations",
-                    "compliance policies",
-                ],
-            }
-        if tool_name == "dashboard.snapshot":
-            return {"tool": tool_name, "snapshot": _compute_dashboard_snapshot(db)}
-        if tool_name == "workspace.snapshot":
-            return {"tool": tool_name, "snapshot": _workspace_snapshot(db, query), "record_counts": _record_counts(db)}
-        if tool_name == "document.csv_ingest":
-            return {"tool": tool_name, "result": _parse_csv_and_ingest(db, attachments)}
-        if tool_name == "data.mutate":
+
+        if tool_name == "modify":
             if not current_user.is_admin:
-                return {"tool": tool_name, "blocked": True, "reason": "RBAC requires an admin"}
-            if any(word in user_text.lower() for word in ("delete", "remove", "purge", "clear")):
-                return {"tool": tool_name, "blocked": True, "reason": "Deletion requires human approval"}
-            return {"tool": tool_name, "result": _apply_data_mutation(db, user_text)}
-        if tool_name == "data.verify":
-            return {"tool": tool_name, "result": _verify_mutation(db, user_text, mutation_state or {})}
+                return {"tool": tool_name, "blocked": True, "reason": "RBAC requires an admin for modify"}
+            entity = _normalize_entity(arguments.get("entity") or "employee")
+            spec = _TOOL_ENTITIES.get(entity)
+            if not spec:
+                return {"tool": tool_name, "blocked": True, "reason": f"Unknown entity: {entity}"}
+            identifier = str(arguments.get("identifier") or arguments.get("id") or arguments.get("email") or "")[:500]
+            if not identifier:
+                return {"tool": tool_name, "blocked": True, "reason": "modify requires an exact identifier (email or id)"}
+            fields = arguments.get("fields") or arguments.get("changes") or arguments.get("updates") or {}
+            result = _apply_structured_modify(db, entity, spec, identifier, fields, user_text)
+            return result
+
+        if tool_name == "write":
+            if not current_user.is_admin:
+                return {"tool": tool_name, "blocked": True, "reason": "RBAC requires an admin for write"}
+            entity = _normalize_entity(arguments.get("entity") or "employee")
+            spec = _TOOL_ENTITIES.get(entity)
+            if not spec:
+                return {"tool": tool_name, "blocked": True, "reason": f"Unknown entity: {entity}"}
+            data = arguments.get("data") or arguments.get("record") or {}
+            if not isinstance(data, dict) or not data:
+                return {"tool": tool_name, "blocked": True, "reason": "write requires a data object"}
+            try:
+                return _apply_agent_write(db, entity, spec, data)
+            except Exception as exc:
+                db.rollback()
+                return {"tool": tool_name, "blocked": True, "reason": f"write failed: {str(exc)[:300]}"}
+
+        if tool_name == "delete":
+            entity = _normalize_entity(arguments.get("entity") or "employee")
+            spec = _TOOL_ENTITIES.get(entity)
+            if not spec:
+                return {"tool": tool_name, "blocked": True, "reason": f"Unknown entity: {entity}"}
+            identifier = str(arguments.get("identifier") or arguments.get("id") or arguments.get("email") or "")[:500]
+            if not identifier:
+                return {"tool": tool_name, "blocked": True, "reason": "delete requires an exact identifier (email or id)"}
+            targets = _records_by_identifier(db, spec, identifier)
+            if not targets:
+                return {"tool": tool_name, "blocked": True, "reason": f"No {entity} matched {identifier}"}
+            delete_spec = _prepare_delete_spec(entity, identifier, user_text)
+            return {
+                "tool": tool_name,
+                "blocked": True,
+                "approval_required": True,
+                "reason": "Deletion requires an authorized human approval; the exact action was stored for approval",
+                "spec": delete_spec,
+                "matches_found": len(targets),
+            }
+
+        if tool_name == "analyse":
+            return {"tool": tool_name, "analysis": _analyse_engine(db, query, query, session_id, attachments, current_user)}
+
+        if tool_name == "observe":
+            if not isinstance(mutation_state, dict):
+                mutation_state = {}
+            prior = mutation_state.get("observations")
+            if isinstance(prior, dict):
+                prior = [prior]
+            observation = _observe_engine(db, query, session_id, attachments, current_user, prior)
+            observations = list(mutation_state.get("observations") or [])
+            observations.append(observation)
+            mutation_state["observations"] = observations
+            return {"tool": tool_name, "observation": observation}
+
         return {"tool": tool_name, "blocked": True, "reason": "Tool was not available"}
 
 
@@ -2662,7 +3189,8 @@ async def _stream_true_agent_loop(
         "You must choose one next action, never multiple actions. Do not reveal chain-of-thought. "
         "Use a tool when verified workspace data or a database action is required. "
         "After each tool result, decide whether another tool is required or the final answer can be written. "
-        "Never mutate on behalf of a member. Never delete; request human approval for deletion. "
+        "Never mutate on behalf of a member. For deletion, run the delete tool to prepare the exact spec, "
+        "then choose approval_required so an authorized human approves the exact action. "
         "Allowed actions: tool, respond, approval_required. Allowed tools: "
         + ", ".join(AGENT_TOOL_CATALOG.keys())
         + "."
@@ -2818,22 +3346,22 @@ async def _stream_true_agent_loop(
                 if any(word in request_lower for word in ("database", "db", "record", "records", "entry", "entries", "table", "tables")):
                     decision = {
                         "action": "tool",
-                        "tool": "database.overview",
-                        "arguments": {"query": request.content},
-                        "message": "The controller requested a verified database record overview.",
+                        "tool": "analyse",
+                        "arguments": {"scope": request.content},
+                        "message": "The controller requested a verified database analysis.",
                     }
                 elif any(word in request_lower for word in ("employee", "employees", "staff", "workforce", "worker")):
                     decision = {
                         "action": "tool",
-                        "tool": "employee.search",
-                        "arguments": {"query": request.content},
+                        "tool": "search",
+                        "arguments": {"entity": "employee", "query": request.content},
                         "message": "The controller requested a verified employee search.",
                     }
                 elif any(word in request_lower for word in ("candidate", "candidates", "applicant", "applicants")):
                     decision = {
                         "action": "tool",
-                        "tool": "candidate.search",
-                        "arguments": {"query": request.content},
+                        "tool": "search",
+                        "arguments": {"entity": "candidate", "query": request.content},
                         "message": "The controller requested a verified candidate search.",
                     }
                 else:
@@ -2902,7 +3430,19 @@ async def _stream_true_agent_loop(
 
         if action == "approval_required":
             approval_id = str(uuid4())
-            approval_payload = request.content[:12000]
+            delete_spec = None
+            for item in reversed(tool_transcript):
+                if (
+                    isinstance(item.get("result"), dict)
+                    and item["result"].get("approval_required")
+                    and isinstance(item["result"].get("spec"), dict)
+                ):
+                    delete_spec = item["result"]["spec"]
+                    break
+            if delete_spec:
+                approval_payload = json.dumps(delete_spec, default=str)[:12000]
+            else:
+                approval_payload = request.content[:12000]
             db.add(
                 WorkflowApprovalTable(
                     id=approval_id,
@@ -3404,7 +3944,67 @@ async def list_workflow_events(
 
 
 def _perform_approved_delete(db: Session, payload: str) -> Dict[str, Any]:
-    """Delete exactly one employee/candidate identified by an approved email."""
+    """Delete the exact record(s) approved by an authorized human."""
+    spec_payload: Optional[Dict[str, Any]] = None
+    if payload and payload.lstrip().startswith("{"):
+        try:
+            parsed = json.loads(payload)
+            if isinstance(parsed, dict) and parsed.get("entity") and parsed.get("identifier"):
+                spec_payload = parsed
+        except Exception:
+            spec_payload = None
+
+    if spec_payload:
+        spec = _TOOL_ENTITIES.get(_normalize_entity(str(spec_payload["entity"])))
+        if not spec:
+            raise HTTPException(status_code=422, detail=f"Unsupported entity in approved deletion: {spec_payload.get('entity')}")
+        targets = _records_by_identifier(
+            db,
+            spec,
+            str(spec_payload["identifier"]),
+        )
+        if not targets:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No {spec_payload['entity']} matched approved identifier {spec_payload['identifier']}",
+            )
+        resource_type = str(spec_payload["entity"])
+        if resource_type in {"employee", "candidate"}:
+            child_skill = SkillTable.employee_id if resource_type == "employee" else SkillTable.candidate_id
+            child_experience = (
+                ExperienceTable.employee_id
+                if resource_type == "employee"
+                else ExperienceTable.candidate_id
+            )
+            skills = db.exec(select(SkillTable).where(child_skill.in_([row.id for row in targets]))).all()
+            experiences = db.exec(
+                select(ExperienceTable).where(child_experience.in_([row.id for row in targets]))
+            ).all()
+            for item in skills + experiences:
+                db.delete(item)
+            db.flush()
+            names = [row.full_name for row in targets]
+            for row in targets:
+                db.delete(row)
+            return {
+                "deleted": True,
+                "resource_type": resource_type,
+                "identifier": str(spec_payload["identifier"]),
+                "deleted_records": len(targets),
+                "name": "; ".join(names),
+                "related_records_deleted": len(skills) + len(experiences),
+            }
+        for row in targets:
+            db.delete(row)
+        return {
+            "deleted": True,
+            "resource_type": resource_type,
+            "identifier": str(spec_payload["identifier"]),
+            "deleted_records": len(targets),
+            "name": "",
+            "related_records_deleted": 0,
+        }
+
     email_match = re.search(
         r"([a-zA-Z0-9.\-_+]+@[a-zA-Z0-9.\-_]+\.[a-zA-Z]{2,})", payload
     )
@@ -3441,6 +4041,7 @@ def _perform_approved_delete(db: Session, payload: str) -> Dict[str, Any]:
     ).all()
     for item in skills + experiences:
         db.delete(item)
+    db.flush()
     name = record.full_name
     db.delete(record)
     return {
@@ -3488,7 +4089,7 @@ async def approve_workflow_action(
         current_user,
         action="APPROVED_DELETE",
         resource_type=result["resource_type"],
-        resource_id=str(result["email"]),
+        resource_id=str(result.get("email") or result.get("identifier")),
         details=result,
     )
     db.commit()

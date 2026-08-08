@@ -146,6 +146,31 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 This stack is designed around a production runtime with web, API, worker, scheduler, PostgreSQL, Redis, and Qdrant services.
 
+## Workflow Chat Agent
+
+The intelligence chat agent executes requests through a dynamic 7-tool architecture driven by an LLM execution controller. Every tool returns verified live data and reports progress through observable workflow events.
+
+| Tool | Purpose | Access |
+| --- | --- | --- |
+| `search` | Find records across employees, candidates, skills, messages, attachments, integrations, policies, and interventions | admin + member |
+| `read` | Read one record end to end by entity and exact identifier | admin + member |
+| `modify` | Update explicit fields on one record and read it back to verify | admin only |
+| `write` | Create a new record and verify the committed result | admin only |
+| `delete` | Prepare an exact deletion spec; never executes automatically | always requires human approval |
+| `analyse` | Structured analysis of records, sentiment, analytics, workflows, and data operations | admin + member |
+| `observe` | Capture system patterns, symptoms, and predictions compared against prior observations | admin + member |
+
+Deletions are governed: the agent prepares an exact deletion spec (entity + identifier), an
+`approval_required` decision stores that spec in a `workflow_approvals` row with a 30-minute
+expiry, and an admin must approve the exact stored payload at
+`POST /api/v1/chat/workflows/{run_id}/approvals/{approval_id}/approve` before anything is
+deleted. Approved deletions execute transactionally, are recorded in the audit log, and are
+verified by read-back.
+
+Secret columns (`api_key`, `file_path`) are never returned by search/read/analyse results.
+Admin-only tools are blocked at the tool engine for member sessions regardless of what the
+model requests.
+
 ## Desktop Builds
 
 Aurelinx now includes a Tauri-based desktop shell under `desktop/`. It is built for GitHub Actions release packaging and can produce Windows and Linux installers.
