@@ -308,39 +308,37 @@ const ThinkingMessageContent = ({ text, children, isBusy }) => {
   );
 };
 
+const toolTarget = (step) => {
+  const input = step.safe_input || {};
+  const args =
+    input && typeof input === "object" && (input.arguments || input) || {};
+  const entity = args.entity || args.type || "";
+  const identifier = args.identifier || args.id || args.email || "";
+  if (entity && identifier) return `${entity} ${identifier}`;
+  if (entity) return entity;
+  if (identifier) return identifier;
+  return (step.tool || step.tool_name || "records").replaceAll(".", " ");
+};
+
 const naturalStepDetail = (step) => {
   const summary = step.result_summary;
   if (step.type === "model_reasoning") {
-    const streamed = summary?.characters ? ` · ${summary.characters} reasoning chars` : "";
-    return step.status === "running" ? `Thinking${streamed}` : `Reasoning complete${streamed}`;
+    return step.status === "running" ? "Thinking" : "Thought";
   }
   if (step.type === "agent_started") return "Working on your request";
   if (step.type === "agent_failed") {
     return `Provider turn failed${summary?.reason ? `: ${summary.reason}` : ""}`;
   }
   if (step.type === "tool_call" || step.type === "tool_result" || step.type === "tool_execution") {
-    const labels = {
-      search: "system records",
-      read: "the requested record",
-      modify: "the requested data change",
-      write: "the new record",
-      delete: "the requested deletion",
-      analyse: "deep analysis",
-      observe: "system observation",
-    };
-    const toolName = step.tool || step.tool_name || "unknown";
-    const target = labels[toolName] || toolName.replaceAll(".", " ");
-    if (step.status === "running") {
-      return `Executing ${target}`;
-    }
-    if (step.status === "completed") {
-      if (summary?.query) return `Searched ${target} for "${summary.query}"`;
-      if (summary?.count != null) return `Verified ${summary.count} record(s) in ${target}`;
-      return step.display_message || `${target} verified successfully`;
-    }
+    const toolName = step.tool || step.tool_name || "tool";
+    const target = toolTarget(step);
     if (step.status === "blocked") {
       return `Step stopped by policy guardrail`;
     }
+    if (step.status === "running") {
+      return `→ ${toolName} ${target}`;
+    }
+    return `← ${toolName} ${target}`;
   }
   if (step.type === "final_response_started") return "Streaming the final answer";
   if (step.type === "final_response_completed") return "Final answer generated";
@@ -876,11 +874,15 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className={`text-xs font-medium leading-relaxed ${statusColor}`}>
-                      {status === "completed" ? "✓ " : status === "running" ? "● " : ""}{message}
+                      {status === "completed" && !isToolExecution && step.type !== "model_reasoning" ? "✓ " : status === "running" ? "● " : ""}{message}
+                      {step.type === "model_reasoning" && (
+                        <span className="font-mono text-slate-400">: {durationLabel}</span>
+                      )}
                     </span>
                     {status === "running" && step.type === "model_reasoning" && (
                       <span className="flex items-center gap-1 text-[9px] font-mono text-cyan-400">
-                        <span className="animate-pulse">⚡</span> thinking live
+                        <span className="animate-pulse">⚡</span>
+                        thinking live · {durationLabel} elapsed · {(step.result_summary?.characters || 0)} chars
                       </span>
                     )}
                     {isToolExecution && (
