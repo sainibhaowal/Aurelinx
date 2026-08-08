@@ -1659,6 +1659,7 @@ const IntelligenceCenterView = () => {
                                         className="h-full w-full overflow-hidden"
                                         viewBox="0 0 100 100"
                                         preserveAspectRatio="none"
+                                        shapeRendering="geometricPrecision"
                                       >
                                         <defs>
                                           <linearGradient
@@ -1671,7 +1672,7 @@ const IntelligenceCenterView = () => {
                                             <stop
                                               offset="0%"
                                               stopColor="#2dd4bf"
-                                              stopOpacity="0.25"
+                                              stopOpacity="0.22"
                                             />
                                             <stop
                                               offset="100%"
@@ -1741,6 +1742,12 @@ const IntelligenceCenterView = () => {
                                           vectorEffect="non-scaling-stroke"
                                         />
 
+                                        {/* Energy Area Fill Gradient */}
+                                        <path
+                                          d={`M 0,84 ${ePts[0].x},${ePts[0].y} ${smoothPath(ePts).slice(2)} L 100,84 Z`}
+                                          fill="url(#annealGradHigh)"
+                                        />
+
                                         {/* Coverage area (smooth closed path) + line (right axis) */}
                                         <path
                                           d={`M 0,84 ${cPts[0].x},${cPts[0].y} ${smoothPath(cPts).slice(2)} L 100,84 Z`}
@@ -1788,7 +1795,7 @@ const IntelligenceCenterView = () => {
                                           vectorEffect="non-scaling-stroke"
                                         />
 
-                                        {/* Energy line (smooth with soft halo) */}
+                                        {/* Energy line (smooth cubic bezier with soft ambient glow) */}
                                         <path
                                           d={smoothPath(ePts)}
                                           fill="none"
@@ -1796,7 +1803,7 @@ const IntelligenceCenterView = () => {
                                           strokeWidth="6"
                                           strokeLinecap="round"
                                           strokeLinejoin="round"
-                                          opacity="0.16"
+                                          opacity="0.18"
                                           vectorEffect="non-scaling-stroke"
                                         />
                                         <path
@@ -1822,50 +1829,30 @@ const IntelligenceCenterView = () => {
                                             vectorEffect="non-scaling-stroke"
                                           />
                                         )}
-
-                                        {/* Energy step nodes (rounded with soft glow) */}
-                                        {ePts.map((p, idx) => (
-                                          <circle
-                                            key={idx}
-                                            cx={p.x}
-                                            cy={p.y}
-                                            r={
-                                              idx === bestIndex
-                                                ? "4.2"
-                                                : idx === hovered
-                                                  ? "3.2"
-                                                  : "2.2"
-                                            }
-                                            fill={
-                                              idx === bestIndex
-                                                ? "#34d399"
-                                                : "#2dd4bf"
-                                            }
-                                            filter={
-                                              idx === bestIndex
-                                                ? "url(#glowEmerald)"
-                                                : "url(#glowTeal)"
-                                            }
-                                            stroke={
-                                              idx === bestIndex
-                                                ? "#ffffff"
-                                                : idx === hovered
-                                                  ? "rgba(255,255,255,0.9)"
-                                                  : "rgba(255,255,255,0.35)"
-                                            }
-                                            strokeWidth="0.7"
-                                            vectorEffect="non-scaling-stroke"
-                                          />
-                                        ))}
-                                        {/* Best point inner marker */}
-                                        <circle
-                                          cx={ePts[bestIndex].x}
-                                          cy={ePts[bestIndex].y}
-                                          r="1.5"
-                                          fill="#ffffff"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
                                       </svg>
+
+                                      {/* True 100% Round Circle Node Markers Overlay (Zero Distortion/Egg Shape) */}
+                                      <div className="absolute inset-0 pointer-events-none">
+                                        {ePts.map((p, idx) => {
+                                          const isBest = idx === bestIndex;
+                                          const isHov = idx === hovered;
+                                          if (!isBest && !isHov && idx % Math.max(1, Math.floor(n / 8)) !== 0) return null;
+
+                                          return (
+                                            <div
+                                              key={idx}
+                                              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-150 ${
+                                                isBest
+                                                  ? "w-3.5 h-3.5 bg-emerald-400 border-2 border-white shadow-[0_0_10px_#34d399] z-20"
+                                                  : isHov
+                                                  ? "w-3 h-3 bg-white border-2 border-teal-400 shadow-[0_0_8px_#2dd4bf] z-20"
+                                                  : "w-2 h-2 bg-teal-400/90 border border-slate-900 shadow-[0_0_4px_#2dd4bf] z-10"
+                                              }`}
+                                              style={{ left: `${p.x}%`, top: `${p.y}%` }}
+                                            />
+                                          );
+                                        })}
+                                      </div>
                                     </div>
                                   </div>
 
