@@ -1884,12 +1884,12 @@ def _is_casual_chat(user_text: str) -> bool:
 
 
 AGENT_TOOL_CATALOG = {
-    "search": "Find records by matching TEXT inside the system: names, emails, job titles, skills, departments, policies, and identifiers across employees, candidates, and more. Pass a few concrete terms (name, email, title, skill). When nothing matches, verified recent records are returned as context. Sentiment and at-risk status are NOT stored as text: use analyse or observe for those.",
+    "search": "Find records by matching TEXT inside the system: names, emails, job titles, skills, departments, policies, and identifiers across employees, candidates, and more. Pass a few concrete terms (name, email, title, skill). When nothing matches, verified recent records are returned as context. For statistics, health, risk, or 'what does the system know about X' questions use analyse instead — search cannot compute.",
     "read": "Read any record end to end by entity and identifier (email, name, or id). Returns the full safe record. Reads never mutate.",
     "modify": "Modify one record end to end: entity, identifier, and explicit field updates. Commits the change and reads the record back to verify. Admin only.",
     "write": "Create one new record: entity plus required field data. Admin only.",
     "delete": "Prepare a deletion of one record (entity and exact identifier). Deletion NEVER executes automatically; it always returns an approval spec that requires an authorized human to approve the exact action.",
-    "analyse": "Analyse anything end to end: records, chat and input/output, database values and properties, sentiment, analytics, workflows, intelligence center, and data operations. Use this whenever the user asks about sentiment, risk, at-risk cohorts, performance, or statistics. Returns a structured analysis for the answer model.",
+    "analyse": "Analyse anything anywhere in the enterprise: workflows, chat and input/output, database values, sentiment, analytics, integrations, ai/ml, governance, pipeline, and data operations. Use this for statistics, at-risk cohorts, health, and every OVERVIEW or what-do-you-know / what-is-going-on question. Returns a structured analysis with verified counts, current values, and computed formulas for the answer model.",
     "observe": "Observe the current system state, detect patterns, symptoms, and anomalies, learn from prior observations, predict, and return an observation bundle for the answer model. Use for 'who is at risk', 'patterns', 'anomalies' and predictive questions.",
 }
 
