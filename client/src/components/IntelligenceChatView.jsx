@@ -588,13 +588,58 @@ const RenderToolResultCard = ({ toolName, result }) => {
   return null;
 };
 
-const AgenticStepTracker = ({ steps = [], onApproval }) => {
+const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
   const [expandedId, setExpandedId] = useState(null);
   const [expandedAll, setExpandedAll] = useState(false);
   const [filterTab, setFilterTab] = useState("all");
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
-  const hasRunningStep = steps.some((step) => step.status === "running");
+  // Deterministic settling: a finished stream is history. Any step still
+  // marked "running" on a non-active stream is deterministically finalized so
+  // restored conversations never show eternal live elapsed timers (the stuck
+  // "Thinking ... 7207.2s" symptom). The live tracker keeps animating while
+  // the phase is genuinely active.
+  const settling = !phase || phase === "done" || phase === "error";
+  const deterministicSteps = useMemo(() => {
+    if (!settling) return steps;
+    const wasRunning = steps.map((step) => step.status === "running");
+    const list = steps.map((step) => {
+      if (step.type === "model_reasoning" && step.status === "running") {
+        return { ...step, status: "completed", duration_ms: Number(step.duration_ms || 0) };
+      }
+      if (step.status === "running") {
+        return { ...step, status: "completed", duration_ms: Number(step.duration_ms || 0) };
+      }
+      return step;
+    });
+    const collapsed = [];
+    for (let index = 0; index < list.length; index += 1) {
+      const step = list[index];
+      const next = list[index + 1];
+      if (
+        step.type === "model_reasoning" &&
+        wasRunning[index] &&
+        next &&
+        next.type === "model_reasoning"
+      ) {
+        collapsed.push({
+          ...next,
+          started_at: step.started_at || next.started_at,
+          created_at: step.created_at || next.created_at,
+          result_summary: {
+            ...(next.result_summary || {}),
+            ...(step.result_summary || {}),
+          },
+        });
+        index += 1;
+        continue;
+      }
+      collapsed.push(step);
+    }
+    return collapsed;
+  }, [steps, settling]);
+
+  const hasRunningStep = deterministicSteps.some((step) => step.status === "running");
 
   useEffect(() => {
     if (!hasRunningStep) return undefined;
@@ -616,10 +661,10 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
   // Merge each tool call and result into one stable execution card. Correlation
   // IDs are preferred; the per-tool queue is a safe fallback for older events.
   const mergedSteps = useMemo(() => {
-    const visible = steps.filter((step) => {
+    const visible = deterministicSteps.filter((step) => {
       if (step.tool === "conversation.context") return false;
       if (["workflow_started", "agent_started", "validation_completed", "workflow_completed", "final_response_completed"].includes(step.type)) return false;
-      if (step.type === "workflow_failed" && steps.some((item) => item.type === "agent_failed")) return false;
+      if (step.type === "workflow_failed" && deterministicSteps.some((item) => item.type === "agent_failed")) return false;
       return true;
     });
 
@@ -673,28 +718,28 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
     });
 
     return result;
-  }, [steps]);
+  }, [deterministicSteps]);
 
   // Telemetry Calculations. Token throughput is only shown when the stream
   // provides token metadata; character-derived values are explicitly marked
   // as estimates rather than presenting invented precision.
   const telemetry = useMemo(() => {
-    const totalDuration = steps.reduce((acc, curr) => acc + (curr.duration_ms || 0), 0) || 120;
-    const reasoningStep = steps.find((s) => s.type === "model_reasoning");
+    const totalDuration = deterministicSteps.reduce((acc, curr) => acc + (curr.duration_ms || 0), 0) || 120;
+    const reasoningStep = deterministicSteps.find((s) => s.type === "model_reasoning");
     const reasoningChars = reasoningStep?.result_summary?.characters || 0;
-    const explicitTokens = steps.reduce(
+    const explicitTokens = deterministicSteps.reduce(
       (acc, step) => acc + Number(step.tokens || step.token_count || step.result_summary?.tokens || 0),
       0,
     );
     const estimatedTokens = explicitTokens || (reasoningChars ? Math.round(reasoningChars / 4) : 0);
-    const activeDuration = steps.reduce(
+    const activeDuration = deterministicSteps.reduce(
       (max, step) => Math.max(max, step.status === "running" ? runningDuration(step) : Number(step.duration_ms || 0)),
       totalDuration,
     );
     const throughput = estimatedTokens && activeDuration > 0
       ? `${(estimatedTokens / (activeDuration / 1000)).toFixed(1)}${explicitTokens ? "" : "~"}`
       : "—";
-    const isRunning = steps.some((s) => s.status === "running");
+    const isRunning = deterministicSteps.some((s) => s.status === "running");
     return {
       latency: `${totalDuration}ms`,
       throughput,
@@ -704,7 +749,7 @@ const AgenticStepTracker = ({ steps = [], onApproval }) => {
       tokenCount: estimatedTokens,
       status: isRunning ? "Active IPC" : "Idle / Ready",
     };
-  }, [steps, currentTime]);
+  }, [deterministicSteps, currentTime]);
 
   // Filter tabs logic
   const filteredSteps = useMemo(() => {
