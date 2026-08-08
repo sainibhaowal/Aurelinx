@@ -747,7 +747,7 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
       reasoningChars,
       reasoningDuration: reasoningStep ? stepDuration(reasoningStep) : 0,
       tokenCount: estimatedTokens,
-      status: isRunning ? "Active IPC" : "Idle / Ready",
+      status: isRunning ? "Streaming" : "Idle / Ready",
     };
   }, [deterministicSteps, currentTime]);
 
@@ -787,19 +787,19 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
               <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-500" />
             </span>
             <span className="text-[11px] font-bold tracking-wider text-slate-200">
-              AURELINX HARNESS RUNTIME
+              AURELINX AGENT RUNTIME
             </span>
           </div>
           <div className="flex items-center gap-3 text-[10px]">
             <span className="text-slate-400">⚡ <strong className="font-mono text-cyan-300">{telemetry.latency}</strong></span>
             <span className="text-slate-400">🚀 <strong className="font-mono text-cyan-300">{telemetry.throughput} tok/s</strong></span>
-            <span className="text-slate-400">🛡️ <strong className="text-emerald-300">Deny-All Strict</strong></span>
+            <span className="text-slate-400">🛡️ <strong className="text-emerald-300">RBAC + Approval Gates</strong></span>
           </div>
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] text-slate-400">
           <span className="uppercase tracking-wider text-slate-500">Active Runtime</span>
-          <span className="font-mono text-cyan-300">Google Antigravity Go Binary · Local IPC</span>
+          <span className="font-mono text-cyan-300">Native Agent Loop · Live Model + Dynamic Tools</span>
           <span className="text-slate-600">{telemetry.status}</span>
         </div>
 
