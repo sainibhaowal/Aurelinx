@@ -3464,14 +3464,14 @@ async def _stream_true_agent_loop(
         events.append(event)
         return f"event: agent_step\ndata: {_json_dumps(event)}\n\n"
 
-    def reasoning_delta(event_id: Optional[str], phase: str, iteration: Optional[int], characters: int) -> str:
-        """Stream safe reasoning telemetry without exposing private reasoning text."""
+    def reasoning_delta(event_id: Optional[str], phase: str, iteration: Optional[int], characters: int, text: str = "") -> str:
+        """Stream live reasoning text as the provider's thinking arrives."""
         return (
             "event: model_reasoning_delta\n"
-            f"data: {_json_dumps({'event_id': event_id, 'phase': phase, 'iteration': iteration, 'characters': characters})}\n\n"
+            f"data: {_json_dumps({'event_id': event_id, 'phase': phase, 'iteration': iteration, 'characters': characters, 'text': text})}\n\n"
         )
 
-    async def paced_reasoning_deltas(event_id: Optional[str], phase: str, iteration: Optional[int], token: str, running_chars: int, step: int = 8, gap_ms: int = 14):
+    async def paced_reasoning_deltas(event_id: Optional[str], phase: str, iteration: Optional[int], token: str, running_chars: int, text: str = "", step: int = 8, gap_ms: int = 14):
         """Emit the live counter in small visible increments even when the provider
         delivers a large reasoning burst inside one stream chunk, so the UI always
         shows real motion instead of 0 -> 178 in a single flash."""
@@ -3480,10 +3480,10 @@ async def _stream_true_agent_loop(
             take = min(step, len(token) - idx)
             idx += take
             running_chars += take
-            yield running_chars, reasoning_delta(event_id, phase, iteration, running_chars)
+            yield running_chars, reasoning_delta(event_id, phase, iteration, running_chars, text)
             await asyncio.sleep(gap_ms / 1000.0)
         if not token:
-            yield running_chars, reasoning_delta(event_id, phase, iteration, running_chars)
+            yield running_chars, reasoning_delta(event_id, phase, iteration, running_chars, text)
 
     yield emit(
         "workflow_started",
@@ -3578,6 +3578,7 @@ async def _stream_true_agent_loop(
             nonlocal reasoning_active, reasoning_event_chars, reasoning_event_id, raw_decision
             reasoning_active = True
             reasoning_event_chars = 0
+            reasoning_event_text = ""
             raw_decision = ""
             
             # Emit initial thinking step so UI shows live thinking emitter immediately
@@ -3617,8 +3618,9 @@ async def _stream_true_agent_loop(
                         reasoning_active = False
                     continue
                 if reasoning_active:
+                    reasoning_event_text = (reasoning_event_text or "") + (token or "")
                     async for running_chars, delta_sse in paced_reasoning_deltas(
-                        reasoning_event_id, "planning", iteration, token or "", reasoning_event_chars
+                        reasoning_event_id, "planning", iteration, token or "", reasoning_event_chars, reasoning_event_text
                     ):
                         reasoning_event_chars = running_chars
                         yield delta_sse
@@ -3637,6 +3639,7 @@ async def _stream_true_agent_loop(
                 result_summary={
                     "iteration": iteration,
                     "characters": reasoning_event_chars,
+                    "text": reasoning_event_text,
                 },
             )
 
@@ -3664,6 +3667,7 @@ async def _stream_true_agent_loop(
                     result_summary={
                         "iteration": iteration,
                         "characters": reasoning_event_chars,
+                        "text": reasoning_event_text,
                     },
                     error_code=_provider_error_code(exc),
                 )
@@ -3958,6 +3962,7 @@ async def _stream_true_agent_loop(
             for attempt_round in range(1, 5):
                 reasoning_active = False
                 reasoning_event_chars = 0
+                reasoning_event_text = ""
                 reasoning_event_id = None
                 content_before_attempt = len(assistant_text)
                 try:
@@ -3995,12 +4000,13 @@ async def _stream_true_agent_loop(
                                     "response",
                                     "Reasoning complete",
                                     status="completed",
-                                    result_summary={"characters": reasoning_event_chars},
+                                    result_summary={"characters": reasoning_event_chars, "text": reasoning_event_text},
                                 )
                             continue
                         if reasoning_active:
+                            reasoning_event_text = (reasoning_event_text or "") + (token or "")
                             async for running_chars, delta_sse in paced_reasoning_deltas(
-                                reasoning_event_id, "response", None, token or "", reasoning_event_chars
+                                reasoning_event_id, "response", None, token or "", reasoning_event_chars, reasoning_event_text
                             ):
                                 reasoning_event_chars = running_chars
                                 yield delta_sse
@@ -4014,7 +4020,7 @@ async def _stream_true_agent_loop(
                             "response",
                             "Reasoning complete",
                             status="completed",
-                            result_summary={"characters": reasoning_event_chars},
+                            result_summary={"characters": reasoning_event_chars, "text": reasoning_event_text},
                         )
                     break
                 except Exception as exc:
@@ -4026,7 +4032,7 @@ async def _stream_true_agent_loop(
                             "response",
                             "Reasoning stopped",
                             status="failed",
-                            result_summary={"characters": reasoning_event_chars},
+                            result_summary={"characters": reasoning_event_chars, "text": reasoning_event_text},
                             error_code=_provider_error_code(exc),
                         )
                     if attempt_round < 4 and _transient_provider_error(exc):
@@ -4045,7 +4051,7 @@ async def _stream_true_agent_loop(
                 "response",
                 "Reasoning stopped",
                 status="failed",
-                result_summary={"characters": reasoning_event_chars},
+                result_summary={"characters": reasoning_event_chars, "text": reasoning_event_text},
                 error_code=_provider_error_code(exc),
             )
         assistant_text = _safe_provider_failure_reply(context_payload, exc)

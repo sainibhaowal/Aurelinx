@@ -872,16 +872,28 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
               {isExpanded && (
                 <div className="ml-5 mt-1 mb-2 p-2.5 rounded-lg border border-white/10 bg-slate-950/90 text-[11px] text-slate-300 space-y-2">
                   {isReasoning ? (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1.5">
                       <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-cyan-400 font-semibold border-b border-white/5 pb-1">
-                        <span>Reasoning Telemetry</span>
-                        <span>{step.result_summary?.characters || 0} chars · {durationLabel}</span>
+                        <span className="flex items-center gap-1.5">
+                          {status === "running" ? (
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                          ) : (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          )}
+                          Live Thinking{' '}
+                          {status === "running" ? "· thinking…" : ""}
+                        </span>
+                        <span className="font-mono">{step.result_summary?.characters || 0} chars</span>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 pt-1">
-                        <div>Characters: <strong className="text-cyan-300">{step.result_summary?.characters || 0}</strong></div>
-                        <div>Duration: <strong className="text-cyan-300">{durationLabel}</strong></div>
-                        <div>Estimated Tokens: <strong className="text-cyan-300">{Math.round((step.result_summary?.characters || 0) / 4)}</strong></div>
-                      </div>
+                      <pre className="p-2.5 rounded bg-black/40 border border-white/5 font-mono text-[11px] leading-relaxed text-cyan-100/90 overflow-y-auto whitespace-pre-wrap break-words max-h-52 min-h-[3rem]">
+                        {step.result_summary?.text
+                          ? <>{step.result_summary.text}{status === "running" && <span className="inline-block w-1.5 h-3.5 bg-cyan-400/80 animate-pulse ml-0.5 align-text-bottom" />}</>
+                          : (
+                            <span className="text-slate-500">
+                              {status === "running" ? "thinking…" : "No reasoning text captured — this model may not expose thinking."}
+                            </span>
+                          )}
+                      </pre>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1255,6 +1267,7 @@ const IntelligenceChatView = () => {
                     result_summary: {
                       ...(item.result_summary || {}),
                       characters: event.characters,
+                      text: event.text || item.result_summary?.text || "",
                     },
                   }
                 : item
