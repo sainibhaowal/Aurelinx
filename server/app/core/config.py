@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     CLAUDE_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
+    OPENCODE_ZEN: Optional[str] = None
 
     # Vector Search
     EMBEDDING_MODEL: str = "text-embedding-3-small"
@@ -75,6 +76,7 @@ class Settings(BaseSettings):
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
         self.CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
         self.GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+        self.OPENCODE_ZEN = os.getenv("OPENCODE_ZEN")
         self.ENVIRONMENT = os.getenv("ENVIRONMENT", self.ENVIRONMENT)
         self.REQUIRE_HTTPS = self._parse_bool(
             os.getenv("REQUIRE_HTTPS", self.REQUIRE_HTTPS)
