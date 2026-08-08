@@ -16,7 +16,12 @@ from typing import List, Dict, Any, Tuple, Set
 from collections import deque
 import heapq
 
-from app.models.database import EmployeeTable, SkillTable, ForecastScenarioTable, get_session
+from app.models.database import (
+    EmployeeTable,
+    SkillTable,
+    ForecastScenarioTable,
+    get_session,
+)
 from app.core.security import get_current_user, get_tenant_id, TokenData
 from app.core.logging_config import get_logger
 from app.core.data_policy import filter_real_records
@@ -291,12 +296,20 @@ def evaluate_team(
     # Combine candidate skills
     merged_skills: Dict[str, int] = {}
     total_cost = 0.0
+    real_salary_records = 0
 
     for emp in team:
-        # Estimate salary/cost from role/sentiment/mock basis
-        base_salary = 80000 + (
-            len(emp.role) * 1500
-        )  # Algorithmic pricing based on position
+        # Prefer the real compensation recorded on the employee record.
+        # Fall back to a deterministic role-length estimate only when the
+        # employee record has no salary data (None / <= 0) so the solver never
+        # breaks on incomplete inputs and remains reproducible.
+        base_salary = (
+            emp.salary
+            if emp.salary is not None and emp.salary > 0
+            else 80000 + len(emp.role or "") * 1500
+        )
+        if emp.salary is not None and emp.salary > 0:
+            real_salary_records += 1
         total_cost += base_salary
 
         if skills_by_employee is not None:
@@ -356,6 +369,18 @@ def evaluate_team(
         "is_under_budget": total_cost <= budget_cap,
         "budget_usage_percentage": round((total_cost / budget_cap) * 100, 1),
         "skills_coverage": skill_details,
+        "compensation_basis": (
+            "real_salary_records"
+            if real_salary_records == len(team)
+            else (
+                "partial_estimate_fallback"
+                if real_salary_records > 0
+                else "role_estimate_fallback"
+            )
+        ),
+        "salary_record_ratio": (
+            round(real_salary_records / len(team), 2) if team else 0.0
+        ),
     }
 
 
@@ -375,12 +400,21 @@ def optimize_team(
     max_team_size = int(payload.get("max_team_size", 4))
     requested_seed = payload.get("seed")
     canonical_inputs = json.dumps(
-        {"target_skills": target_skills, "budget_cap": budget_cap, "max_team_size": max_team_size},
+        {
+            "target_skills": target_skills,
+            "budget_cap": budget_cap,
+            "max_team_size": max_team_size,
+        },
         sort_keys=True,
         default=str,
     )
-    seed = int(requested_seed) if requested_seed is not None else int(
-        hashlib.sha256(f"{tenant_id}:{canonical_inputs}".encode()).hexdigest()[:16], 16
+    seed = (
+        int(requested_seed)
+        if requested_seed is not None
+        else int(
+            hashlib.sha256(f"{tenant_id}:{canonical_inputs}".encode()).hexdigest()[:16],
+            16,
+        )
     )
     rng = random.Random(seed)
 
@@ -464,8 +498,12 @@ def optimize_team(
                 "step": step,
                 "temperature": round(temp, 3),
                 "energy": round(current_energy, 3),
+                "best_energy": round(best_energy, 3),
                 "coverage": current_breakdown.get("coverage_percentage", 0),
                 "cost": current_breakdown.get("total_cost", 0),
+                "budget_usage_percentage": current_breakdown.get(
+                    "budget_usage_percentage", 0
+                ),
             }
         )
 
@@ -478,13 +516,23 @@ def optimize_team(
                 "full_name": emp.full_name,
                 "role": emp.role,
                 "department": emp.department,
-                "estimated_cost": 80000 + (len(emp.role) * 1500),
+                "estimated_cost": (
+                    emp.salary
+                    if emp.salary is not None and emp.salary > 0
+                    else 80000 + (len(emp.role or "") * 1500)
+                ),
+                "salary_source": (
+                    "employee_record"
+                    if emp.salary is not None and emp.salary > 0
+                    else "role_estimate"
+                ),
             }
             for emp in best_team
         ],
         "optimization_history": history,
         "metrics": best_breakdown,
         "total_optimization_steps": step,
+        "budget_cap": budget_cap,
         "model_version": "team-annealing-v1",
         "model_status": "synthetic_calibration_only",
         "validation_status": "algorithmic_consistency_checked_not_real_world_validated",
@@ -495,7 +543,15 @@ def optimize_team(
     scenario = ForecastScenarioTable(
         tenant_id=tenant_id,
         scenario_name=f"Team optimization · {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}",
-        input_payload=json.dumps({"target_skills": target_skills, "budget_cap": budget_cap, "max_team_size": max_team_size, "seed": seed}, default=str),
+        input_payload=json.dumps(
+            {
+                "target_skills": target_skills,
+                "budget_cap": budget_cap,
+                "max_team_size": max_team_size,
+                "seed": seed,
+            },
+            default=str,
+        ),
         output_payload=json.dumps(output, default=str),
         created_by=current_user.user_id,
     )
@@ -672,7 +728,9 @@ def compute_ona(
     """
     employees = [
         emp
-        for emp in filter_real_records(session.exec(select(EmployeeTable).limit(limit)).all())
+        for emp in filter_real_records(
+            session.exec(select(EmployeeTable).limit(limit)).all()
+        )
         if emp is not None and getattr(emp, "id", None) is not None
     ]
     if not employees:

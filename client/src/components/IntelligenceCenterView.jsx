@@ -1458,148 +1458,605 @@ const IntelligenceCenterView = () => {
                             </span>
                           </div>
 
-                          {/* High-Precision Interactive SVG Convergence Chart */}
-                          <div className="space-y-2">
-                            <div className="relative h-64 w-full rounded-xl border border-white/10 bg-slate-950/80 p-4 shadow-inner flex flex-col justify-between overflow-hidden">
-                              {/* Y-Axis Value Labels (Left) */}
-                              {(() => {
-                                const history = annealingHistory.length > 0 ? annealingHistory : Array(10).fill({ step: 0, energy: 0, coverage: 0 });
-                                const energies = history.map((item) => Number(item.energy) || 0);
-                                const minE = Math.min(...energies);
-                                const maxE = Math.max(...energies);
-                                const range = maxE - minE || 1;
-                                const bestIndex = history.findIndex((h) => Number(h.energy) === maxE);
+                          {(() => {
+                            const history =
+                              annealingHistory.length > 0 ? annealingHistory : [];
 
-                                return (
-                                  <>
-                                    {/* Left Y-Axis numeric labels: Max E (Best) at Top, Min E at Bottom */}
-                                    <div className="absolute left-2 top-3 bottom-8 flex flex-col justify-between text-[10px] font-mono text-slate-400 z-10 pointer-events-none">
-                                      <span className="bg-slate-900/90 px-2 py-0.5 rounded border border-emerald-500/30 text-emerald-300 font-bold shadow">
-                                        E: {maxE.toFixed(2)} (Best)
-                                      </span>
-                                      <span className="bg-slate-900/80 px-1.5 py-0.5 rounded border border-white/5 text-slate-400">
-                                        E: {((maxE + minE) / 2).toFixed(2)}
-                                      </span>
-                                      <span className="bg-slate-900/80 px-1.5 py-0.5 rounded border border-white/5 text-slate-400">
-                                        E: {minE.toFixed(2)} (Initial)
-                                      </span>
-                                    </div>
+                            if (history.length === 0) {
+                              return (
+                                <div className="h-44 rounded-xl border border-white/10 bg-slate-950/80 flex items-center justify-center px-4 text-center text-[10px] text-slate-500">
+                                  No optimization data yet — configure target
+                                  skills and run the solver.
+                                </div>
+                              );
+                            }
 
-                                    {/* SVG Graphic Canvas */}
-                                    <div className="relative flex-1 w-full pl-28 pr-4 pt-2 pb-2">
+                            const n = history.length;
+                            const steps = history.map((h) => Number(h.step) || 0);
+                            const energies = history.map(
+                              (h) => Number(h.energy) || 0,
+                            );
+                            const bestSoFar = history.map((h) => {
+                              const rawBest = h.best_energy;
+                              return rawBest === null || rawBest === undefined
+                                ? Number(h.energy) || 0
+                                : Number(rawBest) || 0;
+                            });
+                            const coverages = history.map(
+                              (h) => Number(h.coverage) || 0,
+                            );
+                            const temps = history.map(
+                              (h) => Number(h.temperature) || 0,
+                            );
+                            const costs = history.map((h) => Number(h.cost) || 0);
+
+                            const metrics = optimizedTeam.metrics || {};
+                            const lastCost = costs[costs.length - 1] || 0;
+                            const usagePct =
+                              Number(metrics.budget_usage_percentage) || 0;
+                            const budgetCap =
+                              Number(optimizedTeam.budget_cap) ||
+                              (usagePct > 0
+                                ? Math.round(lastCost / (usagePct / 100))
+                                : Math.max(...costs) || 1);
+
+                            const minE = Math.min(...energies, ...bestSoFar);
+                            const maxE = Math.max(...energies, ...bestSoFar);
+                            const ePad = (maxE - minE) * 0.12 || 1;
+
+                            const niceTicks = (lo, hi, count = 5) => {
+                              if (!isFinite(lo) || !isFinite(hi) || hi <= lo)
+                                return [lo, hi];
+                              const stepRaw = (hi - lo) / count;
+                              const mag = Math.pow(
+                                10,
+                                Math.floor(Math.log10(stepRaw)),
+                              );
+                              const ratio = stepRaw / mag;
+                              const step =
+                                (ratio < 1.5 ? 1 : ratio < 3 ? 2 : ratio < 7 ? 5 : 10) *
+                                mag;
+                              const ticks = [];
+                              for (
+                                let v = Math.ceil(lo / step) * step;
+                                v <= hi + step * 1e-6;
+                                v += step
+                              ) {
+                                ticks.push(Number(v.toFixed(6)));
+                              }
+                              return ticks.length >= 2 ? ticks : [lo, hi];
+                            };
+
+                            const eTicks = niceTicks(minE - ePad, maxE + ePad, 5);
+                            const maxCost =
+                              Math.max(...costs, budgetCap) * 1.05 || 1;
+                            const costTicks = niceTicks(0, maxCost, 4);
+                            const covTicks = [0, 25, 50, 75, 100];
+                            const tmpTicks = [10, 5, 0];
+
+                            const xPos = (i) =>
+                              (i / Math.max(n - 1, 1)) * 100;
+                            const yScaler = (lo, hi) => (v) => {
+                              const r = hi - lo || 1;
+                              return (
+                                84 -
+                                Math.max(0, Math.min(1, (v - lo) / r)) * 66
+                              );
+                            };
+                            const yE = yScaler(
+                              eTicks[0],
+                              eTicks[eTicks.length - 1],
+                            );
+                            const yC = yScaler(0, 100);
+                            const yT = yScaler(0, 10);
+                            const yK = yScaler(0, Math.max(...costTicks));
+
+                            const ePts = energies.map((e, i) => ({
+                              x: xPos(i),
+                              y: yE(e),
+                            }));
+                            const bPts = bestSoFar.map((e, i) => ({
+                              x: xPos(i),
+                              y: yE(e),
+                            }));
+                            const cPts = coverages.map((c, i) => ({
+                              x: xPos(i),
+                              y: yC(c),
+                            }));
+                            const tPts = temps.map((t, i) => ({
+                              x: xPos(i),
+                              y: yT(t),
+                            }));
+
+                            const globalBest = Math.max(...energies);
+                            const bestIndex = energies.indexOf(globalBest);
+                            const finalIsBest = bestIndex === n - 1;
+                            const covAreaPts = `0,84 ${cPts
+                              .map((p) => `${p.x},${p.y}`)
+                              .join(" ")} 100,84`;
+                            const budgetY = yK(budgetCap);
+
+                            const fmtMoney = (v) => {
+                              const num = Number(v) || 0;
+                              if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
+                              if (num >= 1e3) return `$${(num / 1e3).toFixed(0)}k`;
+                              return `$${num.toFixed(0)}`;
+                            };
+
+                            const stepAt = (frac) =>
+                              steps[Math.round((n - 1) * frac)] ??
+                              steps[n - 1];
+                            const barW = Math.max(0.6, (100 / n) * 0.6);
+                            const hovered = hoveredAnnealIndex;
+
+                            return (
+                              <>
+                                {/* Legend */}
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[9px] text-slate-400 mb-2">
+                                  <span className="flex items-center gap-1">
+                                    <span className="h-0.5 w-3 rounded bg-teal-400" />
+                                    Energy E(x)
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <span className="h-0.5 w-3 rounded border-t border-dashed border-emerald-400" />
+                                    Best-so-far E*
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <span className="h-0.5 w-3 rounded bg-indigo-400" />
+                                    Coverage %
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <span className="h-0.5 w-3 rounded bg-amber-400" />
+                                    Temperature
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <span className="h-0.5 w-3 rounded border-t border-dashed border-rose-400" />
+                                    Budget cap
+                                  </span>
+                                </div>
+
+                                <div className="relative">
+                                  {/* ===== MAIN CHART: Energy + Best-so-far (left) + Coverage (right) ===== */}
+                                  <div className="relative h-36 w-full rounded-lg border border-white/10 bg-slate-950/80 overflow-hidden">
+                                    {/* Y-axis energy tick labels */}
+                                    {eTicks.map((t) => (
+                                      <span
+                                        key={`et-${t}`}
+                                        className="absolute left-1 -translate-y-1/2 z-10 pointer-events-none text-[8px] font-mono text-slate-400 bg-slate-900/70 px-0.5 rounded"
+                                        style={{ top: `${yE(t)}%` }}
+                                      >
+                                        {t.toFixed(1)}
+                                      </span>
+                                    ))}
+                                    {/* Y-axis coverage tick labels (right) */}
+                                    {covTicks.map((t) => (
+                                      <span
+                                        key={`ct-${t}`}
+                                        className="absolute right-1 -translate-y-1/2 z-10 pointer-events-none text-[8px] font-mono text-indigo-300/80 bg-slate-900/70 px-0.5 rounded"
+                                        style={{ top: `${yC(t)}%` }}
+                                      >
+                                        {t}
+                                      </span>
+                                    ))}
+                                    <div className="ml-12 mr-9 h-full">
                                       <svg
                                         className="h-full w-full overflow-hidden"
                                         viewBox="0 0 100 100"
                                         preserveAspectRatio="none"
                                       >
                                         <defs>
-                                          <linearGradient id="annealGradHigh" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.25" />
-                                            <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0.0" />
+                                          <linearGradient
+                                            id="annealGradHigh"
+                                            x1="0"
+                                            y1="0"
+                                            x2="0"
+                                            y2="1"
+                                          >
+                                            <stop
+                                              offset="0%"
+                                              stopColor="#2dd4bf"
+                                              stopOpacity="0.25"
+                                            />
+                                            <stop
+                                              offset="100%"
+                                              stopColor="#2dd4bf"
+                                              stopOpacity="0.0"
+                                            />
+                                          </linearGradient>
+                                          <linearGradient
+                                            id="annealCovArea"
+                                            x1="0"
+                                            y1="0"
+                                            x2="0"
+                                            y2="1"
+                                          >
+                                            <stop
+                                              offset="0%"
+                                              stopColor="#818cf8"
+                                              stopOpacity="0.18"
+                                            />
+                                            <stop
+                                              offset="100%"
+                                              stopColor="#818cf8"
+                                              stopOpacity="0.0"
+                                            />
                                           </linearGradient>
                                         </defs>
 
-                                        {/* Y-Axis Grid lines */}
-                                        <line x1="0" y1="15" x2="100" y2="15" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-                                        <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-                                        <line x1="0" y1="85" x2="100" y2="85" stroke="rgba(255,255,255,0.12)" vectorEffect="non-scaling-stroke" />
-
-                                        {/* Explicit Y-Axis & X-Axis Lines */}
-                                        <line x1="0" y1="0" x2="0" y2="85" stroke="rgba(255,255,255,0.2)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                                        <line x1="0" y1="85" x2="100" y2="85" stroke="rgba(255,255,255,0.2)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-
-                                        {/* Area polygon & crisp line */}
-                                        {(() => {
-                                          const pts = history.map((h, i, arr) => {
-                                            const x = (i / Math.max(arr.length - 1, 1)) * 100;
-                                            // Clamped normalization: strictly bounds Y between 15 (top) and 80 (bottom)
-                                            const norm = range === 0 ? 0.5 : Math.max(0.0, Math.min(1.0, (Number(h.energy) - minE) / range));
-                                            const y = 80 - norm * 65;
-                                            return `${x},${y}`;
-                                          });
-                                          const pointsStr = pts.join(" ");
-
-                                          return (
-                                            <>
-                                              {/* Laser Crosshair Line on hover */}
-                                              {hoveredAnnealIndex !== null && (
-                                                <line
-                                                  x1={(hoveredAnnealIndex / Math.max(history.length - 1, 1)) * 100}
-                                                  y1="0"
-                                                  x2={(hoveredAnnealIndex / Math.max(history.length - 1, 1)) * 100}
-                                                  y2="85"
-                                                  stroke="#2dd4bf"
-                                                  strokeWidth="1.5"
-                                                  strokeDasharray="3 3"
-                                                  vectorEffect="non-scaling-stroke"
-                                                />
-                                              )}
-
-                                              {/* Clean Pure SVG Line Graph (NO BALLS / NO CIRCLES) */}
-                                              <polyline
-                                                fill="none"
-                                                stroke="#2dd4bf"
-                                                strokeWidth="2.5"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                vectorEffect="non-scaling-stroke"
-                                                points={pointsStr}
-                                              />
-                                            </>
-                                          );
-                                        })()}
-                                      </svg>
-
-                                      {/* Invisible Interactive node hover trigger zones */}
-                                      <div className="absolute inset-0 pl-28 pr-4 pt-2 pb-2 flex justify-between items-center pointer-events-auto">
-                                        {history.map((h, i, arr) => (
-                                          <div
-                                            key={i}
-                                            onMouseEnter={() => setHoveredAnnealIndex(i)}
-                                            onMouseLeave={() => setHoveredAnnealIndex(null)}
-                                            className="h-full flex-1 cursor-pointer relative group flex justify-center items-center"
+                                        {/* Horizontal gridlines at every energy tick */}
+                                        {eTicks.map((t) => (
+                                          <line
+                                            key={`gl-${t}`}
+                                            x1="0"
+                                            y1={yE(t)}
+                                            x2="100"
+                                            y2={yE(t)}
+                                            stroke="rgba(255,255,255,0.07)"
+                                            strokeDasharray="3 3"
+                                            vectorEffect="non-scaling-stroke"
                                           />
                                         ))}
-                                      </div>
-                                    </div>
 
-                                    {/* Bottom X-Axis Step Ticks */}
-                                    <div className="pl-28 pr-4 flex justify-between items-center text-[10px] font-mono text-slate-400 border-t border-white/10 pt-1.5">
-                                      <span className="flex flex-col items-center">
-                                        <span className="text-slate-300 font-bold">Step 0</span>
-                                        <span className="text-[8px] text-slate-500">Initial</span>
-                                      </span>
-                                      <span className="flex flex-col items-center">
-                                        <span>Step {Math.floor((history.length - 1) * 0.25)}</span>
-                                      </span>
-                                      <span className="flex flex-col items-center">
-                                        <span>Step {Math.floor((history.length - 1) * 0.5)}</span>
-                                      </span>
-                                      <span className="flex flex-col items-center">
-                                        <span>Step {Math.floor((history.length - 1) * 0.75)}</span>
-                                      </span>
-                                      <span className="flex flex-col items-center">
-                                        <span className="text-emerald-300 font-bold">Step {history.length - 1}</span>
-                                        <span className="text-[8px] text-emerald-400/80">Optimal</span>
-                                      </span>
-                                    </div>
+                                        {/* Explicit Y & X axis lines */}
+                                        <line
+                                          x1="0"
+                                          y1="12"
+                                          x2="0"
+                                          y2="84"
+                                          stroke="rgba(255,255,255,0.2)"
+                                          strokeWidth="1"
+                                          vectorEffect="non-scaling-stroke"
+                                        />
+                                        <line
+                                          x1="0"
+                                          y1="84"
+                                          x2="100"
+                                          y2="84"
+                                          stroke="rgba(255,255,255,0.2)"
+                                          strokeWidth="1"
+                                          vectorEffect="non-scaling-stroke"
+                                        />
 
-                                    {/* Active Hover Tooltip Box */}
-                                    {hoveredAnnealIndex !== null && history[hoveredAnnealIndex] && (
-                                      <div className="absolute top-3 right-3 z-20 rounded-xl border border-teal-400/30 bg-slate-950/90 p-3 shadow-2xl backdrop-blur-md text-[11px] space-y-1">
-                                        <div className="font-bold text-teal-300 flex items-center gap-1.5">
-                                          <span>Step #{history[hoveredAnnealIndex].step ?? hoveredAnnealIndex}</span>
-                                          {hoveredAnnealIndex === bestIndex && <span className="bg-emerald-500/20 text-emerald-300 text-[9px] px-1.5 py-0.5 rounded border border-emerald-500/30">Optimal Best</span>}
+                                        {/* Coverage area + line (right axis) */}
+                                        <polygon
+                                          points={covAreaPts}
+                                          fill="url(#annealCovArea)"
+                                        />
+                                        <polyline
+                                          fill="none"
+                                          stroke="#818cf8"
+                                          strokeWidth="1.5"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          vectorEffect="non-scaling-stroke"
+                                          points={cPts
+                                            .map((p) => `${p.x},${p.y}`)
+                                            .join(" ")}
+                                        />
+
+                                        {/* Best-so-far dashed line */}
+                                        <polyline
+                                          fill="none"
+                                          stroke="#34d399"
+                                          strokeWidth="1.5"
+                                          strokeDasharray="4 3"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          vectorEffect="non-scaling-stroke"
+                                          points={bPts
+                                            .map((p) => `${p.x},${p.y}`)
+                                            .join(" ")}
+                                        />
+
+                                        {/* Energy line */}
+                                        <polyline
+                                          fill="none"
+                                          stroke="#2dd4bf"
+                                          strokeWidth="2"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          vectorEffect="non-scaling-stroke"
+                                          points={ePts
+                                            .map((p) => `${p.x},${p.y}`)
+                                            .join(" ")}
+                                        />
+
+                                        {/* Laser crosshair on hover */}
+                                        {hovered !== null && (
+                                          <line
+                                            x1={xPos(hovered)}
+                                            y1="12"
+                                            x2={xPos(hovered)}
+                                            y2="84"
+                                            stroke="#2dd4bf"
+                                            strokeWidth="1.5"
+                                            strokeDasharray="3 3"
+                                            vectorEffect="non-scaling-stroke"
+                                          />
+                                        )}
+
+                                        {/* Energy step dots */}
+                                        {ePts.map((p, idx) => (
+                                          <circle
+                                            key={idx}
+                                            cx={p.x}
+                                            cy={p.y}
+                                            r={
+                                              idx === bestIndex
+                                                ? "3.5"
+                                                : idx === hovered
+                                                  ? "2.6"
+                                                  : "1.6"
+                                            }
+                                            fill={
+                                              idx === bestIndex
+                                                ? "#34d399"
+                                                : "#2dd4bf"
+                                            }
+                                            stroke={
+                                              idx === bestIndex
+                                                ? "#ffffff"
+                                                : "none"
+                                            }
+                                            strokeWidth="1"
+                                            vectorEffect="non-scaling-stroke"
+                                          />
+                                        ))}
+                                        {/* Best point inner marker */}
+                                        <circle
+                                          cx={ePts[bestIndex].x}
+                                          cy={ePts[bestIndex].y}
+                                          r="1.5"
+                                          fill="#ffffff"
+                                          vectorEffect="non-scaling-stroke"
+                                        />
+                                      </svg>
+                                    </div>
+                                  </div>
+
+                                  {/* ===== SUB CHART: Team Cost vs Budget Cap + Temperature ===== */}
+                                  <div className="relative mt-2 h-24 w-full rounded-lg border border-white/10 bg-slate-950/80 overflow-hidden">
+                                    {/* Cost tick labels (left) */}
+                                    {costTicks.map((t) => (
+                                      <span
+                                        key={`kt-${t}`}
+                                        className="absolute left-1 -translate-y-1/2 z-10 pointer-events-none text-[8px] font-mono text-slate-400 bg-slate-900/70 px-0.5 rounded"
+                                        style={{ top: `${yK(t)}%` }}
+                                      >
+                                        {fmtMoney(t)}
+                                      </span>
+                                    ))}
+                                    {/* Temperature tick labels (right) */}
+                                    {tmpTicks.map((t) => (
+                                      <span
+                                        key={`tt-${t}`}
+                                        className="absolute right-1 -translate-y-1/2 z-10 pointer-events-none text-[8px] font-mono text-amber-300/80 bg-slate-950/70 px-0.5 rounded"
+                                        style={{ top: `${yT(t)}%` }}
+                                      >
+                                        T {t}
+                                      </span>
+                                    ))}
+                                    <div className="ml-12 mr-9 h-full">
+                                      <svg
+                                        className="h-full w-full overflow-hidden"
+                                        viewBox="0 0 100 100"
+                                        preserveAspectRatio="none"
+                                      >
+                                        {/* Cost gridlines */}
+                                        {costTicks.map((t) => (
+                                          <line
+                                            key={`kgl-${t}`}
+                                            x1="0"
+                                            y1={yK(t)}
+                                            x2="100"
+                                            y2={yK(t)}
+                                            stroke="rgba(255,255,255,0.07)"
+                                            strokeDasharray="3 3"
+                                            vectorEffect="non-scaling-stroke"
+                                          />
+                                        ))}
+                                        <line
+                                          x1="0"
+                                          y1="84"
+                                          x2="100"
+                                          y2="84"
+                                          stroke="rgba(255,255,255,0.2)"
+                                          strokeWidth="1"
+                                          vectorEffect="non-scaling-stroke"
+                                        />
+
+                                        {/* Budget cap line */}
+                                        <line
+                                          x1="0"
+                                          y1={budgetY}
+                                          x2="100"
+                                          y2={budgetY}
+                                          stroke="#fb7185"
+                                          strokeWidth="1.5"
+                                          strokeDasharray="5 4"
+                                          vectorEffect="non-scaling-stroke"
+                                        />
+
+                                        {/* Cost bars per step */}
+                                        {costs.map((c, i) => (
+                                          <rect
+                                            key={`bar-${i}`}
+                                            x={xPos(i) - barW / 2}
+                                            y={yK(c)}
+                                            width={barW}
+                                            height={84 - yK(c)}
+                                            fill="#22d3ee"
+                                            opacity={hovered === i ? 1 : 0.45}
+                                            stroke={
+                                              hovered === i
+                                                ? "#ffffff"
+                                                : "none"
+                                            }
+                                            strokeWidth="0.4"
+                                            vectorEffect="non-scaling-stroke"
+                                          />
+                                        ))}
+
+                                        {/* Temperature line (right axis) */}
+                                        <polyline
+                                          fill="none"
+                                          stroke="#fbbf24"
+                                          strokeWidth="1.5"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          vectorEffect="non-scaling-stroke"
+                                          points={tPts
+                                            .map((p) => `${p.x},${p.y}`)
+                                            .join(" ")}
+                                        />
+                                        {tPts.map((p, idx) => (
+                                          <circle
+                                            key={`td-${idx}`}
+                                            cx={p.x}
+                                            cy={p.y}
+                                            r="1.2"
+                                            fill="#fbbf24"
+                                            vectorEffect="non-scaling-stroke"
+                                          />
+                                        ))}
+
+                                        {/* Crosshair on hover */}
+                                        {hovered !== null && (
+                                          <line
+                                            x1={xPos(hovered)}
+                                            y1="18"
+                                            x2={xPos(hovered)}
+                                            y2="84"
+                                            stroke="#2dd4bf"
+                                            strokeWidth="1.5"
+                                            strokeDasharray="3 3"
+                                            vectorEffect="non-scaling-stroke"
+                                          />
+                                        )}
+                                      </svg>
+                                    </div>
+                                  </div>
+
+                                  {/* Hover overlay spanning both charts */}
+                                  <div className="absolute inset-0 ml-12 mr-9 flex justify-between items-stretch pointer-events-auto">
+                                    {history.map((h, i) => (
+                                      <div
+                                        key={i}
+                                        onMouseEnter={() =>
+                                          setHoveredAnnealIndex(i)
+                                        }
+                                        onMouseLeave={() =>
+                                          setHoveredAnnealIndex(null)
+                                        }
+                                        className="flex-1 h-full cursor-pointer relative group"
+                                      />
+                                    ))}
+                                  </div>
+
+                                  {/* Active Hover Tooltip Box */}
+                                  {hovered !== null &&
+                                    history[hovered] && (
+                                      <div className="absolute top-1 right-1 z-20 rounded-xl border border-teal-400/30 bg-slate-950/95 p-2.5 shadow-2xl backdrop-blur-md text-[10px] space-y-1">
+                                        <div className="font-bold text-teal-300 flex items-center gap-1">
+                                          <span>
+                                            Step #
+                                            {history[hovered].step ??
+                                              hovered}
+                                          </span>
+                                          {hovered === bestIndex && (
+                                            <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 rounded border border-emerald-500/30">
+                                              Optimal Best
+                                            </span>
+                                          )}
                                         </div>
-                                        <div className="text-slate-300">Objective Energy E(x): <strong className="text-white font-mono">{Number(history[hoveredAnnealIndex].energy).toFixed(4)}</strong></div>
-                                        <div className="text-slate-300">Skill Coverage: <strong className="text-cyan-300 font-mono">{Number(history[hoveredAnnealIndex].coverage ?? 0).toFixed(1)}%</strong></div>
+                                        <div className="text-slate-300">
+                                          Temperature:{" "}
+                                          <strong className="text-amber-300 font-mono">
+                                            {Number(
+                                              history[hovered].temperature,
+                                            ).toFixed(3)}
+                                          </strong>
+                                        </div>
+                                        <div className="text-slate-300">
+                                          Energy E(x):{" "}
+                                          <strong className="text-white font-mono">
+                                            {Number(
+                                              history[hovered].energy,
+                                            ).toFixed(4)}
+                                          </strong>
+                                        </div>
+                                        <div className="text-slate-300">
+                                          Best-so-far E*:{" "}
+                                          <strong className="text-emerald-300 font-mono">
+                                            {Number(
+                                              history[hovered].best_energy ??
+                                                history[hovered].energy,
+                                            ).toFixed(4)}
+                                          </strong>
+                                        </div>
+                                        <div className="text-slate-300">
+                                          Skill Coverage:{" "}
+                                          <strong className="text-indigo-300 font-mono">
+                                            {Number(
+                                              history[hovered].coverage ?? 0,
+                                            ).toFixed(1)}
+                                            %
+                                          </strong>
+                                        </div>
+                                        <div className="text-slate-300">
+                                          Team Cost:{" "}
+                                          <strong className="text-cyan-300 font-mono">
+                                            {fmtMoney(
+                                              history[hovered].cost ?? 0,
+                                            )}
+                                          </strong>
+                                          <span className="text-slate-500">
+                                            {" "}
+                                            (
+                                            {Number(
+                                              history[hovered]
+                                                .budget_usage_percentage ?? 0,
+                                            ).toFixed(0)}
+                                            % of cap)
+                                          </span>
+                                        </div>
                                       </div>
                                     )}
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          </div>
+                                </div>
+
+                                {/* X-Axis Step Ticks (real step numbers) */}
+                                <div className="ml-12 mr-9 mt-1 flex justify-between items-center text-[8px] font-mono text-slate-400 border-t border-white/10 pt-1">
+                                  <span className="flex flex-col items-center">
+                                    <span className="text-slate-300 font-bold">
+                                      Step {stepAt(0)}
+                                    </span>
+                                    <span className="text-[8px] text-slate-500">
+                                      Initial
+                                    </span>
+                                  </span>
+                                  <span className="flex flex-col items-center">
+                                    <span>Step {stepAt(0.25)}</span>
+                                  </span>
+                                  <span className="flex flex-col items-center">
+                                    <span>Step {stepAt(0.5)}</span>
+                                  </span>
+                                  <span className="flex flex-col items-center">
+                                    <span>Step {stepAt(0.75)}</span>
+                                  </span>
+                                  <span className="flex flex-col items-center">
+                                    <span className="text-emerald-300 font-bold">
+                                      Step {stepAt(1)}
+                                    </span>
+                                    <span className="text-[8px] text-emerald-400/80">
+                                      {finalIsBest
+                                        ? "Final · Optimal"
+                                        : "Final"}
+                                    </span>
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
 
                         {/* Skill Coverage details */}

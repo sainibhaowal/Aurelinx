@@ -1277,7 +1277,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                         The achievement ratio for that skill is bounded at 1.0: <code className="text-cyan-300">min(1.0, effective_level / L_j)</code>.
                       </li>
                       <li>
-                        <strong>CFO Budget Cap Constraint:</strong> Salaries are algorithmically estimated from role lengths: <code className="text-cyan-300">cost = $80,000 + (length(role) &times; $1,500)</code>. If total cost exceeds the Budget Cap, a severe penalty is applied: <br />
+                        <strong>CFO Budget Cap Constraint:</strong> Salaries are read from the <strong>recorded compensation</strong> on each employee profile (<code className="text-cyan-300">EmployeeTable.salary</code>), so the budget math reflects your real pay data. Only when a profile has no salary record does the solver fall back to a deterministic role-length estimate: <code className="text-cyan-300">cost = $80,000 + (length(role) &times; $1,500)</code>. Each roster member is labeled <code className="text-cyan-300">salary_source: employee_record | role_estimate</code> and the metrics report a <code className="text-cyan-300">salary_record_ratio</code> so you always know how much of the cost is real versus estimated. If total cost exceeds the Budget Cap, a severe penalty is applied: <br />
                         <code className="text-rose-400">Cost Penalty = ((Total Cost - Budget Cap) / Budget Cap) &times; 5.0</code>.
                       </li>
                     </ul>
@@ -1320,10 +1320,10 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                       When a run finishes, the workbench displays:
                     </p>
                     <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
-                      <li><strong>Assembly Roster:</strong> The optimized team configuration showing the roles and estimated cost.</li>
+                      <li><strong>Assembly Roster:</strong> The optimized team configuration showing the roles, recorded salary (or fallback estimate), and per-member <code>salary_source</code>.</li>
                       <li><strong>Total Skills Coverage:</strong> The coverage percentage and achievement pathways showing how the team covers the matrix demand (including bridge matches).</li>
-                      <li><strong>Total Team Cost Calculation:</strong> Aggregated salaries verified against the CFO Limit.</li>
-                      <li><strong>Convergence Timeline:</strong> An SVG line chart showing how the system energy stabilized as temperature cooled down.</li>
+                      <li><strong>Total Team Cost Calculation:</strong> Aggregated real salaries verified against the CFO Limit.</li>
+                      <li><strong>Convergence Timeline:</strong> A dual-axis SVG dashboard with real tick values and gridlines. The top chart plots objective energy E(x) (teal), Best-so-far E* (emerald dashed), and Skill Coverage % (indigo, right axis) across every annealing step. The bottom chart plots Team Cost bars against the Budget Cap line (rose dashed) and the Temperature cooling curve (amber, right axis). X-axis labels show the actual solver step numbers; hovering shows the full per-step breakdown (temperature, energy, best-so-far, coverage, cost, and budget usage).</li>
                     </ul>
                   </div>
                 </div>
