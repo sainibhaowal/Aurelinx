@@ -1875,13 +1875,13 @@ def _is_casual_chat(user_text: str) -> bool:
 
 
 AGENT_TOOL_CATALOG = {
-    "search": "Find any records in the entire Aurelinx system: employees, candidates, skills, integrations, policies, chat messages, attachments, workflow runs. Detects the entity from the query. Returns verified matches.",
+    "search": "Find records by matching TEXT inside the system: names, emails, job titles, skills, departments, policies, and identifiers across employees, candidates, and more. Pass a few concrete terms (name, email, title, skill). When nothing matches, verified recent records are returned as context. Sentiment and at-risk status are NOT stored as text: use analyse or observe for those.",
     "read": "Read any record end to end by entity and identifier (email, name, or id). Returns the full safe record. Reads never mutate.",
     "modify": "Modify one record end to end: entity, identifier, and explicit field updates. Commits the change and reads the record back to verify. Admin only.",
     "write": "Create one new record: entity plus required field data. Admin only.",
     "delete": "Prepare a deletion of one record (entity and exact identifier). Deletion NEVER executes automatically; it always returns an approval spec that requires an authorized human to approve the exact action.",
-    "analyse": "Analyse anything end to end: records, chat and input/output, database values and properties, sentiment, analytics, workflows, intelligence center, and data operations. Returns a structured analysis for the answer model.",
-    "observe": "Observe the current system state, detect patterns, symptoms, and anomalies, learn from prior observations, predict, and return an observation bundle for the answer model.",
+    "analyse": "Analyse anything end to end: records, chat and input/output, database values and properties, sentiment, analytics, workflows, intelligence center, and data operations. Use this whenever the user asks about sentiment, risk, at-risk cohorts, performance, or statistics. Returns a structured analysis for the answer model.",
+    "observe": "Observe the current system state, detect patterns, symptoms, and anomalies, learn from prior observations, predict, and return an observation bundle for the answer model. Use for 'who is at risk', 'patterns', 'anomalies' and predictive questions.",
 }
 
 
@@ -2205,20 +2205,84 @@ def _resolve_definition(entity: str, db: Session) -> Optional[Dict[str, Any]]:
     return spec
 
 
+_SEARCH_STOPWORDS = frozenset({
+    "a", "an", "and", "or", "of", "for", "to", "in", "on", "with", "my",
+    "our", "your", "their", "his", "her", "its", "this", "that", "these",
+    "those", "from", "by", "at", "all", "any", "please", "give", "tell",
+    "show", "find", "look", "search", "list", "rank", "top", "most", "least",
+    "current", "latest", "recent", "new", "what", "which", "who", "where",
+    "when", "why", "how", "many", "much", "total", "count", "about", "within",
+    "between", "than", "then", "they", "them", "we", "you", "your", "i",
+    "it", "me", "us", "the", "and", "record", "records", "employee",
+    "employees", "candidate", "candidates", "data", "status", "state",
+    "activity", "now", "also", "then", "into", "out", "up", "down", "more",
+    "less", "each", "every", "some", "are", "is", "was", "were", "be",
+    "been", "will", "would", "can", "could", "should", "do", "did", "does",
+    "get", "having", "has", "have", "return", "returns", "send", "using",
+    "use", "used", "check", "per", "see", "view", "verify", "read", "write",
+    "update", "modify", "change", "delete", "remove", "add", "create",
+})
+
+
+def _search_tokens(query: str) -> List[str]:
+    import re as _re
+
+    tokens = _re.split(r"[^A-Za-z0-9._+@-]+", (query or "").lower())
+    cleaned = [tok.strip("._-") for tok in tokens if tok.strip("._-")]
+    return [tok for tok in cleaned if len(tok) >= 2 and tok not in _SEARCH_STOPWORDS]
+
+
+def _browse_records(
+    db: Session, model: Any, limit: int, offset: int
+) -> List[Any]:
+    sort_column = getattr(model, "created_at", None) or getattr(model, "id", None)
+    statement = select(model)
+    if sort_column is not None:
+        statement = statement.order_by(sort_column.desc())
+    return db.exec(statement.limit(limit).offset(offset)).all()
+
+
 def _match_records(
     db: Session, spec: Dict[str, Any], query: str, limit: int, offset: int
 ) -> List[Any]:
-    """Dynamic ILIKE search across an entity's safe columns."""
+    """Tokenized ILIKE search across an entity's safe columns.
+
+    The query is split into real search tokens (stopwords stripped) so a
+    natural-language query such as 'show me Olivia Chen' matches any column
+    that contains ANY of the tokens (name/email/title/skills), instead of
+    requiring the whole sentence to be a single substring. An empty or fully
+    stopword query browsers recent records instead of returning zero.
+    """
+    tokens = _search_tokens(query)
+    if not tokens:
+        return _browse_records(db, spec["model"], limit, offset)
     model = spec["model"]
-    conditions = []
+    columns = []
     for col in spec["search_cols"]:
         column = getattr(model, col, None)
         if column is not None:
-            conditions.append(column.ilike(f"%{query}%"))
-    statement = select(model)
-    if conditions:
-        statement = statement.where(or_(*conditions))
-    return db.exec(statement.order_by(getattr(model, "created_at", None) or getattr(model, "id", None)).limit(limit).offset(offset)).all()
+            columns.append(column)
+    conditions = [
+        column.ilike(f"%{tok}%")
+        for column in columns
+        for tok in tokens
+    ]
+    if not conditions:
+        return []
+    statement = select(model).where(or_(*conditions))
+    fetched = db.exec(statement.limit(limit).offset(offset)).all()
+    if len(fetched) < limit:
+        fetched = db.exec(statement.limit(limit * 3).offset(offset)).all()
+    ranked = sorted(
+        fetched,
+        key=lambda row: -sum(
+            1
+            for col in columns
+            if getattr(row, col.name, None) is not None
+            and any(tok in str(getattr(row, col.name)).lower() for tok in tokens)
+        ),
+    )
+    return ranked[:limit]
 
 
 def _records_by_identifier(
@@ -2578,11 +2642,28 @@ def _execute_agent_tool(
                     matches = _match_records(db, spec, query, requested_limit, offset)
                 except Exception:
                     matches = []
-                if matches:
-                    groups.append({"entity": entity, "matches": _safe_rows(matches)})
+                group = {"entity": entity, "matches": _safe_rows(matches)}
+                if not matches:
+                    try:
+                        browse = _match_records(db, spec, "", requested_limit, 0)
+                    except Exception:
+                        browse = []
+                    if browse:
+                        group["browse"] = _safe_rows(browse)
+                        group["browse_note"] = (
+                            f"No records matched the search terms; showing the {len(browse)} "
+                            f"most recent {entity} records as verified context."
+                        )
+                if matches or group.get("browse"):
+                    groups.append(group)
                 if len(groups) >= 5:
                     break
-            return {"tool": tool_name, "groups": groups, "returned": sum(len(g["matches"]) for g in groups)}
+            return {
+                "tool": tool_name,
+                "groups": groups,
+                "returned": sum(len(g["matches"]) for g in groups),
+                "browsed": any(g.get("browse") for g in groups),
+            }
 
         if tool_name == "read":
             entity = _normalize_entity(arguments.get("entity") or arguments.get("type") or "employee")
@@ -3262,10 +3343,27 @@ async def _stream_true_agent_loop(
 
         async def controller_turn_attempt():
             nonlocal reasoning_active, reasoning_event_chars, reasoning_event_id, raw_decision
-            reasoning_active = False
+            reasoning_active = True
             reasoning_event_chars = 0
-            reasoning_event_id = None
             raw_decision = ""
+            
+            # Emit initial thinking step so UI shows live thinking emitter immediately
+            reasoning_frame = emit_workflow_event(
+                workflow_run.id,
+                "model_reasoning",
+                "planning",
+                "The execution model is thinking about the next step",
+                status="running",
+                result_summary={
+                    "iteration": iteration,
+                    "provider": request.provider or "lmstudio",
+                    "model": request.model or "provider_default",
+                },
+            )
+            reasoning_event_id = reasoning_frame["event_id"]
+            events.append(reasoning_frame)
+            yield f"event: agent_step\ndata: {_json_dumps(reasoning_frame)}\n\n"
+
             async for token in _llm_stream_response(
                 provider=request.provider or "lmstudio",
                 api_key=_resolve_api_key(request.provider, request.api_key),
@@ -3277,38 +3375,13 @@ async def _stream_true_agent_loop(
                 temperature_override=0.0,
                 user_content_override=planner_prompt,
             ):
-                if token == " thinking":
+                if token in ("<think>", " thinking", "<thought>"):
                     if not reasoning_active:
                         reasoning_active = True
-                        reasoning_frame = emit_workflow_event(
-                            workflow_run.id,
-                            "model_reasoning",
-                            "planning",
-                            "The execution model is thinking about the next step",
-                            status="running",
-                            result_summary={
-                                "iteration": iteration,
-                                "provider": request.provider or "lmstudio",
-                                "model": request.model or "provider_default",
-                            },
-                        )
-                        reasoning_event_id = reasoning_frame["event_id"]
-                        events.append(reasoning_frame)
-                        yield f"event: agent_step\ndata: {_json_dumps(reasoning_frame)}\n\n"
                     continue
-                if token == " response":
+                if token in ("</think>", " response", "</thought>"):
                     if reasoning_active:
                         reasoning_active = False
-                        yield emit(
-                            "model_reasoning",
-                            "planning",
-                            "The execution model finished thinking",
-                            status="completed",
-                            result_summary={
-                                "iteration": iteration,
-                                "characters": reasoning_event_chars,
-                            },
-                        )
                     continue
                 if reasoning_active:
                     async for running_chars, delta_sse in paced_reasoning_deltas(
@@ -3316,21 +3389,23 @@ async def _stream_true_agent_loop(
                     ):
                         reasoning_event_chars = running_chars
                         yield delta_sse
+                    # Also append tokens to raw_decision so JSON decision parsing works
+                    raw_decision += token or ""
                 else:
                     raw_decision += token or ""
 
             if reasoning_active:
                 reasoning_active = False
-                yield emit(
-                    "model_reasoning",
-                    "planning",
-                    "Reasoning complete",
-                    status="completed",
-                    result_summary={
-                        "iteration": iteration,
-                        "characters": reasoning_event_chars,
-                    },
-                )
+            yield emit(
+                "model_reasoning",
+                "planning",
+                "Reasoning complete",
+                status="completed",
+                result_summary={
+                    "iteration": iteration,
+                    "characters": reasoning_event_chars,
+                },
+            )
 
         try:
             for attempt_round in range(1, 4):
@@ -3632,10 +3707,20 @@ async def _stream_true_agent_loop(
         if controller_error:
             last_err = controller_error
             assistant_text = _safe_provider_failure_reply(context_payload, controller_error)
-            yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+            # Stream word-by-word so the UI sees live delta instead of a single flush
+            words = assistant_text.split(" ")
+            for i, word in enumerate(words):
+                token = word if i == 0 else " " + word
+                yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
+                await asyncio.sleep(0.012)
         elif controller_answer and not tool_transcript:
             assistant_text = controller_answer
-            yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
+            # Stream word-by-word so the UI sees live delta instead of a single flush
+            words = assistant_text.split(" ")
+            for i, word in enumerate(words):
+                token = word if i == 0 else " " + word
+                yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
+                await asyncio.sleep(0.012)
         else:
             for attempt_round in range(1, 4):
                 reasoning_active = False
