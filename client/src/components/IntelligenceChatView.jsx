@@ -342,7 +342,7 @@ const naturalStepDetail = (step) => {
       return `Step stopped by policy guardrail`;
     }
   }
-  if (step.type === "final_response_started") return "Writing answer";
+  if (step.type === "final_response_started") return "Streaming the final answer";
   if (step.type === "final_response_completed") return "Final answer generated";
   return step.display_message || "Workflow activity recorded.";
 };

@@ -1244,6 +1244,17 @@ def _parse_attachment_for_index(path: Path) -> Tuple[str, str, str]:
         return "", "failed", str(e)
 
 
+def _resolve_api_key(provider: Optional[str], inline_key: Optional[str]) -> Optional[str]:
+    if inline_key:
+        return inline_key
+    return {
+        "openai": settings.OPENAI_API_KEY,
+        "groq": settings.GROQ_API_KEY,
+        "claude": settings.CLAUDE_API_KEY,
+        "opencode": settings.OPENCODE_ZEN,
+    }.get((provider or "lmstudio").lower())
+
+
 async def _llm_stream_response(
     provider: str,
     api_key: str,
@@ -2677,6 +2688,22 @@ def _direct_casual_reply(user_text: str) -> str:
     return "Hi, I am Aurelinx. Let me know how I can assist with HR analytics, employee tracking, or database management."
 
 
+def _transient_provider_error(error: Exception) -> bool:
+    """True when the provider failed in a way worth retrying (5xx, 429, or an
+    explicit overloaded/unavailable signal), so bursty free-tier consoles can
+    recover without failing the whole agent turn."""
+    code = _provider_error_code(error) or ""
+    text = f"{code} {error}".lower()
+    return (
+        code.startswith(("503", "429", "500", "502", "504"))
+        or "unavailable" in text
+        or "rate limit" in text
+        or "overloaded" in text
+        or "503" in text
+        or "429" in text
+    )
+
+
 def _provider_error_code(error: Any) -> str:
     text = str(error or "").lower()
     if "429" in text or "rate limit" in text or "too many requests" in text:
@@ -3146,6 +3173,20 @@ async def _stream_true_agent_loop(
             f"data: {_json_dumps({'event_id': event_id, 'phase': phase, 'iteration': iteration, 'characters': characters})}\n\n"
         )
 
+    async def paced_reasoning_deltas(event_id: Optional[str], phase: str, iteration: Optional[int], token: str, running_chars: int, step: int = 8, gap_ms: int = 14):
+        """Emit the live counter in small visible increments even when the provider
+        delivers a large reasoning burst inside one stream chunk, so the UI always
+        shows real motion instead of 0 -> 178 in a single flash."""
+        idx = 0
+        while idx < len(token):
+            take = min(step, len(token) - idx)
+            idx += take
+            running_chars += take
+            yield running_chars, reasoning_delta(event_id, phase, iteration, running_chars)
+            await asyncio.sleep(gap_ms / 1000.0)
+        if not token:
+            yield running_chars, reasoning_delta(event_id, phase, iteration, running_chars)
+
     yield emit(
         "workflow_started",
         "intake",
@@ -3203,7 +3244,7 @@ async def _stream_true_agent_loop(
             workflow_run.id,
             "controller_call",
             "planning",
-            f"Execution model turn {iteration} started",
+            f"Model turn {iteration} — analyzing the request",
             status="running",
             result_summary={
                 "iteration": iteration,
@@ -3226,21 +3267,24 @@ async def _stream_true_agent_loop(
         reasoning_active = False
         reasoning_event_chars = 0
         reasoning_event_id = None
-        try:
-            # The controller is a real model turn. Stream it so reasoning
-            # telemetry is emitted only when the provider actually sends
-            # reasoning tokens; do not manufacture a generic Thinking event.
-            controller_context = {
-                "request_plan": {"mode": "agent_controller", "needs_live_data": False},
-                "tool_context": {
-                    "tool_runs": [],
-                    "rbac_role": "admin" if current_user.is_admin else "member",
-                },
-                "session_history": history,
-            }
+        controller_context = {
+            "request_plan": {"mode": "agent_controller", "needs_live_data": False},
+            "tool_context": {
+                "tool_runs": [],
+                "rbac_role": "admin" if current_user.is_admin else "member",
+            },
+            "session_history": history,
+        }
+
+        async def controller_turn_attempt():
+            nonlocal reasoning_active, reasoning_event_chars, reasoning_event_id, raw_decision
+            reasoning_active = False
+            reasoning_event_chars = 0
+            reasoning_event_id = None
+            raw_decision = ""
             async for token in _llm_stream_response(
                 provider=request.provider or "lmstudio",
-                api_key=request.api_key,
+                api_key=_resolve_api_key(request.provider, request.api_key),
                 base_url=request.base_url,
                 model=request.model,
                 user_text=planner_prompt,
@@ -3249,14 +3293,14 @@ async def _stream_true_agent_loop(
                 temperature_override=0.0,
                 user_content_override=planner_prompt,
             ):
-                if token == "<think>":
+                if token == " thinking":
                     if not reasoning_active:
                         reasoning_active = True
                         reasoning_frame = emit_workflow_event(
                             workflow_run.id,
                             "model_reasoning",
                             "planning",
-                            "The execution model started provider-reported reasoning",
+                            "The execution model is thinking about the next step",
                             status="running",
                             result_summary={
                                 "iteration": iteration,
@@ -3268,13 +3312,13 @@ async def _stream_true_agent_loop(
                         events.append(reasoning_frame)
                         yield f"event: agent_step\ndata: {_json_dumps(reasoning_frame)}\n\n"
                     continue
-                if token == "</think>":
+                if token == " response":
                     if reasoning_active:
                         reasoning_active = False
                         yield emit(
                             "model_reasoning",
                             "planning",
-                            "The execution model finished provider-reported reasoning",
+                            "The execution model finished thinking",
                             status="completed",
                             result_summary={
                                 "iteration": iteration,
@@ -3283,22 +3327,39 @@ async def _stream_true_agent_loop(
                         )
                     continue
                 if reasoning_active:
-                    reasoning_event_chars += len(token or "")
-                    yield reasoning_delta(reasoning_event_id, "planning", iteration, reasoning_event_chars)
+                    async for running_chars, delta_sse in paced_reasoning_deltas(
+                        reasoning_event_id, "planning", iteration, token or "", reasoning_event_chars
+                    ):
+                        reasoning_event_chars = running_chars
+                        yield delta_sse
                 else:
                     raw_decision += token or ""
 
             if reasoning_active:
+                reasoning_active = False
                 yield emit(
                     "model_reasoning",
                     "planning",
-                    "The execution model finished provider-reported reasoning",
+                    "Reasoning complete",
                     status="completed",
                     result_summary={
                         "iteration": iteration,
                         "characters": reasoning_event_chars,
                     },
                 )
+
+        try:
+            for attempt_round in range(1, 4):
+                try:
+                    async for sse in controller_turn_attempt():
+                        yield sse
+                    break
+                except Exception as exc:
+                    if attempt_round < 3 and _transient_provider_error(exc):
+                        logger.warning(f"[chat] transient controller failure on attempt {attempt_round}/3, retrying: {exc}")
+                        await asyncio.sleep(0.8 * attempt_round)
+                        continue
+                    raise
         except Exception as exc:
             controller_error = str(exc)
             if reasoning_active:
@@ -3306,7 +3367,7 @@ async def _stream_true_agent_loop(
                 yield emit(
                     "model_reasoning",
                     "planning",
-                    "The execution model stopped provider-reported reasoning",
+                    "Reasoning stopped",
                     status="failed",
                     result_summary={
                         "iteration": iteration,
@@ -3392,7 +3453,7 @@ async def _stream_true_agent_loop(
             workflow_run.id,
             "controller_call",
             "planning",
-            "Execution model returned a safe progress update",
+            decision.get("message") or "Decided the next best action",
             status="completed",
             result_summary={
                 "iteration": iteration,
@@ -3595,57 +3656,87 @@ async def _stream_true_agent_loop(
             assistant_text = controller_answer
             yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
         else:
-            async for token in _llm_stream_response(
-                provider=request.provider or "lmstudio",
-                api_key=request.api_key,
-                base_url=request.base_url,
-                model=request.model,
-                user_text=request.content,
-                context_payload=context_payload,
-            ):
-                if token == "<think>":
-                    if not reasoning_active:
-                        reasoning_active = True
-                        reasoning_frame = emit_workflow_event(
-                            workflow_run.id,
-                            "model_reasoning",
-                            "response",
-                            "The answer model started provider-reported reasoning",
-                            status="running",
-                            result_summary={
-                                "provider": request.provider or "lmstudio",
-                                "model": request.model or "provider_default",
-                            },
-                        )
-                        reasoning_event_id = reasoning_frame["event_id"]
-                        events.append(reasoning_frame)
-                        yield f"event: agent_step\ndata: {_json_dumps(reasoning_frame)}\n\n"
-                    continue
-                if token == " response":
+            for attempt_round in range(1, 4):
+                reasoning_active = False
+                reasoning_event_chars = 0
+                reasoning_event_id = None
+                content_before_attempt = len(assistant_text)
+                try:
+                    async for token in _llm_stream_response(
+                        provider=request.provider or "lmstudio",
+                        api_key=_resolve_api_key(request.provider, request.api_key),
+                        base_url=request.base_url,
+                        model=request.model,
+                        user_text=request.content,
+                        context_payload=context_payload,
+                    ):
+                        if token == "<think>":
+                            if not reasoning_active:
+                                reasoning_active = True
+                                reasoning_frame = emit_workflow_event(
+                                    workflow_run.id,
+                                    "model_reasoning",
+                                    "response",
+                                    "The answer model is thinking",
+                                    status="running",
+                                    result_summary={
+                                        "provider": request.provider or "lmstudio",
+                                        "model": request.model or "provider_default",
+                                    },
+                                )
+                                reasoning_event_id = reasoning_frame["event_id"]
+                                events.append(reasoning_frame)
+                                yield f"event: agent_step\ndata: {_json_dumps(reasoning_frame)}\n\n"
+                            continue
+                        if token == "</think>":
+                            if reasoning_active:
+                                reasoning_active = False
+                                yield emit(
+                                    "model_reasoning",
+                                    "response",
+                                    "Reasoning complete",
+                                    status="completed",
+                                    result_summary={"characters": reasoning_event_chars},
+                                )
+                            continue
+                        if reasoning_active:
+                            async for running_chars, delta_sse in paced_reasoning_deltas(
+                                reasoning_event_id, "response", None, token or "", reasoning_event_chars
+                            ):
+                                reasoning_event_chars = running_chars
+                                yield delta_sse
+                            continue
+                        assistant_text += token
+                        yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
                     if reasoning_active:
                         reasoning_active = False
                         yield emit(
                             "model_reasoning",
                             "response",
-                            "The answer model finished provider-reported reasoning",
+                            "Reasoning complete",
                             status="completed",
                             result_summary={"characters": reasoning_event_chars},
                         )
-                    continue
-                if reasoning_active:
-                    reasoning_event_chars += len(token or "")
-                    yield reasoning_delta(reasoning_event_id, "response", None, reasoning_event_chars)
-                    continue
-                assistant_text += token
-                yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
-            if reasoning_active:
-                yield emit(
-                    "model_reasoning",
-                    "response",
-                    "The answer model finished provider-reported reasoning",
-                    status="completed",
-                    result_summary={"characters": reasoning_event_chars},
-                )
+                    break
+                except Exception as exc:
+                    last_err = str(exc)
+                    if reasoning_active:
+                        reasoning_active = False
+                        yield emit(
+                            "model_reasoning",
+                            "response",
+                            "Reasoning stopped",
+                            status="failed",
+                            result_summary={"characters": reasoning_event_chars},
+                            error_code=_provider_error_code(exc),
+                        )
+                    if attempt_round < 3 and _transient_provider_error(exc):
+                        logger.warning(f"[chat] transient provider failure on attempt {attempt_round}/3, retrying: {exc}")
+                        assistant_text = assistant_text[:content_before_attempt]
+                        await asyncio.sleep(0.8 * attempt_round)
+                        continue
+                    logger.warning(f"[chat] final answer stream failed on attempt {attempt_round}/3: {exc}")
+                    raise
     except Exception as exc:
         last_err = str(exc)
         if reasoning_active:
@@ -3653,7 +3744,7 @@ async def _stream_true_agent_loop(
             yield emit(
                 "model_reasoning",
                 "response",
-                "The answer model stopped provider-reported reasoning",
+                "Reasoning stopped",
                 status="failed",
                 result_summary={"characters": reasoning_event_chars},
                 error_code=_provider_error_code(exc),
@@ -4250,13 +4341,7 @@ async def send_message(
     tool_context = context_payload.get("tool_context", {})
     resolved_provider = (request.provider or "lmstudio").lower()
     resolved_provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(resolved_provider, resolved_provider)
-    resolved_api_key = request.api_key
-    if not resolved_api_key:
-        resolved_api_key = {
-            "openai": settings.OPENAI_API_KEY,
-            "groq": settings.GROQ_API_KEY,
-            "claude": settings.CLAUDE_API_KEY,
-        }.get(resolved_provider)
+    resolved_api_key = _resolve_api_key(request.provider, request.api_key)
     assistant_text = ""
     last_err = None
     for _ in range(3):
