@@ -661,7 +661,7 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
   const mergedSteps = useMemo(() => {
     const visible = deterministicSteps.filter((step) => {
       if (step.tool === "conversation.context") return false;
-      if (["workflow_started", "agent_started", "validation_completed", "workflow_completed", "final_response_completed"].includes(step.type)) return false;
+      if (["workflow_started", "agent_started", "validation_completed", "workflow_completed", "final_response_completed", "final_response_started", "agent_decision"].includes(step.type)) return false;
       if (step.type === "workflow_failed" && deterministicSteps.some((item) => item.type === "agent_failed")) return false;
       return true;
     });
