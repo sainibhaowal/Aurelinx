@@ -53,9 +53,18 @@ from app.models.database import (
     RawEventTable,
     QuarantineEventTable,
     ConnectorSyncJobTable,
+    ConnectorFieldMappingTable,
     WorkflowRunTable,
     WorkflowEventTable,
     WorkflowApprovalTable,
+    IntegrationApiKeyTable,
+    IntegrationLogTable,
+    IntegrationWebhookEventTable,
+    MLModelRegistryTable,
+    DataContractTable,
+    ForecastScenarioTable,
+    InterventionOutcomeTable,
+    UserTable,
     engine,
     get_session,
 )
@@ -2131,6 +2140,54 @@ _TOOL_ENTITIES = {
         "identifiers": ["title", "id"],
         "secret_cols": [],
     },
+    "workflow": {
+        "model": WorkflowRunTable,
+        "search_cols": ["status", "intent", "current_phase"],
+        "identifiers": ["id"],
+        "secret_cols": [],
+    },
+    "audit": {
+        "model": AuditLogTable,
+        "search_cols": ["action", "resource_type"],
+        "identifiers": ["id"],
+        "secret_cols": ["details", "ip_address"],
+    },
+    "model": {
+        "model": MLModelRegistryTable,
+        "search_cols": ["model_name", "version", "status"],
+        "identifiers": ["model_name", "id"],
+        "secret_cols": [],
+    },
+    "data_contract": {
+        "model": DataContractTable,
+        "search_cols": ["source_type", "provider", "status"],
+        "identifiers": ["id"],
+        "secret_cols": ["required_fields"],
+    },
+    "scenario": {
+        "model": ForecastScenarioTable,
+        "search_cols": ["scenario_name", "created_by"],
+        "identifiers": ["id"],
+        "secret_cols": [],
+    },
+    "webhook": {
+        "model": IntegrationWebhookEventTable,
+        "search_cols": ["integration_name", "endpoint", "status"],
+        "identifiers": ["id"],
+        "secret_cols": ["payload", "headers"],
+    },
+    "api_key": {
+        "model": IntegrationApiKeyTable,
+        "search_cols": ["name", "status"],
+        "identifiers": ["name", "id"],
+        "secret_cols": ["api_key_hash"],
+    },
+    "integration_log": {
+        "model": IntegrationLogTable,
+        "search_cols": ["integration_name", "status"],
+        "identifiers": ["id"],
+        "secret_cols": ["details"],
+    },
 }
 
 _ENTITY_ALIASES = {
@@ -2154,6 +2211,26 @@ _ENTITY_ALIASES = {
     "policy": "policy",
     "interventions": "intervention",
     "title": "intervention",
+    "workflows": "workflow",
+    "workflow-runs": "workflow",
+    "audits": "audit",
+    "audit-log": "audit",
+    "audit-events": "audit",
+    "ml-model": "model",
+    "ml-models": "model",
+    "ai-model": "model",
+    "models": "model",
+    "data-contract": "data_contract",
+    "data-contracts": "data_contract",
+    "contract": "data_contract",
+    "scenarios": "scenario",
+    "forecast": "scenario",
+    "forecasts": "scenario",
+    "webhooks": "webhook",
+    "webhook-event": "webhook",
+    "api-keys": "api_key",
+    "apikey": "api_key",
+    "registry": "api_key",
 }
 
 
@@ -2421,7 +2498,141 @@ def _analyse_engine(
     except Exception:
         analysis["data_operations"] = {}
 
+    analysis["enterprise"] = _enterprise_knowledge(db)
+
     return analysis
+
+
+def _enterprise_knowledge(db: Session) -> Dict[str, Any]:
+    """One safe, secret-redacted summary of every Aurelinx module so the
+    answer model can explain anything an admin asks about."""
+    result: Dict[str, Any] = {}
+
+    def count(model: Any, filters: Optional[List[Any]] = None) -> int:
+        try:
+            statement = select(func.count()).select_from(model)
+            if filters:
+                statement = statement.where(*filters)
+            return int(db.exec(statement).one())
+        except Exception:
+            return 0
+
+    def recent(model: Any, limit: int = 3) -> List[Dict[str, Any]]:
+        try:
+            return _safe_rows(
+                db.exec(select(model).order_by(getattr(model, "created_at", getattr(model, "id", None)).desc()).limit(limit)).all()
+            )
+        except Exception:
+            return []
+
+    result["users"] = {"total": count(UserTable)}
+    result["chat"] = {
+        "sessions": count(ChatSessionTable),
+        "messages": count(ChatMessageTable),
+    }
+    result["workflows"] = {
+        "runs": count(WorkflowRunTable),
+        "by_status": {
+            status: count(
+                WorkflowRunTable, [WorkflowRunTable.status == status]
+            )
+            for status in ("received", "running", "completed", "failed", "canceled")
+        },
+        "approvals_pending": count(
+            WorkflowApprovalTable, [WorkflowApprovalTable.status == "pending"]
+        ),
+        "recent": recent(WorkflowRunTable, 6),
+    }
+    result["audit"] = {
+        "events": count(AuditLogTable),
+        "recent": recent(AuditLogTable, 6),
+    }
+    result["integrations"] = {
+        "connections": count(IntegrationConnectionTable),
+        "api_keys": count(IntegrationApiKeyTable),
+        "api_keys_active": count(
+            IntegrationApiKeyTable, [IntegrationApiKeyTable.status == "active"]
+        ),
+        "logs": count(IntegrationLogTable),
+        "webhook_events": count(IntegrationWebhookEventTable),
+        "webhook_failures": count(
+            IntegrationWebhookEventTable,
+            [IntegrationWebhookEventTable.status == "failed"],
+        ),
+        "connections_recent": recent(IntegrationConnectionTable, 6),
+        "webhook_recent": recent(IntegrationWebhookEventTable, 4),
+    }
+    result["ai_ml"] = {
+        "registry": count(MLModelRegistryTable),
+        "models": recent(MLModelRegistryTable, 6),
+        "drift_snapshots": count(MLDriftSnapshotTable),
+        "model_cards": count(MLModelCardTable),
+        "forecast_scenarios": count(ForecastScenarioTable),
+        "scenarios_recent": recent(ForecastScenarioTable, 4),
+        "gold_metrics": count(GoldMetricSnapshotTable),
+    }
+    result["governance"] = {
+        "compliance_policies": count(CompliancePolicyTable),
+        "data_contracts": count(DataContractTable),
+        "release_gates": count(ReleaseGateTable),
+        "runbooks": count(DRRunbookTable),
+        "interventions": count(InterventionTable),
+        "intervention_outcomes": count(InterventionOutcomeTable),
+        "policies_recent": recent(CompliancePolicyTable, 6),
+    }
+    result["pipeline"] = {
+        "raw_events": count(RawEventTable),
+        "quarantined_events": count(QuarantineEventTable),
+        "canonical_employees": count(CanonicalEmployeeTable),
+        "canonical_candidates": count(CanonicalCandidateTable),
+        "synced_jobs": count(ConnectorSyncJobTable),
+        "field_mappings": count(ConnectorFieldMappingTable),
+    }
+    try:
+        employees_all = db.exec(select(EmployeeTable)).all()
+        total_workforce = len(employees_all)
+        at_risk_count = sum(1 for e in employees_all if e.is_at_risk)
+        avg_morale = (
+            round(sum((e.sentiment_score or 0) for e in employees_all) / total_workforce, 3)
+            if total_workforce
+            else 0.0
+        )
+        dept_stats = {}
+        for e in employees_all:
+            dept = e.department or "Unknown"
+            entry = dept_stats.setdefault(dept, {"total": 0, "at_risk": 0})
+            entry["total"] += 1
+            if e.is_at_risk:
+                entry["at_risk"] += 1
+        result["business_logic"] = {
+            "formulas": {
+                "avg_morale": "mean of employee sentiment_score across the full workforce",
+                "at_risk_rate": "employees flagged is_at_risk / total_workforce",
+                "department_at_risk_rate": "at-risk employees in a department / department headcount",
+                "risk_concentration": "at-risk counts grouped by department (used to find hotspots)",
+            },
+            "computed_now": {
+                "total_workforce": total_workforce,
+                "at_risk": at_risk_count,
+                "at_risk_rate": round(at_risk_count / total_workforce, 3) if total_workforce else None,
+                "avg_morale": avg_morale,
+                "departments": {
+                    dept: {
+                        "total": stats["total"],
+                        "at_risk": stats["at_risk"],
+                        "at_risk_rate": round(stats["at_risk"] / stats["total"], 3) if stats["total"] else 0.0,
+                    }
+                    for dept, stats in sorted(dept_stats.items(), key=lambda item: -item[1]["total"])
+                },
+            },
+        }
+    except Exception:
+        result["business_logic"] = {"formulas": {}, "computed_now": {}}
+    result["safety"] = {
+        "secret_columns_hidden": "[redacted]",
+        "policy": "Never expose api_key, payload, headers, file_path, ip_address, or hashed credentials in any answer.",
+    }
+    return result
 
 
 def _observe_engine(
