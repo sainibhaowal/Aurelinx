@@ -320,14 +320,13 @@ const naturalStepDetail = (step) => {
   }
   if (step.type === "tool_call" || step.type === "tool_result" || step.type === "tool_execution") {
     const labels = {
-      "employee.search": "employee records",
-      "candidate.search": "candidate records",
-      "database.overview": "database totals",
-      "dashboard.snapshot": "workforce analytics",
-      "workspace.snapshot": "workspace records",
-      "document.csv_ingest": "the attached CSV",
-      "data.mutate": "data modification",
-      "data.verify": "data verification",
+      search: "system records",
+      read: "the requested record",
+      modify: "the requested data change",
+      write: "the new record",
+      delete: "the requested deletion",
+      analyse: "deep analysis",
+      observe: "system observation",
     };
     const toolName = step.tool || step.tool_name || "unknown";
     const target = labels[toolName] || toolName.replaceAll(".", " ");
@@ -359,7 +358,11 @@ const workflowTime = (value) => {
 const toolNameForStep = (step) => step?.tool || step?.tool_name || "unknown";
 
 const isMutationTool = (toolName = "") =>
-  toolName.startsWith("data.") || toolName.includes("mutat");
+  toolName === "modify" ||
+  toolName === "write" ||
+  toolName === "delete" ||
+  toolName.startsWith("data.") ||
+  toolName.includes("mutat");
 
 const formatDuration = (milliseconds) => {
   if (!Number.isFinite(milliseconds) || milliseconds < 0) return "—";
@@ -376,65 +379,79 @@ const displayPayload = (payload) => {
   }
 };
 
-const firstObject = (...values) =>
-  values.find((value) => value && typeof value === "object" && !Array.isArray(value)) || null;
-
-const RenderToolResultCard = ({ toolName, result, inputArgs, status }) => {
+const RenderToolResultCard = ({ toolName, result }) => {
   if (!result) return null;
 
-  // 1. Employee Search micro cards
-  if (toolName === "employee.search" && Array.isArray(result.result || result.employees)) {
-    const items = result.result || result.employees;
+  // 1. Search card — grouped entity results from the dynamic search tool
+  if (toolName === "search") {
+    const groups = Array.isArray(result.groups)
+      ? result.groups
+      : Array.isArray(result.records)
+        ? [{ entity: result.entity || "records", matches: result.records }]
+        : null;
+    if (!groups) return null;
     return (
-      <div className="mt-2 space-y-1.5">
-        <div className="text-[10px] font-medium text-slate-400">Found {items.length} employee record(s):</div>
-        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-          {items.slice(0, 4).map((emp, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-md border border-cyan-500/20 bg-slate-900/80 p-2 text-[11px]">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-500/20 font-bold text-cyan-300">
-                {(emp.first_name?.[0] || emp.name?.[0] || "E").toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-semibold text-slate-200">{emp.first_name} {emp.last_name}</div>
-                <div className="mt-0.5 flex flex-wrap gap-1 text-[9px]">
-                  <span className="rounded bg-cyan-400/10 px-1 text-cyan-300">{emp.role || emp.title || "Employee"}</span>
-                  <span className="rounded bg-white/[0.06] px-1 text-slate-400">{emp.department || "Staff"}</span>
+      <div className="mt-2 space-y-2">
+        <div className="text-[10px] font-medium text-slate-400">
+          Found {groups.reduce((sum, g) => sum + (g.matches?.length || 0), 0)} matching record(s):
+        </div>
+        {groups.map((group, gi) => (
+          <div key={gi} className="space-y-1.5">
+            {groups.length > 1 && (
+              <div className="text-[9px] font-semibold uppercase tracking-wider text-cyan-400/70">{group.entity}</div>
+            )}
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {(group.matches || []).slice(0, 6).map((item, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-md border border-cyan-500/20 bg-slate-900/80 p-2 text-[11px]">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-500/20 font-bold text-cyan-300">
+                    {(item.full_name?.[0] || item.first_name?.[0] || item.name?.[0] || item.title?.[0] || "R").toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-semibold text-slate-200">{item.full_name || item.policy_name || item.title || item.name || "Matched record"}</div>
+                    <div className="mt-0.5 flex flex-wrap gap-1 text-[9px]">
+                      {item.role && <span className="rounded bg-cyan-400/10 px-1 text-cyan-300">{item.role}</span>}
+                      {item.department && <span className="rounded bg-white/[0.06] px-1 text-slate-400">{item.department}</span>}
+                      {item.provider && <span className="rounded bg-white/[0.06] px-1 text-slate-400">{item.provider}</span>}
+                      {item.status && <span className="rounded bg-white/[0.06] px-1 text-slate-400">{item.status}</span>}
+                    </div>
+                    <div className="truncate text-[10px] text-slate-500">{item.email || (item.content ? `${String(item.content).slice(0, 60)}…` : "Verified")}</div>
+                  </div>
                 </div>
-                <div className="truncate text-[10px] text-slate-500">{emp.email || "Verified"}</div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
     );
   }
 
-  // 2. Candidate Search micro cards
-  if (toolName === "candidate.search" && Array.isArray(result.result || result.candidates)) {
-    const items = result.result || result.candidates;
+  // 2. Read card — one verified record end to end
+  if (toolName === "read" && Array.isArray(result.records)) {
     return (
-      <div className="mt-2 space-y-1.5">
-        <div className="text-[10px] font-medium text-slate-400">Found {items.length} candidate record(s):</div>
-        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-          {items.slice(0, 4).map((cand, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-slate-900/80 p-2 text-[11px]">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 font-bold text-emerald-300">
-                {(cand.first_name?.[0] || cand.name?.[0] || "C").toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-semibold text-slate-200">{cand.first_name} {cand.last_name}</div>
-                <div className="truncate text-[10px] text-slate-400">{cand.target_role || "Candidate"} · {cand.status || "Verified"}</div>
-              </div>
-            </div>
+      <div className="mt-2 rounded-md border border-cyan-500/20 bg-slate-900/80 p-2 text-[11px]">
+        <div className="mb-1 text-[10px] font-medium text-slate-400">{result.returned} record(s) read:</div>
+        <div className="space-y-1">
+          {result.records.map((item, i) => (
+            <details key={i} className="rounded border border-white/10 bg-slate-950/35 p-1.5">
+              <summary className="cursor-pointer text-[10px] text-slate-300">
+                {item.full_name || item.policy_name || item.name || item.content ? `${String(item.content || "").slice(0, 80)}…` : item.id}
+              </summary>
+              <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[9px] leading-relaxed text-slate-400">
+                {displayPayload(item)}
+              </pre>
+            </details>
           ))}
         </div>
       </div>
     );
   }
 
-  // 3. Workforce / Dashboard Snapshot visual metrics
-  if (toolName === "dashboard.snapshot" && typeof result === "object") {
-    const depts = result.departments || result.result?.departments;
+  // 3. Analyse card — headcount distribution + key analytics
+  if (toolName === "analyse") {
+    const analysis = result.analysis || result;
+    const analytics = analysis.workforce_analytics || {};
+    const depts = analytics.departments;
+    const sentiment = analysis.sentiment;
     if (depts) {
       const entries = Object.entries(depts).slice(0, 6);
       const maxCount = Math.max(...entries.map(([, count]) => Number(count) || 0), 1);
@@ -455,45 +472,113 @@ const RenderToolResultCard = ({ toolName, result, inputArgs, status }) => {
               </div>
             ))}
           </div>
+          {analytics.total_workforce != null && (
+            <div className="mt-1.5 flex flex-wrap gap-1.5 text-[9px]">
+              <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-slate-300">Workforce {analytics.total_workforce}</span>
+              <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-rose-300">At risk {analytics.at_risk}</span>
+              <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-300">Avg morale {analytics.avg_morale}</span>
+            </div>
+          )}
+          {sentiment?.average_sentiment != null && (
+            <div className="mt-1 text-[9px] text-slate-400">Sentiment average: {sentiment.average_sentiment}</div>
+          )}
         </div>
       );
     }
   }
 
-  // 4. Data Mutation Diff card
-  if (toolName === "data.mutate") {
-    const before = firstObject(result.before, result.previous, result.result?.before);
-    const after = firstObject(result.after, result.updated, result.result?.after);
-    const approvalSignature = result.approval_signature || result.approval_id || result.result?.approval_signature;
-    const changedKeys = [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])]
-      .filter((key) => JSON.stringify(before?.[key]) !== JSON.stringify(after?.[key]));
+  // 4. Modify diff card
+  if (toolName === "modify") {
+    const mutation = result.result || {};
+    const changes = mutation.changes || {};
+    const entries = Object.entries(changes);
     return (
       <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-[11px]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 font-semibold text-amber-300">
-            <span>⚡ Admin Mutation Applied</span>
+            <span>⚡ Admin Modification Committed</span>
           </div>
-          <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${
-            status === "completed" && approvalSignature
-              ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
-              : "border-amber-400/30 bg-amber-400/10 text-amber-300"
-          }`}>
-            {status === "completed" && approvalSignature ? "✓ Approval signature verified" : "⚠ Approval gate"}
+          <span className="rounded-full border px-1.5 py-0.5 text-[9px] font-semibold border-emerald-400/30 bg-emerald-400/10 text-emerald-300">
+            ✓ Verified by read-back
           </span>
         </div>
         <div className="mt-1 text-[10px] text-slate-300">
-          Query: {inputArgs?.query || inputArgs?.arguments?.query || "Database record update"}
+          {mutation.entity || "record"} · {mutation.identifier || "verified identifier"}
         </div>
-        {changedKeys.length > 0 && (
+        {entries.length > 0 && (
           <div className="mt-2 space-y-1 rounded border border-white/10 bg-slate-950/35 p-1.5">
-            {changedKeys.slice(0, 5).map((key) => (
+            {entries.slice(0, 5).map(([key, change]) => (
               <div key={key} className="grid grid-cols-[5rem_1fr_auto_1fr] items-center gap-1 text-[10px]">
                 <span className="truncate text-slate-500">{key}</span>
-                <span className="truncate text-rose-300">{String(before?.[key] ?? "—")}</span>
+                <span className="truncate text-rose-300">{String(change?.from ?? "—")}</span>
                 <span className="text-amber-300">→</span>
-                <span className="truncate text-emerald-300">{String(after?.[key] ?? "—")}</span>
+                <span className="truncate text-emerald-300">{String(change?.to ?? "—")}</span>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 5. Write card
+  if (toolName === "write" && result.result?.created) {
+    return (
+      <div className="mt-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2 text-[11px]">
+        <div className="font-semibold text-emerald-300">✓ New {result.result.entity || "record"} created and verified</div>
+        <div className="mt-1 truncate text-[10px] text-slate-400">
+          {result.result.record?.full_name || result.result.record?.title || result.result.record?.email || result.result.record?.id}
+        </div>
+      </div>
+    );
+  }
+
+  // 6. Delete — prepared spec awaiting human approval
+  if (toolName === "delete" || (result.approval_required && toolName === "delete")) {
+    const spec = result.spec || {};
+    return (
+      <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-[11px]">
+        <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+          <span>🔒 Deletion Prepared — Authorization Required</span>
+        </div>
+        <div className="mt-1 text-[10px] text-slate-300">
+          {spec.entity || result.entity || "Record"} · {spec.identifier || "verified identifier"}
+          {result.matches_found != null && <> · {result.matches_found} match(es) found</>}
+        </div>
+        <div className="mt-1 text-[9px] text-slate-500">The exact action is stored; deletion executes only after an authorized human approves it.</div>
+      </div>
+    );
+  }
+
+  // 7. Observe card — patterns, symptoms, prediction
+  if (toolName === "observe" && result.observation) {
+    const observation = result.observation;
+    const patterns = observation.patterns || {};
+    const symptoms = observation.symptoms || [];
+    const prediction = observation.prediction || {};
+    return (
+      <div className="mt-2 space-y-1.5 rounded-md border border-violet-500/30 bg-violet-500/5 p-2 text-[11px]">
+        <div className="font-semibold text-violet-300">🔭 System Observation</div>
+        {patterns.employees_total != null && (
+          <div className="flex flex-wrap gap-1.5 text-[9px]">
+            <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-slate-300">Employees {patterns.employees_total}</span>
+            <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-slate-300">Candidates {patterns.candidates_total}</span>
+            {patterns.at_risk_ratio != null && (
+              <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-rose-300">At-risk ratio {patterns.at_risk_ratio}</span>
+            )}
+          </div>
+        )}
+        {symptoms.length > 0 && (
+          <ul className="space-y-1 text-[9px] text-slate-300">
+            {symptoms.slice(0, 5).map((symptom, i) => (
+              <li key={i} className="flex gap-1"><span className="text-amber-300">•</span>{symptom}</li>
+            ))}
+          </ul>
+        )}
+        {prediction.recommended_action && (
+          <div className="rounded border border-white/10 bg-slate-950/35 p-1.5 text-[9px] text-violet-200">
+            Prediction: {prediction.recommended_action}
+            {prediction.attention_needed === "yes" && <> · attention needed</>}
           </div>
         )}
       </div>
