@@ -3240,22 +3240,6 @@ async def _stream_true_agent_loop(
     controller_answer = ""
     controller_error = None
     for iteration in range(1, max_iterations + 1):
-        controller_started = emit_workflow_event(
-            workflow_run.id,
-            "controller_call",
-            "planning",
-            f"Model turn {iteration} — analyzing the request",
-            status="running",
-            result_summary={
-                "iteration": iteration,
-                "max_iterations": max_iterations,
-                "provider": request.provider or "lmstudio",
-                "model": request.model or "provider_default",
-                "observed_tool_calls": len(tool_transcript),
-            },
-        )
-        events.append(controller_started)
-        yield f"event: agent_step\ndata: {_json_dumps(controller_started)}\n\n"
         planner_prompt = _agent_controller_prompt(
             request.content,
             history,
@@ -3375,11 +3359,13 @@ async def _stream_true_agent_loop(
                     },
                     error_code=_provider_error_code(exc),
                 )
+            raw_status = re.search(r"'([^']+)'", str(exc))
+            status_line = raw_status.group(1) if raw_status else str(exc)[:120]
             controller_failed = emit_workflow_event(
                 workflow_run.id,
                 "controller_call",
                 "planning",
-                "Controller model call failed; no action was executed",
+                f"Provider call failed: {status_line}",
                 status="failed",
                 result_summary={"iteration": iteration, "reason": _provider_error_label(exc)},
                 error_code=_provider_error_code(exc),
@@ -3449,30 +3435,23 @@ async def _stream_true_agent_loop(
                 },
             )
 
-        controller_completed = emit_workflow_event(
-            workflow_run.id,
-            "controller_call",
-            "planning",
-            decision.get("message") or "Decided the next best action",
-            status="completed",
-            result_summary={
-                "iteration": iteration,
-                "progress": decision.get("message") or "The controller selected the next bounded step.",
-                "action": decision.get("action"),
-            },
-        )
-        events.append(controller_completed)
-        yield f"event: agent_step\ndata: {_json_dumps(controller_completed)}\n\n"
+        if decision.get("message"):
+            controller_completed = emit_workflow_event(
+                workflow_run.id,
+                "controller_call",
+                "planning",
+                decision["message"],
+                status="completed",
+                result_summary={
+                    "iteration": iteration,
+                    "progress": decision.get("message"),
+                    "action": decision.get("action"),
+                },
+            )
+            events.append(controller_completed)
+            yield f"event: agent_step\ndata: {_json_dumps(controller_completed)}\n\n"
 
         action = decision.get("action")
-        if action == "tool":
-            decision_title = decision.get("message") or f"I’m checking {_agent_tool_label(decision.get('tool', 'the requested data'))}."
-        elif action == "respond":
-            decision_title = decision.get("message") or "I have enough verified context to answer you."
-        elif action == "approval_required":
-            decision_title = decision.get("message") or "Controller requested human approval"
-        else:
-            decision_title = "Controller returned an invalid action"
         decision_result = {
             "iteration": iteration,
             "action": action,
@@ -3483,13 +3462,15 @@ async def _stream_true_agent_loop(
         if decision.get("answer"):
             decision_result["answer_preview"] = decision["answer"][:500]
 
-        yield emit(
-            "agent_decision",
-            "planning",
-            decision_title,
-            status="completed",
-            result_summary=decision_result,
-        )
+        if decision.get("message") or decision.get("answer"):
+            decision_result["message"] = decision.get("message")
+            yield emit(
+                "agent_decision",
+                "planning",
+                decision.get("message") or "",
+                status="completed",
+                result_summary=decision_result,
+            )
 
         if action == "approval_required":
             approval_id = str(uuid4())
