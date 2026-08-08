@@ -4255,7 +4255,13 @@ async def send_message_stream(
                 getattr(current_user, "tenant_id", None) or "default",
             )
 
-            async for frame in _stream_antigravity_agent_loop(
+            agent_runtime = os.getenv("AURELINX_AGENT_RUNTIME", "builtin").strip().lower()
+            agent_loop = (
+                _stream_antigravity_agent_loop
+                if agent_runtime == "antigravity"
+                else _stream_true_agent_loop
+            )
+            async for frame in agent_loop(
                 db,
                 chat_session,
                 user_msg,
