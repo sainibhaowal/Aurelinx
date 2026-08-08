@@ -1607,29 +1607,60 @@ const IntelligenceCenterView = () => {
 
                             return (
                               <>
-                                {/* Legend */}
-                                <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-slate-400 mb-3">
-                                  <span className="flex items-center gap-1">
-                                    <span className="h-0.5 w-3 rounded bg-teal-400" />
-                                    Energy E(x)
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <span className="h-0.5 w-3 rounded border-t border-dashed border-emerald-400" />
-                                    Best-so-far E*
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <span className="h-0.5 w-3 rounded bg-indigo-400" />
-                                    Coverage %
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <span className="h-0.5 w-3 rounded bg-amber-400" />
-                                    Temperature
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <span className="h-0.5 w-3 rounded border-t border-dashed border-rose-400" />
-                                    Budget cap
-                                  </span>
-                                </div>
+                                {/* Legend & Live Active Hover Readout Bar */}
+                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10px] text-slate-400 mb-3">
+                                   {/* Legend items */}
+                                   <div className="flex flex-wrap gap-x-4 gap-y-1.5 items-center">
+                                     <span className="flex items-center gap-1">
+                                       <span className="h-0.5 w-3 rounded bg-teal-400" />
+                                       Energy E(x)
+                                     </span>
+                                     <span className="flex items-center gap-1">
+                                       <span className="h-0.5 w-3 rounded border-t border-dashed border-emerald-400" />
+                                       Best-so-far E*
+                                     </span>
+                                     <span className="flex items-center gap-1">
+                                       <span className="h-0.5 w-3 rounded bg-indigo-400" />
+                                       Coverage %
+                                     </span>
+                                     <span className="flex items-center gap-1">
+                                       <span className="h-0.5 w-3 rounded bg-amber-400" />
+                                       Temperature
+                                     </span>
+                                     <span className="flex items-center gap-1">
+                                       <span className="h-0.5 w-3 rounded border-t border-dashed border-rose-400" />
+                                       Budget cap
+                                     </span>
+                                   </div>
+
+                                   {/* Live Step Readout (When Hovered) - Zero Obstruction */}
+                                   {hovered !== null && history[hovered] ? (
+                                     <div className="flex items-center gap-3 px-3 py-1 rounded-lg bg-teal-950/80 border border-teal-400/40 text-[10.5px] font-mono shadow-lg animate-in fade-in duration-150">
+                                       <span className="font-bold text-teal-300 flex items-center gap-1">
+                                         Step #{history[hovered].step ?? hovered}
+                                         {hovered === bestIndex && (
+                                           <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">
+                                             Optimal Best
+                                           </span>
+                                         )}
+                                       </span>
+                                       <span className="text-slate-500">|</span>
+                                       <span>Temp: <strong className="text-amber-300">{Number(history[hovered].temperature).toFixed(3)}</strong></span>
+                                       <span className="text-slate-500">|</span>
+                                       <span>Energy E(x): <strong className="text-teal-300">{Number(history[hovered].energy).toFixed(4)}</strong></span>
+                                       <span className="text-slate-500">|</span>
+                                       <span>Best E*: <strong className="text-emerald-400">{Number(history[hovered].best_energy ?? history[hovered].energy).toFixed(4)}</strong></span>
+                                       <span className="text-slate-500">|</span>
+                                       <span>Coverage: <strong className="text-indigo-300">{Number(history[hovered].coverage ?? 0).toFixed(1)}%</strong></span>
+                                       <span className="text-slate-500">|</span>
+                                       <span>Cost: <strong className="text-cyan-300">{fmtMoney(history[hovered].cost ?? 0)}</strong></span>
+                                     </div>
+                                   ) : (
+                                     <div className="text-[9.5px] text-slate-500 italic">
+                                       Hover over timeline to inspect step details
+                                     </div>
+                                   )}
+                                 </div>
 
                                 <div className="relative">
                                   {/* ===== MAIN CHART: Energy + Best-so-far (left) + Coverage (right) ===== */}
@@ -2015,88 +2046,12 @@ const IntelligenceCenterView = () => {
                                     {history.map((h, i) => (
                                       <div
                                         key={i}
-                                        onMouseEnter={() =>
-                                          setHoveredAnnealIndex(i)
-                                        }
-                                        onMouseLeave={() =>
-                                            setHoveredAnnealIndex(null)
-                                        }
+                                        onMouseEnter={() => setHoveredAnnealIndex(i)}
+                                        onMouseLeave={() => setHoveredAnnealIndex(null)}
                                         className="flex-1 h-full cursor-pointer relative group"
                                       />
                                     ))}
                                   </div>
-
-                                  {/* Active Hover Tooltip Box - Follows Cursor Side-by-Side with 20px Clear Gap */}
-                                   {hovered !== null && history[hovered] && (() => {
-                                     const hx = xPos(hovered);
-                                     const isRightHalf = hx > 50;
-                                     return (
-                                       <div
-                                         className="absolute top-2 z-30 rounded-xl border border-teal-400/40 bg-slate-950/90 p-2.5 shadow-2xl backdrop-blur-md text-[10.5px] space-y-1 pointer-events-none transition-all duration-100 ease-out min-w-[170px]"
-                                         style={
-                                           isRightHalf
-                                             ? { left: `calc(${hx}% - 185px)` }
-                                             : { left: `calc(${hx}% + 20px)` }
-                                         }
-                                       >
-                                        <div className="font-bold text-teal-300 flex items-center justify-between gap-1 border-b border-white/10 pb-1">
-                                          <span className="flex items-center gap-1">
-                                            Step #
-                                            {history[hovered].step ??
-                                              hovered}
-                                          </span>
-                                          {hovered === bestIndex && (
-                                            <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">
-                                              Optimal Best
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div className="text-slate-300 flex justify-between gap-2">
-                                          <span>Temperature:</span>
-                                          <strong className="text-amber-300 font-mono">
-                                            {Number(
-                                              history[hovered].temperature,
-                                            ).toFixed(3)}
-                                          </strong>
-                                        </div>
-                                        <div className="text-slate-300 flex justify-between gap-2">
-                                          <span>Energy E(x):</span>
-                                          <strong className="text-teal-300 font-mono">
-                                            {Number(
-                                              history[hovered].energy,
-                                            ).toFixed(4)}
-                                          </strong>
-                                        </div>
-                                        <div className="text-slate-300 flex justify-between gap-2">
-                                          <span>Best-so-far E*:</span>
-                                          <strong className="text-emerald-400 font-mono">
-                                            {Number(
-                                              history[hovered].best_energy ??
-                                                history[hovered].energy,
-                                            ).toFixed(4)}
-                                          </strong>
-                                        </div>
-                                        <div className="text-slate-300 flex justify-between gap-2">
-                                          <span>Skill Coverage:</span>
-                                          <strong className="text-indigo-300 font-mono">
-                                            {Number(
-                                              history[hovered].coverage ?? 0,
-                                            ).toFixed(1)}
-                                            %
-                                          </strong>
-                                        </div>
-                                        <div className="text-slate-300 flex justify-between gap-2 border-t border-white/5 pt-1">
-                                          <span>Team Cost:</span>
-                                          <strong className="text-cyan-300 font-mono">
-                                            {fmtMoney(
-                                              history[hovered].cost ?? 0,
-                                            )}
-                                          </strong>
-                                        </div>
-                                      </div>
-                                    );
-                                  })()}
-
                                 </div>
 
                                 {/* X-Axis Step Ticks (real step numbers) */}
