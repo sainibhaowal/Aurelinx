@@ -1630,50 +1630,7 @@ const IntelligenceCenterView = () => {
                                     Budget cap
                                   </span>
                                 </div>
-                                {/* Dedicated Live Step Inspector Bar (100% Uncovered Chart View) */}
-                                 <div className="mb-3 flex items-center justify-between min-h-[36px] rounded-lg border border-white/10 bg-slate-950/90 px-3 py-1.5 shadow-inner">
-                                   {hovered !== null && history[hovered] ? (
-                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono w-full justify-between">
-                                       <span className="text-teal-300 font-bold flex items-center gap-1.5">
-                                         <span>Step #{history[hovered].step ?? hovered}</span>
-                                         {hovered === bestIndex && (
-                                           <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">
-                                             Optimal Best
-                                           </span>
-                                         )}
-                                       </span>
-                                       <span className="text-slate-700">|</span>
-                                       <span className="text-slate-400">
-                                         Temp: <strong className="text-amber-300">{Number(history[hovered].temperature).toFixed(3)}</strong>
-                                       </span>
-                                       <span className="text-slate-700">|</span>
-                                       <span className="text-slate-400">
-                                         Energy E(x): <strong className="text-teal-300">{Number(history[hovered].energy).toFixed(4)}</strong>
-                                       </span>
-                                       <span className="text-slate-700">|</span>
-                                       <span className="text-slate-400">
-                                         Best E*: <strong className="text-emerald-400">{Number(history[hovered].best_energy ?? history[hovered].energy).toFixed(4)}</strong>
-                                       </span>
-                                       <span className="text-slate-700">|</span>
-                                       <span className="text-slate-400">
-                                         Coverage: <strong className="text-indigo-300">{Number(history[hovered].coverage ?? 0).toFixed(1)}%</strong>
-                                       </span>
-                                       <span className="text-slate-700">|</span>
-                                       <span className="text-slate-400">
-                                         Cost: <strong className="text-cyan-300">{fmtMoney(history[hovered].cost ?? 0)}</strong>
-                                       </span>
-                                     </div>
-                                   ) : (
-                                     <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 w-full justify-between">
-                                       <span>Hover mouse across timeline steps for real-time metric inspection</span>
-                                       <span className="text-[9px] text-teal-400/70 border border-teal-500/20 px-2 py-0.5 rounded bg-teal-500/5">
-                                         Optimal Best: Step #{bestIndex} ({globalBest.toFixed(4)})
-                                       </span>
-                                     </div>
-                                   )}
-                                 </div>
-
-                                <div className="relative">
+                                <div className="relative mt-28">
                                   {/* ===== MAIN CHART: Energy + Best-so-far (left) + Coverage (right) ===== */}
                                   <div className="relative h-56 w-full rounded-lg border border-white/10 bg-slate-950/80 overflow-hidden">
                                     {/* Y-axis energy tick labels */}
@@ -2067,18 +2024,15 @@ const IntelligenceCenterView = () => {
                                       ))}
                                     </div>
 
-                                    {/* Floating Hover Tooltip Box - Flanked 36px Away Side-by-Side (Zero Crosshair Obscuration) */}
+                                    {/* Floating Hover Visor Tooltip Box - Positioned Entirely ABOVE the Graph Canvas (Zero Obscuration) */}
                                     {hovered !== null && history[hovered] && (() => {
                                       const hx = xPos(hovered);
-                                      const isRightHalf = hx > 50;
                                       return (
                                         <div
-                                          className="absolute top-2 z-30 rounded-xl border border-teal-400/40 bg-slate-950/80 p-2.5 shadow-[0_10px_25px_rgba(0,0,0,0.8)] backdrop-blur-md text-[10.5px] space-y-1 pointer-events-none transition-all duration-100 ease-out min-w-[165px]"
-                                          style={
-                                            isRightHalf
-                                              ? { left: `calc(${hx}% - 195px)` }
-                                              : { left: `calc(${hx}% + 36px)` }
-                                          }
+                                          className="absolute -top-[115px] z-30 rounded-xl border border-teal-400/50 bg-slate-950/95 p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.9)] backdrop-blur-md text-[10.5px] space-y-1 pointer-events-none transition-all duration-100 ease-out min-w-[170px]"
+                                          style={{
+                                            left: `clamp(0px, calc(${hx}% - 85px), calc(100% - 170px))`
+                                          }}
                                         >
                                           <div className="font-bold text-teal-300 flex items-center justify-between gap-1 border-b border-white/10 pb-1">
                                             <span className="flex items-center gap-1">
