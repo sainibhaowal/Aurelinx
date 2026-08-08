@@ -1607,8 +1607,8 @@ const IntelligenceCenterView = () => {
 
                             return (
                               <>
-                                {/* Legend (Row 1) */}
-                                <div className="flex flex-wrap gap-x-4 gap-y-1.5 items-center text-[10px] text-slate-400 mb-2">
+                                {/* Legend */}
+                                <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-slate-400 mb-3">
                                   <span className="flex items-center gap-1">
                                     <span className="h-0.5 w-3 rounded bg-teal-400" />
                                     Energy E(x)
@@ -1630,42 +1630,48 @@ const IntelligenceCenterView = () => {
                                     Budget cap
                                   </span>
                                 </div>
-
-                                {/* Active Step Live Readout Banner Bar (Row 2 - Full Width, Single Line, Zero Wrap) */}
-                                <div className="w-full mb-3 min-h-[34px] flex items-center">
-                                  {hovered !== null && history[hovered] ? (
-                                    <div className="w-full flex items-center justify-between gap-3 px-3.5 py-1.5 rounded-xl bg-slate-950/90 border border-teal-500/40 text-[10.5px] font-mono shadow-xl whitespace-nowrap overflow-x-auto custom-scrollbar animate-in fade-in duration-150">
-                                      <div className="flex items-center gap-2 shrink-0">
-                                        <span className="font-bold text-teal-300 whitespace-nowrap">
-                                          Step #{history[hovered].step ?? hovered}
-                                        </span>
-                                        {hovered === bestIndex && (
-                                          <span className="bg-emerald-500/20 text-emerald-300 text-[8.5px] px-2 py-0.5 rounded-md border border-emerald-500/30 font-semibold whitespace-nowrap">
-                                            Optimal Best
-                                          </span>
-                                        )}
-                                      </div>
-
-                                      <div className="flex items-center gap-3 shrink-0 text-slate-300">
-                                        <span className="text-slate-600">|</span>
-                                        <span className="whitespace-nowrap">Temp: <strong className="text-amber-300">{Number(history[hovered].temperature).toFixed(3)}</strong></span>
-                                        <span className="text-slate-600">|</span>
-                                        <span className="whitespace-nowrap">Energy E(x): <strong className="text-teal-300">{Number(history[hovered].energy).toFixed(4)}</strong></span>
-                                        <span className="text-slate-600">|</span>
-                                        <span className="whitespace-nowrap">Best E*: <strong className="text-emerald-400">{Number(history[hovered].best_energy ?? history[hovered].energy).toFixed(4)}</strong></span>
-                                        <span className="text-slate-600">|</span>
-                                        <span className="whitespace-nowrap">Coverage: <strong className="text-indigo-300">{Number(history[hovered].coverage ?? 0).toFixed(1)}%</strong></span>
-                                        <span className="text-slate-600">|</span>
-                                        <span className="whitespace-nowrap">Cost: <strong className="text-cyan-300">{fmtMoney(history[hovered].cost ?? 0)}</strong></span>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="w-full flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-slate-950/40 border border-white/5 text-[9.5px] font-mono text-slate-500 italic">
-                                      <span>Hover over chart timeline to inspect exact step metrics</span>
-                                      <span className="text-slate-600 font-sans not-italic text-[9px]">Interactive Timeline Active</span>
-                                    </div>
-                                  )}
-                                </div>
+                                {/* Dedicated Live Step Inspector Bar (100% Uncovered Chart View) */}
+                                 <div className="mb-3 flex items-center justify-between min-h-[36px] rounded-lg border border-white/10 bg-slate-950/90 px-3 py-1.5 shadow-inner">
+                                   {hovered !== null && history[hovered] ? (
+                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono w-full justify-between">
+                                       <span className="text-teal-300 font-bold flex items-center gap-1.5">
+                                         <span>Step #{history[hovered].step ?? hovered}</span>
+                                         {hovered === bestIndex && (
+                                           <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">
+                                             Optimal Best
+                                           </span>
+                                         )}
+                                       </span>
+                                       <span className="text-slate-700">|</span>
+                                       <span className="text-slate-400">
+                                         Temp: <strong className="text-amber-300">{Number(history[hovered].temperature).toFixed(3)}</strong>
+                                       </span>
+                                       <span className="text-slate-700">|</span>
+                                       <span className="text-slate-400">
+                                         Energy E(x): <strong className="text-teal-300">{Number(history[hovered].energy).toFixed(4)}</strong>
+                                       </span>
+                                       <span className="text-slate-700">|</span>
+                                       <span className="text-slate-400">
+                                         Best E*: <strong className="text-emerald-400">{Number(history[hovered].best_energy ?? history[hovered].energy).toFixed(4)}</strong>
+                                       </span>
+                                       <span className="text-slate-700">|</span>
+                                       <span className="text-slate-400">
+                                         Coverage: <strong className="text-indigo-300">{Number(history[hovered].coverage ?? 0).toFixed(1)}%</strong>
+                                       </span>
+                                       <span className="text-slate-700">|</span>
+                                       <span className="text-slate-400">
+                                         Cost: <strong className="text-cyan-300">{fmtMoney(history[hovered].cost ?? 0)}</strong>
+                                       </span>
+                                     </div>
+                                   ) : (
+                                     <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 w-full justify-between">
+                                       <span>Hover mouse across timeline steps for real-time metric inspection</span>
+                                       <span className="text-[9px] text-teal-400/70 border border-teal-500/20 px-2 py-0.5 rounded bg-teal-500/5">
+                                         Optimal Best: Step #{bestIndex} ({globalBest.toFixed(4)})
+                                       </span>
+                                     </div>
+                                   )}
+                                 </div>
 
                                 <div className="relative">
                                   {/* ===== MAIN CHART: Energy + Best-so-far (left) + Coverage (right) ===== */}
@@ -2051,8 +2057,12 @@ const IntelligenceCenterView = () => {
                                     {history.map((h, i) => (
                                       <div
                                         key={i}
-                                        onMouseEnter={() => setHoveredAnnealIndex(i)}
-                                        onMouseLeave={() => setHoveredAnnealIndex(null)}
+                                        onMouseEnter={() =>
+                                          setHoveredAnnealIndex(i)
+                                        }
+                                        onMouseLeave={() =>
+                                            setHoveredAnnealIndex(null)
+                                        }
                                         className="flex-1 h-full cursor-pointer relative group"
                                       />
                                     ))}
