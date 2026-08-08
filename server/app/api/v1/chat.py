@@ -2694,14 +2694,14 @@ async def _stream_true_agent_loop(
             current_user,
             bool(db.exec(select(ChatAttachmentTable).where(ChatAttachmentTable.session_id == str(chat_session.id))).all()),
         )
+        raw_decision = ""
+        reasoning_active = False
+        reasoning_event_chars = 0
+        reasoning_event_id = None
         try:
             # The controller is a real model turn. Stream it so reasoning
             # telemetry is emitted only when the provider actually sends
             # reasoning tokens; do not manufacture a generic Thinking event.
-            raw_decision = ""
-            reasoning_active = False
-            reasoning_event_chars = 0
-            reasoning_event_id = None
             controller_context = {
                 "request_plan": {"mode": "agent_controller", "needs_live_data": False},
                 "tool_context": {
@@ -2771,6 +2771,19 @@ async def _stream_true_agent_loop(
                 )
         except Exception as exc:
             controller_error = str(exc)
+            if reasoning_active:
+                reasoning_active = False
+                yield emit(
+                    "model_reasoning",
+                    "planning",
+                    "The execution model stopped provider-reported reasoning",
+                    status="failed",
+                    result_summary={
+                        "iteration": iteration,
+                        "characters": reasoning_event_chars,
+                    },
+                    error_code=_provider_error_code(exc),
+                )
             controller_failed = emit_workflow_event(
                 workflow_run.id,
                 "controller_call",
@@ -3028,6 +3041,9 @@ async def _stream_true_agent_loop(
 
     assistant_text = ""
     last_err = None
+    reasoning_active = False
+    reasoning_event_chars = 0
+    reasoning_event_id = None
     try:
         if controller_error:
             last_err = controller_error
@@ -3037,9 +3053,6 @@ async def _stream_true_agent_loop(
             assistant_text = controller_answer
             yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
         else:
-            reasoning_active = False
-            reasoning_event_chars = 0
-            reasoning_event_id = None
             async for token in _llm_stream_response(
                 provider=request.provider or "lmstudio",
                 api_key=request.api_key,
@@ -3091,6 +3104,16 @@ async def _stream_true_agent_loop(
                 )
     except Exception as exc:
         last_err = str(exc)
+        if reasoning_active:
+            reasoning_active = False
+            yield emit(
+                "model_reasoning",
+                "response",
+                "The answer model stopped provider-reported reasoning",
+                status="failed",
+                result_summary={"characters": reasoning_event_chars},
+                error_code=_provider_error_code(exc),
+            )
         assistant_text = _safe_provider_failure_reply(context_payload, exc)
         yield f"event: chunk\ndata: {_json_dumps({'text': assistant_text})}\n\n"
 
