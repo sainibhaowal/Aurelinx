@@ -1586,13 +1586,13 @@ const IntelligenceCenterView = () => {
                             const stepAt = (frac) =>
                               steps[Math.round((n - 1) * frac)] ??
                               steps[n - 1];
-                            const barW = Math.max(0.6, (100 / n) * 0.6);
+                            const barW = Math.max(0.85, (100 / n) * 0.8);
                             const hovered = hoveredAnnealIndex;
 
                             return (
                               <>
                                 {/* Legend */}
-                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[9px] text-slate-400 mb-2">
+                                <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-slate-400 mb-3">
                                   <span className="flex items-center gap-1">
                                     <span className="h-0.5 w-3 rounded bg-teal-400" />
                                     Energy E(x)
@@ -1617,12 +1617,12 @@ const IntelligenceCenterView = () => {
 
                                 <div className="relative">
                                   {/* ===== MAIN CHART: Energy + Best-so-far (left) + Coverage (right) ===== */}
-                                  <div className="relative h-36 w-full rounded-lg border border-white/10 bg-slate-950/80 overflow-hidden">
+                                  <div className="relative h-56 w-full rounded-lg border border-white/10 bg-slate-950/80 overflow-hidden">
                                     {/* Y-axis energy tick labels */}
                                     {eTicks.map((t) => (
                                       <span
                                         key={`et-${t}`}
-                                        className="absolute left-1 -translate-y-1/2 z-10 pointer-events-none text-[8px] font-mono text-slate-400 bg-slate-900/70 px-0.5 rounded"
+                                        className="absolute left-1 -translate-y-1/2 z-10 pointer-events-none text-[10px] font-mono text-slate-400 bg-slate-900/75 px-1 rounded"
                                         style={{ top: `${yE(t)}%` }}
                                       >
                                         {t.toFixed(1)}
@@ -1632,13 +1632,13 @@ const IntelligenceCenterView = () => {
                                     {covTicks.map((t) => (
                                       <span
                                         key={`ct-${t}`}
-                                        className="absolute right-1 -translate-y-1/2 z-10 pointer-events-none text-[8px] font-mono text-indigo-300/80 bg-slate-900/70 px-0.5 rounded"
+                                        className="absolute right-1 -translate-y-1/2 z-10 pointer-events-none text-[10px] font-mono text-indigo-300/80 bg-slate-900/75 px-1 rounded"
                                         style={{ top: `${yC(t)}%` }}
                                       >
                                         {t}
                                       </span>
                                     ))}
-                                    <div className="ml-12 mr-9 h-full">
+                                    <div className="ml-14 mr-11 h-full">
                                       <svg
                                         className="h-full w-full overflow-hidden"
                                         viewBox="0 0 100 100"
@@ -1783,10 +1783,10 @@ const IntelligenceCenterView = () => {
                                             cy={p.y}
                                             r={
                                               idx === bestIndex
-                                                ? "3.5"
+                                                ? "4"
                                                 : idx === hovered
-                                                  ? "2.6"
-                                                  : "1.6"
+                                                  ? "3"
+                                                  : "2"
                                             }
                                             fill={
                                               idx === bestIndex
@@ -1815,12 +1815,12 @@ const IntelligenceCenterView = () => {
                                   </div>
 
                                   {/* ===== SUB CHART: Team Cost vs Budget Cap + Temperature ===== */}
-                                  <div className="relative mt-2 h-24 w-full rounded-lg border border-white/10 bg-slate-950/80 overflow-hidden">
+                                  <div className="relative mt-3 h-32 w-full rounded-lg border border-white/10 bg-slate-950/80 overflow-hidden">
                                     {/* Cost tick labels (left) */}
                                     {costTicks.map((t) => (
                                       <span
                                         key={`kt-${t}`}
-                                        className="absolute left-1 -translate-y-1/2 z-10 pointer-events-none text-[8px] font-mono text-slate-400 bg-slate-900/70 px-0.5 rounded"
+                                        className="absolute left-1 -translate-y-1/2 z-10 pointer-events-none text-[10px] font-mono text-slate-400 bg-slate-900/75 px-1 rounded"
                                         style={{ top: `${yK(t)}%` }}
                                       >
                                         {fmtMoney(t)}
@@ -1830,13 +1830,13 @@ const IntelligenceCenterView = () => {
                                     {tmpTicks.map((t) => (
                                       <span
                                         key={`tt-${t}`}
-                                        className="absolute right-1 -translate-y-1/2 z-10 pointer-events-none text-[8px] font-mono text-amber-300/80 bg-slate-950/70 px-0.5 rounded"
+                                        className="absolute right-1 -translate-y-1/2 z-10 pointer-events-none text-[10px] font-mono text-amber-300/80 bg-slate-950/75 px-1 rounded"
                                         style={{ top: `${yT(t)}%` }}
                                       >
                                         T {t}
                                       </span>
                                     ))}
-                                    <div className="ml-12 mr-9 h-full">
+                                    <div className="ml-14 mr-11 h-full">
                                       <svg
                                         className="h-full w-full overflow-hidden"
                                         viewBox="0 0 100 100"
@@ -1938,7 +1938,7 @@ const IntelligenceCenterView = () => {
                                   </div>
 
                                   {/* Hover overlay spanning both charts */}
-                                  <div className="absolute inset-0 ml-12 mr-9 flex justify-between items-stretch pointer-events-auto">
+                                  <div className="absolute inset-0 ml-14 mr-11 flex justify-between items-stretch pointer-events-auto">
                                     {history.map((h, i) => (
                                       <div
                                         key={i}
@@ -1956,7 +1956,7 @@ const IntelligenceCenterView = () => {
                                   {/* Active Hover Tooltip Box */}
                                   {hovered !== null &&
                                     history[hovered] && (
-                                      <div className="absolute top-1 right-1 z-20 rounded-xl border border-teal-400/30 bg-slate-950/95 p-2.5 shadow-2xl backdrop-blur-md text-[10px] space-y-1">
+                                      <div className="absolute top-1 right-1 z-20 rounded-xl border border-teal-400/30 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-md text-[11px] space-y-1.5">
                                         <div className="font-bold text-teal-300 flex items-center gap-1">
                                           <span>
                                             Step #
@@ -2025,12 +2025,12 @@ const IntelligenceCenterView = () => {
                                 </div>
 
                                 {/* X-Axis Step Ticks (real step numbers) */}
-                                <div className="ml-12 mr-9 mt-1 flex justify-between items-center text-[8px] font-mono text-slate-400 border-t border-white/10 pt-1">
+                                <div className="ml-14 mr-11 mt-2 flex justify-between items-center text-[10px] font-mono text-slate-400 border-t border-white/10 pt-2">
                                   <span className="flex flex-col items-center">
                                     <span className="text-slate-300 font-bold">
                                       Step {stepAt(0)}
                                     </span>
-                                    <span className="text-[8px] text-slate-500">
+                                    <span className="text-[9px] text-slate-500">
                                       Initial
                                     </span>
                                   </span>
@@ -2047,7 +2047,7 @@ const IntelligenceCenterView = () => {
                                     <span className="text-emerald-300 font-bold">
                                       Step {stepAt(1)}
                                     </span>
-                                    <span className="text-[8px] text-emerald-400/80">
+                                    <span className="text-[9px] text-emerald-400/80">
                                       {finalIsBest
                                         ? "Final · Optimal"
                                         : "Final"}
