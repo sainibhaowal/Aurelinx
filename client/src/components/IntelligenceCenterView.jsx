@@ -2019,56 +2019,65 @@ const IntelligenceCenterView = () => {
                                           setHoveredAnnealIndex(i)
                                         }
                                         onMouseLeave={() =>
-                                          setHoveredAnnealIndex(null)
+                                            setHoveredAnnealIndex(null)
                                         }
                                         className="flex-1 h-full cursor-pointer relative group"
                                       />
                                     ))}
                                   </div>
 
-                                  {/* Active Hover Tooltip Box */}
-                                  {hovered !== null &&
-                                    history[hovered] && (
-                                      <div className="absolute top-1 right-1 z-20 rounded-xl border border-teal-400/30 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-md text-[11px] space-y-1.5">
-                                        <div className="font-bold text-teal-300 flex items-center gap-1">
-                                          <span>
+                                  {/* Active Hover Tooltip Box - Follows Cursor Side-by-Side */}
+                                  {hovered !== null && history[hovered] && (() => {
+                                    const hx = xPos(hovered);
+                                    const isRightHalf = hx > 58;
+                                    return (
+                                      <div
+                                        className="absolute top-3 z-30 rounded-xl border border-teal-400/40 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-md text-[11px] space-y-1.5 pointer-events-none transition-all duration-100 ease-out min-w-[175px]"
+                                        style={
+                                          isRightHalf
+                                            ? { right: `${Math.max(2, 100 - hx + 3)}%` }
+                                            : { left: `${Math.max(2, hx + 3)}%` }
+                                        }
+                                      >
+                                        <div className="font-bold text-teal-300 flex items-center justify-between gap-1 border-b border-white/10 pb-1">
+                                          <span className="flex items-center gap-1">
                                             Step #
                                             {history[hovered].step ??
                                               hovered}
                                           </span>
                                           {hovered === bestIndex && (
-                                            <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 rounded border border-emerald-500/30">
+                                            <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">
                                               Optimal Best
                                             </span>
                                           )}
                                         </div>
-                                        <div className="text-slate-300">
-                                          Temperature:{" "}
+                                        <div className="text-slate-300 flex justify-between gap-2">
+                                          <span>Temperature:</span>
                                           <strong className="text-amber-300 font-mono">
                                             {Number(
                                               history[hovered].temperature,
                                             ).toFixed(3)}
                                           </strong>
                                         </div>
-                                        <div className="text-slate-300">
-                                          Energy E(x):{" "}
-                                          <strong className="text-white font-mono">
+                                        <div className="text-slate-300 flex justify-between gap-2">
+                                          <span>Energy E(x):</span>
+                                          <strong className="text-teal-300 font-mono">
                                             {Number(
                                               history[hovered].energy,
                                             ).toFixed(4)}
                                           </strong>
                                         </div>
-                                        <div className="text-slate-300">
-                                          Best-so-far E*:{" "}
-                                          <strong className="text-emerald-300 font-mono">
+                                        <div className="text-slate-300 flex justify-between gap-2">
+                                          <span>Best-so-far E*:</span>
+                                          <strong className="text-emerald-400 font-mono">
                                             {Number(
                                               history[hovered].best_energy ??
                                                 history[hovered].energy,
                                             ).toFixed(4)}
                                           </strong>
                                         </div>
-                                        <div className="text-slate-300">
-                                          Skill Coverage:{" "}
+                                        <div className="text-slate-300 flex justify-between gap-2">
+                                          <span>Skill Coverage:</span>
                                           <strong className="text-indigo-300 font-mono">
                                             {Number(
                                               history[hovered].coverage ?? 0,
@@ -2076,25 +2085,18 @@ const IntelligenceCenterView = () => {
                                             %
                                           </strong>
                                         </div>
-                                        <div className="text-slate-300">
-                                          Team Cost:{" "}
+                                        <div className="text-slate-300 flex justify-between gap-2 border-t border-white/5 pt-1">
+                                          <span>Team Cost:</span>
                                           <strong className="text-cyan-300 font-mono">
                                             {fmtMoney(
                                               history[hovered].cost ?? 0,
                                             )}
                                           </strong>
-                                          <span className="text-slate-500">
-                                            {" "}
-                                            (
-                                            {Number(
-                                              history[hovered]
-                                                .budget_usage_percentage ?? 0,
-                                            ).toFixed(0)}
-                                            % of cap)
-                                          </span>
                                         </div>
                                       </div>
-                                    )}
+                                    );
+                                  })()}
+
                                 </div>
 
                                 {/* X-Axis Step Ticks (real step numbers) */}
