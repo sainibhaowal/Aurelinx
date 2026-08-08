@@ -1654,7 +1654,7 @@ const IntelligenceCenterView = () => {
                                         {t}
                                       </span>
                                     ))}
-                                    <div className="ml-14 mr-11 h-full">
+                                    <div className="ml-14 mr-11 h-full relative">
                                       <svg
                                         className="h-full w-full overflow-hidden"
                                         viewBox="0 0 100 100"
@@ -1831,7 +1831,7 @@ const IntelligenceCenterView = () => {
                                         )}
                                       </svg>
 
-                                      {/* True 100% Round Circle Node Markers Overlay (Zero Distortion/Egg Shape) */}
+                                      {/* True 100% Round Circle Node Markers Overlay (Positioned Directly on SVG Curve Line) */}
                                       <div className="absolute inset-0 pointer-events-none">
                                         {ePts.map((p, idx) => {
                                           const isBest = idx === bestIndex;
@@ -1878,11 +1878,12 @@ const IntelligenceCenterView = () => {
                                         T {t}
                                       </span>
                                     ))}
-                                    <div className="ml-14 mr-11 h-full">
+                                    <div className="ml-14 mr-11 h-full relative">
                                       <svg
                                         className="h-full w-full overflow-hidden"
                                         viewBox="0 0 100 100"
                                         preserveAspectRatio="none"
+                                        shapeRendering="geometricPrecision"
                                       >
                                         <defs>
                                           <linearGradient
@@ -1971,7 +1972,7 @@ const IntelligenceCenterView = () => {
                                           />
                                         ))}
 
-                                        {/* Temperature curve (smooth) with rounded glowing nodes */}
+                                        {/* Temperature curve (smooth cubic bezier) */}
                                         <path
                                           d={smoothPath(tPts)}
                                           fill="none"
@@ -1991,23 +1992,6 @@ const IntelligenceCenterView = () => {
                                           strokeLinejoin="round"
                                           vectorEffect="non-scaling-stroke"
                                         />
-                                        {tPts.map((p, idx) => (
-                                          <circle
-                                            key={`td-${idx}`}
-                                            cx={p.x}
-                                            cy={p.y}
-                                            r={hovered === idx ? "2.4" : "1.7"}
-                                            fill="#fde68a"
-                                            filter="url(#glowAmber)"
-                                            stroke={
-                                              hovered === idx
-                                                ? "#ffffff"
-                                                : "none"
-                                            }
-                                            strokeWidth="0.6"
-                                            vectorEffect="non-scaling-stroke"
-                                          />
-                                        ))}
 
                                         {/* Crosshair on hover */}
                                         {hovered !== null && (
