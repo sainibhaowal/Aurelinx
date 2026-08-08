@@ -1460,7 +1460,7 @@ const IntelligenceCenterView = () => {
 
                           {/* High-Precision Interactive SVG Convergence Chart */}
                           <div className="space-y-2">
-                            <div className="relative h-44 w-full rounded-xl border border-white/10 bg-slate-950/80 p-3 shadow-inner flex flex-col justify-between overflow-hidden">
+                            <div className="relative h-64 w-full rounded-xl border border-white/10 bg-slate-950/80 p-4 shadow-inner flex flex-col justify-between overflow-hidden">
                               {/* Y-Axis Value Labels (Left) */}
                               {(() => {
                                 const history = annealingHistory.length > 0 ? annealingHistory : Array(10).fill({ step: 0, energy: 0, coverage: 0 });
@@ -1473,20 +1473,20 @@ const IntelligenceCenterView = () => {
                                 return (
                                   <>
                                     {/* Left Y-Axis numeric labels: Max E (Best) at Top, Min E at Bottom */}
-                                    <div className="absolute left-2 top-2 bottom-7 flex flex-col justify-between text-[9px] font-mono text-slate-400 z-10 pointer-events-none">
-                                      <span className="bg-slate-900/90 px-1.5 py-0.5 rounded border border-emerald-500/30 text-emerald-300 font-bold shadow">
+                                    <div className="absolute left-2 top-3 bottom-8 flex flex-col justify-between text-[10px] font-mono text-slate-400 z-10 pointer-events-none">
+                                      <span className="bg-slate-900/90 px-2 py-0.5 rounded border border-emerald-500/30 text-emerald-300 font-bold shadow">
                                         E: {maxE.toFixed(2)} (Best)
                                       </span>
-                                      <span className="bg-slate-900/80 px-1 py-0.5 rounded border border-white/5 text-slate-400">
+                                      <span className="bg-slate-900/80 px-1.5 py-0.5 rounded border border-white/5 text-slate-400">
                                         E: {((maxE + minE) / 2).toFixed(2)}
                                       </span>
-                                      <span className="bg-slate-900/80 px-1 py-0.5 rounded border border-white/5 text-slate-400">
+                                      <span className="bg-slate-900/80 px-1.5 py-0.5 rounded border border-white/5 text-slate-400">
                                         E: {minE.toFixed(2)} (Initial)
                                       </span>
                                     </div>
 
                                     {/* SVG Graphic Canvas */}
-                                    <div className="relative flex-1 w-full pl-24 pr-4 pt-2 pb-2">
+                                    <div className="relative flex-1 w-full pl-28 pr-4 pt-2 pb-2">
                                       <svg
                                         className="h-full w-full overflow-hidden"
                                         viewBox="0 0 100 100"
@@ -1515,9 +1515,9 @@ const IntelligenceCenterView = () => {
                                             // Clamped normalization: strictly bounds Y between 15 (top) and 80 (bottom)
                                             const norm = range === 0 ? 0.5 : Math.max(0.0, Math.min(1.0, (Number(h.energy) - minE) / range));
                                             const y = 80 - norm * 65;
-                                            return { x, y, energy: Number(h.energy) };
+                                            return `${x},${y}`;
                                           });
-                                          const pointsStr = pts.map((p) => `${p.x},${p.y}`).join(" ");
+                                          const pointsStr = pts.join(" ");
 
                                           return (
                                             <>
@@ -1535,52 +1535,36 @@ const IntelligenceCenterView = () => {
                                                 />
                                               )}
 
-                                              {/* Clean SVG Polyline */}
+                                              {/* Clean Pure SVG Line Graph (NO BALLS / NO CIRCLES) */}
                                               <polyline
                                                 fill="none"
                                                 stroke="#2dd4bf"
-                                                strokeWidth="2"
+                                                strokeWidth="2.5"
                                                 strokeLinecap="round"
                                                 strokeLinejoin="round"
                                                 vectorEffect="non-scaling-stroke"
                                                 points={pointsStr}
                                               />
-
-                                              {/* Scientific Step Nodes Dots */}
-                                              {pts.map((p, idx) => (
-                                                <circle
-                                                  key={idx}
-                                                  cx={p.x}
-                                                  cy={p.y}
-                                                  r={idx === bestIndex ? "3.5" : "1.8"}
-                                                  fill={idx === bestIndex ? "#34d399" : "#2dd4bf"}
-                                                  stroke={idx === bestIndex ? "#ffffff" : "none"}
-                                                  strokeWidth="1"
-                                                  vectorEffect="non-scaling-stroke"
-                                                />
-                                              ))}
                                             </>
                                           );
                                         })()}
                                       </svg>
 
-                                      {/* Interactive node hover triggers */}
-                                      <div className="absolute inset-0 pl-24 pr-4 pt-2 pb-2 flex justify-between items-center pointer-events-auto">
+                                      {/* Invisible Interactive node hover trigger zones */}
+                                      <div className="absolute inset-0 pl-28 pr-4 pt-2 pb-2 flex justify-between items-center pointer-events-auto">
                                         {history.map((h, i, arr) => (
                                           <div
                                             key={i}
                                             onMouseEnter={() => setHoveredAnnealIndex(i)}
                                             onMouseLeave={() => setHoveredAnnealIndex(null)}
                                             className="h-full flex-1 cursor-pointer relative group flex justify-center items-center"
-                                          >
-                                            <div className={`w-2 h-2 rounded-full transition-all ${i === hoveredAnnealIndex ? "bg-white scale-150 shadow-[0_0_8px_#2dd4bf]" : i === bestIndex ? "bg-emerald-400" : "bg-teal-500/40 opacity-0 group-hover:opacity-100"}`} />
-                                          </div>
+                                          />
                                         ))}
                                       </div>
                                     </div>
 
                                     {/* Bottom X-Axis Step Ticks */}
-                                    <div className="pl-24 pr-4 flex justify-between items-center text-[9px] font-mono text-slate-400 border-t border-white/10 pt-1">
+                                    <div className="pl-28 pr-4 flex justify-between items-center text-[10px] font-mono text-slate-400 border-t border-white/10 pt-1.5">
                                       <span className="flex flex-col items-center">
                                         <span className="text-slate-300 font-bold">Step 0</span>
                                         <span className="text-[8px] text-slate-500">Initial</span>
@@ -1602,10 +1586,10 @@ const IntelligenceCenterView = () => {
 
                                     {/* Active Hover Tooltip Box */}
                                     {hoveredAnnealIndex !== null && history[hoveredAnnealIndex] && (
-                                      <div className="absolute top-2 right-2 z-20 rounded-xl border border-teal-400/30 bg-slate-950/90 p-2.5 shadow-2xl backdrop-blur-md text-[10px] space-y-1">
-                                        <div className="font-bold text-teal-300 flex items-center gap-1">
+                                      <div className="absolute top-3 right-3 z-20 rounded-xl border border-teal-400/30 bg-slate-950/90 p-3 shadow-2xl backdrop-blur-md text-[11px] space-y-1">
+                                        <div className="font-bold text-teal-300 flex items-center gap-1.5">
                                           <span>Step #{history[hoveredAnnealIndex].step ?? hoveredAnnealIndex}</span>
-                                          {hoveredAnnealIndex === bestIndex && <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 rounded border border-emerald-500/30">Optimal Best</span>}
+                                          {hoveredAnnealIndex === bestIndex && <span className="bg-emerald-500/20 text-emerald-300 text-[9px] px-1.5 py-0.5 rounded border border-emerald-500/30">Optimal Best</span>}
                                         </div>
                                         <div className="text-slate-300">Objective Energy E(x): <strong className="text-white font-mono">{Number(history[hoveredAnnealIndex].energy).toFixed(4)}</strong></div>
                                         <div className="text-slate-300">Skill Coverage: <strong className="text-cyan-300 font-mono">{Number(history[hoveredAnnealIndex].coverage ?? 0).toFixed(1)}%</strong></div>
