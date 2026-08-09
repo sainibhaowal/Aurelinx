@@ -15,11 +15,106 @@ import {
   PanelRightOpen,
   Info,
   Download,
+  Copy,
+  RefreshCw,
+  ThumbsUp,
+  ThumbsDown,
+  Check,
+  FileSpreadsheet,
 } from "lucide-react";
 import { UserManualButton } from "./UserManual";
 import { chatAPI } from "../services/apiClient";
 
 // ── Premium Markdown renderer — full GFM: tables, code, blockquotes, lists, task lists, images ──
+const TableWithActions = ({ children }) => {
+  const [flash, setFlash] = useState("");
+
+  const extractTableData = () => {
+    const cellText = (node) => {
+      if (node == null) return "";
+      if (typeof node === "string" || typeof node === "number") return String(node);
+      if (Array.isArray(node)) return node.map(cellText).join("");
+      if (node && typeof node === "object" && node.props && node.props.children !== undefined) {
+        return cellText(node.props.children);
+      }
+      return "";
+    };
+    const rows = [];
+    const collect = (node) => {
+      if (!node) return;
+      if (Array.isArray(node)) { node.forEach(collect); return; }
+      if (typeof node !== "object") return;
+      if (node.type === "tr") {
+        const cells = [];
+        const walkCells = (n) => {
+          if (!n) return;
+          if (Array.isArray(n)) { n.forEach(walkCells); return; }
+          if (typeof n === "object" && n.props && n.props.children !== undefined) {
+            if (n.type === "td" || n.type === "th") cells.push(cellText(n.props.children));
+            else walkCells(n.props.children);
+          }
+        };
+        walkCells(node.props && node.props.children);
+        rows.push(cells);
+        return;
+      }
+      if (node.props && node.props.children !== undefined) collect(node.props.children);
+    };
+    collect(children);
+    return rows.filter((r) => r.some((c) => c.trim() !== ""));
+  };
+
+  const tableToCsv = (data) =>
+    data.map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+
+  const copyTable = async () => {
+    try {
+      await navigator.clipboard.writeText(tableToCsv(extractTableData()));
+      setFlash("copied");
+    } catch (e) {
+      setFlash("error");
+    }
+    window.setTimeout(() => setFlash(""), 1600);
+  };
+
+  const exportTableExcel = async () => {
+    const data = extractTableData();
+    if (!data.length) return;
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), "Table");
+    XLSX.writeFile(wb, `aurelinx-table-${Date.now()}.xlsx`);
+  };
+
+  return (
+    <div className="my-4 rounded-xl border border-white/10 shadow-lg shadow-black/30 relative">
+      <div className="flex items-center justify-end gap-1.5 px-2 pt-1.5">
+        <button
+          type="button"
+          onClick={copyTable}
+          className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-300 hover:bg-white/10 hover:text-cyan-200 transition-colors"
+          title="Copy table to clipboard"
+        >
+          {flash === "copied" ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+          {flash === "copied" ? "Copied" : "Copy"}
+        </button>
+        <button
+          type="button"
+          onClick={exportTableExcel}
+          className="inline-flex items-center gap-1 rounded-md border border-emerald-400/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-300 hover:bg-emerald-500/20 transition-colors"
+          title="Export this table to Excel (.xlsx)"
+        >
+          <FileSpreadsheet size={10} />
+          Export Excel
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm border-collapse table-auto">{children}</table>
+      </div>
+    </div>
+  );
+};
+
 const MarkdownRenderer = ({ children }) => (
   <ReactMarkdown
     remarkPlugins={[remarkGfm]}
@@ -210,13 +305,7 @@ const MarkdownRenderer = ({ children }) => (
       ),
 
       // ── GFM Tables — premium glassmorphic dark styling ──
-      table: ({ children }) => (
-        <div className="my-4 overflow-x-auto rounded-xl border border-white/10 shadow-lg shadow-black/30 -mx-1">
-          <table className="min-w-full text-sm border-collapse table-auto">
-            {children}
-          </table>
-        </div>
-      ),
+      table: TableWithActions,
       thead: ({ children }) => (
         <thead className="bg-cyan-950/60 border-b border-cyan-500/20">
           {children}
@@ -956,6 +1045,10 @@ const IntelligenceChatView = () => {
   const [attachments, setAttachments] = useState([]);
   const [streamText, setStreamText] = useState("");
   const [streamPhase, setStreamPhase] = useState(null);
+  const [feedbackMap, setFeedbackMap] = useState({});
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [copiedMsgId, setCopiedMsgId] = useState(null);
   const [agentSteps, setAgentSteps] = useState([]);
   // Keep the session history out of the way on first visit. Users can still
   // expand it with the rail control whenever they need to switch workflows.
@@ -1186,14 +1279,18 @@ const IntelligenceChatView = () => {
     }
   };
 
-  const sendMessage = async () => {
-    if (!input.trim() || busy) return;
+  const sendMessage = async (overrideText) => {
+    const override = typeof overrideText === "string" ? String(overrideText).trim() : "";
+    const userText = override || (input || "").trim();
+    if (!userText || busy) return;
     setBusy(true);
     setStreamText("");
     setStreamPhase("starting");
     const controller = new AbortController();
     abortRef.current = controller;
-    const userText = input.trim();
+    if (override) setInput(userText);
+    setEditingId(null);
+    setEditDraft("");
     setLastFailedPrompt("");
     setInput("");
     setAgentSteps([]);
@@ -1347,8 +1444,56 @@ const IntelligenceChatView = () => {
 
   const retryLastPrompt = () => {
     if (!lastFailedPrompt || busy) return;
-    setInput(lastFailedPrompt);
-    window.setTimeout(() => sendMessage(), 0);
+    window.setTimeout(() => sendMessage(lastFailedPrompt), 0);
+  };
+
+  const copyMessage = async (messageId, content) => {
+    try {
+      await navigator.clipboard.writeText(content || "");
+      setCopiedMsgId(messageId);
+    } catch (e) {
+      console.warn("copy failed", e);
+    }
+    window.setTimeout(() => setCopiedMsgId(null), 1400);
+  };
+
+  const startEdit = (message) => {
+    setEditingId(message.id);
+    setEditDraft(message.content || "");
+  };
+
+  const saveEdit = () => {
+    const text = (editDraft || "").trim();
+    if (!text || busy) return;
+    const idx = messages.findIndex((m) => m.id === editingId);
+    if (idx < 0) return;
+    setMessages((prev) => prev.slice(0, idx));
+    setEditingId(null);
+    setEditDraft("");
+    window.setTimeout(() => sendMessage(text), 0);
+  };
+
+  const regenerateFrom = (assistantMessage) => {
+    if (busy) return;
+    const idx = messages.findIndex((m) => m.id === assistantMessage.id);
+    if (idx < 0) return;
+    const prior = messages.slice(0, idx).reverse().find((m) => m.role === "user");
+    if (!prior) return;
+    setMessages((prev) => {
+      const at = prev.findIndex((m) => m.id === prior.id);
+      return at >= 0 ? prev.slice(0, at) : prev;
+    });
+    setStreamText("");
+    window.setTimeout(() => sendMessage(prior.content), 0);
+  };
+
+  const submitFeedback = async (messageId, rating) => {
+    setFeedbackMap((prev) => ({ ...prev, [messageId]: rating }));
+    try {
+      await chatAPI.sendFeedback(selectedSessionId, { message_id: messageId, rating });
+    } catch (e) {
+      console.warn("Feedback could not be saved", e);
+    }
   };
 
   const exportTranscript = async (format = "markdown") => {
@@ -1497,34 +1642,139 @@ const IntelligenceChatView = () => {
               ref={messagesScrollRef}
               className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1"
             >
-              {messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`min-w-0 ${m.role === "user" ? "ml-16 rounded-2xl p-4 bg-primary/10 border border-primary/30" : "mr-4 py-2"}`}
-                >
-                  {m.role === "user" && (
-                    <div className="text-[10px] uppercase tracking-[0.12em] text-slate-400 mb-1.5">You</div>
-                  )}
-                  {m.role === "assistant" ? (
-                    <div className="min-w-0">
-                      {m.workflow_events?.length > 0 && (
-                        <div className="mt-2 pt-2">
-                          <AgenticStepTracker steps={m.workflow_events} onApproval={resolveApproval} />
+              {messages.map((m) => {
+                const isEditing = editingId === m.id;
+                const hasActions = !busy && !isEditing;
+                return (
+                  <div
+                    key={m.id}
+                    className={`min-w-0 ${m.role === "user" ? "ml-16 rounded-2xl p-4 bg-primary/10 border border-primary/30" : "mr-4 py-2"}`}
+                  >
+                    {m.role === "user" && (
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="text-[10px] uppercase tracking-[0.12em] text-slate-400">You</div>
+                        {hasActions && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => copyMessage(m.id, m.content)}
+                              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-slate-300 hover:bg-white/10 hover:text-cyan-200 transition-colors"
+                              title="Copy your message"
+                            >
+                              {copiedMsgId === m.id ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                              {copiedMsgId === m.id ? "Copied" : "Copy"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => startEdit(m)}
+                              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-slate-300 hover:bg-white/10 hover:text-cyan-200 transition-colors"
+                              title="Edit and regenerate from scratch"
+                            >
+                              <Pencil size={10} />
+                              Edit
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {m.role === "assistant" ? (
+                      <div className="min-w-0">
+                        {m.workflow_events?.length > 0 && (
+                          <div className="mt-2 pt-2">
+                            <AgenticStepTracker steps={m.workflow_events} onApproval={resolveApproval} />
+                          </div>
+                        )}
+                        <ThinkingMessageContent
+                          text={m.content || ""}
+                          isBusy={false}
+                        />
+                        {(String(m.id || "").startsWith("error-") || String(m.id || "").startsWith("stream-error-")) && lastFailedPrompt && (
+                          <button onClick={retryLastPrompt} className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-400/20">Retry request</button>
+                        )}
+                        {hasActions && !String(m.id || "").startsWith("error-") && !String(m.id || "").startsWith("stream-error-") && (
+                          <div className="mt-2.5 flex items-center flex-wrap gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => copyMessage(m.id, m.content)}
+                              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-300 hover:bg-white/10 hover:text-cyan-200 transition-colors"
+                              title="Copy this answer"
+                            >
+                              {copiedMsgId === m.id ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                              {copiedMsgId === m.id ? "Copied" : "Copy"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => regenerateFrom(m)}
+                              className="inline-flex items-center gap-1 rounded-md border border-cyan-400/20 bg-cyan-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-cyan-300 hover:bg-cyan-500/20 hover:text-cyan-200 transition-colors"
+                              title="Regenerate the answer from scratch"
+                            >
+                              <RefreshCw size={10} />
+                              Regenerate
+                            </button>
+                            <span className="mx-0.5 h-3.5 w-px bg-white/10" />
+                            <button
+                              type="button"
+                              onClick={() => submitFeedback(m.id, "up")}
+                              className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                                feedbackMap[m.id] === "up"
+                                  ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-300"
+                                  : "border-white/10 bg-white/5 text-slate-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+                              }`}
+                              title="Good response — helps the model improve"
+                            >
+                              <ThumbsUp size={10} />
+                              Good
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => submitFeedback(m.id, "down")}
+                              className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                                feedbackMap[m.id] === "down"
+                                  ? "border-rose-400/40 bg-rose-500/20 text-rose-300"
+                                  : "border-white/10 bg-white/5 text-slate-400 hover:bg-rose-500/10 hover:text-rose-300"
+                              }`}
+                              title="Bad response — the model will improve the next answer"
+                            >
+                              <ThumbsDown size={10} />
+                              Bad
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : isEditing ? (
+                      <div className="flex flex-col gap-2">
+                        <textarea
+                          value={editDraft}
+                          onChange={(e) => setEditDraft(e.target.value)}
+                          rows={Math.min(6, Math.max(2, (editDraft || "").split("\n").length))}
+                          autoFocus
+                          className="w-full rounded-xl border border-cyan-400/30 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-400/60 resize-y"
+                          placeholder="Edit your request…"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={saveEdit}
+                            className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-teal-400 to-cyan-400 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-950 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                          >
+                            <Send size={11} />
+                            Regenerate with Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setEditingId(null); setEditDraft(""); }}
+                            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-300 hover:bg-white/10 transition-colors"
+                          >
+                            Cancel
+                          </button>
                         </div>
-                      )}
-                      <ThinkingMessageContent
-                        text={m.content || ""}
-                        isBusy={false}
-                      />
-                      {(String(m.id || "").startsWith("error-") || String(m.id || "").startsWith("stream-error-")) && lastFailedPrompt && (
-                        <button onClick={retryLastPrompt} className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-400/20">Retry request</button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-sm whitespace-pre-wrap">{m.content}</div>
-                  )}
-                </div>
-              ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm whitespace-pre-wrap">{m.content}</div>
+                    )}
+                  </div>
+                );
+              })}
               {busy && (
                 <div className="mr-4 py-2">
                   <div className="min-w-0">

@@ -976,6 +976,11 @@ export const chatAPI = {
     request(`${API_V1}/chat/sessions/${sessionId}/messages`, {
       method: "DELETE",
     }),
+  sendFeedback: (sessionId, payload) =>
+    request(`${API_V1}/chat/sessions/${sessionId}/feedback`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   deleteAttachment: (sessionId, attachmentId) =>
     request(
       `${API_V1}/chat/sessions/${sessionId}/attachments/${attachmentId}`,

@@ -241,6 +241,32 @@ class ChatMessageTable(SQLModel, table=True):
         super().__init__(**data)
 
 
+class ChatFeedbackTable(SQLModel, table=True):
+    """Admin feedback (thumbs up/down) on assistant answers, used to steer
+    later generations toward better, more accurate responses."""
+
+    __tablename__ = "chat_feedback"
+
+    id: Optional[str] = Field(
+        default=None, sa_column=Column(String(36), primary_key=True)
+    )
+    session_id: str = Field(foreign_key="chat_sessions.id", index=True)
+    user_id: str = Field(index=True)
+    message_id: Optional[str] = Field(
+        default=None, foreign_key="chat_messages.id", index=True
+    )
+    rating: str = Field(default="down", index=True)  # up | down
+    assistant_preview: Optional[str] = Field(default=None, max_length=2000)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+    def __init__(self, **data):
+        if "id" not in data or data["id"] is None:
+            data["id"] = str(uuid4())
+        if "session_id" in data and data["session_id"] is not None:
+            data["session_id"] = str(data["session_id"])
+        super().__init__(**data)
+
+
 class ChatAttachmentTable(SQLModel, table=True):
     """Uploaded files associated with a chat session/message"""
 
