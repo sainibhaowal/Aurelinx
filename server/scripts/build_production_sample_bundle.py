@@ -93,6 +93,44 @@ DEPT_SENTIMENT = {
     "Customer Support": -0.04,
 }
 
+# Broad department-level skill pools (extras beyond the 4 role core skills).
+SKILL_POOLS = {
+    "Engineering & IT": ("TypeScript", "React", "Go", "AWS", "PostgreSQL", "REST APIs",
+                         "Docker", "Kubernetes", "CI/CD", "Microservices", "Testing",
+                         "Terraform", "Observability", "Linux", "Git", "Security"),
+    "Sales": ("Cold Calling", "Product Demos", "Forecasting", "Pipeline Management",
+              "Presentation", "Pricing Strategy", "Contract Negotiation", "Sales Planning",
+              "Customer Success", "Quota Management", "CRM", "Market Research", "Prospecting", "Demo Management"),
+    "Research & Development": ("Statistical Analysis", "Data Visualization", "Machine Learning",
+                               "ETL", "Peer Review", "Scientific Writing", "Hypothesis Testing",
+                               "Python", "Survey Design", "Literature Review", "Experiment Design", "Mentoring"),
+    "Customer Support": ("Ticketing", "Documentation", "Training", "Escalation Management",
+                         "Quality Assurance", "Product Knowledge", "Knowledge Base", "SLA Management",
+                         "Self-Service Design", "Onboarding", "Feedback Loops", "Diagnostics"),
+    "Finance & Accounting": ("GAAP", "Variance Analysis", "Risk Management", "Internal Controls",
+                             "Power BI", "Data Reconciliation", "Budgeting", "Forecasting",
+                             "Tax Compliance", "Financial Reporting", "ERP", "Payroll", "Audit Support"),
+    "Operations": ("Enterprise Resource Planning", "Inventory Management", "Lean", "Six Sigma",
+                   "Vendor Management", "Quality Control", "Cost Optimization", "Scheduling",
+                   "Supply Chain", "Logistics", "KPI Reporting", "Change Management"),
+    "Marketing": ("Analytics", "Google Analytics", "Social Media", "Campaign Management", "Brand Management",
+                  "Email Marketing", "Marketing Automation", "Event Planning", "Market Research",
+                  "Paid Ads", "Segmentation", "Landing Pages"),
+    "Healthcare & Services": ("Medical Compliance", "Documentation", "Patient Communication",
+                              "Field Documentation", "Regulatory Standards", "Risk Mitigation",
+                              "Audit Readiness", "Client Reporting", "Service Excellence", "Scheduling"),
+    "Human Resources": ("Performance Management", "Benefits Administration", "Payroll", "Onboarding",
+                        "Employee Engagement", "Compensation Analysis", "Labor Relations", "Succession Planning",
+                        "Learning & Development", "Conflict Resolution", "HR Metrics", "Policy Design"),
+    "Product Management": ("Agile", "User Stories", "A/B Testing", "Product Analytics", "Stakeholder Management",
+                           "Data Analysis", "Pricing Strategy", "Competitive Analysis", "Prototyping",
+                           "Release Management", "Customer Discovery", "Metrics Design"),
+}
+
+# Skill count per person, mirroring the observed 6-12 distribution from the legacy DB
+# (11 skills was the most common profile).
+SKILL_COUNT_DIST = {6: 2, 7: 8, 8: 10, 9: 43, 10: 169, 11: 496, 12: 272}
+
 ROLE_PROFILES = {
     "account executive": {
         "skills": ("Communication", "Negotiation", "CRM", "Account Strategy"),
@@ -399,25 +437,34 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
         row["sentiment_score"] = f"{sentiment:.3f}"
         row["match_score"] = f"{match_score:.3f}"
 
-    # Update skills with role-aligned profiles & diverse levels
+    # Update skills: role core skills + variable 6-12 extras from department pool
     for filename, base_filename in (
         ("employee_skills_public.csv", "employees_public.csv"),
         ("candidate_skills_public.csv", "candidates_public.csv"),
     ):
         by_email = {row["email"]: row for row in source[base_filename]}
-        rows = source[filename]
-        occurrence: dict[str, int] = {}
-        for row in rows:
-            email = row["email"]
-            person = by_email[email]
+        templates: dict[str, dict] = {email: row for row in source[filename]}
+        rebuilt: list[dict[str, str]] = []
+        for email, person in by_email.items():
             profile = profile_for(person["role"])
-            index = occurrence.get(email, 0)
-            row["skill_name"] = profile["skills"][index % len(profile["skills"])]
-            email_hash = sum(ord(c) for c in email)
-            mean_level = 3.4 if filename.startswith("employee") else 2.8
-            base_level = max(1, min(5, round(mean_level + (_hash01(email + f":lv{index}") - 0.5) * 2.2)))
-            row["level"] = str(base_level)
-            occurrence[email] = index + 1
+            rng = random.Random(email + ":skills")
+            count = rng.choices(
+                list(SKILL_COUNT_DIST), weights=list(SKILL_COUNT_DIST.values()), k=1
+            )[0]
+            core = list(profile["skills"])
+            pool = [s for s in SKILL_POOLS.get(person["department"], ()) if s not in core]
+            chosen = list(core) + rng.sample(pool, count - len(core))
+            template = templates.get(email, {"email": email, "skill_name": "", "level": ""})
+            for index, skill in enumerate(chosen):
+                level = max(1, min(5, round(3.3 + (_hash01(f"{email}:lv{index}") - 0.5) * 2.4)))
+                rebuilt.append(
+                    {
+                        "email": template.get("email", email),
+                        "skill_name": skill,
+                        "level": str(level),
+                    }
+                )
+        source[filename] = rebuilt
 
     # Update experience with company tenure
     for filename, base_filename in (
