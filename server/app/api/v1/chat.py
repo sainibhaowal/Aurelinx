@@ -36,6 +36,7 @@ from app.models.database import (
     ChatAttachmentTable,
     ChatMessageTable,
     ChatSessionTable,
+    ChatFeedbackTable,
     CanonicalCandidateTable,
     CanonicalEmployeeTable,
     EmployeeTable,
@@ -1412,6 +1413,16 @@ async def _llm_stream_response(
             f"Mutation log: {json.dumps(mutations, default=str)}\n"
             f"User RBAC role: {rbac}\n"
             "--- END TOOL DATA ---\n\n"
+        )
+        feedback_block = str(context_payload.get("feedback_notes") or "").strip()
+        if feedback_block:
+            user_content += (
+                "--- PRIOR ADMIN FEEDBACK ---\n"
+                f"{feedback_block}\n"
+                "Improve this answer accordingly.\n"
+                "--- END PRIOR FEEDBACK ---\n\n"
+            )
+        user_content += (
             "Using the data above, answer the user's request clearly in Markdown. "
             "Present employee data as a formatted table. Do not include raw JSON in your response."
         )
@@ -1710,6 +1721,16 @@ async def _llm_response(
             f"Mutation log: {json.dumps(mutations, default=str)}\n"
             f"User RBAC role: {rbac}\n"
             "--- END TOOL DATA ---\n\n"
+        )
+        feedback_block = str(context_payload.get("feedback_notes") or "").strip()
+        if feedback_block:
+            user_content += (
+                "--- PRIOR ADMIN FEEDBACK ---\n"
+                f"{feedback_block}\n"
+                "Improve this answer accordingly.\n"
+                "--- END PRIOR FEEDBACK ---\n\n"
+            )
+        user_content += (
             "Using the data above, answer the user's request clearly in Markdown. "
             "Present employee data as a formatted table. Do not include raw JSON in your response."
         )
@@ -3957,6 +3978,24 @@ async def _stream_true_agent_loop(
         )
 
     tool_runs = [{"tool": item["tool"], "output": item["result"]} for item in tool_transcript]
+    feedback_rows = db.exec(
+        select(ChatFeedbackTable)
+        .where(ChatFeedbackTable.session_id == str(chat_session.id))
+        .order_by(ChatFeedbackTable.created_at.desc())
+        .limit(10)
+    ).all()
+    feedback_notes: List[str] = []
+    for fnote in reversed(feedback_rows):
+        snippet = (fnote.assistant_preview or "").strip()
+        excerpt = snippet[:600].replace("\n", " ")
+        if fnote.rating == "up":
+            continue
+        if excerpt:
+            feedback_notes.append(
+                f'• The admin marked the previous answer as unsatisfactory. '
+                f'That answer was: "{excerpt}". Provide a more accurate, complete, '
+                f"and clearly sourced answer this time."
+            )
     context_payload = {
         "request_plan": {**_request_plan(request.content), "mode": "agent_loop"},
         "tool_context": {
@@ -3974,6 +4013,7 @@ async def _stream_true_agent_loop(
         "agent_loop": tool_transcript,
         "workflow_run_id": workflow_run.id,
         "workflow_events": events,
+        "feedback_notes": "\n".join(feedback_notes),
     }
 
     yield emit(
@@ -4353,6 +4393,51 @@ async def list_messages(
         .order_by(ChatMessageTable.created_at.asc())
     ).all()
     return [_to_message_out(m) for m in messages]
+
+
+@router.post("/sessions/{session_id}/feedback")
+async def submit_feedback(
+    session_id: UUID,
+    payload: Dict[str, Any],
+    current_user: TokenData = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    """Record admin thumb feedback (up/down) on an assistant answer.
+
+    The assistant preview is stored so later generations know what was
+    disliked and can answer more accurately next time.
+    """
+    row = _get_session_normalized(db, session_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Session not found")
+    _assert_session_owner(row, current_user)
+    rating = str(payload.get("rating") or "").strip().lower()
+    if rating not in ("up", "down"):
+        raise HTTPException(status_code=422, detail="rating must be 'up' or 'down'")
+    message_id = payload.get("message_id")
+    preview = ""
+    if message_id:
+        target = db.exec(
+            select(ChatMessageTable).where(ChatMessageTable.id == str(message_id))
+        ).first()
+        if target:
+            preview = (target.content or "")[:2000]
+    feedback = ChatFeedbackTable(
+        session_id=row.id,
+        user_id=str(current_user.user_id or current_user.user_uuid or "admin"),
+        message_id=str(message_id) if message_id else None,
+        rating=rating,
+        assistant_preview=preview,
+    )
+    db.add(feedback)
+    db.commit()
+    db.refresh(feedback)
+    return {
+        "id": feedback.id,
+        "rating": feedback.rating,
+        "message_id": feedback.message_id,
+        "created_at": feedback.created_at.isoformat(),
+    }
 
 
 @router.get(
