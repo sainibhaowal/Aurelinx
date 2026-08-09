@@ -3002,6 +3002,83 @@ def _transient_provider_error(error: Exception) -> bool:
     )
 
 
+def _try_reasoning_json(raw: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Return the dict when the captured reasoning text is pure structured JSON."""
+    if not raw:
+        return None
+    stripped = raw.strip()
+    if not stripped.startswith("{"):
+        return None
+    try:
+        parsed = json.loads(stripped)
+        return parsed if isinstance(parsed, dict) else None
+    except Exception:
+        return None
+
+
+def _humanize_reasoning_dict(parsed: Dict[str, Any]) -> Optional[str]:
+    """Render a structured controller/answer decision as natural, user-facing language."""
+    if not isinstance(parsed, dict):
+        return None
+    action = str(parsed.get("action") or "").lower()
+    answer = parsed.get("answer")
+    message = parsed.get("message")
+    if action == "tool":
+        tool = str(parsed.get("tool") or "tool")
+        arguments = parsed.get("arguments") or {}
+        parts = [f"the execution model chose {tool}"]
+        entity = arguments.get("entity")
+        query = arguments.get("query")
+        if entity:
+            parts.append(f"on {entity}")
+        if query and isinstance(query, str):
+            trimmed = query.strip()
+            if len(trimmed) > 90:
+                trimmed = trimmed[:90] + "…"
+            parts.append(f"with \"{trimmed}\"")
+        return " ".join(parts)
+    if action == "approval_required":
+        return "the execution model prepared the deletion request; an authorized human must approve it before anything changes"
+    if action == "respond":
+        if message and isinstance(message, str) and message.strip():
+            return message.strip()[:280]
+        if answer and isinstance(answer, str) and answer.strip():
+            return None
+        return "the execution model prepared the reply"
+    if action and isinstance(action, str):
+        return f"the execution model prepared the {action} step"
+    if message and isinstance(message, str) and message.strip():
+        return message.strip()[:280]
+    return None
+
+
+def _friendly_reasoning_text(raw: Optional[str]) -> str:
+    """Thinking text for the UI: raw natural-language when available, otherwise a
+    natural rendering of the structured decision. Raw JSON is never shown."""
+    text = (raw or "").strip()
+    if not text:
+        return ""
+    if text.startswith("{"):
+        parsed = _try_reasoning_json(raw)
+        if parsed:
+            return _humanize_reasoning_dict(parsed) or ""
+        return ""
+    return text
+
+
+def _extract_answer_from_reasoning(raw: Optional[str]) -> Optional[str]:
+    """When the response model streams its full answer inside JSON thinking
+    (file 'answer' key), return the answer text so the UI can render it as
+    the normal assistant answer instead of JSON."""
+    parsed = _try_reasoning_json(raw)
+    if not parsed:
+        return None
+    answer = parsed.get("answer")
+    if isinstance(answer, str) and answer.strip():
+        return answer
+    return None
+
+
 def _provider_error_code(error: Any) -> str:
     text = str(error or "").lower()
     if "429" in text or "rate limit" in text or "too many requests" in text:
@@ -3620,7 +3697,7 @@ async def _stream_true_agent_loop(
                 if reasoning_active:
                     reasoning_event_text = (reasoning_event_text or "") + (token or "")
                     async for running_chars, delta_sse in paced_reasoning_deltas(
-                        reasoning_event_id, "planning", iteration, token or "", reasoning_event_chars, reasoning_event_text
+                        reasoning_event_id, "planning", iteration, token or "", reasoning_event_chars, _friendly_reasoning_text(reasoning_event_text)
                     ):
                         reasoning_event_chars = running_chars
                         yield delta_sse
@@ -3639,7 +3716,7 @@ async def _stream_true_agent_loop(
                 result_summary={
                     "iteration": iteration,
                     "characters": reasoning_event_chars,
-                    "text": reasoning_event_text,
+                    "text": _friendly_reasoning_text(reasoning_event_text),
                 },
             )
 
@@ -3667,7 +3744,7 @@ async def _stream_true_agent_loop(
                     result_summary={
                         "iteration": iteration,
                         "characters": reasoning_event_chars,
-                        "text": reasoning_event_text,
+                        "text": _friendly_reasoning_text(reasoning_event_text),
                     },
                     error_code=_provider_error_code(exc),
                 )
@@ -4020,8 +4097,17 @@ async def _stream_true_agent_loop(
                             "response",
                             "Reasoning complete",
                             status="completed",
-                            result_summary={"characters": reasoning_event_chars, "text": reasoning_event_text},
+                            result_summary={"characters": reasoning_event_chars, "text": _friendly_reasoning_text(reasoning_event_text)},
                         )
+                    if not assistant_text:
+                        embedded_answer = _extract_answer_from_reasoning(reasoning_event_text)
+                        if embedded_answer:
+                            words = embedded_answer.split(" ")
+                            for i, word in enumerate(words):
+                                token = word if i == 0 else " " + word
+                                assistant_text += token
+                                yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
+                                await asyncio.sleep(0.012)
                     break
                 except Exception as exc:
                     last_err = str(exc)
