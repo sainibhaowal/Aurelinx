@@ -87,25 +87,23 @@ const TableWithActions = ({ children }) => {
   };
 
   return (
-    <div className="my-4 rounded-xl border border-white/10 shadow-lg shadow-black/30 relative">
-      <div className="flex items-center justify-end gap-1.5 px-2 pt-1.5">
+    <div className="group/table my-4 relative rounded-xl border border-white/10 shadow-lg shadow-black/30">
+      <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover/table:opacity-100">
         <button
           type="button"
           onClick={copyTable}
-          className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-300 hover:bg-white/10 hover:text-cyan-200 transition-colors"
-          title="Copy table to clipboard"
+          className="inline-flex items-center rounded-md border border-white/10 bg-slate-950/90 px-1.5 py-1 text-slate-300 hover:text-cyan-200 shadow-md transition-colors"
+          title="Copy table (CSV)"
         >
-          {flash === "copied" ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
-          {flash === "copied" ? "Copied" : "Copy"}
+          {flash === "copied" ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
         </button>
         <button
           type="button"
           onClick={exportTableExcel}
-          className="inline-flex items-center gap-1 rounded-md border border-emerald-400/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-300 hover:bg-emerald-500/20 transition-colors"
-          title="Export this table to Excel (.xlsx)"
+          className="inline-flex items-center rounded-md border border-emerald-400/25 bg-slate-950/90 px-1.5 py-1 text-emerald-300 hover:text-emerald-200 shadow-md transition-colors"
+          title="Export table to Excel (.xlsx)"
         >
-          <FileSpreadsheet size={10} />
-          Export Excel
+          <FileSpreadsheet size={11} />
         </button>
       </div>
       <div className="overflow-x-auto">
@@ -1658,20 +1656,18 @@ const IntelligenceChatView = () => {
                             <button
                               type="button"
                               onClick={() => copyMessage(m.id, m.content)}
-                              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-slate-300 hover:bg-white/10 hover:text-cyan-200 transition-colors"
+                              className="inline-flex items-center rounded-md border border-white/10 bg-white/5 p-1 text-slate-300 hover:bg-white/10 hover:text-cyan-200 transition-colors"
                               title="Copy your message"
                             >
-                              {copiedMsgId === m.id ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
-                              {copiedMsgId === m.id ? "Copied" : "Copy"}
+                              {copiedMsgId === m.id ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
                             </button>
                             <button
                               type="button"
                               onClick={() => startEdit(m)}
-                              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-slate-300 hover:bg-white/10 hover:text-cyan-200 transition-colors"
+                              className="inline-flex items-center rounded-md border border-white/10 bg-white/5 p-1 text-slate-300 hover:bg-white/10 hover:text-cyan-200 transition-colors"
                               title="Edit and regenerate from scratch"
                             >
-                              <Pencil size={10} />
-                              Edit
+                              <Pencil size={11} />
                             </button>
                           </div>
                         )}
@@ -1696,47 +1692,43 @@ const IntelligenceChatView = () => {
                             <button
                               type="button"
                               onClick={() => copyMessage(m.id, m.content)}
-                              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-300 hover:bg-white/10 hover:text-cyan-200 transition-colors"
+                              className="inline-flex items-center rounded-md border border-white/10 bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 hover:text-cyan-200 transition-colors"
                               title="Copy this answer"
                             >
-                              {copiedMsgId === m.id ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
-                              {copiedMsgId === m.id ? "Copied" : "Copy"}
+                              {copiedMsgId === m.id ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                             </button>
                             <button
                               type="button"
                               onClick={() => regenerateFrom(m)}
-                              className="inline-flex items-center gap-1 rounded-md border border-cyan-400/20 bg-cyan-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-cyan-300 hover:bg-cyan-500/20 hover:text-cyan-200 transition-colors"
+                              className="inline-flex items-center rounded-md border border-cyan-400/20 bg-cyan-500/10 p-1.5 text-cyan-300 hover:bg-cyan-500/20 hover:text-cyan-200 transition-colors"
                               title="Regenerate the answer from scratch"
                             >
-                              <RefreshCw size={10} />
-                              Regenerate
+                              <RefreshCw size={12} />
                             </button>
                             <span className="mx-0.5 h-3.5 w-px bg-white/10" />
                             <button
                               type="button"
                               onClick={() => submitFeedback(m.id, "up")}
-                              className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                              className={`inline-flex items-center rounded-md border p-1.5 transition-colors ${
                                 feedbackMap[m.id] === "up"
                                   ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-300"
                                   : "border-white/10 bg-white/5 text-slate-400 hover:bg-emerald-500/10 hover:text-emerald-300"
                               }`}
                               title="Good response — helps the model improve"
                             >
-                              <ThumbsUp size={10} />
-                              Good
+                              <ThumbsUp size={12} />
                             </button>
                             <button
                               type="button"
                               onClick={() => submitFeedback(m.id, "down")}
-                              className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                              className={`inline-flex items-center rounded-md border p-1.5 transition-colors ${
                                 feedbackMap[m.id] === "down"
                                   ? "border-rose-400/40 bg-rose-500/20 text-rose-300"
                                   : "border-white/10 bg-white/5 text-slate-400 hover:bg-rose-500/10 hover:text-rose-300"
                               }`}
                               title="Bad response — the model will improve the next answer"
                             >
-                              <ThumbsDown size={10} />
-                              Bad
+                              <ThumbsDown size={12} />
                             </button>
                           </div>
                         )}
