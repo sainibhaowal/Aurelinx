@@ -46,6 +46,8 @@ from app.models.database import (
     MLModelRegistryTable,
     EmployeeTable,
     ExperienceTable,
+    InterventionOutcomeTable,
+    InterventionTable,
     SkillTable,
     ReleaseGateTable,
     ProcurementArtifactTable,
@@ -2511,6 +2513,8 @@ async def reset_local_demo_data(
     from sqlmodel import delete
 
     for model in [
+        InterventionOutcomeTable,
+        InterventionTable,
         SkillTable,
         ExperienceTable,
         EmployeeTable,
@@ -2539,6 +2543,8 @@ def _reset_local_demo_data_sync(db: Session, current_user: TokenData) -> None:
     from sqlmodel import delete
 
     for model in [
+        InterventionOutcomeTable,
+        InterventionTable,
         SkillTable,
         ExperienceTable,
         EmployeeTable,
