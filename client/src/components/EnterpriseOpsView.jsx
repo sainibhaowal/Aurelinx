@@ -857,7 +857,7 @@ const EnterpriseOpsView = () => {
     .sort((a, b) => new Date(b.last_drill_at) - new Date(a.last_drill_at))[0];
 
   return (
-    <div className="h-full flex flex-col min-h-0 text-slate-100 antialiased selection:bg-cyan-500/30 w-full overflow-hidden">
+    <div className="flex flex-col text-slate-100 antialiased selection:bg-cyan-500/30 w-full lg:h-full lg:min-h-0 lg:overflow-hidden">
       {/* Top Non-Scrolling Fixed Header & Navigation Block */}
       <div className="flex-none text-left space-y-3 mb-3 border-b border-white/5 pb-2">
         {/* Header Panel */}

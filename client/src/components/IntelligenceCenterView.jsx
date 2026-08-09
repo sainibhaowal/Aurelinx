@@ -772,7 +772,7 @@ const IntelligenceCenterView = () => {
       </div>
 
       {/* TABS CONTAINER */}
-      <div className="relative flex-1 flex flex-col min-h-0">
+      <div className="relative flex-1 flex flex-col min-h-0 max-lg:min-h-[520px] max-lg:overflow-y-auto custom-scrollbar">
         <AnimatePresence mode="wait">
           {/* TAB 1: SKILL GRAPH DIJKSTRA MATCH */}
           {activeSubTab === "skill-match" && (
@@ -781,7 +781,7 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 h-full min-h-0"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-0 lg:h-full"
             >
               {/* Left Settings */}
               <div className="space-y-6 flex flex-col h-full min-h-0">
@@ -1187,7 +1187,7 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 h-full min-h-0"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-0 lg:h-full"
             >
               {/* Left Config */}
               <div className="space-y-6 flex flex-col h-full min-h-0">
@@ -2178,7 +2178,7 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 h-full min-h-0"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-0 lg:h-full"
             >
               {/* Left Employee list */}
               <div className="premium-card h-full p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col overflow-hidden">
@@ -2544,7 +2544,7 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[1fr_340px] gap-6 text-left flex-1 h-full min-h-0"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[1fr_340px] gap-6 text-left flex-1 min-h-0 lg:h-full"
             >
               {/* Left Graph Panel */}
               <div className="premium-card p-6 border border-white/5 bg-slate-950/20 flex flex-col justify-between relative overflow-hidden h-full">
@@ -2775,7 +2775,7 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[320px_1fr] gap-6 text-left flex-1 h-full min-h-0"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[320px_1fr] gap-6 text-left flex-1 min-h-0 lg:h-full"
             >
               {/* Left Selector */}
               <div className="premium-card p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col justify-between h-full">
