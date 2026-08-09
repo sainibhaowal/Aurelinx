@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
+import random
 import zipfile
 from pathlib import Path
 
@@ -34,6 +36,62 @@ ENTERPRISE_DEPARTMENTS_AND_ROLES = [
     ("Healthcare & Services", ["Healthcare Representative", "Field Services Specialist", "Compliance Lead"]),
     ("Finance & Accounting", ["Financial Analyst", "Senior Accountant", "Finance Lead", "Audit Specialist"]),
 ]
+
+# Realistic enterprise headcount weights per department (share of population).
+DEPT_WEIGHTS = {
+    "Engineering & IT": 290,
+    "Sales": 210,
+    "Research & Development": 195,
+    "Customer Support": 150,
+    "Finance & Accounting": 135,
+    "Operations": 125,
+    "Marketing": 105,
+    "Healthcare & Services": 100,
+    "Human Resources": 85,
+    "Product Management": 75,
+}
+
+# Occupational mix inside each department (weight per role).
+ROLE_WEIGHTS = {
+    "Sales": {"Account Executive": 34, "Sales Representative": 28, "Sales Executive": 22, "Sales Manager": 16},
+    "Research & Development": {"Research Scientist": 40, "Research Associate": 30, "Laboratory Technician": 22, "Research Director": 8},
+    "Engineering & IT": {"Software Engineer": 45, "DevOps Engineer": 20, "IT Specialist": 20, "System Architect": 15},
+    "Product Management": {"Product Manager": 40, "Product Analyst": 28, "UX Researcher": 20, "Business Associate": 12},
+    "Marketing": {"Growth Marketing Specialist": 34, "Content Strategist": 28, "Brand Specialist": 22, "Digital Marketing Lead": 16},
+    "Human Resources": {"HR Generalist": 40, "Recruiting Specialist": 26, "Talent Partner": 22, "People Operations": 12},
+    "Operations": {"Operations Manager": 44, "Supply Chain Analyst": 28, "Process Improvement Lead": 18, "Manufacturing Director": 10},
+    "Customer Support": {"Customer Support Specialist": 62, "Client Success Manager": 24, "Support Operations Lead": 14},
+    "Healthcare & Services": {"Healthcare Representative": 44, "Field Services Specialist": 34, "Compliance Lead": 22},
+    "Finance & Accounting": {"Financial Analyst": 44, "Senior Accountant": 28, "Audit Specialist": 15, "Finance Lead": 13},
+}
+
+# Annualized base attrition rates per department (drives at-risk population).
+DEPT_ATTRITION = {
+    "Sales": 0.24,
+    "Customer Support": 0.22,
+    "Marketing": 0.19,
+    "Research & Development": 0.16,
+    "Human Resources": 0.15,
+    "Product Management": 0.14,
+    "Engineering & IT": 0.13,
+    "Healthcare": 0.13,
+    "Operations": 0.12,
+    "Finance": 0.10,
+}
+
+# Department-level sentiment tilt (engagement surveys per org unit).
+DEPT_SENTIMENT = {
+    "Engineering & IT": 0.04,
+    "Research & Development": 0.03,
+    "Product Management": 0.02,
+    "Finance & Accounting": 0.02,
+    "Human Resources": 0.01,
+    "Sales": 0.01,
+    "Marketing": 0.00,
+    "Healthcare & Services": -0.01,
+    "Operations": -0.02,
+    "Customer Support": -0.04,
+}
 
 ROLE_PROFILES = {
     "account executive": {
@@ -216,7 +274,37 @@ def profile_for(role: str) -> dict:
 
 
 def clamp(value: float, low: float = 0.05, high: float = 0.95) -> float:
-    return round(max(low, min(high, value)), 2)
+    return round(max(low, min(high, value)), 3)
+
+
+def _hash01(seed: str) -> float:
+    """Deterministic pseudo-random value in [0, 1) derived from a string."""
+    digest = int(hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16], 16)
+    return (digest % 1_000_000) / 1_000_000.0
+
+
+def _allocate_counts(count: int, weights: dict[str, int]) -> list[str]:
+    """Largest-remainder allocation of `count` per weighted department."""
+    total_w = sum(weights.values())
+    raw = {name: count * weight / total_w for name, weight in weights.items()}
+    result = {name: int(value) for name, value in raw.items()}
+    remaining = count - sum(result.values())
+    for name, _ in sorted(raw.items(), key=lambda item: item[1] - result[item[0]], reverse=True)[:remaining]:
+        result[name] += 1
+    return [name for name, value in result.items() for _ in range(value)]
+
+
+def _dept_role_plan(total: int, seed: str) -> list[tuple[str, str]]:
+    """Weighted, shuffled (department, role) assignment plan."""
+    rng = random.Random(seed)
+    plan: list[tuple[str, str]] = []
+    by_dept = dict(ENTERPRISE_DEPARTMENTS_AND_ROLES)
+    for dept_name in _allocate_counts(total, DEPT_WEIGHTS):
+        roles = by_dept[dept_name]
+        weights = [ROLE_WEIGHTS.get(dept_name, {}).get(role, 1) for role in roles]
+        plan.append((dept_name, rng.choices(roles, weights=weights, k=1)[0]))
+    rng.shuffle(plan)
+    return plan
 
 
 def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dict[str, int | str]:
@@ -234,17 +322,16 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
         for row in source[filename]:
             skill_levels.setdefault(row["email"], []).append(max(1, min(5, int(float(row["level"])))))
 
-    # Balance departments and roles across employees (10 enterprise departments)
-    total_dept_tuples = len(ENTERPRISE_DEPARTMENTS_AND_ROLES)
+    # Assign weighted departments and roles across employees (enterprise-shaped, shuffled)
+    employee_plan = _dept_role_plan(len(employees), "employees:dept-plan")
     for index, row in enumerate(employees):
-        dept_name, roles = ENTERPRISE_DEPARTMENTS_AND_ROLES[index % total_dept_tuples]
-        role_name = roles[(index // total_dept_tuples) % len(roles)]
+        dept_name, role_name = employee_plan[index]
         row["department"] = dept_name
         row["role"] = role_name
 
         email = row["email"]
         email_hash = sum(ord(c) for c in email)
-        
+
         if ibm_rows:
             ibm = ibm_rows[index % len(ibm_rows)]
             job_sat = float(ibm.get("JobSatisfaction", 3))
@@ -255,41 +342,42 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
             attrition = ibm.get("Attrition", "No").strip().casefold() == "yes"
             overtime = ibm.get("OverTime", "No").strip().casefold() == "yes"
 
-            # Unique, continuous sentiment score (0.12 - 0.98)
+            # Continuous sentiment anchored on IBM telemetry, tilted per department,
+            # with per-person gaussian noise so values are mostly unique.
             base_sent = (job_sat * 0.35 + env_sat * 0.25 + work_life * 0.25 + job_inv * 0.15) / 4.0
-            sentiment = clamp(base_sent + ((email_hash % 23) - 11) * 0.007, 0.12, 0.98)
+            dept_tilt = DEPT_SENTIMENT.get(dept_name, 0.0)
+            noise = (_hash01(email + ":sent") - 0.5) * 0.16
+            sentiment = clamp(0.10 + base_sent * 0.70 + dept_tilt + noise, 0.08, 0.98)
 
-            # Department-specific attrition risk profile
-            dept_risk_bias = {
-                "Sales": 0.22,
-                "Customer Support": 0.25,
-                "Engineering & IT": 0.15,
-                "Marketing": 0.18,
-                "Human Resources": 0.19,
-                "Operations": 0.12,
-                "Research & Development": 0.14,
-                "Product Management": 0.16,
-                "Finance & Accounting": 0.11,
-                "Healthcare & Services": 0.13,
-            }.get(dept_name, 0.15)
+            # Realistic per-department attrition pressure + IBM signals
+            risk = DEPT_ATTRITION.get(dept_name, 0.15)
+            if attrition:
+                risk += 0.35
+            if overtime:
+                risk += 0.06
+            if job_sat <= 2 and work_life <= 2:
+                risk += 0.05
+            is_at_risk = _hash01(email + ":risk") < min(0.90, risk)
 
-            is_at_risk = attrition or (overtime and job_sat <= 2) or ((email_hash % 100) < int(dept_risk_bias * 100))
-
-            # Continuous retention probability
-            retention = clamp(0.32 + 0.48 * sentiment - (0.42 if is_at_risk else 0.0) + (hike / 100.0) * 0.25 + ((email_hash % 13) - 6) * 0.005, 0.05, 0.98)
+            # Continuous retention probability driven by sentiment, risk and hike
+            retention = clamp(
+                0.34 + 0.55 * sentiment - 0.42 * float(is_at_risk)
+                + (hike / 100.0) * 0.20 + (_hash01(email + ":ret") - 0.5) * 0.10,
+                0.05, 0.98,
+            )
         else:
-            sentiment = clamp(0.20 + ((email_hash % 79) * 0.01), 0.12, 0.98)
-            is_at_risk = (email_hash % 6 == 0)
-            retention = clamp(0.25 + (0.65 * sentiment) - (0.35 if is_at_risk else 0.0), 0.05, 0.98)
+            sentiment = clamp(0.30 + (_hash01(email + ":sent") - 0.5) * 0.70, 0.08, 0.98)
+            is_at_risk = _hash01(email + ":risk") < DEPT_ATTRITION.get(dept_name, 0.15)
+            retention = clamp(0.25 + 0.65 * sentiment - 0.35 * float(is_at_risk), 0.05, 0.98)
 
-        row["sentiment_score"] = f"{sentiment:.2f}"
+        row["sentiment_score"] = f"{sentiment:.3f}"
         row["is_at_risk"] = "true" if is_at_risk else "false"
-        row["retention_prob"] = f"{retention:.2f}"
+        row["retention_prob"] = f"{retention:.3f}"
 
-    # Balance departments and roles across candidates (14,999 candidates)
+    # Assign weighted departments and roles across candidates (14,999 candidates)
+    candidate_plan = _dept_role_plan(len(candidates), "candidates:dept-plan")
     for index, row in enumerate(candidates):
-        dept_name, roles = ENTERPRISE_DEPARTMENTS_AND_ROLES[index % total_dept_tuples]
-        role_name = roles[(index // total_dept_tuples) % len(roles)]
+        dept_name, role_name = candidate_plan[index]
         row["department"] = dept_name
         row["role"] = role_name
 
@@ -297,13 +385,19 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
         email_hash = sum(ord(c) for c in email)
         levels = skill_levels.get(email, [3])
         skill_strength = sum(levels) / (len(levels) * 5)
-        
-        # Continuous sentiment & match scores
-        sentiment = clamp(0.18 + ((email_hash % 81) * 0.01) + ((index % 7) - 3) * 0.005, 0.10, 0.98)
-        match_score = clamp(0.30 * sentiment + 0.55 * skill_strength + ((email_hash % 13) * 0.015), 0.15, 0.99)
-        
-        row["sentiment_score"] = f"{sentiment:.2f}"
-        row["match_score"] = f"{match_score:.2f}"
+
+        # Continuous sentiment & match scores with realistic variance
+        sentiment = clamp(
+            0.46 + (_hash01(email + ":cs") - 0.5) * 0.36 + (skill_strength - 0.60) * 0.28,
+            0.10, 0.98,
+        )
+        match_score = clamp(
+            0.30 * sentiment + 0.52 * skill_strength + (_hash01(email + ":cm") - 0.5) * 0.16,
+            0.15, 0.99,
+        )
+
+        row["sentiment_score"] = f"{sentiment:.3f}"
+        row["match_score"] = f"{match_score:.3f}"
 
     # Update skills with role-aligned profiles & diverse levels
     for filename, base_filename in (
@@ -320,7 +414,8 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
             index = occurrence.get(email, 0)
             row["skill_name"] = profile["skills"][index % len(profile["skills"])]
             email_hash = sum(ord(c) for c in email)
-            base_level = max(1, min(5, int((email_hash + index * 2) % 5) + 1))
+            mean_level = 3.4 if filename.startswith("employee") else 2.8
+            base_level = max(1, min(5, round(mean_level + (_hash01(email + f":lv{index}") - 0.5) * 2.2)))
             row["level"] = str(base_level)
             occurrence[email] = index + 1
 
