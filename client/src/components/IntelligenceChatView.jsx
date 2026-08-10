@@ -967,8 +967,7 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
                           ) : (
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                           )}
-                          Live Thinking{' '}
-                          {status === "running" ? "· thinking…" : ""}
+                          Live Thinking
                         </span>
                         <span className="font-mono">{step.result_summary?.characters || 0} chars</span>
                       </div>
