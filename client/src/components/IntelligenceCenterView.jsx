@@ -804,51 +804,51 @@ const IntelligenceCenterView = () => {
                   </div>
 
                   {/* Top Form Inputs (Fixed) */}
-                  <div className="space-y-3 px-5 pt-4 pb-2 shrink-0">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                        Skill Node
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. PyTorch, React, FastAPI"
-                        value={newSkillName}
-                        onChange={(e) => setNewSkillName(e.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white placeholder-slate-600 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                        Min Proficiency
-                      </label>
-                      <PremiumSelect
-                        value={newSkillLevel}
-                        onChange={(e) =>
-                          setNewSkillLevel(Number(e.target.value))
-                        }
-                        className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
+<div className="space-y-3.5 md:space-y-3 px-5 pt-4 pb-2 shrink-0">
+                      <div>
+                        <label className="text-[10px] md:text-[11px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
+                          Skill Node
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. PyTorch, React, FastAPI"
+                          value={newSkillName}
+                          onChange={(e) => setNewSkillName(e.target.value)}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 md:py-2 text-xs md:text-sm text-white placeholder-slate-600 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10 min-h-[44px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] md:text-[11px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
+                          Min Proficiency
+                        </label>
+                        <PremiumSelect
+                          value={newSkillLevel}
+                          onChange={(e) =>
+                            setNewSkillLevel(Number(e.target.value))
+                          }
+                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 md:py-2 text-xs md:text-sm text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10 min-h-[44px]"
+                        >
+                          {[1, 2, 3, 4, 5].map((v) => (
+                            <option key={v} value={v}>
+                              Lvl {v}
+                            </option>
+                          ))}
+                        </PremiumSelect>
+                      </div>
+                      <button
+                        onClick={addSkillMatchReq}
+                        className="inline-flex h-10 md:h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-300/20 bg-indigo-500/90 text-xs md:text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(99,102,241,.18)] transition hover:bg-indigo-400 min-h-[44px]"
                       >
-                        {[1, 2, 3, 4, 5].map((v) => (
-                          <option key={v} value={v}>
-                            Lvl {v}
-                          </option>
-                        ))}
-                      </PremiumSelect>
+                        <Plus size={14} /> Add Skill requirement
+                      </button>
                     </div>
-                    <button
-                      onClick={addSkillMatchReq}
-                      className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-300/20 bg-indigo-500/90 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(99,102,241,.18)] transition hover:bg-indigo-400"
-                    >
-                      <Plus size={14} /> Add Skill requirement
-                    </button>
-                  </div>
 
                   {/* Internal Scrollable Skill List Box */}
                   <div className="flex-1 overflow-y-auto min-h-[120px] custom-scrollbar px-5 py-2 space-y-2">
                     {matchSkillsInput.map((skill, idx) => (
                       <div
                         key={idx}
-                        className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2 transition hover:border-indigo-300/30 hover:bg-indigo-300/[0.06]"
+                        className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 md:py-2 transition hover:border-indigo-300/30 hover:bg-indigo-300/[0.06] min-h-[44px]"
                       >
                         <div className="text-xs">
                           <span className="font-bold text-white">
@@ -861,7 +861,7 @@ const IntelligenceCenterView = () => {
                         <button
                           onClick={() => removeSkillMatchReq(idx)}
                           aria-label={`Remove ${skill.name}`}
-                          className="rounded-md p-1 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300"
+                          className="rounded-md p-2 md:p-1.5 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300 min-w-[40px] min-h-[40px] flex items-center justify-center"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -879,7 +879,7 @@ const IntelligenceCenterView = () => {
                     <button
                       onClick={triggerSkillMatch}
                       disabled={matchingLoading || matchSkillsInput.length === 0}
-                      className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-cyan-300/50 bg-cyan-300/[0.07] text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200 transition hover:bg-cyan-300/[0.14] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="inline-flex h-11 md:h-12 lg:h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-cyan-300/50 bg-cyan-300/[0.07] text-xs md:text-sm font-semibold uppercase tracking-[0.12em] text-cyan-200 transition hover:bg-cyan-300/[0.14] disabled:cursor-not-allowed disabled:opacity-40 min-h-[48px]"
                     >
                       <Search size={14} />{" "}
                       {matchingLoading
@@ -924,28 +924,28 @@ const IntelligenceCenterView = () => {
                 </div>
 
                 {matchResults.length > 0 ? (
-                  <div className="grid grid-cols-1 xl:grid-cols-[250px_1fr] gap-6 flex-1 min-h-0 overflow-hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] xl:grid-cols-[250px_1fr] gap-4 md:gap-6 flex-1 min-h-0 overflow-hidden">
                     {/* Left list of employees */}
-                    <div className="space-y-2 border-r border-white/5 pr-4 overflow-y-auto custom-scrollbar">
+                    <div className="space-y-2.5 border-r border-white/5 pr-3 md:pr-4 overflow-y-auto custom-scrollbar max-lg:pb-4">
                       {matchResults.map((result) => (
                         <button
                           key={result.employee_id}
                           onClick={() => {
                             setActiveMatchEmployeeId(result.employee_id);
                           }}
-                          className={`w-full text-left p-3.5 rounded-xl border transition-all relative overflow-hidden select-none cursor-pointer ${result.employee_id === activeMatchEmployeeId ? "border-primary bg-primary/5" : "border-white/5 bg-white/2 hover:border-white/10 hover:bg-white/[0.04]"}`}
+                          className={`w-full text-left p-3 md:p-4 rounded-xl border transition-all relative overflow-hidden select-none cursor-pointer min-h-[52px] ${result.employee_id === activeMatchEmployeeId ? "border-primary bg-primary/5" : "border-white/5 bg-white/2 hover:border-white/10 hover:bg-white/[0.04]"}`}
                         >
-                          <div className="font-bold text-white text-xs">
+                          <div className="font-bold text-white text-xs md:text-sm">
                             {result.full_name}
                           </div>
-                          <div className="text-[9px] text-slate-400 mt-1 uppercase tracking-wider">
+                          <div className="text-[9px] md:text-[11px] text-slate-400 mt-1 uppercase tracking-wider">
                             {result.role}
                           </div>
-                          <div className="flex items-center justify-between mt-3 border-t border-white/5 pt-2">
-                            <span className="text-[9px] uppercase font-semibold text-slate-500">
+                          <div className="flex items-center justify-between mt-2 md:mt-3 border-t border-white/5 pt-2">
+                            <span className="text-[9px] md:text-[10px] uppercase font-semibold text-slate-500">
                               Compatibility
                             </span>
-                            <span className="text-xs font-black text-primary">
+                            <span className="text-xs md:text-sm font-black text-primary">
                               {(
                                 result.match_details.overall_compatibility * 100
                               ).toFixed(0)}
@@ -957,7 +957,7 @@ const IntelligenceCenterView = () => {
                     </div>
 
                     {/* Right Dijkstra Path Details */}
-                    <div className="space-y-6 overflow-y-auto custom-scrollbar flex-1 min-h-0 pr-1">
+                    <div className="space-y-5 md:space-y-6 overflow-y-auto custom-scrollbar flex-1 min-h-0 pr-1 max-lg:pb-4">
                       {(() => {
                         const activeMatch = matchResults.find(
                           (r) => r.employee_id === activeMatchEmployeeId,
@@ -977,70 +977,70 @@ const IntelligenceCenterView = () => {
                                 </h4>
                               </div>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {activeMatch.match_details.detailed_matches.map(
-                                  (detail, idx) => (
-                                    <div
-                                      key={idx}
-                                      className="rounded-xl border border-white/5 bg-slate-950 p-4"
-                                    >
-                                      <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
-                                        <div className="text-xs font-bold text-white">
-                                          Target Skill: {detail.target_skill} (L
-                                          {detail.target_level})
-                                        </div>
-                                        <span
-                                          className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
-                                            detail.status === "Perfect"
-                                              ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
-                                              : detail.status ===
-                                                  "Highly Transferable"
-                                                ? "text-cyan-400 border-cyan-500/20 bg-cyan-500/5"
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                                  {activeMatch.match_details.detailed_matches.map(
+                                    (detail, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="rounded-xl border border-white/5 bg-slate-950 p-3 md:p-4"
+                                      >
+                                        <div className="flex items-center justify-between mb-2 md:mb-3 border-b border-white/5 pb-2">
+                                          <div className="text-xs md:text-sm font-bold text-white">
+                                            Target Skill: {detail.target_skill} (L
+                                            {detail.target_level})
+                                          </div>
+                                          <span
+                                            className={`text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 md:px-2.5 md:py-1 rounded border ${
+                                              detail.status === "Perfect"
+                                                ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
                                                 : detail.status ===
-                                                    "Trainable Gap"
-                                                  ? "text-amber-400 border-amber-500/20 bg-amber-500/5"
-                                                  : "text-rose-400 border-rose-500/20 bg-rose-500/5"
-                                          }`}
-                                        >
-                                          {detail.status}
-                                        </span>
-                                      </div>
-
-                                      {/* Path rendering */}
-                                      <div className="flex items-center flex-wrap gap-2 text-xs">
-                                        {detail.matched_by_skill ? (
-                                          <>
-                                            <div className="bg-white/5 px-2 py-1 rounded border border-white/10 text-slate-200">
-                                              {detail.matched_by_skill}
-                                            </div>
-                                            {detail.semantic_distance > 0 && (
-                                              <>
-                                                <div className="text-slate-500 flex flex-col items-center">
-                                                  <span className="text-[8px] text-indigo-400 font-mono">
-                                                    Weight:{" "}
-                                                    {detail.semantic_distance}
-                                                  </span>
-                                                  <span className="text-indigo-400">
-                                                    ➔
-                                                  </span>
-                                                </div>
-                                                <div className="bg-indigo-950 px-2 py-1 rounded border border-indigo-500/30 text-indigo-300">
-                                                  {detail.target_skill}
-                                                </div>
-                                              </>
-                                            )}
-                                          </>
-                                        ) : (
-                                          <span className="text-rose-400 font-mono text-[10px]">
-                                            No transition path discovered.
-                                            Distance: Infinite.
+                                                    "Highly Transferable"
+                                                  ? "text-cyan-400 border-cyan-500/20 bg-cyan-500/5"
+                                                  : detail.status ===
+                                                      "Trainable Gap"
+                                                    ? "text-amber-400 border-amber-500/20 bg-amber-500/5"
+                                                    : "text-rose-400 border-rose-500/20 bg-rose-500/5"
+                                            }`}
+                                          >
+                                            {detail.status}
                                           </span>
-                                        )}
+                                        </div>
+
+                                        {/* Path rendering */}
+                                        <div className="flex items-center flex-wrap gap-1.5 md:gap-2 text-xs md:text-sm">
+                                          {detail.matched_by_skill ? (
+                                            <>
+                                              <div className="bg-white/5 px-2 md:px-3 py-1 md:py-1.5 rounded border border-white/10 text-slate-200">
+                                                {detail.matched_by_skill}
+                                              </div>
+                                              {detail.semantic_distance > 0 && (
+                                                <>
+                                                  <div className="text-slate-500 flex flex-col items-center">
+                                                    <span className="text-[8px] md:text-[9px] text-indigo-400 font-mono">
+                                                      Weight:{" "}
+                                                      {detail.semantic_distance}
+                                                    </span>
+                                                    <span className="text-indigo-400">
+                                                      ➔
+                                                    </span>
+                                                  </div>
+                                                  <div className="bg-indigo-950 px-2 md:px-3 py-1 md:py-1.5 rounded border border-indigo-500/30 text-indigo-300">
+                                                    {detail.target_skill}
+                                                  </div>
+                                                </>
+                                              )}
+                                            </>
+                                          ) : (
+                                            <span className="text-rose-400 font-mono text-[10px] md:text-[11px]">
+                                              No transition path discovered.
+                                              Distance: Infinite.
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
-                                    </div>
-                                  ),
-                                )}
-                              </div>
+                                    ),
+                                  )}
+                                </div>
                             </div>
 
                             {/* visual DAG map */}
