@@ -20,15 +20,18 @@
   }
 
   /* COMPLETE GLOBAL PURGE OF BROWSER SCROLLBARS (SCROLLING REMAINS 100% FUNCTIONAL) */
-  * {
-    scrollbar-width: none !important; /* Firefox */
-    -ms-overflow-style: none !important; /* IE and Edge */
-  }
+  /* Only on desktop - mobile/tablet MUST show scrollbars so users know areas are scrollable */
+  @media (min-width: 1024px) {
+    * {
+      scrollbar-width: none !important; /* Firefox */
+      -ms-overflow-style: none !important; /* IE and Edge */
+    }
 
-  *::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
+    *::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+    }
   }
 }
 
