@@ -3729,6 +3729,7 @@ async def _stream_true_agent_loop(
 
             if reasoning_active:
                 reasoning_active = False
+            planning_friendly_text = _friendly_reasoning_text(reasoning_event_text) or reasoning_event_text
             yield emit(
                 "model_reasoning",
                 "planning",
@@ -3736,8 +3737,8 @@ async def _stream_true_agent_loop(
                 status="completed",
                 result_summary={
                     "iteration": iteration,
-                    "characters": reasoning_event_chars,
-                    "text": _friendly_reasoning_text(reasoning_event_text),
+                    "characters": len(planning_friendly_text),
+                    "text": planning_friendly_text,
                 },
             )
 
@@ -3764,8 +3765,8 @@ async def _stream_true_agent_loop(
                     status="failed",
                     result_summary={
                         "iteration": iteration,
-                        "characters": reasoning_event_chars,
-                        "text": _friendly_reasoning_text(reasoning_event_text),
+                        "characters": len(planning_friendly_text),
+                        "text": planning_friendly_text,
                     },
                     error_code=_provider_error_code(exc),
                 )
@@ -4117,7 +4118,7 @@ async def _stream_true_agent_loop(
                                     "response",
                                     "Reasoning complete",
                                     status="completed",
-                                    result_summary={"characters": reasoning_event_chars, "text": reasoning_event_text},
+                                    result_summary={"characters": len(_ans_friendly), "text": _ans_friendly},
                                 )
                             continue
                         if reasoning_active:
@@ -4132,12 +4133,13 @@ async def _stream_true_agent_loop(
                         yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
                     if reasoning_active:
                         reasoning_active = False
+                        _ans_friendly = _friendly_reasoning_text(reasoning_event_text) or reasoning_event_text
                         yield emit(
                             "model_reasoning",
                             "response",
                             "Reasoning complete",
                             status="completed",
-                            result_summary={"characters": reasoning_event_chars, "text": _friendly_reasoning_text(reasoning_event_text)},
+                            result_summary={"characters": len(_ans_friendly), "text": _ans_friendly},
                         )
                     if not assistant_text:
                         embedded_answer = _extract_answer_from_reasoning(reasoning_event_text)
@@ -4158,7 +4160,7 @@ async def _stream_true_agent_loop(
                             "response",
                             "Reasoning stopped",
                             status="failed",
-                            result_summary={"characters": reasoning_event_chars, "text": reasoning_event_text},
+                            result_summary={"characters": len(_ans_friendly), "text": _ans_friendly},
                             error_code=_provider_error_code(exc),
                         )
                     if attempt_round < 4 and _transient_provider_error(exc):
@@ -4172,12 +4174,13 @@ async def _stream_true_agent_loop(
         last_err = str(exc)
         if reasoning_active:
             reasoning_active = False
+            _ans_friendly = _friendly_reasoning_text(reasoning_event_text) or reasoning_event_text
             yield emit(
                 "model_reasoning",
                 "response",
                 "Reasoning stopped",
                 status="failed",
-                result_summary={"characters": reasoning_event_chars, "text": reasoning_event_text},
+                result_summary={"characters": len(_ans_friendly), "text": _ans_friendly},
                 error_code=_provider_error_code(exc),
             )
         assistant_text = _safe_provider_failure_reply(context_payload, exc)
