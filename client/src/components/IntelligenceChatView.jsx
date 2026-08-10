@@ -967,7 +967,7 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
                           ) : (
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                           )}
-                          Live Thinking
+                          Thinking
                         </span>
                         <span className="font-mono">{step.result_summary?.characters || 0} chars</span>
                       </div>
@@ -976,7 +976,15 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
                           ? <>{step.result_summary.text}{status === "running" && <span className="inline-block w-1.5 h-3.5 bg-cyan-400/80 animate-pulse ml-0.5 align-text-bottom" />}</>
                           : (
                             <span className="text-slate-500">
-                              {status === "running" ? "thinking…" : "No reasoning text captured — this model may not expose thinking."}
+                              {status === "running" ? (
+                                <span className="flex items-center gap-0.5">
+                                  <span className="animate-pulse-dots">●</span>
+                                  <span className="animate-pulse-dots" style={{animationDelay: "150ms"}}>●</span>
+                                  <span className="animate-pulse-dots" style={{animationDelay: "300ms"}}>●</span>
+                                </span>
+                              ) : (
+                                "No reasoning text captured — this model may not expose thinking."
+                              )}
                             </span>
                           )}
                       </pre>
