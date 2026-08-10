@@ -415,39 +415,49 @@ const App = () => {
         />
 
         <div className="absolute inset-0 z-20 flex w-full min-h-0 p-0 gap-1.5 md:gap-2 overflow-hidden">
+          {/* Mobile Standalone Floating Hamburger Menu Trigger */}
+          {isSidebarCollapsed && (
+            <button
+              type="button"
+              aria-label="Open navigation"
+              onClick={() => setIsSidebarCollapsed(false)}
+              className="fixed left-3 top-3 z-50 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-slate-950/85 text-cyan-300 shadow-xl backdrop-blur-md transition hover:border-cyan-300/40 hover:bg-cyan-300/10 md:hidden cursor-pointer"
+            >
+              <Menu size={20} />
+            </button>
+          )}
+
+          {/* Mobile Overlay Backdrop */}
           {!isSidebarCollapsed && (
             <button
               type="button"
               aria-label="Close navigation"
               onClick={() => setIsSidebarCollapsed(true)}
-              className="fixed inset-0 z-40 hidden bg-slate-950/55 backdrop-blur-[2px] max-md:block"
+              className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm transition-opacity md:hidden"
             />
           )}
+
           <motion.aside
             initial={false}
-            animate={{ width: isSidebarCollapsed ? 64 : 220 }}
+            animate={{
+              width: typeof window !== "undefined" && window.innerWidth < 768 ? 220 : (isSidebarCollapsed ? 64 : 220)
+            }}
             transition={{ duration: 0.3, ease: "circOut" }}
-            className="relative z-50 flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/65 shadow-2xl backdrop-blur-2xl max-md:fixed max-md:inset-y-2 max-md:left-2"
+            className={`relative z-50 flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/90 shadow-2xl backdrop-blur-2xl transition-transform duration-300 max-md:fixed max-md:inset-y-2 max-md:left-2 max-md:w-[220px] ${
+              isSidebarCollapsed
+                ? "max-md:-translate-x-[calc(100%+20px)] max-md:pointer-events-none max-md:opacity-0"
+                : "max-md:translate-x-0 max-md:pointer-events-auto max-md:opacity-100"
+            }`}
           >
-            {isSidebarCollapsed && (
-              <button
-                type="button"
-                aria-label="Open navigation"
-                onClick={() => setIsSidebarCollapsed(false)}
-                className="absolute left-1/2 top-2 z-10 hidden h-10 w-10 -translate-x-1/2 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-slate-300 shadow-lg transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-cyan-200 max-md:flex"
-              >
-                <Menu size={19} />
-              </button>
-            )}
             <div
               onClick={() => navigate("/")}
-              className={`h-14 px-2 mb-2 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start"} cursor-pointer hover:opacity-80 transition-opacity ${isSidebarCollapsed ? "max-md:invisible" : ""}`}
+              className={`h-14 px-2 mb-2 flex items-center ${isSidebarCollapsed ? "md:justify-center" : "justify-start"} cursor-pointer hover:opacity-80 transition-opacity`}
               title="Go to Landing Page"
             >
-              <AurelinxLogo collapsed={isSidebarCollapsed} size={24} />
+              <AurelinxLogo collapsed={typeof window !== "undefined" && window.innerWidth < 768 ? false : isSidebarCollapsed} size={24} />
             </div>
 
-            {!isSidebarCollapsed && (
+            {(!isSidebarCollapsed || (typeof window !== "undefined" && window.innerWidth < 768)) && (
               <div className="px-3 pb-3">
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3">
                   <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">
@@ -475,83 +485,83 @@ const App = () => {
                   setIsSidebarCollapsed(true);
                 }
               }}
-              className={`flex-1 ${isSidebarCollapsed ? "px-1" : "px-2"} space-y-1 ${isSidebarCollapsed ? "max-md:hidden" : ""}`}
+              className={`flex-1 px-2 space-y-1`}
             >
               <SidebarItem
                 icon={<LayoutDashboard size={16} />}
                 label="Dashboard"
                 active={activeTab === "dashboard"}
-                collapsed={isSidebarCollapsed}
+                collapsed={typeof window !== "undefined" && window.innerWidth < 768 ? false : isSidebarCollapsed}
                 onClick={() => setActiveTab("dashboard")}
               />
               <SidebarItem
                 icon={<Users size={16} />}
                 label="Directory"
                 active={activeTab === "directory"}
-                collapsed={isSidebarCollapsed}
+                collapsed={typeof window !== "undefined" && window.innerWidth < 768 ? false : isSidebarCollapsed}
                 onClick={() => setActiveTab("directory")}
               />
               <SidebarItem
                 icon={<MessageSquare size={16} />}
                 label="Sentiment"
                 active={activeTab === "sentiment"}
-                collapsed={isSidebarCollapsed}
+                collapsed={typeof window !== "undefined" && window.innerWidth < 768 ? false : isSidebarCollapsed}
                 onClick={() => setActiveTab("sentiment")}
               />
               <SidebarItem
                 icon={<TrendingUp size={16} />}
                 label="Analytics"
                 active={activeTab === "analytics"}
-                collapsed={isSidebarCollapsed}
+                collapsed={typeof window !== "undefined" && window.innerWidth < 768 ? false : isSidebarCollapsed}
                 onClick={() => setActiveTab("analytics")}
               />
               <SidebarItem
                 icon={<Search size={16} />}
                 label="Scout"
                 active={activeTab === "scout"}
-                collapsed={isSidebarCollapsed}
+                collapsed={typeof window !== "undefined" && window.innerWidth < 768 ? false : isSidebarCollapsed}
                 onClick={() => setActiveTab("scout")}
               />
               <SidebarItem
                 icon={<Bot size={16} />}
                 label="Workflow"
                 active={activeTab === "intelligence"}
-                collapsed={isSidebarCollapsed}
+                collapsed={typeof window !== "undefined" && window.innerWidth < 768 ? false : isSidebarCollapsed}
                 onClick={() => setActiveTab("intelligence")}
               />
               <SidebarItem
                 icon={<Cpu size={16} />}
                 label="Intel Center"
                 active={activeTab === "intel-center"}
-                collapsed={isSidebarCollapsed}
+                collapsed={typeof window !== "undefined" && window.innerWidth < 768 ? false : isSidebarCollapsed}
                 onClick={() => setActiveTab("intel-center")}
               />
               <SidebarItem
                 icon={<Database size={16} />}
                 label="Data Ops"
                 active={activeTab === "enterprise"}
-                collapsed={isSidebarCollapsed}
+                collapsed={typeof window !== "undefined" && window.innerWidth < 768 ? false : isSidebarCollapsed}
                 onClick={() => setActiveTab("enterprise")}
               />
             </nav>
 
-            <div className={`${isSidebarCollapsed ? "px-1" : "px-2"} pb-1 ${isSidebarCollapsed ? "max-md:hidden" : ""}`}>
+            <div className={`px-2 pb-1`}>
               <SidebarItem
                 icon={<Settings size={16} />}
                 label="Settings"
                 active={activeTab === "providers"}
-                collapsed={isSidebarCollapsed}
+                collapsed={typeof window !== "undefined" && window.innerWidth < 768 ? false : isSidebarCollapsed}
                 onClick={() => setActiveTab("providers")}
               />
             </div>
 
-            <div className={`mt-auto pb-2 text-center select-none pointer-events-none ${isSidebarCollapsed ? "max-md:hidden" : ""}`}>
+            <div className={`mt-auto pb-2 text-center select-none pointer-events-none`}>
               <span className="text-[10px] text-slate-500 font-mono tracking-wider">
                 {isSidebarCollapsed ? "v1.0.0" : "AURELINX v1.0.0"}
               </span>
             </div>
 
-            <div className={`${isSidebarCollapsed ? "px-1" : "px-2"} pb-2 ${isSidebarCollapsed ? "max-md:hidden" : ""}`}>
+            <div className={`px-2 pb-2 max-md:hidden`}>
               <button
                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
                 className={`${isSidebarCollapsed ? "h-11 w-11 mx-auto" : "h-10 w-full"} flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-200 hover:bg-white/10 transition-all`}
@@ -565,7 +575,7 @@ const App = () => {
             </div>
           </motion.aside>
 
-          <main className={`workspace-main-scale flex-1 h-full min-h-0 relative z-10 custom-scrollbar ${activeTab === "intelligence" ? "p-0 overflow-hidden" : activeTab === "intel-center" || activeTab === "enterprise" ? "p-3 md:p-5 lg:p-6 overflow-hidden flex flex-col max-lg:overflow-y-auto" : "p-3 md:p-5 lg:p-6 overflow-y-auto"}`}>
+          <main className={`workspace-main-scale flex-1 h-full min-h-0 relative z-10 custom-scrollbar max-md:pt-14 ${activeTab === "intelligence" ? "p-0 overflow-hidden" : activeTab === "intel-center" || activeTab === "enterprise" ? "p-3 md:p-5 lg:p-6 overflow-y-auto lg:overflow-hidden flex flex-col" : "p-3 md:p-5 lg:p-6 overflow-y-auto"}`}>
             <Suspense fallback={<LoadingScreen label={`Loading ${activeTab}`} />}>
               <AnimatePresence mode="wait">
                 <motion.div
@@ -574,7 +584,7 @@ const App = () => {
                   initial="hidden"
                   animate="visible"
                   exit="hidden"
-                  className={`relative min-h-0 flex flex-col ${activeTab === "intelligence" || activeTab === "intel-center" || activeTab === "enterprise" ? "h-full" : "h-auto"}`}
+                  className={`relative min-h-0 flex flex-col ${activeTab === "intelligence" ? "h-full" : activeTab === "intel-center" || activeTab === "enterprise" ? "h-auto lg:h-full" : "h-auto"}`}
                 >
                   {activeTab === "dashboard" && (
                     <>

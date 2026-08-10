@@ -263,7 +263,7 @@ const AuthScreen = () => {
       </aside>
 
       {/* ── RIGHT FORM PANEL ── */}
-      <div className="flex-1 flex items-center justify-center px-5 py-12 sm:px-10 relative z-10">
+      <div className="flex-1 flex items-center justify-center px-3.5 py-4 sm:px-10 sm:py-12 relative z-10">
         <motion.div
           className="w-full"
           style={{ maxWidth: 440 }}
@@ -272,13 +272,13 @@ const AuthScreen = () => {
           transition={{ duration: 0.4 }}
         >
           {/* Mobile logo */}
-          <div className="lg:hidden mb-10">
+          <div className="lg:hidden mb-4 sm:mb-8">
             <AurelinxLogo collapsed={false} size={22} />
           </div>
 
           {/* Glass card */}
           <div
-            className="rounded-3xl p-8"
+            className="rounded-2xl sm:rounded-3xl p-4 sm:p-8"
             style={{
               background: "rgba(255,255,255,0.025)",
               border: "1px solid rgba(255,255,255,0.07)",
@@ -287,7 +287,7 @@ const AuthScreen = () => {
           >
             {/* Underline tabs */}
             <div
-              className="flex gap-8 mb-9"
+              className="flex gap-6 mb-4 sm:mb-8"
               style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
             >
               <TabBtn
@@ -310,18 +310,18 @@ const AuthScreen = () => {
                   exit={{ opacity: 0, x: 14 }}
                   transition={{ duration: 0.22 }}
                   onSubmit={handleRegister}
-                  className="space-y-6"
+                  className="space-y-3.5 sm:space-y-5"
                 >
-                  <div className="mb-2">
-                    <h2 className="text-xl font-bold text-white tracking-tight">
+                  <div className="mb-1 sm:mb-2">
+                    <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
                       Create your account
                     </h2>
-                    <p className="text-slate-500 text-sm mt-1">
+                    <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
                       After signup you'll be directed to sign in.
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-5">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-5">
                     <LineField
                       label="First Name"
                       value={registerForm.firstName}
@@ -359,8 +359,8 @@ const AuthScreen = () => {
                       animate={{ opacity: 1, height: "auto" }}
                       className="overflow-hidden"
                     >
-                      <div className="pt-1 pb-2">
-                        <div className="flex justify-between text-xs mb-1.5">
+                      <div className="pt-0.5 pb-1">
+                        <div className="flex justify-between text-xs mb-1">
                           <span style={{ color: "rgba(148,163,184,0.5)" }}>
                             Password Strength
                           </span>
@@ -403,7 +403,7 @@ const AuthScreen = () => {
                     {loading ? "Registering..." : "Create account"}
                   </SubmitBtn>
 
-                  <p className="text-sm text-slate-500 text-center">
+                  <p className="text-xs sm:text-sm text-slate-500 text-center">
                     Already have an account?{" "}
                     <button
                       type="button"
@@ -416,20 +416,20 @@ const AuthScreen = () => {
                   </p>
 
                   {/* ── Social Login Row ── */}
-                  <div className="relative my-6 flex items-center justify-center">
+                  <div className="relative my-3 sm:my-5 flex items-center justify-center">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-slate-700/50" />
                     </div>
-                    <span className="relative px-3 text-xs text-slate-500 uppercase bg-[#07111f] bg-opacity-0 backdrop-blur-sm">
+                    <span className="relative px-3 text-[10px] sm:text-xs text-slate-500 uppercase bg-[#07111f] bg-opacity-0 backdrop-blur-sm">
                       Or continue with
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
                     <button
                       type="button"
                       onClick={() => handleOAuth("google")}
-                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 text-slate-200 text-sm font-semibold transition-all duration-200 cursor-pointer"
+                      className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 text-slate-200 text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer"
                     >
                       <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -442,7 +442,7 @@ const AuthScreen = () => {
                     <button
                       type="button"
                       onClick={() => handleOAuth("github")}
-                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 text-slate-200 text-sm font-semibold transition-all duration-200 cursor-pointer"
+                      className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 text-slate-200 text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer"
                     >
                       <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
@@ -459,13 +459,13 @@ const AuthScreen = () => {
                   exit={{ opacity: 0, x: -14 }}
                   transition={{ duration: 0.22 }}
                   onSubmit={handleLogin}
-                  className="space-y-6"
+                  className="space-y-3.5 sm:space-y-5"
                 >
-                  <div className="mb-2">
-                    <h2 className="text-xl font-bold text-white tracking-tight">
+                  <div className="mb-1 sm:mb-2">
+                    <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
                       Welcome back
                     </h2>
-                    <p className="text-slate-500 text-sm mt-1">
+                    <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
                       Sign in to manage your workspace.
                     </p>
                   </div>
@@ -648,7 +648,7 @@ const TabBtn = ({ active, children, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className="pb-3 text-sm font-semibold tracking-wide transition-colors"
+    className="pb-2 text-xs sm:text-sm font-semibold tracking-wide transition-colors"
     style={{
       color: active ? "#ffffff" : "rgba(148,163,184,0.5)",
       background: "none",
@@ -658,7 +658,7 @@ const TabBtn = ({ active, children, onClick }) => (
       borderBottom: active ? "2px solid #67e8f9" : "2px solid transparent",
       marginBottom: "-1px",
       cursor: "pointer",
-      padding: "0 0 12px 0",
+      padding: "0 0 8px 0",
     }}
   >
     {children}
@@ -668,7 +668,7 @@ const TabBtn = ({ active, children, onClick }) => (
 const LineField = ({ label, type = "text", value, onChange, placeholder, onFocus, onBlur, children }) => (
   <div className="relative">
     <label
-      className="block text-[10px] uppercase font-semibold mb-2"
+      className="block text-[9px] sm:text-[10px] uppercase font-semibold mb-1 sm:mb-1.5"
       style={{ letterSpacing: "0.2em", color: "rgba(148,163,184,0.5)" }}
     >
       {label}
@@ -679,14 +679,12 @@ const LineField = ({ label, type = "text", value, onChange, placeholder, onFocus
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       autoComplete={type === "password" ? "new-password" : "email"}
-      className="auth-input w-full text-sm outline-none transition-colors"
+      className="auth-input w-full text-xs sm:text-sm outline-none transition-colors py-2.5 px-3.5 sm:py-3.5 sm:px-4"
       style={{
         background: "rgba(7,17,31,0.96)",
         border: "1px solid rgba(103,232,249,0.12)",
-        borderRadius: "16px",
+        borderRadius: "14px",
         color: "#dbe7f3",
-        fontSize: "14px",
-        padding: "14px 16px",
         boxShadow: "inset 0 1px 0 rgba(255,255,255,0.02)",
       }}
       onFocus={(e) => {
@@ -707,7 +705,7 @@ const SubmitBtn = ({ loading, accent, children }) => {
     <button
       type="submit"
       disabled={loading}
-      className="w-full h-12 rounded-2xl font-bold text-sm tracking-wide transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="w-full h-10 sm:h-12 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm tracking-wide transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
       style={{
         background:
           accent === "cyan"
@@ -715,7 +713,7 @@ const SubmitBtn = ({ loading, accent, children }) => {
             : "linear-gradient(135deg, #0f766e, #166534)",
         color: "#d8f7ff",
         border: "1px solid rgba(103,232,249,0.18)",
-        boxShadow: "0 14px 40px rgba(8,145,178,0.18)",
+        boxShadow: "0 10px 30px rgba(8,145,178,0.18)",
       }}
       onMouseEnter={(e) => {
         if (!loading) {

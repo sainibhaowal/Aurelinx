@@ -17,10 +17,139 @@ import {
   RefreshCw,
   Maximize2,
   Minimize2,
+  SlidersHorizontal,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { UserManualButton } from "./UserManual";
 import PremiumSelect from "./PremiumSelect";
 import { API_BASE_URL } from "../services/apiBase";
+
+const MobileSplitPane = ({
+  activePane,
+  setActivePane,
+  leftTitle,
+  rightTitle,
+  leftIcon,
+  rightIcon,
+  leftContent,
+  rightContent,
+  leftWidthClass = "lg:w-[340px] xl:w-[360px]",
+}) => {
+  const handleLeftClick = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      if (activePane === "right") setActivePane("left");
+    }
+  };
+
+  const handleRightClick = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      if (activePane === "left") setActivePane("right");
+    }
+  };
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 w-full h-full">
+      {/* Mobile Top Segmented Switcher Control */}
+      <div className="flex lg:hidden items-center justify-between gap-2 p-1 rounded-xl border border-white/10 bg-slate-950/80 mb-2 shrink-0 select-none">
+        <button
+          type="button"
+          onClick={() => setActivePane("left")}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+            activePane === "left"
+              ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          {leftIcon}
+          <span className="truncate">{leftTitle}</span>
+          {activePane === "left" && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActivePane("right")}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+            activePane === "right"
+              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          {rightIcon}
+          <span className="truncate">{rightTitle}</span>
+          {activePane === "right" && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />}
+        </button>
+      </div>
+
+      {/* Side-by-Side Flex Container */}
+      <div className="flex-1 flex flex-row items-stretch gap-2 lg:gap-6 min-h-0 lg:h-full w-full relative">
+        {/* LEFT PANE */}
+        <div
+          onClick={handleLeftClick}
+          className={`flex flex-col min-h-0 ${leftWidthClass} ${
+            activePane === "left"
+              ? "max-lg:flex-1 max-lg:w-[calc(100%-48px)] sm:max-lg:w-[calc(100%-54px)] max-lg:transition-all max-lg:duration-300"
+              : "max-lg:w-11 sm:max-lg:w-12 max-lg:shrink-0 max-lg:overflow-hidden max-lg:cursor-pointer max-lg:select-none max-lg:opacity-85 max-lg:hover:opacity-100 max-lg:transition-all max-lg:duration-300"
+          }`}
+        >
+          <div className={`h-full w-full flex flex-col min-h-0 ${activePane === "left" ? "flex" : "hidden lg:flex"}`}>
+            {leftContent}
+          </div>
+
+          {activePane !== "left" && (
+            <div className="lg:hidden h-full min-h-[380px] rounded-2xl border border-white/10 bg-slate-950/80 p-2 flex flex-col items-center justify-between hover:border-indigo-400/40 transition-all shadow-lg group">
+              <div className="flex flex-col items-center gap-2 pt-2 text-indigo-400 group-hover:scale-110 transition-transform">
+                {leftIcon}
+                <ChevronRight size={14} className="text-indigo-300 animate-pulse" />
+              </div>
+              <div
+                className="uppercase tracking-widest text-[10px] font-bold text-slate-300 text-center py-4 select-none whitespace-nowrap"
+                style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+              >
+                {leftTitle}
+              </div>
+              <div className="pb-2 text-[9px] font-bold text-indigo-300 uppercase tracking-wider">
+                Expand
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT PANE */}
+        <div
+          onClick={handleRightClick}
+          className={`flex flex-col min-h-0 lg:flex-1 ${
+            activePane === "right"
+              ? "max-lg:flex-1 max-lg:w-[calc(100%-48px)] sm:max-lg:w-[calc(100%-54px)] max-lg:transition-all max-lg:duration-300"
+              : "max-lg:w-11 sm:max-lg:w-12 max-lg:shrink-0 max-lg:overflow-hidden max-lg:cursor-pointer max-lg:select-none max-lg:opacity-85 max-lg:hover:opacity-100 max-lg:transition-all max-lg:duration-300"
+          }`}
+        >
+          <div className={`h-full w-full flex flex-col min-h-0 ${activePane === "right" ? "flex" : "hidden lg:flex"}`}>
+            {rightContent}
+          </div>
+
+          {activePane !== "right" && (
+            <div className="lg:hidden h-full min-h-[380px] rounded-2xl border border-white/10 bg-slate-950/80 p-2 flex flex-col items-center justify-between hover:border-cyan-400/40 transition-all shadow-lg group">
+              <div className="flex flex-col items-center gap-2 pt-2 text-cyan-400 group-hover:scale-110 transition-transform">
+                {rightIcon}
+                <ChevronLeft size={14} className="text-cyan-300 animate-pulse" />
+              </div>
+              <div
+                className="uppercase tracking-widest text-[10px] font-bold text-slate-300 text-center py-4 select-none whitespace-nowrap"
+                style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+              >
+                {rightTitle}
+              </div>
+              <div className="pb-2 text-[9px] font-bold text-cyan-300 uppercase tracking-wider">
+                Expand
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Curated 2D positions for skill nodes in Dijkstra SVG graph
 const SKILL_GRAPH_COORDS = {
@@ -172,6 +301,7 @@ const apiCall = async (url, method = "GET", body = null) => {
 const IntelligenceCenterView = () => {
   const [activeSubTab, setActiveSubTab] = useState("skill-match");
   const [graphExpanded, setGraphExpanded] = useState(false);
+  const [mobileActivePane, setMobileActivePane] = useState("left");
 
   // 1. Skill Match State
   const [matchSkillsInput, setMatchSkillsInput] = useState([
@@ -626,6 +756,7 @@ const IntelligenceCenterView = () => {
     try {
       setMatchingLoading(true);
       setSkillMatchStatus("running");
+      setMobileActivePane("right");
       const results = await apiCall("/skill-match", "POST", {
         target_skills: matchSkillsInput,
       });
@@ -648,6 +779,7 @@ const IntelligenceCenterView = () => {
     try {
       setOptimizingLoading(true);
       setAnnealingStatus("running");
+      setMobileActivePane("right");
       setAnnealingStep(0);
       setAnnealingTemp(10.0);
       setAnnealingHistory([]);
@@ -707,32 +839,32 @@ const IntelligenceCenterView = () => {
   const highlightNodes = getHighlightPathNodes();
 
   return (
-    <div className="flex-1 flex flex-col min-h-full lg:h-full space-y-4">
+    <div className="flex-1 flex flex-col min-h-0 lg:h-full space-y-3 md:space-y-4 max-w-full">
       {/* Top Header */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2 border-b border-white/5 pb-3">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-1 border-b border-white/5 pb-3">
         <div className="flex-1 flex items-start justify-between">
           <div className="text-left">
             <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/5 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-indigo-400 mb-1.5">
               <Cpu size={10} className="animate-spin-slow" /> Math-Engine &
               Optimization
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-white">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-white">
               Intelligence Center
             </h1>
-            <p className="text-slate-400 text-xs leading-relaxed max-w-3xl">
+            <p className="text-slate-400 text-[11px] sm:text-xs leading-relaxed max-w-3xl">
               Aurelinx state-of-the-art decision workbench. Powered by graph
               theory, combinatorial solvers, survival models, and Markov
               transition matrices.
             </p>
           </div>
-          <UserManualButton defaultTab="intelligence" className="ml-4 mt-6" />
+          <UserManualButton defaultTab="intelligence" className="ml-3 shrink-0" />
         </div>
       </header>
 
 
 
       {/* Main Tabs Navigation */}
-      <div className="flex flex-wrap gap-2 border-b border-white/5 pb-3 mb-2">
+      <div className="flex overflow-x-auto custom-scrollbar no-scrollbar sm:flex-wrap gap-1.5 sm:gap-2 border-b border-white/5 pb-2.5 mb-1 shrink-0 max-w-full">
         {[
           {
             id: "skill-match",
@@ -763,7 +895,7 @@ const IntelligenceCenterView = () => {
           <button
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer select-none ${activeSubTab === tab.id ? "border-primary/40 bg-primary/10 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]" : "border-white/5 bg-white/2 text-slate-400 hover:text-slate-200 hover:border-white/10"}`}
+            className={`flex shrink-0 items-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer select-none whitespace-nowrap ${activeSubTab === tab.id ? "border-primary/40 bg-primary/10 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]" : "border-white/5 bg-white/2 text-slate-400 hover:text-slate-200 hover:border-white/10"}`}
           >
             {tab.icon}
             {tab.label}
@@ -772,7 +904,7 @@ const IntelligenceCenterView = () => {
       </div>
 
       {/* TABS CONTAINER */}
-      <div className="relative flex-1 flex flex-col min-h-0 max-lg:min-h-[520px] max-lg:overflow-y-auto custom-scrollbar">
+      <div className="relative flex-1 flex flex-col min-h-0 lg:overflow-hidden">
         <AnimatePresence mode="wait">
           {/* TAB 1: SKILL GRAPH DIJKSTRA MATCH */}
           {activeSubTab === "skill-match" && (
@@ -781,402 +913,415 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left min-h-0 lg:flex-1 lg:h-full"
+              className="min-h-0 lg:flex-1 lg:h-full w-full flex flex-col"
             >
-              {/* Left Settings */}
-              <div className="space-y-6 flex flex-col h-full min-h-0">
-                <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)] h-full flex flex-col justify-between">
-                  <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
-                    <div>
-                      <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">
-                        <Briefcase size={13} /> Target definition
+              <MobileSplitPane
+                activePane={mobileActivePane}
+                setActivePane={setMobileActivePane}
+                leftTitle="Target Definition"
+                rightTitle="Matching Matrix & Graph"
+                leftIcon={<Briefcase size={14} />}
+                rightIcon={<Brain size={14} />}
+                leftWidthClass="lg:w-[340px] xl:w-[360px]"
+                leftContent={
+                  <div className="space-y-4 flex flex-col h-auto lg:h-full min-h-0">
+                    <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)] h-auto lg:h-full flex flex-col justify-between">
+                      <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+                        <div>
+                          <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">
+                            <Briefcase size={13} /> Target definition
+                          </div>
+                          <h3 className="text-sm font-semibold tracking-tight text-white">
+                            Define target requirements
+                          </h3>
+                          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                            Add the skills and minimum levels the graph solver must evaluate.
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full border border-indigo-300/20 bg-indigo-300/10 px-2 py-1 text-[9px] font-semibold text-indigo-200">
+                          {matchSkillsInput.length} requirement{matchSkillsInput.length === 1 ? "" : "s"}
+                        </span>
                       </div>
-                      <h3 className="text-sm font-semibold tracking-tight text-white">
-                        Define target requirements
-                      </h3>
-                      <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                        Add the skills and minimum levels the graph solver must evaluate.
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-full border border-indigo-300/20 bg-indigo-300/10 px-2 py-1 text-[9px] font-semibold text-indigo-200">
-                      {matchSkillsInput.length} requirement{matchSkillsInput.length === 1 ? "" : "s"}
-                    </span>
-                  </div>
 
-                  {/* Top Form Inputs (Fixed) */}
-<div className="space-y-3.5 md:space-y-3 px-5 pt-4 pb-2 shrink-0">
-                      <div>
-                        <label className="text-[10px] md:text-[11px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                          Skill Node
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. PyTorch, React, FastAPI"
-                          value={newSkillName}
-                          onChange={(e) => setNewSkillName(e.target.value)}
-                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 md:py-2 text-xs md:text-sm text-white placeholder-slate-600 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10 min-h-[44px]"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] md:text-[11px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                          Min Proficiency
-                        </label>
-                        <PremiumSelect
-                          value={newSkillLevel}
-                          onChange={(e) =>
-                            setNewSkillLevel(Number(e.target.value))
-                          }
-                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 md:py-2 text-xs md:text-sm text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10 min-h-[44px]"
-                        >
-                          {[1, 2, 3, 4, 5].map((v) => (
-                            <option key={v} value={v}>
-                              Lvl {v}
-                            </option>
-                          ))}
-                        </PremiumSelect>
-                      </div>
-                      <button
-                        onClick={addSkillMatchReq}
-                        className="inline-flex h-10 md:h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-300/20 bg-indigo-500/90 text-xs md:text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(99,102,241,.18)] transition hover:bg-indigo-400 min-h-[44px]"
-                      >
-                        <Plus size={14} /> Add Skill requirement
-                      </button>
-                    </div>
-
-                  {/* Internal Scrollable Skill List Box */}
-                  <div className="flex-1 overflow-y-auto min-h-[120px] custom-scrollbar px-5 py-2 space-y-2">
-                    {matchSkillsInput.map((skill, idx) => (
-                      <div
-                        key={idx}
-                        className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 md:py-2 transition hover:border-indigo-300/30 hover:bg-indigo-300/[0.06] min-h-[44px]"
-                      >
-                        <div className="text-xs">
-                          <span className="font-bold text-white">
-                            {skill.name}
-                          </span>
-                          <span className="ml-2 rounded-full bg-indigo-300/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-200">
-                            L{skill.level}
-                          </span>
+                      {/* Top Form Inputs (Fixed) */}
+                      <div className="space-y-3.5 md:space-y-3 px-5 pt-4 pb-2 shrink-0">
+                        <div>
+                          <label className="text-[10px] md:text-[11px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
+                            Skill Node
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. PyTorch, React, FastAPI"
+                            value={newSkillName}
+                            onChange={(e) => setNewSkillName(e.target.value)}
+                            className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 md:py-2 text-xs md:text-sm text-white placeholder-slate-600 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10 min-h-[44px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] md:text-[11px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
+                            Min Proficiency
+                          </label>
+                          <PremiumSelect
+                            value={newSkillLevel}
+                            onChange={(e) =>
+                              setNewSkillLevel(Number(e.target.value))
+                            }
+                            className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 md:py-2 text-xs md:text-sm text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10 min-h-[44px]"
+                          >
+                            {[1, 2, 3, 4, 5].map((v) => (
+                              <option key={v} value={v}>
+                                Lvl {v}
+                              </option>
+                            ))}
+                          </PremiumSelect>
                         </div>
                         <button
-                          onClick={() => removeSkillMatchReq(idx)}
-                          aria-label={`Remove ${skill.name}`}
-                          className="rounded-md p-2 md:p-1.5 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                          onClick={addSkillMatchReq}
+                          className="inline-flex h-10 md:h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-300/20 bg-indigo-500/90 text-xs md:text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(99,102,241,.18)] transition hover:bg-indigo-400 min-h-[44px]"
                         >
-                          <Trash2 size={12} />
+                          <Plus size={14} /> Add Skill requirement
                         </button>
                       </div>
-                    ))}
-                    {matchSkillsInput.length === 0 && (
-                      <div className="text-xs text-slate-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
-                        No skills requirements added yet.
+
+                      {/* Internal Scrollable Skill List Box */}
+                      <div className="flex-1 overflow-y-auto min-h-[120px] custom-scrollbar px-5 py-2 space-y-2">
+                        {matchSkillsInput.map((skill, idx) => (
+                          <div
+                            key={idx}
+                            className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 md:py-2 transition hover:border-indigo-300/30 hover:bg-indigo-300/[0.06] min-h-[44px]"
+                          >
+                            <div className="text-xs">
+                              <span className="font-bold text-white">
+                                {skill.name}
+                              </span>
+                              <span className="ml-2 rounded-full bg-indigo-300/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-200">
+                                L{skill.level}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => removeSkillMatchReq(idx)}
+                              aria-label={`Remove ${skill.name}`}
+                              className="rounded-md p-2 md:p-1.5 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                        {matchSkillsInput.length === 0 && (
+                          <div className="text-xs text-slate-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
+                            No skills requirements added yet.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Fixed Footer */}
+                      <div className="border-t border-white/10 p-5 space-y-3 bg-slate-950/40 shrink-0">
+                        <button
+                          onClick={() => {
+                            setMobileActivePane("right");
+                            triggerSkillMatch();
+                          }}
+                          disabled={matchingLoading || matchSkillsInput.length === 0}
+                          className="inline-flex h-11 md:h-12 lg:h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-cyan-300/50 bg-cyan-300/[0.07] text-xs md:text-sm font-semibold uppercase tracking-[0.12em] text-cyan-200 transition hover:bg-cyan-300/[0.14] disabled:cursor-not-allowed disabled:opacity-40 min-h-[48px]"
+                        >
+                          <Search size={14} />{" "}
+                          {matchingLoading
+                            ? "Graph Traversing..."
+                            : "Solve Adjacencies"}
+                        </button>
+
+                        {(skillMatchStatus === "running" || skillMatchStatus === "complete" || skillMatchStatus === "error") && (
+                          <div className="pt-2 border-t border-white/10" aria-live="polite">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                              Solver request status
+                            </span>
+                            <span className={`text-[10px] font-medium ${skillMatchStatus === "error" ? "text-rose-300" : skillMatchStatus === "complete" ? "text-emerald-300" : "text-cyan-300"}`}>
+                              {skillMatchStatus === "error" ? "Request failed" : skillMatchStatus === "complete" ? `${matchResults.length} matches returned` : "Processing on server"}
+                            </span>
+                          </div>
+                          <div className="mb-3 h-1 overflow-hidden rounded-full bg-white/10">
+                            <div className={`h-full rounded-full transition-all duration-500 ${skillMatchStatus === "error" ? "w-full bg-rose-400" : skillMatchStatus === "complete" ? "w-full bg-emerald-400" : "w-2/3 animate-pulse bg-cyan-300"}`} />
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-[9px]">
+                            {["Requirements validated", "Adjacency solver", "Matches rendered"].map((label, index) => {
+                              const reached = skillMatchStatus === "complete" || (skillMatchStatus === "running" && index < 2) || (skillMatchStatus === "error" && index < 2);
+                              return <div key={label} className={`flex items-center gap-1.5 ${reached ? "text-slate-200" : "text-slate-600"}`}><span className={`h-1.5 w-1.5 rounded-full ${reached ? (skillMatchStatus === "error" && index === 1 ? "bg-rose-300" : "bg-cyan-300") : "bg-white/15"}`} />{label}</div>;
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  </div>
+                }
+                rightContent={
+                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 h-auto lg:h-full flex flex-col overflow-visible lg:overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 shrink-0">
+                      <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
+                        Semantic Matching Matrix & Path Analysis
+                      </h3>
+                      <span className="text-[10px] text-slate-500">
+                        Shortest Path Dijkstra Weighting
+                      </span>
+                    </div>
+
+                    {matchResults.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] xl:grid-cols-[250px_1fr] gap-4 md:gap-6 min-h-0 lg:flex-1 lg:h-full">
+                        {/* Left list of employees */}
+                        <div className="space-y-2.5 border-r border-white/5 pr-3 md:pr-4 overflow-y-auto custom-scrollbar max-lg:pb-4">
+                          {matchResults.map((result) => (
+                            <button
+                              key={result.employee_id}
+                              onClick={() => {
+                                setActiveMatchEmployeeId(result.employee_id);
+                              }}
+                              className={`w-full text-left p-3 md:p-4 rounded-xl border transition-all relative overflow-hidden select-none cursor-pointer min-h-[52px] ${result.employee_id === activeMatchEmployeeId ? "border-primary bg-primary/5" : "border-white/5 bg-white/2 hover:border-white/10 hover:bg-white/[0.04]"}`}
+                            >
+                              <div className="font-bold text-white text-xs md:text-sm">
+                                {result.full_name}
+                              </div>
+                              <div className="text-[9px] md:text-[11px] text-slate-400 mt-1 uppercase tracking-wider">
+                                {result.role}
+                              </div>
+                              <div className="flex items-center justify-between mt-2 md:mt-3 border-t border-white/5 pt-2">
+                                <span className="text-[9px] md:text-[10px] uppercase font-semibold text-slate-500">
+                                  Compatibility
+                                </span>
+                                <span className="text-xs md:text-sm font-black text-primary">
+                                  {(
+                                    result.match_details.overall_compatibility * 100
+                                  ).toFixed(0)}
+                                  %
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Right Dijkstra Path Details */}
+                        <div className="space-y-5 md:space-y-6 overflow-y-auto custom-scrollbar flex-1 min-h-0 pr-1 max-lg:pb-4">
+                          {(() => {
+                            const activeMatch = matchResults.find(
+                              (r) => r.employee_id === activeMatchEmployeeId,
+                            );
+                            if (!activeMatch) return null;
+
+                            return (
+                              <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-6">
+                                {/* Detailed path list */}
+                                <div className="space-y-4">
+                                  <div>
+                                    <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-1">
+                                      Target Match Breakdown for:
+                                    </div>
+                                    <h4 className="text-lg font-extrabold text-white">
+                                      {activeMatch.full_name}
+                                    </h4>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                                    {activeMatch.match_details.detailed_matches.map(
+                                      (detail, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="rounded-xl border border-white/5 bg-slate-950 p-3 md:p-4"
+                                        >
+                                          <div className="flex items-center justify-between mb-2 md:mb-3 border-b border-white/5 pb-2">
+                                            <div className="text-xs md:text-sm font-bold text-white">
+                                              Target Skill: {detail.target_skill} (L
+                                              {detail.target_level})
+                                            </div>
+                                            <span
+                                              className={`text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 md:px-2.5 md:py-1 rounded border ${
+                                                detail.status === "Perfect"
+                                                  ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
+                                                  : detail.status ===
+                                                      "Highly Transferable"
+                                                    ? "text-cyan-400 border-cyan-500/20 bg-cyan-500/5"
+                                                    : detail.status ===
+                                                        "Trainable Gap"
+                                                      ? "text-amber-400 border-amber-500/20 bg-amber-500/5"
+                                                      : "text-rose-400 border-rose-500/20 bg-rose-500/5"
+                                              }`}
+                                            >
+                                              {detail.status}
+                                            </span>
+                                          </div>
+
+                                          {/* Path rendering */}
+                                          <div className="flex items-center flex-wrap gap-1.5 md:gap-2 text-xs md:text-sm">
+                                            {detail.matched_by_skill ? (
+                                              <>
+                                                <div className="bg-white/5 px-2 md:px-3 py-1 md:py-1.5 rounded border border-white/10 text-slate-200">
+                                                  {detail.matched_by_skill}
+                                                </div>
+                                                {detail.semantic_distance > 0 && (
+                                                  <>
+                                                    <div className="text-slate-500 flex flex-col items-center">
+                                                      <span className="text-[8px] md:text-[9px] text-indigo-400 font-mono">
+                                                        Weight:{" "}
+                                                        {detail.semantic_distance}
+                                                      </span>
+                                                      <span className="text-indigo-400">
+                                                        ➔
+                                                      </span>
+                                                    </div>
+                                                    <div className="bg-indigo-950 px-2 md:px-3 py-1 md:py-1.5 rounded border border-indigo-500/30 text-indigo-300">
+                                                      {detail.target_skill}
+                                                    </div>
+                                                  </>
+                                                )}
+                                              </>
+                                            ) : (
+                                              <span className="text-rose-400 font-mono text-[10px] md:text-[11px]">
+                                                No transition path discovered.
+                                                Distance: Infinite.
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ),
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* visual DAG map */}
+                                <div className={`${graphExpanded ? "fixed inset-3 z-[90] flex flex-col rounded-2xl border border-cyan-300/25 bg-[#020617]/[0.98] p-4 shadow-[0_24px_90px_rgba(0,0,0,.65)] backdrop-blur-2xl md:inset-8 md:p-6" : "relative rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between flex-1 h-full min-h-[300px]"}`} onClick={(event) => event.stopPropagation()}>
+                                  <div>
+                                    <div className="mb-2 flex items-start justify-between gap-3">
+                                      <div>
+                                        <div className="text-[9px] uppercase tracking-widest text-slate-300 font-bold">
+                                          Shortest path graph view
+                                        </div>
+                                        <div className="mt-1 text-[10px] text-slate-500 leading-relaxed">
+                                          Green nodes are present in the candidate profile. Cyan paths show the evaluated transitions.
+                                        </div>
+                                      </div>
+                                      <button type="button" aria-label={graphExpanded ? "Collapse graph" : "Expand graph"} title={graphExpanded ? "Collapse graph" : "Expand graph"} onClick={() => setGraphExpanded((open) => !open)} className="shrink-0 rounded-lg border border-white/10 bg-white/[0.05] p-2 text-slate-300 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-cyan-200">
+                                        {graphExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div className={`${graphExpanded ? "min-h-0 flex-1" : "h-[380px] min-h-[380px]"} relative border border-white/5 rounded-lg overflow-hidden bg-slate-950/80`}>
+                                    <svg
+                                      className="absolute inset-0 h-full w-full pointer-events-none"
+                                      viewBox="80 70 840 400"
+                                      preserveAspectRatio="xMidYMid meet"
+                                    >
+                                      {/* Links */}
+                                      {SKILL_GRAPH_LINKS.map((link, idx) => {
+                                        const src = SKILL_GRAPH_COORDS[link.source];
+                                        const tgt = SKILL_GRAPH_COORDS[link.target];
+                                        if (!src || !tgt) return null;
+
+                                        const isActivePath =
+                                          highlightNodes.has(link.source) &&
+                                          highlightNodes.has(link.target);
+
+                                        return (
+                                          <g key={idx}>
+                                            <line
+                                              x1={src.x}
+                                              y1={src.y}
+                                              x2={tgt.x}
+                                              y2={tgt.y}
+                                              stroke={
+                                                isActivePath ? "#2dd4bf" : "#ffffff"
+                                              }
+                                              strokeOpacity={
+                                                isActivePath ? 0.9 : 0.05
+                                              }
+                                              strokeWidth={isActivePath ? 3.5 : 1}
+                                            />
+                                            {isActivePath && (
+                                              <circle r="4" fill="#2dd4bf">
+                                                <animateMotion
+                                                  path={`M ${src.x} ${src.y} L ${tgt.x} ${tgt.y}`}
+                                                  dur="2s"
+                                                  repeatCount="indefinite"
+                                                />
+                                              </circle>
+                                            )}
+                                          </g>
+                                        );
+                                      })}
+
+                                      {/* Nodes */}
+                                      {Object.entries(SKILL_GRAPH_COORDS).map(
+                                        ([name, node]) => {
+                                          const isHighlighted =
+                                            highlightNodes.has(name);
+
+                                          return (
+                                            <g key={name}>
+                                              <circle
+                                                cx={node.x}
+                                                cy={node.y}
+                                                r={isHighlighted ? 10 : 5}
+                                                fill={
+                                                  isHighlighted
+                                                    ? "#10b981"
+                                                    : "#1e293b"
+                                                }
+                                                stroke={
+                                                  isHighlighted
+                                                    ? "#ffffff"
+                                                    : "#475569"
+                                                }
+                                                strokeWidth={
+                                                  isHighlighted ? 2.5 : 1
+                                                }
+                                                style={{ transition: "all 0.5s" }}
+                                              />
+                                              <text
+                                                x={node.x}
+                                                y={node.y - (isHighlighted ? 14 : 10)}
+                                                fill={
+                                                  isHighlighted
+                                                    ? "#ffffff"
+                                                    : "#475569"
+                                                }
+                                                fontSize={isHighlighted ? "12" : "10"}
+                                                fontWeight={
+                                                  isHighlighted ? "black" : "normal"
+                                                }
+                                                textAnchor="middle"
+                                                paintOrder="stroke"
+                                                stroke="#020617"
+                                                strokeWidth="4"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                              >
+                                                {name}
+                                              </text>
+                                            </g>
+                                          );
+                                        },
+                                      )}
+                                    </svg>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 min-h-[420px] flex flex-col items-center justify-center py-10 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-auto">
+                        <div className="h-12 w-12 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 flex items-center justify-center text-indigo-300 mb-4 shadow-[0_0_20px_rgba(99,102,241,0.15)]">
+                          <Brain size={24} />
+                        </div>
+                        <h4 className="text-sm font-extrabold text-white tracking-wide uppercase mb-2">Graph Solver Standing By</h4>
+                        <p className="text-xs text-slate-400 leading-relaxed max-w-md">
+                          Enter target skill requirements on the left panel and click <span className="font-semibold text-cyan-300">Solve Adjacencies</span> to calculate graph shortest-path Dijkstra matching across the workforce.
+                        </p>
                       </div>
                     )}
                   </div>
-
-                  {/* Fixed Footer */}
-                  <div className="border-t border-white/10 p-5 space-y-3 bg-slate-950/40 shrink-0">
-                    <button
-                      onClick={triggerSkillMatch}
-                      disabled={matchingLoading || matchSkillsInput.length === 0}
-                      className="inline-flex h-11 md:h-12 lg:h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-cyan-300/50 bg-cyan-300/[0.07] text-xs md:text-sm font-semibold uppercase tracking-[0.12em] text-cyan-200 transition hover:bg-cyan-300/[0.14] disabled:cursor-not-allowed disabled:opacity-40 min-h-[48px]"
-                    >
-                      <Search size={14} />{" "}
-                      {matchingLoading
-                        ? "Graph Traversing..."
-                        : "Solve Adjacencies"}
-                    </button>
-
-                    {(skillMatchStatus === "running" || skillMatchStatus === "complete" || skillMatchStatus === "error") && (
-                      <div className="pt-2 border-t border-white/10" aria-live="polite">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                          Solver request status
-                        </span>
-                        <span className={`text-[10px] font-medium ${skillMatchStatus === "error" ? "text-rose-300" : skillMatchStatus === "complete" ? "text-emerald-300" : "text-cyan-300"}`}>
-                          {skillMatchStatus === "error" ? "Request failed" : skillMatchStatus === "complete" ? `${matchResults.length} matches returned` : "Processing on server"}
-                        </span>
-                      </div>
-                      <div className="mb-3 h-1 overflow-hidden rounded-full bg-white/10">
-                        <div className={`h-full rounded-full transition-all duration-500 ${skillMatchStatus === "error" ? "w-full bg-rose-400" : skillMatchStatus === "complete" ? "w-full bg-emerald-400" : "w-2/3 animate-pulse bg-cyan-300"}`} />
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-[9px]">
-                        {["Requirements validated", "Adjacency solver", "Matches rendered"].map((label, index) => {
-                          const reached = skillMatchStatus === "complete" || (skillMatchStatus === "running" && index < 2) || (skillMatchStatus === "error" && index < 2);
-                          return <div key={label} className={`flex items-center gap-1.5 ${reached ? "text-slate-200" : "text-slate-600"}`}><span className={`h-1.5 w-1.5 rounded-full ${reached ? (skillMatchStatus === "error" && index === 1 ? "bg-rose-300" : "bg-cyan-300") : "bg-white/15"}`} />{label}</div>;
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              </div>
-
-              {/* Right Output */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 shrink-0">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
-                    Semantic Matching Matrix & Path Analysis
-                  </h3>
-                  <span className="text-[10px] text-slate-500">
-                    Shortest Path Dijkstra Weighting
-                  </span>
-                </div>
-
-                {matchResults.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] xl:grid-cols-[250px_1fr] gap-4 md:gap-6 min-h-0 lg:flex-1 lg:h-full">
-                    {/* Left list of employees */}
-                    <div className="space-y-2.5 border-r border-white/5 pr-3 md:pr-4 overflow-y-auto custom-scrollbar max-lg:pb-4">
-                      {matchResults.map((result) => (
-                        <button
-                          key={result.employee_id}
-                          onClick={() => {
-                            setActiveMatchEmployeeId(result.employee_id);
-                          }}
-                          className={`w-full text-left p-3 md:p-4 rounded-xl border transition-all relative overflow-hidden select-none cursor-pointer min-h-[52px] ${result.employee_id === activeMatchEmployeeId ? "border-primary bg-primary/5" : "border-white/5 bg-white/2 hover:border-white/10 hover:bg-white/[0.04]"}`}
-                        >
-                          <div className="font-bold text-white text-xs md:text-sm">
-                            {result.full_name}
-                          </div>
-                          <div className="text-[9px] md:text-[11px] text-slate-400 mt-1 uppercase tracking-wider">
-                            {result.role}
-                          </div>
-                          <div className="flex items-center justify-between mt-2 md:mt-3 border-t border-white/5 pt-2">
-                            <span className="text-[9px] md:text-[10px] uppercase font-semibold text-slate-500">
-                              Compatibility
-                            </span>
-                            <span className="text-xs md:text-sm font-black text-primary">
-                              {(
-                                result.match_details.overall_compatibility * 100
-                              ).toFixed(0)}
-                              %
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Right Dijkstra Path Details */}
-                    <div className="space-y-5 md:space-y-6 overflow-y-auto custom-scrollbar flex-1 min-h-0 pr-1 max-lg:pb-4">
-                      {(() => {
-                        const activeMatch = matchResults.find(
-                          (r) => r.employee_id === activeMatchEmployeeId,
-                        );
-                        if (!activeMatch) return null;
-
-                        return (
-                          <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-6">
-                            {/* Detailed path list */}
-                            <div className="space-y-4">
-                              <div>
-                                <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-1">
-                                  Target Match Breakdown for:
-                                </div>
-                                <h4 className="text-lg font-extrabold text-white">
-                                  {activeMatch.full_name}
-                                </h4>
-                              </div>
-
-<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                                  {activeMatch.match_details.detailed_matches.map(
-                                    (detail, idx) => (
-                                      <div
-                                        key={idx}
-                                        className="rounded-xl border border-white/5 bg-slate-950 p-3 md:p-4"
-                                      >
-                                        <div className="flex items-center justify-between mb-2 md:mb-3 border-b border-white/5 pb-2">
-                                          <div className="text-xs md:text-sm font-bold text-white">
-                                            Target Skill: {detail.target_skill} (L
-                                            {detail.target_level})
-                                          </div>
-                                          <span
-                                            className={`text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 md:px-2.5 md:py-1 rounded border ${
-                                              detail.status === "Perfect"
-                                                ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
-                                                : detail.status ===
-                                                    "Highly Transferable"
-                                                  ? "text-cyan-400 border-cyan-500/20 bg-cyan-500/5"
-                                                  : detail.status ===
-                                                      "Trainable Gap"
-                                                    ? "text-amber-400 border-amber-500/20 bg-amber-500/5"
-                                                    : "text-rose-400 border-rose-500/20 bg-rose-500/5"
-                                            }`}
-                                          >
-                                            {detail.status}
-                                          </span>
-                                        </div>
-
-                                        {/* Path rendering */}
-                                        <div className="flex items-center flex-wrap gap-1.5 md:gap-2 text-xs md:text-sm">
-                                          {detail.matched_by_skill ? (
-                                            <>
-                                              <div className="bg-white/5 px-2 md:px-3 py-1 md:py-1.5 rounded border border-white/10 text-slate-200">
-                                                {detail.matched_by_skill}
-                                              </div>
-                                              {detail.semantic_distance > 0 && (
-                                                <>
-                                                  <div className="text-slate-500 flex flex-col items-center">
-                                                    <span className="text-[8px] md:text-[9px] text-indigo-400 font-mono">
-                                                      Weight:{" "}
-                                                      {detail.semantic_distance}
-                                                    </span>
-                                                    <span className="text-indigo-400">
-                                                      ➔
-                                                    </span>
-                                                  </div>
-                                                  <div className="bg-indigo-950 px-2 md:px-3 py-1 md:py-1.5 rounded border border-indigo-500/30 text-indigo-300">
-                                                    {detail.target_skill}
-                                                  </div>
-                                                </>
-                                              )}
-                                            </>
-                                          ) : (
-                                            <span className="text-rose-400 font-mono text-[10px] md:text-[11px]">
-                                              No transition path discovered.
-                                              Distance: Infinite.
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    ),
-                                  )}
-                                </div>
-                            </div>
-
-                            {/* visual DAG map */}
-                            <div className={`${graphExpanded ? "fixed inset-3 z-[90] flex flex-col rounded-2xl border border-cyan-300/25 bg-[#020617]/[0.98] p-4 shadow-[0_24px_90px_rgba(0,0,0,.65)] backdrop-blur-2xl md:inset-8 md:p-6" : "relative rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between flex-1 h-full min-h-[300px]"}`} onClick={(event) => event.stopPropagation()}>
-                              <div>
-                                <div className="mb-2 flex items-start justify-between gap-3">
-                                  <div>
-                                    <div className="text-[9px] uppercase tracking-widest text-slate-300 font-bold">
-                                      Shortest path graph view
-                                    </div>
-                                    <div className="mt-1 text-[10px] text-slate-500 leading-relaxed">
-                                      Green nodes are present in the candidate profile. Cyan paths show the evaluated transitions.
-                                    </div>
-                                  </div>
-                                  <button type="button" aria-label={graphExpanded ? "Collapse graph" : "Expand graph"} title={graphExpanded ? "Collapse graph" : "Expand graph"} onClick={() => setGraphExpanded((open) => !open)} className="shrink-0 rounded-lg border border-white/10 bg-white/[0.05] p-2 text-slate-300 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-cyan-200">
-                                    {graphExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className={`${graphExpanded ? "min-h-0 flex-1" : "h-[380px] min-h-[380px]"} relative border border-white/5 rounded-lg overflow-hidden bg-slate-950/80`}>
-                                <svg
-                                  className="absolute inset-0 h-full w-full pointer-events-none"
-                                  viewBox="80 70 840 400"
-                                  preserveAspectRatio="xMidYMid meet"
-                                >
-                                  {/* Links */}
-                                  {SKILL_GRAPH_LINKS.map((link, idx) => {
-                                    const src = SKILL_GRAPH_COORDS[link.source];
-                                    const tgt = SKILL_GRAPH_COORDS[link.target];
-                                    if (!src || !tgt) return null;
-
-                                    const isActivePath =
-                                      highlightNodes.has(link.source) &&
-                                      highlightNodes.has(link.target);
-
-                                    return (
-                                      <g key={idx}>
-                                        <line
-                                          x1={src.x}
-                                          y1={src.y}
-                                          x2={tgt.x}
-                                          y2={tgt.y}
-                                          stroke={
-                                            isActivePath ? "#2dd4bf" : "#ffffff"
-                                          }
-                                          strokeOpacity={
-                                            isActivePath ? 0.9 : 0.05
-                                          }
-                                          strokeWidth={isActivePath ? 3.5 : 1}
-                                        />
-                                        {isActivePath && (
-                                          <circle r="4" fill="#2dd4bf">
-                                            <animateMotion
-                                              path={`M ${src.x} ${src.y} L ${tgt.x} ${tgt.y}`}
-                                              dur="2s"
-                                              repeatCount="indefinite"
-                                            />
-                                          </circle>
-                                        )}
-                                      </g>
-                                    );
-                                  })}
-
-                                  {/* Nodes */}
-                                  {Object.entries(SKILL_GRAPH_COORDS).map(
-                                    ([name, node]) => {
-                                      const isHighlighted =
-                                        highlightNodes.has(name);
-
-                                      return (
-                                        <g key={name}>
-                                          <circle
-                                            cx={node.x}
-                                            cy={node.y}
-                                            r={isHighlighted ? 10 : 5}
-                                            fill={
-                                              isHighlighted
-                                                ? "#10b981"
-                                                : "#1e293b"
-                                            }
-                                            stroke={
-                                              isHighlighted
-                                                ? "#ffffff"
-                                                : "#475569"
-                                            }
-                                            strokeWidth={
-                                              isHighlighted ? 2.5 : 1
-                                            }
-                                            style={{ transition: "all 0.5s" }}
-                                          />
-                                          <text
-                                            x={node.x}
-                                            y={node.y - (isHighlighted ? 14 : 10)}
-                                            fill={
-                                              isHighlighted
-                                                ? "#ffffff"
-                                                : "#475569"
-                                            }
-                                            fontSize={isHighlighted ? "12" : "10"}
-                                            fontWeight={
-                                              isHighlighted ? "black" : "normal"
-                                            }
-                                            textAnchor="middle"
-                                            paintOrder="stroke"
-                                            stroke="#020617"
-                                            strokeWidth="4"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                          >
-                                            {name}
-                                          </text>
-                                        </g>
-                                      );
-                                    },
-                                  )}
-                                </svg>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 min-h-[420px] flex flex-col items-center justify-center py-10 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-auto">
-                    <div className="h-12 w-12 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 flex items-center justify-center text-indigo-300 mb-4 shadow-[0_0_20px_rgba(99,102,241,0.15)]">
-                      <Brain size={24} />
-                    </div>
-                    <h4 className="text-sm font-extrabold text-white tracking-wide uppercase mb-2">Graph Solver Standing By</h4>
-                    <p className="text-xs text-slate-400 leading-relaxed max-w-md">
-                      Enter target skill requirements on the left panel and click <span className="font-semibold text-cyan-300">Solve Adjacencies</span> to calculate graph shortest-path Dijkstra matching across the workforce.
-                    </p>
-                  </div>
-                )}
-              </div>
+                }
+              />
             </motion.div>
           )}
 
@@ -1187,277 +1332,198 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left min-h-0 lg:flex-1 lg:h-full"
+              className="min-h-0 lg:flex-1 lg:h-full w-full flex flex-col"
             >
-              {/* Left Config */}
-              <div className="space-y-6 flex flex-col h-full min-h-0">
-                <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)] h-full flex flex-col justify-between">
-                  <div className="border-b border-white/10 px-5 py-4">
-                    <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">
-                      <Zap size={13} /> Team constraints
-                    </div>
-                    <h3 className="text-sm font-semibold tracking-tight text-white">
-                      Combinatorial constraints
-                    </h3>
-                    <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                      Set the operating limits used by the optimization solver.
-                    </p>
-                  </div>
-
-                  {/* Top Form Inputs (Fixed) */}
-                  <div className="space-y-3 px-5 pt-4 pb-2 shrink-0">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                        Budget Cap (CFO Limit)
-                      </label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
-                        <input
-                          type="number"
-                          value={teamBudget}
-                          onChange={(e) =>
-                            setTeamBudget(Number(e.target.value))
-                          }
-                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 py-2 pl-9 pr-3 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
-                        />
+              <MobileSplitPane
+                activePane={mobileActivePane}
+                setActivePane={setMobileActivePane}
+                leftTitle="Team Constraints"
+                rightTitle="Optimization Results"
+                leftIcon={<Zap size={14} />}
+                rightIcon={<Sparkles size={14} />}
+                leftWidthClass="lg:w-[340px] xl:w-[360px]"
+                leftContent={
+                  <div className="space-y-4 flex flex-col h-auto lg:h-full min-h-0">
+                    <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)] h-auto lg:h-full flex flex-col justify-between">
+                      <div className="border-b border-white/10 px-5 py-4">
+                        <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">
+                          <Zap size={13} /> Team constraints
+                        </div>
+                        <h3 className="text-sm font-semibold tracking-tight text-white">
+                          Combinatorial constraints
+                        </h3>
+                        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                          Set the operating limits used by the optimization solver.
+                        </p>
                       </div>
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                        Max Team Size
-                      </label>
-                      <input
-                        type="number"
-                        min="2"
-                        max="6"
-                        value={teamSize}
-                        onChange={(e) => setTeamSize(Number(e.target.value))}
-                        className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
-                      />
-                    </div>
 
-                    {/* Skills Add Bar (Fixed) */}
-                    <div>
-                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1.5 block">
-                        Skill Matrix Demands
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          id="team-skill-name"
-                          placeholder="e.g. AWS, Python, Docker"
-                          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
-                        />
+                      {/* Top Form Inputs (Fixed) */}
+                      <div className="space-y-3 px-5 pt-4 pb-2 shrink-0">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
+                            Budget Cap (CFO Limit)
+                          </label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                            <input
+                              type="number"
+                              value={teamBudget}
+                              onChange={(e) =>
+                                setTeamBudget(Number(e.target.value))
+                              }
+                              className="w-full rounded-xl border border-white/10 bg-slate-950/80 py-2 pl-9 pr-3 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
+                            Max Team Size
+                          </label>
+                          <input
+                            type="number"
+                            min="2"
+                            max="6"
+                            value={teamSize}
+                            onChange={(e) => setTeamSize(Number(e.target.value))}
+                            className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
+                          />
+                        </div>
+
+                        {/* Skills Add Bar (Fixed) */}
+                        <div>
+                          <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1.5 block">
+                            Skill Matrix Demands
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              id="team-skill-name"
+                              placeholder="e.g. AWS, Python, Docker"
+                              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const inputEl =
+                                  document.getElementById("team-skill-name");
+                                if (inputEl && inputEl.value.trim()) {
+                                  setTeamSkillsInput([
+                                    ...teamSkillsInput,
+                                    { name: inputEl.value.trim(), level: 3 },
+                                  ]);
+                                  inputEl.value = "";
+                                }
+                              }}
+                              className="h-9 shrink-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 text-xs text-slate-200 transition hover:border-indigo-300/40 hover:bg-indigo-300/10"
+                            >
+                              Add
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Internal Scrollable Skill List Box */}
+                      <div className="flex-1 overflow-y-auto min-h-[120px] custom-scrollbar px-5 py-2 space-y-2">
+                        {teamSkillsInput.map((skill, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2 text-xs"
+                          >
+                            <span className="text-white font-bold">
+                              {skill.name}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <PremiumSelect
+                                value={skill.level}
+                                onChange={(e) => {
+                                  const next = [...teamSkillsInput];
+                                  next[idx].level = Number(e.target.value);
+                                  setTeamSkillsInput(next);
+                                }}
+                                className="bg-slate-950 border border-white/5 rounded px-1.5 py-0.5 text-[10px] text-white focus:outline-none"
+                              >
+                                {[1, 2, 3, 4, 5].map((v) => (
+                                  <option key={v} value={v}>
+                                    L{v}
+                                  </option>
+                                ))}
+                              </PremiumSelect>
+                              <button
+                                onClick={() =>
+                                  setTeamSkillsInput(
+                                    teamSkillsInput.filter((_, i) => i !== idx),
+                                  )
+                                }
+                                className="text-rose-400 text-xs"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {teamSkillsInput.length === 0 && (
+                          <div className="text-xs text-slate-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
+                            No skill demands added yet.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Fixed Footer */}
+                      <div className="border-t border-white/10 p-5 bg-slate-950/40 shrink-0">
                         <button
-                          type="button"
                           onClick={() => {
-                            const inputEl =
-                              document.getElementById("team-skill-name");
-                            if (inputEl && inputEl.value.trim()) {
-                              setTeamSkillsInput([
-                                ...teamSkillsInput,
-                                { name: inputEl.value.trim(), level: 3 },
-                              ]);
-                              inputEl.value = "";
-                            }
+                            setMobileActivePane("right");
+                            triggerTeamOptimize();
                           }}
-                          className="h-9 shrink-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 text-xs text-slate-200 transition hover:border-indigo-300/40 hover:bg-indigo-300/10"
+                          disabled={optimizingLoading || teamSkillsInput.length === 0}
+                          className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-indigo-600 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_28px_rgba(79,70,229,.22)] transition hover:from-primary/90 hover:to-indigo-500/90 disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          Add
+                          <Play size={14} />{" "}
+                          {optimizingLoading
+                            ? "Simulated Annealing Run..."
+                            : "Find Mathematically Perfect Team"}
                         </button>
                       </div>
                     </div>
                   </div>
-
-                  {/* Internal Scrollable Skill List Box */}
-                  <div className="flex-1 overflow-y-auto min-h-[120px] custom-scrollbar px-5 py-2 space-y-2">
-                    {teamSkillsInput.map((skill, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2 text-xs"
-                      >
-                        <span className="text-white font-bold">
-                          {skill.name}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <PremiumSelect
-                            value={skill.level}
-                            onChange={(e) => {
-                              const next = [...teamSkillsInput];
-                              next[idx].level = Number(e.target.value);
-                              setTeamSkillsInput(next);
-                            }}
-                            className="bg-slate-950 border border-white/5 rounded px-1.5 py-0.5 text-[10px] text-white focus:outline-none"
-                          >
-                            {[1, 2, 3, 4, 5].map((v) => (
-                              <option key={v} value={v}>
-                                L{v}
-                              </option>
-                            ))}
-                          </PremiumSelect>
-                          <button
-                            onClick={() =>
-                              setTeamSkillsInput(
-                                teamSkillsInput.filter((_, i) => i !== idx),
-                              )
-                            }
-                            className="text-rose-400 text-xs"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {teamSkillsInput.length === 0 && (
-                      <div className="text-xs text-slate-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
-                        No skill demands added yet.
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Fixed Footer */}
-                  <div className="border-t border-white/10 p-5 bg-slate-950/40 shrink-0">
-                    <button
-                      onClick={triggerTeamOptimize}
-                      disabled={optimizingLoading || teamSkillsInput.length === 0}
-                      className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-indigo-600 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_28px_rgba(79,70,229,.22)] transition hover:from-primary/90 hover:to-indigo-500/90 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Play size={14} />{" "}
-                      {optimizingLoading
-                        ? "Simulated Annealing Run..."
-                        : "Find Mathematically Perfect Team"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Graph/Output */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 shrink-0">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
-                    Optimization Assembly Results
-                  </h3>
-                  <span className="text-[10px] text-slate-500">
-                    Metropolis Hastings Simulated Annealing
-                  </span>
-                </div>
-
-                <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar space-y-4">
-
-                  {/* ANNEALING STATUS ACTIVE PANEL */}
-                  {annealingStatus === "running" && (
-                    <div className="py-12 flex flex-col items-center justify-center space-y-6">
-                      <div className="text-center">
-                        <div className="text-xs font-mono text-primary uppercase tracking-[0.2em] mb-2 animate-pulse">
-                          Running Simulated Annealing Model
-                        </div>
-                        <div className="text-3xl font-black text-white font-mono">
-                          Temp: {annealingTemp.toFixed(2)}K
-                        </div>
-                      </div>
-
-                      {/* Temperature cooling gauge */}
-                      <div className="w-64 h-4 bg-white/5 rounded-full overflow-hidden border border-white/10 relative p-0.5">
-                        <div
-                          className="h-full rounded-full transition-all duration-75 bg-gradient-to-r from-rose-500 via-amber-500 to-indigo-500"
-                          style={{ width: `${(annealingTemp / 10.0) * 100}%` }}
-                        />
-                      </div>
-
-                      <div className="grid w-full max-w-md grid-cols-3 gap-2 text-center text-[10px] font-mono">
-                        <div className="rounded-lg border border-white/10 bg-slate-900/70 px-2 py-2">
-                          <div className="text-slate-500 uppercase">Solver step</div>
-                          <div className="mt-1 font-bold text-white">{annealingHistory.at(-1)?.step ?? 0}</div>
-                        </div>
-                        <div className="rounded-lg border border-white/10 bg-slate-900/70 px-2 py-2">
-                          <div className="text-slate-500 uppercase">Coverage</div>
-                          <div className="mt-1 font-bold text-cyan-300">{Number(annealingHistory.at(-1)?.coverage ?? 0).toFixed(1)}%</div>
-                        </div>
-                        <div className="rounded-lg border border-white/10 bg-slate-900/70 px-2 py-2">
-                          <div className="text-slate-500 uppercase">Energy</div>
-                          <div className="mt-1 font-bold text-white">{Number(annealingHistory.at(-1)?.energy ?? 0).toFixed(2)}</div>
-                        </div>
-                      </div>
-                      <p className="max-w-md text-center text-[10px] leading-relaxed text-slate-500">
-                        Showing recorded solver metrics from the backend run. Employee names appear only after the final roster is returned.
-                      </p>
+                }
+                rightContent={
+                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 h-auto lg:h-full flex flex-col overflow-visible lg:overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 shrink-0">
+                      <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
+                        Optimization Assembly Results
+                      </h3>
+                      <span className="text-[10px] text-slate-500">
+                        Metropolis Hastings Simulated Annealing
+                      </span>
                     </div>
-                  )}
 
-                  {annealingStatus === "complete" && optimizedTeam && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="md:col-span-2 rounded-lg border border-cyan-400/15 bg-cyan-400/[0.03] px-3 py-2 text-[10px] text-slate-400">
-                        <span className="font-bold uppercase tracking-wider text-cyan-200">Modeled result</span>
-                        <span className="mx-2 text-slate-600">·</span>
-                        Model {optimizedTeam.model_version || "unversioned"}
-                        <span className="mx-2 text-slate-600">·</span>
-                        Seed {optimizedTeam.seed ?? "—"}
-                        <span className="mx-2 text-slate-600">·</span>
-                        Scenario {optimizedTeam.scenario_id || "not persisted"}
-                      </div>
-                      {/* Left: Team Members & Budget Check */}
-                      <div className="space-y-4">
-                        <div className="rounded-xl border border-white/5 bg-slate-950 p-4 relative overflow-hidden">
-                          <div className="absolute top-2 right-2 flex items-center justify-center h-8 w-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                            <CheckCircle size={16} />
-                          </div>
-                          <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500 mb-1">
-                            Total Team Cost
-                          </div>
-                          <div className="text-2xl font-black text-white">
-                            ${optimizedTeam.metrics.total_cost.toLocaleString()}
-                          </div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span
-                              className={`h-2 w-2 rounded-full ${optimizedTeam.metrics.is_under_budget ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" : "bg-rose-400"}`}
-                            />
-                            <span className="text-[10px] text-slate-400">
-                              {optimizedTeam.metrics.is_under_budget
-                                ? "Under CFO Budget Cap"
-                                : "Exceeds budget cap"}
-                            </span>
-                          </div>
-                        </div>
+                    <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar space-y-4">
 
-                        <div className="space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-                          <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1 shrink-0">
-                            Assembly Roster
+                      {/* ANNEALING STATUS ACTIVE PANEL */}
+                      {annealingStatus === "running" && (
+                        <div className="py-12 flex flex-col items-center justify-center space-y-6">
+                          <div className="text-center">
+                            <div className="text-xs font-mono text-primary uppercase tracking-[0.2em] mb-2 animate-pulse">
+                              Running Simulated Annealing Model
+                            </div>
+                            <div className="text-3xl font-black text-white font-mono">
+                              Temp: {annealingTemp.toFixed(2)}K
+                            </div>
                           </div>
-                          {optimizedTeam.optimized_team.map((emp) => (
+
+                          {/* Temperature cooling gauge */}
+                          <div className="w-64 h-4 bg-white/5 rounded-full overflow-hidden border border-white/10 relative p-0.5">
                             <div
-                              key={emp.id}
-                              className="rounded-xl border border-white/5 bg-white/2 p-3 flex items-center justify-between hover:bg-white/[0.04] transition-all"
-                            >
-                              <div>
-                                <div className="font-bold text-white text-xs">
-                                  {emp.full_name}
-                                </div>
-                                <div className="text-[9px] text-slate-400 uppercase tracking-wider mt-0.5">
-                                  {emp.role}
-                                </div>
-                              </div>
-                              <div className="text-xs font-black text-slate-400">
-                                ${emp.estimated_cost.toLocaleString()}/yr
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Right: Convergence Graph and Skills Coverage */}
-                      <div className="space-y-4">
-                        {/* Interactive convergence stats */}
-                        <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
-                          <div className="flex justify-between items-center mb-3">
-                            <div className="text-[10px] uppercase font-bold tracking-widest text-slate-500">
-                              Convergence Timeline
-                            </div>
-                            <span className="text-[9px] font-mono text-cyan-300">
-                              Annealing Steps:{" "}
-                              {optimizedTeam.total_optimization_steps}
-                            </span>
+                              className="h-full rounded-full transition-all duration-75 bg-gradient-to-r from-rose-500 via-amber-500 to-indigo-500"
+                              style={{ width: `${(annealingTemp / 10.0) * 100}%` }}
+                            />
                           </div>
+                        </div>
+                      )}
 
+                      {annealingStatus === "complete" && optimizedTeam && (
+                        <div>
                           {(() => {
                             const history =
                               annealingHistory.length > 0 ? annealingHistory : [];
@@ -2126,7 +2192,6 @@ const IntelligenceCenterView = () => {
                               </>
                             );
                           })()}
-                        </div>
 
                         {/* Skill Coverage details */}
                         <div className="rounded-xl border border-white/5 bg-slate-950 p-4 flex-1 flex flex-col justify-between">
@@ -2158,8 +2223,7 @@ const IntelligenceCenterView = () => {
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {annealingStatus === "idle" && (
                     <div className="py-12 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-4 text-xs text-slate-400 leading-relaxed">
@@ -2168,8 +2232,10 @@ const IntelligenceCenterView = () => {
                   )}
                 </div>
               </div>
-            </motion.div>
-          )}
+            }
+          />
+        </motion.div>
+      )}
 
           {/* TAB 3: ATTRITION SURVIVAL PREDICTOR */}
           {activeSubTab === "attrition" && (
@@ -2178,362 +2244,375 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left min-h-0 lg:flex-1 lg:h-full"
+              className="min-h-0 lg:flex-1 lg:h-full w-full flex flex-col"
             >
-              {/* Left Employee list */}
-              <div className="premium-card h-full p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col overflow-hidden">
-                <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2 shrink-0">
-                  Employee Registry Attrition Hazard
-                </h3>
+              <MobileSplitPane
+                activePane={mobileActivePane}
+                setActivePane={setMobileActivePane}
+                leftTitle="Employee Hazard Registry"
+                rightTitle="Survival Breakdown"
+                leftIcon={<Users size={14} />}
+                rightIcon={<TrendingUp size={14} />}
+                leftWidthClass="lg:w-[320px] xl:w-[340px]"
+                leftContent={
+                  <div className="premium-card h-auto lg:h-full p-4 md:p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col overflow-hidden">
+                    <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2 shrink-0">
+                      Employee Registry Attrition Hazard
+                    </h3>
 
-                <div className="space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
-                  {attritionLoading ? (
-                    <div className="text-xs text-slate-500 text-center py-8">
-                      Loading hazard computations...
-                    </div>
-                  ) : (
-                    attritionData.map((emp) => (
-                      <button
-                        key={emp.employee_id}
-                        onClick={() => setSelectedAttritionEmp(emp)}
-                        className={`w-full text-left p-3.5 rounded-xl border transition-all select-none cursor-pointer flex items-center justify-between ${emp.employee_id === selectedAttritionEmp?.employee_id ? "border-rose-400 bg-rose-500/5" : "border-white/5 bg-white/2 hover:border-white/10"}`}
-                      >
-                        <div>
-                          <div className="font-bold text-white text-xs">
-                            {emp.full_name}
-                          </div>
-                          <div className="text-[9px] text-slate-400 uppercase mt-0.5">
-                            {emp.role}
-                          </div>
+                    <div className="space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                      {attritionLoading ? (
+                        <div className="text-xs text-slate-500 text-center py-8">
+                          Loading hazard computations...
                         </div>
-                        <div className="text-right">
-                          <div className="text-xs font-black text-rose-300">
-                            x{emp.hazard_ratio}
-                          </div>
-                          <div className="text-[8px] text-slate-500 uppercase mt-0.5">
-                            Hazard Ratio
-                          </div>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Right Survival Analysis Details */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 h-full flex flex-col overflow-hidden">
-                {selectedAttritionEmp ? (
-                  <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar space-y-6 pr-1">
-                    <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                      <div>
-                        <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                          Survival Hazard Breakdown & Simulation Sandbox
-                        </div>
-                        <div className="mt-1 text-[9px] uppercase tracking-wider text-amber-300">
-                          Modeled · {selectedAttritionEmp.model_version || "cox-sandbox-v1"} · {selectedAttritionEmp.validation_status || "synthetic validation only"}
-                        </div>
-                        <h3 className="text-xl font-extrabold text-white mt-1">
-                          {selectedAttritionEmp.full_name}
-                        </h3>
-                      </div>
-                      <span className="text-[10px] text-indigo-400 bg-indigo-500/5 border border-indigo-500/20 px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">
-                        Tenure: {selectedAttritionEmp.tenure_months} Mo.
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-                      {/* Left: Survival Curve SVG Chart */}
-                      <div className="space-y-4">
-                        <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
-                          <div className="flex justify-between items-center mb-3">
-                            <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                              12-Month Survival Probability Curve
+                      ) : (
+                        attritionData.map((emp) => (
+                          <button
+                            key={emp.employee_id}
+                            onClick={() => {
+                              setSelectedAttritionEmp(emp);
+                              setMobileActivePane("right");
+                            }}
+                            className={`w-full text-left p-3.5 rounded-xl border transition-all select-none cursor-pointer flex items-center justify-between ${emp.employee_id === selectedAttritionEmp?.employee_id ? "border-rose-400 bg-rose-500/5" : "border-white/5 bg-white/2 hover:border-white/10"}`}
+                          >
+                            <div>
+                              <div className="font-bold text-white text-xs">
+                                {emp.full_name}
+                              </div>
+                              <div className="text-[9px] text-slate-400 uppercase mt-0.5">
+                                {emp.role}
+                              </div>
                             </div>
-                            <span className="text-xs font-bold text-indigo-400">
-                              End Projection Survival:{" "}
-                              {(simulatedSurvivalProb * 100).toFixed(1)}%
-                            </span>
+                            <div className="text-right">
+                              <div className="text-xs font-black text-rose-300">
+                                x{emp.hazard_ratio}
+                              </div>
+                              <div className="text-[8px] text-slate-500 uppercase mt-0.5">
+                                Hazard Ratio
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                }
+                rightContent={
+                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 h-auto lg:h-full flex flex-col overflow-visible lg:overflow-hidden">
+                    {selectedAttritionEmp ? (
+                      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar space-y-6 pr-1">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                          <div>
+                            <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                              Survival Hazard Breakdown & Simulation Sandbox
+                            </div>
+                            <div className="mt-1 text-[9px] uppercase tracking-wider text-amber-300">
+                              Modeled · {selectedAttritionEmp.model_version || "cox-sandbox-v1"} · {selectedAttritionEmp.validation_status || "synthetic validation only"}
+                            </div>
+                            <h3 className="text-xl font-extrabold text-white mt-1">
+                              {selectedAttritionEmp.full_name}
+                            </h3>
                           </div>
+                          <span className="text-[10px] text-indigo-400 bg-indigo-500/5 border border-indigo-500/20 px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">
+                            Tenure: {selectedAttritionEmp.tenure_months} Mo.
+                          </span>
+                        </div>
 
-                            {/* High-Precision Interactive SVG Survival Probability Chart */}
-                            <div className="relative h-64 w-full rounded-xl border border-white/10 bg-slate-950/80 p-3 shadow-inner flex flex-col justify-between overflow-hidden">
-                              {/* Left Y-Axis Percentage Labels */}
-                              <div className="absolute left-2 top-3 bottom-8 flex flex-col justify-between text-[9px] font-mono text-slate-400 z-10 pointer-events-none">
-                                <span className="bg-slate-900/80 px-1 rounded border border-indigo-500/20 text-indigo-300 font-bold">100% S(t)</span>
-                                <span className="bg-slate-900/80 px-1 rounded border border-white/5">75% S(t)</span>
-                                <span className="bg-rose-950/80 px-1 rounded border border-rose-500/30 text-rose-300 font-bold">50% Critical</span>
-                                <span className="bg-slate-900/80 px-1 rounded border border-white/5">25% S(t)</span>
-                                <span className="bg-slate-900/80 px-1 rounded border border-white/5">0% S(t)</span>
+                        <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
+                          {/* Left: Survival Curve SVG Chart */}
+                          <div className="space-y-4">
+                            <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
+                              <div className="flex justify-between items-center mb-3">
+                                <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                                  12-Month Survival Probability Curve
+                                </div>
+                                <span className="text-xs font-bold text-indigo-400">
+                                  End Projection Survival:{" "}
+                                  {(simulatedSurvivalProb * 100).toFixed(1)}%
+                                </span>
                               </div>
 
-                              {/* Graphic Canvas Area */}
-                              <div className="relative flex-1 w-full pl-20 pr-4 pt-2 pb-2">
-                                <svg
-                                  className="h-full w-full overflow-visible"
-                                  viewBox="0 0 100 100"
-                                  preserveAspectRatio="none"
-                                >
-                                  <defs>
-                                    <linearGradient id="survGradHigh" x1="0" y1="0" x2="0" y2="1">
-                                      <stop offset="0%" stopColor="#6366f1" stopOpacity="0.4" />
-                                      <stop offset="100%" stopColor="#6366f1" stopOpacity="0.0" />
-                                    </linearGradient>
-                                  </defs>
+                                {/* High-Precision Interactive SVG Survival Probability Chart */}
+                                <div className="relative h-64 w-full rounded-xl border border-white/10 bg-slate-950/80 p-3 shadow-inner flex flex-col justify-between overflow-hidden">
+                                  {/* Left Y-Axis Percentage Labels */}
+                                  <div className="absolute left-2 top-3 bottom-8 flex flex-col justify-between text-[9px] font-mono text-slate-400 z-10 pointer-events-none">
+                                    <span className="bg-slate-900/80 px-1 rounded border border-indigo-500/20 text-indigo-300 font-bold">100% S(t)</span>
+                                    <span className="bg-slate-900/80 px-1 rounded border border-white/5">75% S(t)</span>
+                                    <span className="bg-rose-950/80 px-1 rounded border border-rose-500/30 text-rose-300 font-bold">50% Critical</span>
+                                    <span className="bg-slate-900/80 px-1 rounded border border-white/5">25% S(t)</span>
+                                    <span className="bg-slate-900/80 px-1 rounded border border-white/5">0% S(t)</span>
+                                  </div>
 
-                                  {/* Y-Axis Grid lines */}
-                                  <line x1="0" y1="0" x2="100" y2="0" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-                                  <line x1="0" y1="25" x2="100" y2="25" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-                                  <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(244,63,94,0.4)" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
-                                  <line x1="0" y1="75" x2="100" y2="75" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-                                  <line x1="0" y1="100" x2="100" y2="100" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                  {/* Graphic Canvas Area */}
+                                  <div className="relative flex-1 w-full pl-20 pr-4 pt-2 pb-2">
+                                    <svg
+                                      className="h-full w-full overflow-visible"
+                                      viewBox="0 0 100 100"
+                                      preserveAspectRatio="none"
+                                    >
+                                      <defs>
+                                        <linearGradient id="survGradHigh" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.4" />
+                                          <stop offset="100%" stopColor="#6366f1" stopOpacity="0.0" />
+                                        </linearGradient>
+                                      </defs>
 
-                                  {/* Laser Crosshair Line on hover */}
-                                  {hoveredSurvMonth !== null && (
-                                    <line
-                                      x1={(hoveredSurvMonth / 11) * 100}
-                                      y1="0"
-                                      x2={(hoveredSurvMonth / 11) * 100}
-                                      y2="100"
-                                      stroke="#38bdf8"
-                                      strokeWidth="1.5"
-                                      strokeDasharray="3 3"
-                                      vectorEffect="non-scaling-stroke"
-                                    />
+                                      {/* Y-Axis Grid lines */}
+                                      <line x1="0" y1="0" x2="100" y2="0" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                      <line x1="0" y1="25" x2="100" y2="25" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                      <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(244,63,94,0.4)" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
+                                      <line x1="0" y1="75" x2="100" y2="75" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                      <line x1="0" y1="100" x2="100" y2="100" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+
+                                      {/* Laser Crosshair Line on hover */}
+                                      {hoveredSurvMonth !== null && (
+                                        <line
+                                          x1={(hoveredSurvMonth / 11) * 100}
+                                          y1="0"
+                                          x2={(hoveredSurvMonth / 11) * 100}
+                                          y2="100"
+                                          stroke="#38bdf8"
+                                          strokeWidth="1.5"
+                                          strokeDasharray="3 3"
+                                          vectorEffect="non-scaling-stroke"
+                                        />
+                                      )}
+
+                                      {/* Survival Area */}
+                                      {simulatedForecast.length > 0 && (
+                                        <>
+                                          <path
+                                            fill="url(#survGradHigh)"
+                                            stroke="none"
+                                            d={
+                                              `M 0,${100 - (simulatedForecast[0]?.survival_probability * 100 || 100)} ` +
+                                              simulatedForecast
+                                                .map((f, i) => {
+                                                  const x = (i / 11) * 100;
+                                                  const y = 100 - f.survival_probability * 100;
+                                                  return `L ${x},${y}`;
+                                                })
+                                                .join(" ") +
+                                              ` L 100,100 L 0,100 Z`
+                                            }
+                                          />
+                                          <polyline
+                                            fill="none"
+                                            stroke="#818cf8"
+                                            strokeWidth="2.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            vectorEffect="non-scaling-stroke"
+                                            points={simulatedForecast
+                                              .map((f, i) => {
+                                                const x = (i / 11) * 100;
+                                                const y = 100 - f.survival_probability * 100;
+                                                return `${x},${y}`;
+                                              })
+                                              .join(" ")}
+                                          />
+                                        </>
+                                      )}
+                                    </svg>
+
+                                    {/* Interactive SVG Node triggers */}
+                                    <div className="absolute inset-0 pl-20 pr-4 pt-2 pb-2 flex justify-between items-center pointer-events-auto">
+                                      {simulatedForecast.map((f, i) => {
+                                        const S_t = f.survival_probability;
+                                        return (
+                                          <div
+                                            key={i}
+                                            onMouseEnter={() => setHoveredSurvMonth(i)}
+                                            onMouseLeave={() => setHoveredSurvMonth(null)}
+                                            className="h-full flex-1 cursor-pointer relative group flex justify-center items-center"
+                                          >
+                                            <div className={`w-2 h-2 rounded-full transition-all ${hoveredSurvMonth === i ? "bg-white scale-150 shadow-[0_0_10px_#38bdf8]" : S_t < 0.5 ? "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.6)]" : "bg-indigo-400/80 group-hover:scale-125"}`} />
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+
+                                  {/* Bottom X-Axis Month Ticks */}
+                                  <div className="pl-20 pr-4 flex justify-between items-center text-[9px] font-mono text-slate-400 border-t border-white/5 pt-1">
+                                    {simulatedForecast.map((f, i) => (
+                                      <span key={i} className={`px-0.5 transition-all ${hoveredSurvMonth === i ? "text-cyan-300 font-bold scale-110" : ""}`}>
+                                        M{i + 1}
+                                      </span>
+                                    ))}
+                                  </div>
+
+                                  {/* Hover Data Tooltip Glass Card */}
+                                  {hoveredSurvMonth !== null && simulatedForecast[hoveredSurvMonth] && (
+                                    <div className="absolute top-3 right-3 z-20 rounded-xl border border-indigo-400/30 bg-slate-950/90 p-3 shadow-2xl backdrop-blur-md text-[10px] space-y-1">
+                                      <div className="font-bold text-indigo-300 flex items-center justify-between gap-3">
+                                        <span>Projection Month {simulatedForecast[hoveredSurvMonth].month}</span>
+                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${simulatedForecast[hoveredSurvMonth].survival_probability > 0.75 ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20" : simulatedForecast[hoveredSurvMonth].survival_probability > 0.5 ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-rose-500/10 text-rose-300 border border-rose-500/20"}`}>
+                                          {simulatedForecast[hoveredSurvMonth].survival_probability > 0.75 ? "Low Hazard" : simulatedForecast[hoveredSurvMonth].survival_probability > 0.5 ? "Elevated Risk" : "Critical Flight Danger"}
+                                        </span>
+                                      </div>
+                                      <div className="text-slate-300">Survival Probability: <strong className="text-white font-mono">{(simulatedForecast[hoveredSurvMonth].survival_probability * 100).toFixed(1)}%</strong></div>
+                                      <div className="text-slate-300">Cumulative Tenure: <strong className="text-indigo-300 font-mono">{(simulatedForecast[hoveredSurvMonth].projected_tenure ?? ((selectedAttritionEmp?.tenure_months ?? 12) + (hoveredSurvMonth + 1)))} Months</strong></div>
+                                      <div className="text-slate-300">Hazard Ratio Multiplier: <strong className="text-rose-300 font-mono">x{simulatedHazardRatio.toFixed(2)}</strong></div>
+                                    </div>
                                   )}
+                                </div>
 
-                                  {/* Survival Area */}
-                                  {simulatedForecast.length > 0 && (
-                                    <>
-                                      <path
-                                        fill="url(#survGradHigh)"
-                                        stroke="none"
-                                        d={
-                                          `M 0,${100 - (simulatedForecast[0]?.survival_probability * 100 || 100)} ` +
-                                          simulatedForecast
-                                            .map((f, i) => {
-                                              const x = (i / 11) * 100;
-                                              const y = 100 - f.survival_probability * 100;
-                                              return `L ${x},${y}`;
-                                            })
-                                            .join(" ") +
-                                          ` L 100,100 L 0,100 Z`
-                                        }
-                                      />
-                                      <polyline
-                                        fill="none"
-                                        stroke="#818cf8"
-                                        strokeWidth="2.5"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        vectorEffect="non-scaling-stroke"
-                                        points={simulatedForecast
-                                          .map((f, i) => {
-                                            const x = (i / 11) * 100;
-                                            const y = 100 - f.survival_probability * 100;
-                                            return `${x},${y}`;
-                                          })
-                                          .join(" ")}
-                                      />
-                                    </>
-                                  )}
-                                </svg>
-
-                                {/* Interactive SVG Node triggers */}
-                                <div className="absolute inset-0 pl-20 pr-4 pt-2 pb-2 flex justify-between items-center pointer-events-auto">
-                                  {simulatedForecast.map((f, i) => {
+                                {/* Permanent Month Milestone Summary Grid (Visible without hovering!) */}
+                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+                                  {simulatedForecast.filter((_, idx) => idx % 2 === 1 || idx === 0 || idx === 11).map((f) => {
+                                    const mIdx = f.month - 1;
                                     const S_t = f.survival_probability;
                                     return (
                                       <div
-                                        key={i}
-                                        onMouseEnter={() => setHoveredSurvMonth(i)}
+                                        key={f.month}
+                                        onMouseEnter={() => setHoveredSurvMonth(mIdx)}
                                         onMouseLeave={() => setHoveredSurvMonth(null)}
-                                        className="h-full flex-1 cursor-pointer relative group flex justify-center items-center"
+                                        className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${hoveredSurvMonth === mIdx ? "border-cyan-400 bg-cyan-500/10 shadow-[0_0_12px_rgba(56,189,248,0.25)]" : "border-white/5 bg-slate-950/60 hover:border-white/10"}`}
                                       >
-                                        <div className={`w-2 h-2 rounded-full transition-all ${hoveredSurvMonth === i ? "bg-white scale-150 shadow-[0_0_10px_#38bdf8]" : S_t < 0.5 ? "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.6)]" : "bg-indigo-400/80 group-hover:scale-125"}`} />
+                                        <div className="text-[9px] uppercase font-bold text-slate-400">Month {f.month}</div>
+                                        <div className={`text-xs font-black mt-0.5 ${S_t > 0.75 ? "text-emerald-400" : S_t > 0.5 ? "text-amber-400" : "text-rose-400"}`}>
+                                          {(S_t * 100).toFixed(1)}%
+                                        </div>
                                       </div>
                                     );
                                   })}
                                 </div>
-                              </div>
+                            </div>
 
-                              {/* Bottom X-Axis Month Ticks */}
-                              <div className="pl-20 pr-4 flex justify-between items-center text-[9px] font-mono text-slate-400 border-t border-white/5 pt-1">
-                                {simulatedForecast.map((f, i) => (
-                                  <span key={i} className={`px-0.5 transition-all ${hoveredSurvMonth === i ? "text-cyan-300 font-bold scale-110" : ""}`}>
-                                    M{i + 1}
-                                  </span>
-                                ))}
-                              </div>
+                            {/* Interactive Parameters Sandbox */}
+                            <div className="rounded-xl border border-white/5 bg-slate-950/60 p-4">
+                              <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-4 border-b border-white/5 pb-2">
+                                Flight Risk Mitigation Simulator
+                              </h4>
 
-                              {/* Hover Data Tooltip Glass Card */}
-                              {hoveredSurvMonth !== null && simulatedForecast[hoveredSurvMonth] && (
-                                <div className="absolute top-3 right-3 z-20 rounded-xl border border-indigo-400/30 bg-slate-950/90 p-3 shadow-2xl backdrop-blur-md text-[10px] space-y-1">
-                                  <div className="font-bold text-indigo-300 flex items-center justify-between gap-3">
-                                    <span>Projection Month {simulatedForecast[hoveredSurvMonth].month}</span>
-                                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${simulatedForecast[hoveredSurvMonth].survival_probability > 0.75 ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20" : simulatedForecast[hoveredSurvMonth].survival_probability > 0.5 ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-rose-500/10 text-rose-300 border border-rose-500/20"}`}>
-                                      {simulatedForecast[hoveredSurvMonth].survival_probability > 0.75 ? "Low Hazard" : simulatedForecast[hoveredSurvMonth].survival_probability > 0.5 ? "Elevated Risk" : "Critical Flight Danger"}
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                  <div className="flex justify-between text-[9px] text-slate-400 mb-1">
+                                    <span>Morale Index</span>
+                                    <span className="text-emerald-400">
+                                      {(moraleSlider * 100).toFixed(0)}%
                                     </span>
                                   </div>
-                                  <div className="text-slate-300">Survival Probability: <strong className="text-white font-mono">{(simulatedForecast[hoveredSurvMonth].survival_probability * 100).toFixed(1)}%</strong></div>
-                                  <div className="text-slate-300">Cumulative Tenure: <strong className="text-indigo-300 font-mono">{(simulatedForecast[hoveredSurvMonth].projected_tenure ?? ((selectedAttritionEmp?.tenure_months ?? 12) + (hoveredSurvMonth + 1)))} Months</strong></div>
-                                  <div className="text-slate-300">Hazard Ratio Multiplier: <strong className="text-rose-300 font-mono">x{simulatedHazardRatio.toFixed(2)}</strong></div>
+                                  <input
+                                    type="range"
+                                    min="0.0"
+                                    max="1.0"
+                                    step="0.05"
+                                    value={moraleSlider}
+                                    onChange={(e) =>
+                                      setMoraleSlider(Number(e.target.value))
+                                    }
+                                    className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
+                                  />
                                 </div>
-                              )}
-                            </div>
 
-                            {/* Permanent Month Milestone Summary Grid (Visible without hovering!) */}
-                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
-                              {simulatedForecast.filter((_, idx) => idx % 2 === 1 || idx === 0 || idx === 11).map((f) => {
-                                const mIdx = f.month - 1;
-                                const S_t = f.survival_probability;
-                                return (
-                                  <div
-                                    key={f.month}
-                                    onMouseEnter={() => setHoveredSurvMonth(mIdx)}
-                                    onMouseLeave={() => setHoveredSurvMonth(null)}
-                                    className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${hoveredSurvMonth === mIdx ? "border-cyan-400 bg-cyan-500/10 shadow-[0_0_12px_rgba(56,189,248,0.25)]" : "border-white/5 bg-slate-950/60 hover:border-white/10"}`}
-                                  >
-                                    <div className="text-[9px] uppercase font-bold text-slate-400">Month {f.month}</div>
-                                    <div className={`text-xs font-black mt-0.5 ${S_t > 0.75 ? "text-emerald-400" : S_t > 0.5 ? "text-amber-400" : "text-rose-400"}`}>
-                                      {(S_t * 100).toFixed(1)}%
-                                    </div>
+                                <div>
+                                  <div className="flex justify-between text-[9px] text-slate-400 mb-1">
+                                    <span>Salary Increase</span>
+                                    <span className="text-indigo-400">
+                                      +{(salarySlider * 100).toFixed(0)}%
+                                    </span>
                                   </div>
-                                );
-                              })}
-                            </div>
-                        </div>
-
-                        {/* Interactive Parameters Sandbox */}
-                        <div className="rounded-xl border border-white/5 bg-slate-950/60 p-4">
-                          <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-4 border-b border-white/5 pb-2">
-                            Flight Risk Mitigation Simulator
-                          </h4>
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <div className="flex justify-between text-[9px] text-slate-400 mb-1">
-                                <span>Morale Index</span>
-                                <span className="text-emerald-400">
-                                  {(moraleSlider * 100).toFixed(0)}%
-                                </span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0.0"
-                                max="1.0"
-                                step="0.05"
-                                value={moraleSlider}
-                                onChange={(e) =>
-                                  setMoraleSlider(Number(e.target.value))
-                                }
-                                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
-                              />
-                            </div>
-
-                            <div>
-                              <div className="flex justify-between text-[9px] text-slate-400 mb-1">
-                                <span>Salary Increase</span>
-                                <span className="text-indigo-400">
-                                  +{(salarySlider * 100).toFixed(0)}%
-                                </span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0.0"
-                                max="0.5"
-                                step="0.05"
-                                value={salarySlider}
-                                onChange={(e) =>
-                                  setSalarySlider(Number(e.target.value))
-                                }
-                                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
-                              />
-                            </div>
-
-                            <div>
-                              <div className="flex justify-between text-[9px] text-slate-400 mb-1">
-                                <span>Workload / Skills Count</span>
-                                <span className="text-amber-400">
-                                  {workloadSlider} Nodes
-                                </span>
-                              </div>
-                              <input
-                                type="range"
-                                min="1"
-                                max="15"
-                                step="1"
-                                value={workloadSlider}
-                                onChange={(e) =>
-                                  setWorkloadSlider(Number(e.target.value))
-                                }
-                                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right: SHAP / Feature Contributions */}
-                      <div className="space-y-4">
-                        <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
-                          <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-1">
-                            Simulated Attrition Multiplier
-                          </div>
-                          <div className="text-4xl font-black text-rose-400 font-mono">
-                            x{simulatedHazardRatio.toFixed(2)}
-                          </div>
-                          <p className="text-[9px] text-slate-400 mt-2 leading-relaxed">
-                            A hazard multiplier above 1.0 represents accelerated
-                            flight risk compared to average baseline
-                            probability.
-                          </p>
-                        </div>
-
-                        <div className="space-y-3">
-                          <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
-                            Baseline Covariates (SHAP Explainability)
-                          </div>
-                          {selectedAttritionEmp.covariates_explain.map(
-                            (cov, idx) => (
-                              <div
-                                key={idx}
-                                className="rounded-xl border border-white/5 bg-slate-950 p-3 flex flex-col justify-between"
-                              >
-                                <div className="flex items-center justify-between mb-1.5">
-                                  <span className="text-[10px] font-semibold text-slate-300">
-                                    {cov.factor}
-                                  </span>
-                                  <span
-                                    className={`text-[9px] font-bold ${cov.impact_direction === "risky" ? "text-rose-400" : "text-emerald-400"}`}
-                                  >
-                                    {cov.impact_direction === "risky"
-                                      ? "+"
-                                      : ""}
-                                    {cov.impact_percentage}% risk
-                                  </span>
+                                  <input
+                                    type="range"
+                                    min="0.0"
+                                    max="0.5"
+                                    step="0.05"
+                                    value={salarySlider}
+                                    onChange={(e) =>
+                                      setSalarySlider(Number(e.target.value))
+                                    }
+                                    className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
+                                  />
                                 </div>
-                                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full ${cov.impact_direction === "risky" ? "bg-rose-500" : "bg-emerald-500"}`}
-                                    style={{
-                                      width: `${Math.min(100, Math.abs(cov.impact_percentage))}%`,
-                                    }}
+
+                                <div>
+                                  <div className="flex justify-between text-[9px] text-slate-400 mb-1">
+                                    <span>Workload / Skills Count</span>
+                                    <span className="text-amber-400">
+                                      {workloadSlider} Nodes
+                                    </span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="1"
+                                    max="15"
+                                    step="1"
+                                    value={workloadSlider}
+                                    onChange={(e) =>
+                                      setWorkloadSlider(Number(e.target.value))
+                                    }
+                                    className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                                   />
                                 </div>
                               </div>
-                            ),
-                          )}
+                            </div>
+                          </div>
+
+                          {/* Right: SHAP / Feature Contributions */}
+                          <div className="space-y-4">
+                            <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
+                              <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-1">
+                                Simulated Attrition Multiplier
+                              </div>
+                              <div className="text-4xl font-black text-rose-400 font-mono">
+                                x{simulatedHazardRatio.toFixed(2)}
+                              </div>
+                              <p className="text-[9px] text-slate-400 mt-2 leading-relaxed">
+                                A hazard multiplier above 1.0 represents accelerated
+                                flight risk compared to average baseline
+                                probability.
+                              </p>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
+                                Baseline Covariates (SHAP Explainability)
+                              </div>
+                              {selectedAttritionEmp.covariates_explain.map(
+                                (cov, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="rounded-xl border border-white/5 bg-slate-950 p-3 flex flex-col justify-between"
+                                  >
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <span className="text-[10px] font-semibold text-slate-300">
+                                        {cov.factor}
+                                      </span>
+                                      <span
+                                        className={`text-[9px] font-bold ${cov.impact_direction === "risky" ? "text-rose-400" : "text-emerald-400"}`}
+                                      >
+                                        {cov.impact_direction === "risky"
+                                          ? "+"
+                                          : ""}
+                                        {cov.impact_percentage}% risk
+                                      </span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full ${cov.impact_direction === "risky" ? "bg-rose-500" : "bg-emerald-500"}`}
+                                        style={{
+                                          width: `${Math.min(100, Math.abs(cov.impact_percentage))}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="text-slate-400 text-sm py-20 text-center">
+                        Select an employee from the left panel to review attrition
+                        survival analytics.
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="text-slate-400 text-sm py-20 text-center">
-                    Select an employee from the left panel to review attrition
-                    survival analytics.
-                  </div>
-                )}
-              </div>
+                }
+              />
             </motion.div>
           )}
 
@@ -2544,229 +2623,248 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[1fr_340px] gap-6 text-left min-h-0 lg:flex-1 lg:h-full"
+              className="min-h-0 lg:flex-1 lg:h-full w-full flex flex-col"
             >
-              {/* Left Graph Panel */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20 flex flex-col justify-between relative overflow-hidden h-full">
-                <div>
-                  <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 gap-3">
+              <MobileSplitPane
+                activePane={mobileActivePane}
+                setActivePane={setMobileActivePane}
+                leftTitle="Collaboration Graph"
+                rightTitle="Node Centrality"
+                leftIcon={<Share2 size={14} />}
+                rightIcon={<Activity size={14} />}
+                leftWidthClass="lg:flex-1"
+                leftContent={
+                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 flex flex-col justify-between relative overflow-hidden h-auto lg:h-full">
                     <div>
-                      <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
-                        Corporate collaboration graph
-                      </h3>
-                      <p className="mt-1 text-[10px] text-slate-500">3D force layout · drag a node · drag the canvas to rotate · wheel to zoom</p>
-                    </div>
-                    <button type="button" onClick={resetOnaCamera} className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400 transition hover:border-cyan-300/40 hover:text-cyan-200">Reset view</button>
-                  </div>
-
-                  {/* Physics SVG Canvas */}
-                  <div
-                    ref={canvasRef}
-                    onPointerDown={handleOnaCanvasPointerDown}
-                    onPointerMove={handleOnaCanvasPointerMove}
-                    onPointerUp={handleOnaCanvasPointerUp}
-                    onPointerCancel={handleOnaCanvasPointerUp}
-                    onWheel={handleOnaCanvasWheel}
-                    className="relative h-[clamp(360px,62vh,620px)] min-h-0 cursor-grab touch-none border border-cyan-300/10 bg-[radial-gradient(circle_at_50%_45%,rgba(30,64,175,.16),transparent_52%),#020617] rounded-2xl overflow-hidden flex items-center justify-center select-none active:cursor-grabbing"
-                  >
-                    {onaLoading ? (
-                      <div className="text-slate-400 text-xs flex items-center gap-2">
-                        <RefreshCw size={14} className="animate-spin" />{" "}
-                        Resolving Brandes centrality paths...
+                      <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 gap-3">
+                        <div>
+                          <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
+                            Corporate collaboration graph
+                          </h3>
+                          <p className="mt-1 text-[10px] text-slate-500">3D force layout · drag a node · drag the canvas to rotate · wheel to zoom</p>
+                        </div>
+                        <button type="button" onClick={resetOnaCamera} className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400 transition hover:border-cyan-300/40 hover:text-cyan-200">Reset view</button>
                       </div>
-                    ) : (
+
+                      {/* Physics SVG Canvas */}
+                      <div
+                        ref={canvasRef}
+                        onPointerDown={handleOnaCanvasPointerDown}
+                        onPointerMove={handleOnaCanvasPointerMove}
+                        onPointerUp={handleOnaCanvasPointerUp}
+                        onPointerCancel={handleOnaCanvasPointerUp}
+                        onWheel={handleOnaCanvasWheel}
+                        className="relative h-[clamp(360px,62vh,620px)] min-h-0 cursor-grab touch-none border border-cyan-300/10 bg-[radial-gradient(circle_at_50%_45%,rgba(30,64,175,.16),transparent_52%),#020617] rounded-2xl overflow-hidden flex items-center justify-center select-none active:cursor-grabbing"
+                      >
+                        {onaLoading ? (
+                          <div className="text-slate-400 text-xs flex items-center gap-2">
+                            <RefreshCw size={14} className="animate-spin" />{" "}
+                            Resolving Brandes centrality paths...
+                          </div>
+                        ) : (
+                          <>
+                            {/* Links */}
+                            <svg className="absolute inset-0 h-full w-full pointer-events-none opacity-40">
+                              {onaData.links.map((link, idx) => {
+                                const srcNode = nodesState.find(
+                                  (n) => n.id === link.source,
+                                );
+                                const tgtNode = nodesState.find(
+                                  (n) => n.id === link.target,
+                                );
+                                if (!srcNode || !tgtNode) return null;
+
+                                const srcProj = project3D(
+                                  srcNode.x,
+                                  srcNode.y,
+                                  srcNode.z,
+                                );
+                                const tgtProj = project3D(
+                                  tgtNode.x,
+                                  tgtNode.y,
+                                  tgtNode.z,
+                                );
+
+                                return (
+                                  <line
+                                    key={idx}
+                                    x1={srcProj.x}
+                                    y1={srcProj.y}
+                                    x2={tgtProj.x}
+                                    y2={tgtProj.y}
+                                    stroke="#38bdf8"
+                                    strokeWidth={link.weight}
+                                    strokeOpacity={0.4}
+                                  />
+                                );
+                              })}
+                            </svg>
+
+                            {/* HTML Orbiting Node Bubbles */}
+                            {nodesState.map((node) => {
+                              const projected = project3D(node.x, node.y, node.z);
+                              const isSelected = selectedOnaNode?.id === node.id;
+                              const size = isSelected ? 32 : 24;
+
+                              const depthScale = Math.max(
+                                0.4,
+                                1 - projected.depth / 800,
+                              );
+                              const depthOpacity = Math.max(
+                                0.3,
+                                1 - projected.depth / 600,
+                              );
+
+                              return (
+                                <div
+                                  key={node.id}
+                                  onPointerDown={(e) =>
+                                    handleOnaNodePointerDown(e, node)
+                                  }
+                                  onClick={() => {
+                                    setSelectedOnaNode(node);
+                                    setMobileActivePane("right");
+                                  }}
+                                  style={{
+                                    left: `${projected.x}px`,
+                                    top: `${projected.y}px`,
+                                    width: `${size * depthScale}px`,
+                                    height: `${size * depthScale}px`,
+                                    marginLeft: `-${(size * depthScale) / 2}px`,
+                                    marginTop: `-${(size * depthScale) / 2}px`,
+                                    opacity: depthOpacity,
+                                    zIndex: Math.round(1000 - projected.depth),
+                                  }}
+                                  className={`absolute rounded-full border transition-shadow duration-300 flex items-center justify-center group pointer-events-auto cursor-pointer select-none ${
+                                    isSelected
+                                      ? "bg-primary border-white shadow-[0_0_15px_rgba(45,212,191,0.8)] z-20 scale-105"
+                                      : "bg-slate-900 border-indigo-500/40 hover:border-cyan-300 z-10"
+                                  }`}
+                                >
+                                  <div className="absolute hidden group-hover:block bg-black/90 text-white text-[8px] uppercase tracking-wider px-2 py-1 rounded border border-white/10 whitespace-nowrap -top-8 z-30 pointer-events-none">
+                                    {node.name}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                }
+                rightContent={
+                  <div className="premium-card p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md space-y-6 lg:w-[320px] xl:w-[340px]">
+                    {selectedOnaNode ? (
                       <>
-                        {/* Links */}
-                        <svg className="absolute inset-0 h-full w-full pointer-events-none opacity-40">
-                          {onaData.links.map((link, idx) => {
-                            const srcNode = nodesState.find(
-                              (n) => n.id === link.source,
-                            );
-                            const tgtNode = nodesState.find(
-                              (n) => n.id === link.target,
-                            );
-                            if (!srcNode || !tgtNode) return null;
-                            const src = projectOnaNode(srcNode);
-                            const tgt = projectOnaNode(tgtNode);
-                            const opacity = Math.max(0.08, Math.min(0.65, 0.7 - ((src.depth + tgt.depth) / 1200)));
+                        <div className="border-b border-white/5 pb-3">
+                          <div className="text-[10px] uppercase font-bold tracking-widest text-slate-500">
+                            Corporate Node Centrality
+                          </div>
+                          <h3 className="text-lg font-extrabold text-white mt-1">
+                            {selectedOnaNode.name}
+                          </h3>
+                          <div className="text-[9px] text-slate-400 uppercase mt-0.5 tracking-wider">
+                            {selectedOnaNode.role}
+                          </div>
+                        </div>
 
-                            return (
-                              <line
-                                key={idx}
-                                x1={`${(src.x / 500) * 100}%`}
-                                y1={`${(src.y / 500) * 100}%`}
-                                x2={`${(tgt.x / 500) * 100}%`}
-                                y2={`${(tgt.y / 500) * 100}%`}
-                                stroke="#4f46e5"
-                                strokeWidth={link.weight * 2.5}
-                                strokeOpacity={opacity}
-                              />
-                            );
-                          })}
-                        </svg>
-
-                        {/* Nodes */}
-                        {nodesState.map((node) => {
-                          const size = 15 + node.influence_pagerank * 20;
-                          const isSelected = selectedOnaNode?.id === node.id;
-                          const projected = projectOnaNode(node);
-                          const depthScale = Math.max(0.72, Math.min(1.22, projected.perspective));
-                          const depthOpacity = Math.max(0.42, Math.min(1, 0.72 + projected.perspective * 0.22));
-
-                          return (
-                            <div
-                              key={node.id}
-                              onMouseDown={(e) => {
-                                e.stopPropagation();
-                                setSelectedOnaNode(node);
-                                handleNodeMouseDown(node.id, e);
-                              }}
-                              onTouchStart={(e) => {
-                                e.stopPropagation();
-                                setSelectedOnaNode(node);
-                                handleNodeMouseDown(node.id, e);
-                              }}
-                              style={{
-                                left: `${(projected.x / 500) * 100}%`,
-                                top: `${(projected.y / 500) * 100}%`,
-                                width: `${size * depthScale}px`,
-                                height: `${size * depthScale}px`,
-                                marginLeft: `-${(size * depthScale) / 2}px`,
-                                marginTop: `-${(size * depthScale) / 2}px`,
-                                opacity: depthOpacity,
-                                zIndex: Math.round(1000 - projected.depth),
-                              }}
-                              className={`absolute rounded-full border transition-shadow duration-300 flex items-center justify-center group pointer-events-auto cursor-pointer select-none ${
-                                isSelected
-                                  ? "bg-primary border-white shadow-[0_0_15px_rgba(45,212,191,0.8)] z-20 scale-105"
-                                  : "bg-slate-900 border-indigo-500/40 hover:border-cyan-300 z-10"
-                              }`}
-                            >
-                              <div className="absolute hidden group-hover:block bg-black/90 text-white text-[8px] uppercase tracking-wider px-2 py-1 rounded border border-white/10 whitespace-nowrap -top-8 z-30 pointer-events-none">
-                                {node.name}
-                              </div>
+                        <div className="space-y-4">
+                          {/* PageRank Card */}
+                          <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
+                            <div className="text-[9px] uppercase tracking-[0.16em] text-slate-500 mb-1">
+                              PageRank Centrality (Influence)
                             </div>
-                          );
-                        })}
+                            <div className="flex justify-between items-center">
+                              <div className="text-3xl font-extrabold text-indigo-400">
+                                {(selectedOnaNode.influence_pagerank * 100).toFixed(
+                                  0,
+                                )}
+                                %
+                              </div>
+                              {/* Radial indicator */}
+                              <svg className="w-10 h-10 transform -rotate-90">
+                                <circle
+                                  cx="20"
+                                  cy="20"
+                                  r="16"
+                                  stroke="rgba(255,255,255,0.05)"
+                                  strokeWidth="3"
+                                  fill="transparent"
+                                />
+                                <circle
+                                  cx="20"
+                                  cy="20"
+                                  r="16"
+                                  stroke="#818cf8"
+                                  strokeWidth="3"
+                                  fill="transparent"
+                                  strokeDasharray={100}
+                                  strokeDashoffset={
+                                    100 - selectedOnaNode.influence_pagerank * 100
+                                  }
+                                />
+                              </svg>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-2 leading-relaxed">
+                              Calculates global endorsement weight across edge
+                              connections using Google PageRank power iteration.
+                            </p>
+                          </div>
+
+                          {/* Betweenness Bottleneck Card */}
+                          <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
+                            <div className="text-[9px] uppercase tracking-[0.16em] text-slate-500 mb-1">
+                              Betweenness Centrality (Bridge Power)
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <div className="text-3xl font-extrabold text-cyan-400">
+                                {(selectedOnaNode.bridge_betweenness * 100).toFixed(
+                                  0,
+                                )}
+                                %
+                              </div>
+                              <svg className="w-10 h-10 transform -rotate-90">
+                                <circle
+                                  cx="20"
+                                  cy="20"
+                                  r="16"
+                                  stroke="rgba(255,255,255,0.05)"
+                                  strokeWidth="3"
+                                  fill="transparent"
+                                />
+                                <circle
+                                  cx="20"
+                                  cy="20"
+                                  r="16"
+                                  stroke="#2dd4bf"
+                                  strokeWidth="3"
+                                  fill="transparent"
+                                  strokeDasharray={100}
+                                  strokeDashoffset={
+                                    100 - selectedOnaNode.bridge_betweenness * 100
+                                  }
+                                />
+                              </svg>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-2 leading-relaxed">
+                              Measures structural bridge strength across siloed
+                              departments. High betweenness employees prevent
+                              organization communication bottlenecks.
+                            </p>
+                          </div>
+                        </div>
                       </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Centrality Details */}
-              <div className="premium-card p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md space-y-6">
-                {selectedOnaNode ? (
-                  <>
-                    <div className="border-b border-white/5 pb-3">
-                      <div className="text-[10px] uppercase font-bold tracking-widest text-slate-500">
-                        Corporate Node Centrality
-                      </div>
-                      <h3 className="text-lg font-extrabold text-white mt-1">
-                        {selectedOnaNode.name}
-                      </h3>
-                      <div className="text-[9px] text-slate-400 uppercase mt-0.5 tracking-wider">
-                        {selectedOnaNode.role}
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      {/* PageRank Card */}
-                      <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
-                        <div className="text-[9px] uppercase tracking-[0.16em] text-slate-500 mb-1">
-                          PageRank Centrality (Influence)
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="text-3xl font-extrabold text-indigo-400">
-                            {(selectedOnaNode.influence_pagerank * 100).toFixed(
-                              0,
-                            )}
-                            %
-                          </div>
-                          {/* Radial indicator */}
-                          <svg className="w-10 h-10 transform -rotate-90">
-                            <circle
-                              cx="20"
-                              cy="20"
-                              r="16"
-                              stroke="rgba(255,255,255,0.05)"
-                              strokeWidth="3"
-                              fill="transparent"
-                            />
-                            <circle
-                              cx="20"
-                              cy="20"
-                              r="16"
-                              stroke="#818cf8"
-                              strokeWidth="3"
-                              fill="transparent"
-                              strokeDasharray={100}
-                              strokeDashoffset={
-                                100 - selectedOnaNode.influence_pagerank * 100
-                              }
-                            />
-                          </svg>
-                        </div>
-                        <p className="text-[9px] text-slate-400 mt-2 leading-relaxed">
-                          Measures overall connectivity and communication
-                          propagation strength. High PageRank nodes act as
-                          information multipliers.
-                        </p>
-                      </div>
-
-                      {/* Betweenness Centrality Card */}
-                      <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
-                        <div className="text-[9px] uppercase tracking-[0.16em] text-slate-500 mb-1">
-                          Betweenness Centrality (Bridges)
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="text-3xl font-extrabold text-cyan-400">
-                            {(selectedOnaNode.bridge_betweenness * 100).toFixed(
-                              0,
-                            )}
-                            %
-                          </div>
-                          {/* Radial indicator */}
-                          <svg className="w-10 h-10 transform -rotate-90">
-                            <circle
-                              cx="20"
-                              cy="20"
-                              r="16"
-                              stroke="rgba(255,255,255,0.05)"
-                              strokeWidth="3"
-                              fill="transparent"
-                            />
-                            <circle
-                              cx="20"
-                              cy="20"
-                              r="16"
-                              stroke="#2dd4bf"
-                              strokeWidth="3"
-                              fill="transparent"
-                              strokeDasharray={100}
-                              strokeDashoffset={
-                                100 - selectedOnaNode.bridge_betweenness * 100
-                              }
-                            />
-                          </svg>
-                        </div>
-                        <p className="text-[9px] text-slate-400 mt-2 leading-relaxed">
-                          Measures structural bridge strength across siloed
-                          departments. High betweenness employees prevent
-                          organization communication bottlenecks.
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                ) : (
+                    ) : (
                   <div className="text-slate-400 text-xs py-16 text-center">
                     Select a collaboration node on the graph to analyze
-                    centralities.
                   </div>
                 )}
               </div>
-            </motion.div>
-          )}
+            }
+          />
+        </motion.div>
+      )}
 
           {/* TAB 5: MARKOV CAREER PROGRESSION */}
           {activeSubTab === "career-path" && (
@@ -2775,148 +2873,159 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[320px_1fr] gap-6 text-left min-h-0 lg:flex-1 lg:h-full"
+              className="min-h-0 lg:flex-1 lg:h-full w-full flex flex-col"
             >
-              {/* Left Selector */}
-              <div className="premium-card p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col justify-between h-full">
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2">
-                    Active Career Tracker
-                  </h3>
-
-                  <div className="space-y-4">
+              <MobileSplitPane
+                activePane={mobileActivePane}
+                setActivePane={setMobileActivePane}
+                leftTitle="Employee Profile"
+                rightTitle="Transition Horizon"
+                leftIcon={<Users size={14} />}
+                rightIcon={<Sparkles size={14} />}
+                leftWidthClass="lg:w-[300px] xl:w-[320px]"
+                leftContent={
+                  <div className="premium-card p-4 md:p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col justify-between h-auto lg:h-full">
                     <div>
-                      <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1.5 block">
-                        Select Employee Profile
-                      </label>
-                      <PremiumSelect
-                        value={selectedCareerEmpId}
-                        onChange={(e) => {
-                          setSelectedCareerEmpId(e.target.value);
-                          loadCareerPath(e.target.value);
-                        }}
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
-                      >
-                        {careerEmployees.map((e) => (
-                          <option key={e.id} value={e.id}>
-                            {e.full_name}
-                          </option>
-                        ))}
-                      </PremiumSelect>
+                      <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2">
+                        Active Career Tracker
+                      </h3>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1.5 block">
+                            Select Employee Profile
+                          </label>
+                          <PremiumSelect
+                            value={selectedCareerEmpId}
+                            onChange={(e) => {
+                              setSelectedCareerEmpId(e.target.value);
+                              loadCareerPath(e.target.value);
+                              setMobileActivePane("right");
+                            }}
+                            className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                          >
+                            {careerEmployees.map((e) => (
+                              <option key={e.id} value={e.id}>
+                                {e.full_name}
+                              </option>
+                            ))}
+                          </PremiumSelect>
+                        </div>
+
+                        {careerPathData && (
+                          <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
+                            <div className="text-[9px] uppercase tracking-widest text-slate-500 mb-1">
+                              Starting Node
+                            </div>
+                            <div className="text-sm font-black text-white">
+                              {careerPathData.current_role}
+                            </div>
+                            <div className="text-[9px] text-indigo-400 uppercase mt-0.5">
+                              Markov Chain State
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                }
+                rightContent={
+                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 h-auto lg:h-full lg:overflow-y-auto">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
+                      <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
+                        Markov Career Transition Horizon
+                      </h3>
+                      <span className="text-[10px] text-slate-500">
+                        {careerPathData?.model_version || "markov-career-v1"} · modeled probabilities
+                      </span>
                     </div>
 
-                    {careerPathData && (
-                      <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
-                        <div className="text-[9px] uppercase tracking-widest text-slate-500 mb-1">
-                          Starting Node
-                        </div>
-                        <div className="text-sm font-black text-white">
-                          {careerPathData.current_role}
-                        </div>
-                        <div className="text-[9px] text-indigo-400 uppercase mt-0.5">
-                          Markov Chain State
-                        </div>
+                    {careerLoading ? (
+                      <div className="text-xs text-slate-500 text-center py-20">
+                        Matrix Multiplications under calculations...
+                      </div>
+                    ) : careerPathData ? (
+                      <div className="space-y-8 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/5 z-0">
+                        {careerPathData.career_progression_markov.map(
+                          (step, idx) => (
+                            <div key={idx} className="relative pl-10 z-10">
+                              {/* Dot indicator */}
+                              <div className="absolute left-2.5 top-1.5 h-3 w-3 rounded-full border border-indigo-400 bg-slate-950 z-20 flex items-center justify-center">
+                                <div className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                              </div>
+
+                              <div className="mb-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
+                                  {step.projected_time_horizon} Horizon
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {step.possibilities.map((pos, pIdx) => (
+                                  <div
+                                    key={pIdx}
+                                    className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between"
+                                  >
+                                    <div className="flex justify-between items-start mb-3">
+                                      <div>
+                                        <div className="font-bold text-white text-sm">
+                                          {pos.role}
+                                        </div>
+                                        <div className="text-[9px] text-slate-500 mt-0.5 uppercase">
+                                          Target Transition State
+                                        </div>
+                                      </div>
+                                      <span className="text-[10px] font-black text-cyan-300 bg-cyan-400/5 border border-cyan-400/10 px-2 py-0.5 rounded">
+                                        {(pos.transition_probability * 100).toFixed(
+                                          0,
+                                        )}
+                                        % Prob.
+                                      </span>
+                                    </div>
+
+                                    {/* Skill gaps */}
+                                    {pos.skill_gaps.length > 0 ? (
+                                      <div className="space-y-1.5 border-t border-white/5 pt-2.5">
+                                        <div className="text-[8px] uppercase tracking-wider text-slate-500 font-bold mb-1">
+                                          Required skill transitions
+                                        </div>
+                                        {pos.skill_gaps.map((gap, gIdx) => (
+                                          <div
+                                            key={gIdx}
+                                            className="flex justify-between items-center text-[9px] border-b border-white/5 pb-1"
+                                          >
+                                            <span className="text-slate-400">
+                                              {gap.skill}
+                                            </span>
+                                            <span
+                                              className={`font-mono text-[9px] ${gap.difficulty.includes("Easy") ? "text-emerald-400" : gap.difficulty.includes("Medium") ? "text-amber-400" : "text-rose-400"}`}
+                                            >
+                                              {gap.difficulty}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="border-t border-white/5 pt-2.5 text-[9px] text-emerald-400">
+                                        ✓ Zero skill nodes missing for transition.
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-slate-400 text-sm py-16 text-center">
+                        Select an employee tracking profile to evaluate Markov
+                        Career progression path mapping.
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
-
-              {/* Right Output Transitions */}
-              <div className="premium-card p-6 border border-white/5 bg-slate-950/20">
-                <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
-                    Markov Career Transition Horizon
-                  </h3>
-                  <span className="text-[10px] text-slate-500">
-                    {careerPathData?.model_version || "markov-career-v1"} · modeled probabilities
-                  </span>
-                </div>
-
-                {careerLoading ? (
-                  <div className="text-xs text-slate-500 text-center py-20">
-                    Matrix Multiplications under calculations...
-                  </div>
-                ) : careerPathData ? (
-                  <div className="space-y-8 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/5 z-0">
-                    {careerPathData.career_progression_markov.map(
-                      (step, idx) => (
-                        <div key={idx} className="relative pl-10 z-10">
-                          {/* Dot indicator */}
-                          <div className="absolute left-2.5 top-1.5 h-3 w-3 rounded-full border border-indigo-400 bg-slate-950 z-20 flex items-center justify-center">
-                            <div className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
-                          </div>
-
-                          <div className="mb-2">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
-                              {step.projected_time_horizon} Horizon
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {step.possibilities.map((pos, pIdx) => (
-                              <div
-                                key={pIdx}
-                                className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between"
-                              >
-                                <div className="flex justify-between items-start mb-3">
-                                  <div>
-                                    <div className="font-bold text-white text-sm">
-                                      {pos.role}
-                                    </div>
-                                    <div className="text-[9px] text-slate-500 mt-0.5 uppercase">
-                                      Target Transition State
-                                    </div>
-                                  </div>
-                                  <span className="text-[10px] font-black text-cyan-300 bg-cyan-400/5 border border-cyan-400/10 px-2 py-0.5 rounded">
-                                    {(pos.transition_probability * 100).toFixed(
-                                      0,
-                                    )}
-                                    % Prob.
-                                  </span>
-                                </div>
-
-                                {/* Skill gaps */}
-                                {pos.skill_gaps.length > 0 ? (
-                                  <div className="space-y-1.5 border-t border-white/5 pt-2.5">
-                                    <div className="text-[8px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-                                      Required skill transitions
-                                    </div>
-                                    {pos.skill_gaps.map((gap, gIdx) => (
-                                      <div
-                                        key={gIdx}
-                                        className="flex justify-between items-center text-[9px] border-b border-white/5 pb-1"
-                                      >
-                                        <span className="text-slate-400">
-                                          {gap.skill}
-                                        </span>
-                                        <span
-                                          className={`font-mono text-[9px] ${gap.difficulty.includes("Easy") ? "text-emerald-400" : gap.difficulty.includes("Medium") ? "text-amber-400" : "text-rose-400"}`}
-                                        >
-                                          {gap.difficulty}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <div className="border-t border-white/5 pt-2.5 text-[9px] text-emerald-400">
-                                    ✓ Zero skill nodes missing for transition.
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ),
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-slate-400 text-sm py-16 text-center">
-                    Select an employee tracking profile to evaluate Markov
-                    Career progression path mapping.
-                  </div>
-                )}
-              </div>
+                }
+              />
             </motion.div>
           )}
         </AnimatePresence>
