@@ -3577,11 +3577,11 @@ async def _stream_true_agent_loop(
         while idx < len(token):
             take = min(step, len(token) - idx)
             idx += take
-            running_chars += take
-            yield running_chars, reasoning_delta(event_id, phase, iteration, running_chars, text)
+            chars = max(0, len(text) - (len(token) - idx))
+            yield chars, reasoning_delta(event_id, phase, iteration, chars, text)
             await asyncio.sleep(gap_ms / 1000.0)
         if not token:
-            yield running_chars, reasoning_delta(event_id, phase, iteration, running_chars, text)
+            yield len(text), reasoning_delta(event_id, phase, iteration, len(text), text)
 
     yield emit(
         "workflow_started",
@@ -3718,7 +3718,7 @@ async def _stream_true_agent_loop(
                 if reasoning_active:
                     reasoning_event_text = (reasoning_event_text or "") + (token or "")
                     async for running_chars, delta_sse in paced_reasoning_deltas(
-                        reasoning_event_id, "planning", iteration, token or "", reasoning_event_chars, _friendly_reasoning_text(reasoning_event_text)
+                        reasoning_event_id, "planning", iteration, token or "", reasoning_event_chars, reasoning_event_text
                     ):
                         reasoning_event_chars = running_chars
                         yield delta_sse
@@ -3729,18 +3729,18 @@ async def _stream_true_agent_loop(
 
             if reasoning_active:
                 reasoning_active = False
-            planning_friendly_text = _friendly_reasoning_text(reasoning_event_text) or reasoning_event_text
-            yield emit(
-                "model_reasoning",
-                "planning",
-                "Reasoning complete",
-                status="completed",
-                result_summary={
-                    "iteration": iteration,
-                    "characters": len(planning_friendly_text),
-                    "text": planning_friendly_text,
-                },
-            )
+            if reasoning_event_text:
+                yield emit(
+                    "model_reasoning",
+                    "planning",
+                    "Reasoning complete",
+                    status="completed",
+                    result_summary={
+                        "iteration": iteration,
+                        "characters": len(reasoning_event_text),
+                        "text": reasoning_event_text,
+                    },
+                )
 
         try:
             for attempt_round in range(1, 5):
@@ -3758,6 +3758,7 @@ async def _stream_true_agent_loop(
             controller_error = str(exc)
             if reasoning_active:
                 reasoning_active = False
+            if reasoning_event_text:
                 yield emit(
                     "model_reasoning",
                     "planning",
@@ -3765,8 +3766,8 @@ async def _stream_true_agent_loop(
                     status="failed",
                     result_summary={
                         "iteration": iteration,
-                        "characters": len(planning_friendly_text),
-                        "text": planning_friendly_text,
+                        "characters": len(reasoning_event_text),
+                        "text": reasoning_event_text,
                     },
                     error_code=_provider_error_code(exc),
                 )
@@ -4113,12 +4114,13 @@ async def _stream_true_agent_loop(
                         if token == "</think>":
                             if reasoning_active:
                                 reasoning_active = False
+                            if reasoning_event_text:
                                 yield emit(
                                     "model_reasoning",
                                     "response",
                                     "Reasoning complete",
                                     status="completed",
-                                    result_summary={"characters": len(_ans_friendly), "text": _ans_friendly},
+                                    result_summary={"characters": len(reasoning_event_text), "text": reasoning_event_text},
                                 )
                             continue
                         if reasoning_active:
@@ -4131,15 +4133,14 @@ async def _stream_true_agent_loop(
                             continue
                         assistant_text += token
                         yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
-                    if reasoning_active:
+                    if reasoning_event_text:
                         reasoning_active = False
-                        _ans_friendly = _friendly_reasoning_text(reasoning_event_text) or reasoning_event_text
                         yield emit(
                             "model_reasoning",
                             "response",
                             "Reasoning complete",
                             status="completed",
-                            result_summary={"characters": len(_ans_friendly), "text": _ans_friendly},
+                            result_summary={"characters": len(reasoning_event_text), "text": reasoning_event_text},
                         )
                     if not assistant_text:
                         embedded_answer = _extract_answer_from_reasoning(reasoning_event_text)
@@ -4153,14 +4154,14 @@ async def _stream_true_agent_loop(
                     break
                 except Exception as exc:
                     last_err = str(exc)
-                    if reasoning_active:
+                    if reasoning_event_text:
                         reasoning_active = False
                         yield emit(
                             "model_reasoning",
                             "response",
                             "Reasoning stopped",
                             status="failed",
-                            result_summary={"characters": len(_ans_friendly), "text": _ans_friendly},
+                            result_summary={"characters": len(reasoning_event_text), "text": reasoning_event_text},
                             error_code=_provider_error_code(exc),
                         )
                     if attempt_round < 4 and _transient_provider_error(exc):
@@ -4172,15 +4173,14 @@ async def _stream_true_agent_loop(
                     raise
     except Exception as exc:
         last_err = str(exc)
-        if reasoning_active:
+        if reasoning_event_text:
             reasoning_active = False
-            _ans_friendly = _friendly_reasoning_text(reasoning_event_text) or reasoning_event_text
             yield emit(
                 "model_reasoning",
                 "response",
                 "Reasoning stopped",
                 status="failed",
-                result_summary={"characters": len(_ans_friendly), "text": _ans_friendly},
+                result_summary={"characters": len(reasoning_event_text), "text": reasoning_event_text},
                 error_code=_provider_error_code(exc),
             )
         assistant_text = _safe_provider_failure_reply(context_payload, exc)
