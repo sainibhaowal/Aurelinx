@@ -707,7 +707,7 @@ const IntelligenceCenterView = () => {
   const highlightNodes = getHighlightPathNodes();
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 space-y-4">
+    <div className="flex-1 flex flex-col min-h-full lg:h-full space-y-4">
       {/* Top Header */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2 border-b border-white/5 pb-3">
         <div className="flex-1 flex items-start justify-between">
@@ -781,7 +781,7 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-0 lg:h-full"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left min-h-0 lg:flex-1 lg:h-full"
             >
               {/* Left Settings */}
               <div className="space-y-6 flex flex-col h-full min-h-0">
@@ -924,7 +924,7 @@ const IntelligenceCenterView = () => {
                 </div>
 
                 {matchResults.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] xl:grid-cols-[250px_1fr] gap-4 md:gap-6 flex-1 min-h-0 overflow-hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] xl:grid-cols-[250px_1fr] gap-4 md:gap-6 min-h-0 lg:flex-1 lg:h-full">
                     {/* Left list of employees */}
                     <div className="space-y-2.5 border-r border-white/5 pr-3 md:pr-4 overflow-y-auto custom-scrollbar max-lg:pb-4">
                       {matchResults.map((result) => (
@@ -1187,7 +1187,7 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-0 lg:h-full"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left min-h-0 lg:flex-1 lg:h-full"
             >
               {/* Left Config */}
               <div className="space-y-6 flex flex-col h-full min-h-0">
@@ -2178,7 +2178,7 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left flex-1 min-h-0 lg:h-full"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[360px_1fr] gap-6 text-left min-h-0 lg:flex-1 lg:h-full"
             >
               {/* Left Employee list */}
               <div className="premium-card h-full p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col overflow-hidden">
@@ -2544,7 +2544,7 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[1fr_340px] gap-6 text-left flex-1 min-h-0 lg:h-full"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[1fr_340px] gap-6 text-left min-h-0 lg:flex-1 lg:h-full"
             >
               {/* Left Graph Panel */}
               <div className="premium-card p-6 border border-white/5 bg-slate-950/20 flex flex-col justify-between relative overflow-hidden h-full">
@@ -2775,7 +2775,7 @@ const IntelligenceCenterView = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 items-stretch lg:grid-cols-[320px_1fr] gap-6 text-left flex-1 min-h-0 lg:h-full"
+              className="grid grid-cols-1 items-stretch lg:grid-cols-[320px_1fr] gap-6 text-left min-h-0 lg:flex-1 lg:h-full"
             >
               {/* Left Selector */}
               <div className="premium-card p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col justify-between h-full">
