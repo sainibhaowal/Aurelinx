@@ -3663,6 +3663,7 @@ async def _stream_true_agent_loop(
         reasoning_active = False
         reasoning_event_chars = 0
         reasoning_event_id = None
+        reasoning_started_t: Optional[float] = None
         controller_context = {
             "request_plan": {"mode": "agent_controller", "needs_live_data": False},
             "tool_context": {
@@ -3673,13 +3674,14 @@ async def _stream_true_agent_loop(
         }
 
         async def controller_turn_attempt():
-            nonlocal reasoning_active, reasoning_event_chars, reasoning_event_id, raw_decision
+            nonlocal reasoning_active, reasoning_event_chars, reasoning_event_id, raw_decision, reasoning_started_t
             reasoning_active = True
             reasoning_event_chars = 0
             reasoning_event_text = ""
             raw_decision = ""
             
             # Emit initial thinking step so UI shows live thinking emitter immediately
+            reasoning_started_t = time.monotonic()
             reasoning_frame = emit_workflow_event(
                 workflow_run.id,
                 "model_reasoning",
@@ -3735,6 +3737,7 @@ async def _stream_true_agent_loop(
                     "planning",
                     "Reasoning complete",
                     status="completed",
+                    duration_ms=int((time.monotonic() - reasoning_started_t) * 1000) if reasoning_started_t else None,
                     result_summary={
                         "iteration": iteration,
                         "characters": len(reasoning_event_text),
@@ -3764,6 +3767,7 @@ async def _stream_true_agent_loop(
                     "planning",
                     "Reasoning stopped",
                     status="failed",
+                    duration_ms=int((time.monotonic() - reasoning_started_t) * 1000) if reasoning_started_t else None,
                     result_summary={
                         "iteration": iteration,
                         "characters": len(reasoning_event_text),
@@ -4059,6 +4063,7 @@ async def _stream_true_agent_loop(
     reasoning_active = False
     reasoning_event_chars = 0
     reasoning_event_id = None
+    reasoning_started_a: Optional[float] = None
     try:
         if controller_error:
             last_err = controller_error
@@ -4096,6 +4101,7 @@ async def _stream_true_agent_loop(
                         if token == "<think>":
                             if not reasoning_active:
                                 reasoning_active = True
+                                reasoning_started_a = time.monotonic()
                                 reasoning_frame = emit_workflow_event(
                                     workflow_run.id,
                                     "model_reasoning",
@@ -4120,6 +4126,7 @@ async def _stream_true_agent_loop(
                                     "response",
                                     "Reasoning complete",
                                     status="completed",
+                                    duration_ms=int((time.monotonic() - reasoning_started_a) * 1000) if reasoning_started_a else None,
                                     result_summary={"characters": len(reasoning_event_text), "text": reasoning_event_text},
                                 )
                             continue
@@ -4140,6 +4147,7 @@ async def _stream_true_agent_loop(
                             "response",
                             "Reasoning complete",
                             status="completed",
+                            duration_ms=int((time.monotonic() - reasoning_started_a) * 1000) if reasoning_started_a else None,
                             result_summary={"characters": len(reasoning_event_text), "text": reasoning_event_text},
                         )
                     if not assistant_text:
@@ -4161,6 +4169,7 @@ async def _stream_true_agent_loop(
                             "response",
                             "Reasoning stopped",
                             status="failed",
+                            duration_ms=int((time.monotonic() - reasoning_started_a) * 1000) if reasoning_started_a else None,
                             result_summary={"characters": len(reasoning_event_text), "text": reasoning_event_text},
                             error_code=_provider_error_code(exc),
                         )
@@ -4180,6 +4189,7 @@ async def _stream_true_agent_loop(
                 "response",
                 "Reasoning stopped",
                 status="failed",
+                duration_ms=int((time.monotonic() - reasoning_started_a) * 1000) if reasoning_started_a else None,
                 result_summary={"characters": len(reasoning_event_text), "text": reasoning_event_text},
                 error_code=_provider_error_code(exc),
             )

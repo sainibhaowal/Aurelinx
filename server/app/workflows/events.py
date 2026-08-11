@@ -146,7 +146,7 @@ def workflow_event_dict(event: WorkflowEventTable) -> Dict[str, Any]:
         "result_summary": parse(event.result_summary),
         "error_code": event.error_code,
         "duration_ms": event.duration_ms,
-        "created_at": event.created_at.isoformat() if event.created_at else None,
+        "created_at": event.created_at.isoformat() + "Z" if event.created_at else None,
     }
 
 
