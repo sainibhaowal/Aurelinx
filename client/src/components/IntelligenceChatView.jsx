@@ -439,12 +439,18 @@ const naturalStepDetail = (step) => {
   return step.display_message || "Workflow activity recorded.";
 };
 
+const parseServerTime = (value) => {
+  if (!value) return NaN;
+  const text = String(value);
+  const hasTz = /[zZ]|[+-]\d{2}:?\d{2}$/.test(text);
+  return new Date(hasTz ? text : `${text}Z`).getTime();
+};
+
 const workflowTime = (value) => {
   if (!value) return "";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const ts = parseServerTime(value);
+  if (!Number.isFinite(ts)) return "";
+  return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 };
 
 const toolNameForStep = (step) => step?.tool || step?.tool_name || "unknown";
@@ -741,7 +747,7 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
 
   const runningDuration = (step) => {
     const startedAt = step.started_at || step.created_at;
-    const timestamp = startedAt ? new Date(startedAt).getTime() : NaN;
+    const timestamp = startedAt ? parseServerTime(startedAt) : NaN;
     return Number.isFinite(timestamp) ? Math.max(0, currentTime - timestamp) : 0;
   };
 
@@ -1179,8 +1185,9 @@ const IntelligenceChatView = () => {
 
   const formatSessionTime = (value) => {
     if (!value) return "No activity yet";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "No activity yet" : date.toLocaleString([], { dateStyle: "short", timeStyle: "short" });
+    const ts = parseServerTime(value);
+    if (!Number.isFinite(ts)) return "No activity yet";
+    return new Date(ts).toLocaleString([], { dateStyle: "short", timeStyle: "short" });
   };
 
   const clearMessages = async () => {
