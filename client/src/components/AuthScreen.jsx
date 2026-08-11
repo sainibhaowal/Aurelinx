@@ -171,7 +171,7 @@ const AuthScreen = () => {
   return (
     <div
       className="min-h-screen text-slate-100 relative overflow-x-hidden overflow-y-auto flex"
-      style={{ background: "#07111f" }}
+      style={{ background: "#04100b" }}
     >
       {/* ── Ambient layer ── */}
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -179,13 +179,13 @@ const AuthScreen = () => {
           className="absolute inset-0"
           style={{
             backgroundImage:
-              "radial-gradient(rgba(103,232,249,0.045) 1px, transparent 1px)",
+              "radial-gradient(rgba(110,231,183,0.045) 1px, transparent 1px)",
             backgroundSize: "30px 30px",
           }}
         />
         <div
           className="absolute -top-32 right-0 w-[700px] h-[700px] rounded-full blur-[150px]"
-          style={{ background: "rgba(103,232,249,0.06)" }}
+          style={{ background: "rgba(110,231,183,0.06)" }}
         />
         <div
           className="absolute bottom-0 left-[15%] w-[500px] h-[500px] rounded-full blur-[130px]"
@@ -216,7 +216,7 @@ const AuthScreen = () => {
           >
             <p
               className="text-[11px] uppercase tracking-[0.3em] font-semibold mb-7"
-              style={{ color: "rgba(103,232,249,0.55)" }}
+              style={{ color: "rgba(110,231,183,0.55)" }}
             >
               {mode === "register" ? "01 — Create Account" : "02 — Sign In"}
             </p>
@@ -224,7 +224,7 @@ const AuthScreen = () => {
             <h1 className="text-[3.2rem] font-bold leading-[1.08] tracking-tight text-white mb-7">
               Intelligence begins
               <br />
-              with <span style={{ color: "#67e8f9" }}>access.</span>
+              with <span style={{ color: "#6ee7b7" }}>access.</span>
             </h1>
 
             <p className="text-slate-400 text-[15px] leading-7 max-w-sm">
@@ -244,7 +244,7 @@ const AuthScreen = () => {
               >
                 <div
                   className="flex-none h-px w-8"
-                  style={{ background: "rgba(103,232,249,0.35)" }}
+                  style={{ background: "rgba(110,231,183,0.35)" }}
                 />
                 <span className="text-sm text-slate-300">{item}</span>
               </motion.div>
@@ -408,7 +408,7 @@ const AuthScreen = () => {
                     <button
                       type="button"
                       className="font-semibold transition-colors"
-                      style={{ color: "#67e8f9" }}
+                      style={{ color: "#6ee7b7" }}
                       onClick={() => switchToLogin(registerForm.email)}
                     >
                       Sign in
@@ -420,7 +420,7 @@ const AuthScreen = () => {
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-slate-700/50" />
                     </div>
-                    <span className="relative px-3 text-[10px] sm:text-xs text-slate-500 uppercase bg-[#07111f] bg-opacity-0 backdrop-blur-sm">
+                    <span className="relative px-3 text-[10px] sm:text-xs text-slate-500 uppercase bg-[#04100b] bg-opacity-0 backdrop-blur-sm">
                       Or continue with
                     </span>
                   </div>
@@ -480,16 +480,16 @@ const AuthScreen = () => {
                     placeholder="you@company.com"
                   >
                     {showEmailSuggestion && savedCreds?.email && (
-                      <div className="absolute left-0 right-0 mt-1.5 bg-[#091524] border border-[#67e8f9]/20 rounded-2xl p-1.5 shadow-2xl z-50 animate-fade-in backdrop-blur-md">
+                      <div className="absolute left-0 right-0 mt-1.5 bg-[#091524] border border-[#6ee7b7]/20 rounded-2xl p-1.5 shadow-2xl z-50 animate-fade-in backdrop-blur-md">
                         <button
                           type="button"
-                          className="w-full text-left px-4 py-3 hover:bg-[#67e8f9]/10 rounded-xl transition-all duration-150 flex items-center gap-3 cursor-pointer"
+                          className="w-full text-left px-4 py-3 hover:bg-[#6ee7b7]/10 rounded-xl transition-all duration-150 flex items-center gap-3 cursor-pointer"
                           onClick={() => {
                             setLoginForm(prev => ({ ...prev, email: savedCreds.email }));
                             setShowEmailSuggestion(false);
                           }}
                         >
-                          <div className="flex-none h-2 w-2 rounded-full bg-[#67e8f9] animate-pulse" />
+                          <div className="flex-none h-2 w-2 rounded-full bg-[#6ee7b7] animate-pulse" />
                           <div className="flex-1 min-w-0">
                             <div className="text-xs text-slate-400 font-semibold tracking-wider uppercase">Saved Account</div>
                             <div className="text-sm font-semibold text-slate-200 truncate">{savedCreds.email}</div>
@@ -513,11 +513,11 @@ const AuthScreen = () => {
                     placeholder="••••••••"
                   >
                     {showPasswordSuggestion && savedCreds?.password && (
-                      <div className="absolute left-0 right-0 mt-1.5 bg-[#091524] border border-[#67e8f9]/20 rounded-2xl p-1.5 shadow-2xl z-50 animate-fade-in backdrop-blur-md">
+                      <div className="absolute left-0 right-0 mt-1.5 bg-[#091524] border border-[#6ee7b7]/20 rounded-2xl p-1.5 shadow-2xl z-50 animate-fade-in backdrop-blur-md">
                         <button
                           type="button"
                           disabled={isAuthenticating}
-                          className="w-full text-left px-4 py-3 hover:bg-[#67e8f9]/10 rounded-xl transition-all duration-150 flex items-center gap-3 cursor-pointer disabled:opacity-50"
+                          className="w-full text-left px-4 py-3 hover:bg-[#6ee7b7]/10 rounded-xl transition-all duration-150 flex items-center gap-3 cursor-pointer disabled:opacity-50"
                           onClick={async () => {
                             setIsAuthenticating(true);
                             setAuthError("");
@@ -590,7 +590,7 @@ const AuthScreen = () => {
                     <button
                       type="button"
                       className="font-semibold transition-colors"
-                      style={{ color: "#67e8f9" }}
+                      style={{ color: "#6ee7b7" }}
                       onClick={() => setMode("register")}
                     >
                       Create an account
@@ -602,7 +602,7 @@ const AuthScreen = () => {
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-slate-700/50" />
                     </div>
-                    <span className="relative px-3 text-xs text-slate-500 uppercase bg-[#07111f] bg-opacity-0 backdrop-blur-sm">
+                    <span className="relative px-3 text-xs text-slate-500 uppercase bg-[#04100b] bg-opacity-0 backdrop-blur-sm">
                       Or continue with
                     </span>
                   </div>
@@ -655,7 +655,7 @@ const TabBtn = ({ active, children, onClick }) => (
       borderTop: "none",
       borderLeft: "none",
       borderRight: "none",
-      borderBottom: active ? "2px solid #67e8f9" : "2px solid transparent",
+      borderBottom: active ? "2px solid #6ee7b7" : "2px solid transparent",
       marginBottom: "-1px",
       cursor: "pointer",
       padding: "0 0 8px 0",
@@ -682,17 +682,17 @@ const LineField = ({ label, type = "text", value, onChange, placeholder, onFocus
       className="auth-input w-full text-xs sm:text-sm outline-none transition-colors py-2.5 px-3.5 sm:py-3.5 sm:px-4"
       style={{
         background: "rgba(7,17,31,0.96)",
-        border: "1px solid rgba(103,232,249,0.12)",
+        border: "1px solid rgba(110,231,183,0.12)",
         borderRadius: "14px",
         color: "#dbe7f3",
         boxShadow: "inset 0 1px 0 rgba(255,255,255,0.02)",
       }}
       onFocus={(e) => {
-        e.currentTarget.style.borderColor = "rgba(103,232,249,0.42)";
+        e.currentTarget.style.borderColor = "rgba(110,231,183,0.42)";
         if (onFocus) onFocus(e);
       }}
       onBlur={(e) => {
-        e.currentTarget.style.borderColor = "rgba(103,232,249,0.12)";
+        e.currentTarget.style.borderColor = "rgba(110,231,183,0.12)";
         if (onBlur) onBlur(e);
       }}
     />
@@ -709,10 +709,10 @@ const SubmitBtn = ({ loading, accent, children }) => {
       style={{
         background:
           accent === "cyan"
-            ? "linear-gradient(135deg, #0f766e, #0891b2)"
+            ? "linear-gradient(135deg, #0f766e, #0d9488)"
             : "linear-gradient(135deg, #0f766e, #166534)",
         color: "#d8f7ff",
-        border: "1px solid rgba(103,232,249,0.18)",
+        border: "1px solid rgba(110,231,183,0.18)",
         boxShadow: "0 10px 30px rgba(8,145,178,0.18)",
       }}
       onMouseEnter={(e) => {
@@ -726,7 +726,7 @@ const SubmitBtn = ({ loading, accent, children }) => {
       onMouseLeave={(e) => {
         e.currentTarget.style.background =
           accent === "cyan"
-            ? "linear-gradient(135deg, #0f766e, #0891b2)"
+            ? "linear-gradient(135deg, #0f766e, #0d9488)"
             : "linear-gradient(135deg, #0f766e, #166534)";
       }}
     >

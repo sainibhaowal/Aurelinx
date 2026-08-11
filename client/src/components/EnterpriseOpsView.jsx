@@ -1021,7 +1021,7 @@ const EnterpriseOpsView = () => {
                   <div className="font-extrabold">{tab.label}</div>
                 </div>
                 {active && (
-                  <div className="absolute inset-x-0 bottom-0 h-px bg-cyan-300 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                  <div className="absolute inset-x-0 bottom-0 h-px bg-cyan-300 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
                 )}
               </button>
             );
@@ -3143,7 +3143,7 @@ const EnterpriseOpsView = () => {
             {compSubTab === "briefings_audit" && (
               <div className="space-y-6 w-full">
                 {/* Executive packet summary */}
-                <section className="premium-card p-6 border border-white/5 relative overflow-hidden bg-gradient-to-br from-[#0f1f33]/70 to-[#07111f]/70">
+                <section className="premium-card p-6 border border-white/5 relative overflow-hidden bg-gradient-to-br from-[#0a1a12]/70 to-[#04100b]/70">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-400/[0.02] blur-[30px] rounded-full pointer-events-none" />
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 border-b border-white/5 pb-3.5">
                     <div className="flex items-center gap-3">

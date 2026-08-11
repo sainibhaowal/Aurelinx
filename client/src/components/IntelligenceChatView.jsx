@@ -1586,7 +1586,7 @@ const IntelligenceChatView = () => {
             </button>
             <div className="relative group">
               <button disabled={!messages.length} aria-label="Export query transcript" title="Export query transcript" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs disabled:opacity-40"><Download size={14} /></button>
-              {messages.length > 0 && <div className="absolute right-0 top-full z-30 hidden w-36 rounded-lg border border-white/10 bg-[#0f1f33] p-1 shadow-xl group-hover:block"><button onClick={() => exportTranscript("pdf")} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10">PDF</button><button onClick={() => exportTranscript("excel")} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10">Excel</button><button onClick={() => exportTranscript("markdown")} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10">Markdown</button></div>}
+              {messages.length > 0 && <div className="absolute right-0 top-full z-30 hidden w-36 rounded-lg border border-white/10 bg-[#0a1a12] p-1 shadow-xl group-hover:block"><button onClick={() => exportTranscript("pdf")} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10">PDF</button><button onClick={() => exportTranscript("excel")} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10">Excel</button><button onClick={() => exportTranscript("markdown")} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10">Markdown</button></div>}
             </div>
           </div>
         </div>

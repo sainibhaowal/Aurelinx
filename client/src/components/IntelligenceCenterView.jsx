@@ -977,7 +977,7 @@ const IntelligenceCenterView = () => {
                         </div>
                         <button
                           onClick={addSkillMatchReq}
-                          className="inline-flex h-10 md:h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-300/20 bg-indigo-500/90 text-xs md:text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(99,102,241,.18)] transition hover:bg-indigo-400 min-h-[44px]"
+                          className="inline-flex h-10 md:h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-300/20 bg-indigo-500/90 text-xs md:text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(163,230,53,.18)] transition hover:bg-indigo-400 min-h-[44px]"
                         >
                           <Plus size={14} /> Add Skill requirement
                         </button>
@@ -1310,7 +1310,7 @@ const IntelligenceCenterView = () => {
                       </div>
                     ) : (
                       <div className="flex-1 min-h-[420px] flex flex-col items-center justify-center py-10 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-auto">
-                        <div className="h-12 w-12 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 flex items-center justify-center text-indigo-300 mb-4 shadow-[0_0_20px_rgba(99,102,241,0.15)]">
+                        <div className="h-12 w-12 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 flex items-center justify-center text-indigo-300 mb-4 shadow-[0_0_20px_rgba(163,230,53,0.15)]">
                           <Brain size={24} />
                         </div>
                         <h4 className="text-sm font-extrabold text-white tracking-wide uppercase mb-2">Graph Solver Standing By</h4>
@@ -1754,12 +1754,12 @@ const IntelligenceCenterView = () => {
                                           >
                                             <stop
                                               offset="0%"
-                                              stopColor="#818cf8"
+                                              stopColor="#fbbf24"
                                               stopOpacity="0.18"
                                             />
                                             <stop
                                               offset="100%"
-                                              stopColor="#818cf8"
+                                              stopColor="#fbbf24"
                                               stopOpacity="0.0"
                                             />
                                           </linearGradient>
@@ -1821,7 +1821,7 @@ const IntelligenceCenterView = () => {
                                         <path
                                           d={smoothPath(cPts)}
                                           fill="none"
-                                          stroke="#818cf8"
+                                          stroke="#fbbf24"
                                           strokeWidth="4"
                                           strokeLinecap="round"
                                           strokeLinejoin="round"
@@ -1831,7 +1831,7 @@ const IntelligenceCenterView = () => {
                                         <path
                                           d={smoothPath(cPts)}
                                           fill="none"
-                                          stroke="#818cf8"
+                                          stroke="#fbbf24"
                                           strokeWidth="1.5"
                                           strokeLinecap="round"
                                           strokeLinejoin="round"
@@ -1960,12 +1960,12 @@ const IntelligenceCenterView = () => {
                                           >
                                             <stop
                                               offset="0%"
-                                              stopColor="#67e8f9"
+                                              stopColor="#6ee7b7"
                                               stopOpacity="0.95"
                                             />
                                             <stop
                                               offset="100%"
-                                              stopColor="#0891b2"
+                                              stopColor="#0d9488"
                                               stopOpacity="0.9"
                                             />
                                           </linearGradient>
@@ -2352,8 +2352,8 @@ const IntelligenceCenterView = () => {
                                     >
                                       <defs>
                                         <linearGradient id="survGradHigh" x1="0" y1="0" x2="0" y2="1">
-                                          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.4" />
-                                          <stop offset="100%" stopColor="#6366f1" stopOpacity="0.0" />
+                                          <stop offset="0%" stopColor="#a3e635" stopOpacity="0.4" />
+                                          <stop offset="100%" stopColor="#a3e635" stopOpacity="0.0" />
                                         </linearGradient>
                                       </defs>
 
@@ -2371,7 +2371,7 @@ const IntelligenceCenterView = () => {
                                           y1="0"
                                           x2={(hoveredSurvMonth / 11) * 100}
                                           y2="100"
-                                          stroke="#38bdf8"
+                                          stroke="#2dd4bf"
                                           strokeWidth="1.5"
                                           strokeDasharray="3 3"
                                           vectorEffect="non-scaling-stroke"
@@ -2398,7 +2398,7 @@ const IntelligenceCenterView = () => {
                                           />
                                           <polyline
                                             fill="none"
-                                            stroke="#818cf8"
+                                            stroke="#fbbf24"
                                             strokeWidth="2.5"
                                             strokeLinecap="round"
                                             strokeLinejoin="round"
@@ -2426,7 +2426,7 @@ const IntelligenceCenterView = () => {
                                             onMouseLeave={() => setHoveredSurvMonth(null)}
                                             className="h-full flex-1 cursor-pointer relative group flex justify-center items-center"
                                           >
-                                            <div className={`w-2 h-2 rounded-full transition-all ${hoveredSurvMonth === i ? "bg-white scale-150 shadow-[0_0_10px_#38bdf8]" : S_t < 0.5 ? "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.6)]" : "bg-indigo-400/80 group-hover:scale-125"}`} />
+                                            <div className={`w-2 h-2 rounded-full transition-all ${hoveredSurvMonth === i ? "bg-white scale-150 shadow-[0_0_10px_#2dd4bf]" : S_t < 0.5 ? "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.6)]" : "bg-indigo-400/80 group-hover:scale-125"}`} />
                                           </div>
                                         );
                                       })}
@@ -2692,7 +2692,7 @@ const IntelligenceCenterView = () => {
                                     y1={srcProj.y}
                                     x2={tgtProj.x}
                                     y2={tgtProj.y}
-                                    stroke="#38bdf8"
+                                    stroke="#2dd4bf"
                                     strokeWidth={link.weight}
                                     strokeOpacity={0.4}
                                   />
@@ -2796,7 +2796,7 @@ const IntelligenceCenterView = () => {
                                   cx="20"
                                   cy="20"
                                   r="16"
-                                  stroke="#818cf8"
+                                  stroke="#fbbf24"
                                   strokeWidth="3"
                                   fill="transparent"
                                   strokeDasharray={100}

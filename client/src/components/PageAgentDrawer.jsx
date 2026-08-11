@@ -133,7 +133,7 @@ const PageAgentDrawer = ({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 420, opacity: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 30 }}
-          className="fixed right-3 top-3 bottom-3 z-[180] w-[min(92vw,384px)] rounded-3xl border border-white/10 bg-[#07111f]/92 backdrop-blur-xl shadow-[0_24px_80px_rgba(0,0,0,0.4)] overflow-hidden"
+          className="fixed right-3 top-3 bottom-3 z-[180] w-[min(92vw,384px)] rounded-3xl border border-white/10 bg-[#04100b]/92 backdrop-blur-xl shadow-[0_24px_80px_rgba(0,0,0,0.4)] overflow-hidden"
         >
           <div className="h-full flex flex-col">
             <div className="px-4 py-4 border-b border-white/10 flex items-start justify-between gap-3">
@@ -217,7 +217,7 @@ const PageAgentDrawer = ({
           exit={{ x: 8, opacity: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 30 }}
           onClick={onToggle}
-          className="fixed right-3 top-1/2 -translate-y-1/2 z-[180] h-14 w-14 rounded-2xl border border-white/10 bg-[#07111f]/92 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,0.35)] flex items-center justify-center text-cyan-200 hover:text-cyan-100 hover:bg-white/10"
+          className="fixed right-3 top-1/2 -translate-y-1/2 z-[180] h-14 w-14 rounded-2xl border border-white/10 bg-[#04100b]/92 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,0.35)] flex items-center justify-center text-cyan-200 hover:text-cyan-100 hover:bg-white/10"
           aria-label="Open page AI"
         >
           <PanelRightOpen size={18} />

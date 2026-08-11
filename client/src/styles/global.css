@@ -5,8 +5,8 @@
     color-scheme: dark;
     --background: #030712;
     --surface: #0b0f19;
-    --primary: #6366f1;
-    --secondary: #06b6d4;
+    --primary: #a3e635;
+    --secondary: #2dd4bf;
     --accent: #10b981;
     --risk: #f43f5e;
   }
@@ -38,8 +38,8 @@
 @theme {
   --color-background: #030712;
   --color-surface: #0b0f19;
-  --color-primary: #6366f1;
-  --color-secondary: #06b6d4;
+  --color-primary: #a3e635;
+  --color-secondary: #2dd4bf;
   --color-accent: #10b981;
   --color-risk: #f43f5e;
 }
@@ -47,7 +47,7 @@
 @layer components {
   /* Premium Glass Cards - defined in index.css */
   .premium-card-hover {
-    @apply hover:border-primary/30 hover:bg-slate-950/60 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_-12px_rgba(99,102,241,0.15)] transition-all duration-300;
+    @apply hover:border-primary/30 hover:bg-slate-950/60 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_-12px_rgba(163,230,53,0.15)] transition-all duration-300;
   }
 
   .btn-primary {
