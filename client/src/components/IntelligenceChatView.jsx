@@ -734,7 +734,21 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
       }
       collapsed.push(step);
     }
-    return collapsed;
+    // Legacy histories can hold one reasoning row per provider phase (planner +
+    // answer). The server now writes a single card, but old sessions must still
+    // show exactly one: keep only the last reasoning card per message, and drop
+    // empty reasoning cards so providers without thinking stay silent.
+    const reasoningIndices = collapsed
+      .map((step, i) => (step.type === "model_reasoning" ? i : -1))
+      .filter((i) => i >= 0);
+    const dropReasoningAt = new Set(
+      reasoningIndices.length > 1 ? reasoningIndices.slice(0, -1) : []
+    );
+    return collapsed.filter((step, i) => {
+      if (step.type !== "model_reasoning") return true;
+      if (dropReasoningAt.has(i)) return false;
+      return Boolean(step.result_summary?.text);
+    });
   }, [steps, settling]);
 
   const hasRunningStep = deterministicSteps.some((step) => step.status === "running");
@@ -1392,7 +1406,7 @@ const IntelligenceChatView = () => {
             setAgentSteps((previous) => (
               previous.map((item) => (
                 item.status === "running"
-                  ? { ...item, status: item.type === "model_reasoning" ? "failed" : "completed" }
+                  ? { ...item, status: "completed" }
                   : item
               ))
             ));

@@ -123,6 +123,41 @@ def emit_workflow_event(
         return workflow_event_dict(event)
 
 
+def update_workflow_event(
+    event_id: str,
+    *,
+    status: Optional[str] = None,
+    display_message: Optional[str] = None,
+    result_summary: Any = None,
+    error_code: Optional[str] = None,
+    duration_ms: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    """Update one workflow event in place and return its dict.
+
+    Used to finish a reasoning card on the same row instead of persisting a
+    duplicate 'completed' sibling event, so the timeline shows exactly one
+    thinking card per provider turn.
+    """
+    with Session(engine) as db:
+        event = db.get(WorkflowEventTable, str(event_id))
+        if not event:
+            return None
+        if status is not None:
+            event.status = status
+        if display_message is not None:
+            event.display_message = display_message
+        if result_summary is not None:
+            event.result_summary = _safe_json(safe_summary(result_summary))
+        if error_code is not None:
+            event.error_code = error_code
+        if duration_ms is not None:
+            event.duration_ms = duration_ms
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+        return workflow_event_dict(event)
+
+
 def workflow_event_dict(event: WorkflowEventTable) -> Dict[str, Any]:
     def parse(value: Optional[str]) -> Any:
         if not value:

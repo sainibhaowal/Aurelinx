@@ -117,15 +117,16 @@
 /* Thinking dots animation */
 @keyframes pulse-dots {
   0%, 80%, 100% {
-    opacity: 0.3;
-    transform: scale(0.8);
+    opacity: 0.25;
+    transform: scale(0.7) translateY(1px);
   }
   40% {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1.05) translateY(0);
   }
 }
 
 .animate-pulse-dots {
+  display: inline-block;
   animation: pulse-dots 1.4s infinite ease-in-out;
 }
