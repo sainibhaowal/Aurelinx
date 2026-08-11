@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -19,6 +19,10 @@ import {
   Search,
   BarChart3,
   Network,
+  AlertTriangle,
+  Zap,
+  CheckCircle2,
+  Gauge,
 } from "lucide-react";
 import {
   analysisAPI,
@@ -28,6 +32,7 @@ import {
 } from "../services/apiClient";
 import { useAuth } from "../contexts/AuthContext";
 import NeonParticlesWave from "./NeonParticlesWave";
+import { UserManualModal } from "./UserManual";
 
 /* ─────────────────────────────────────────
    CONSTANTS
@@ -78,7 +83,7 @@ const simulatorScenarios = [
     name: "Greenhouse ATS PM Candidate Ingest",
     source: "Greenhouse ATS Webhook",
     tag: "ATS",
-    tagColor: "#67e8f9",
+    tagColor: "#6ee7b7",
     payload: {
       email: "marcus.vance@talenthub.com",
       role: "Principal Product Manager",
@@ -160,7 +165,7 @@ const simulatorScenarios = [
 const PLATFORM_MODULES = [
   {
     icon: Database,
-    accent: "#67e8f9",
+    accent: "#6ee7b7",
     title: "Bronze → Silver → Gold Ingest Pipelines",
     body: "Secure webhook syncs capture events from Slack, Jira, and Workday. System logs validate data schemas in real-time, quarantine structural anomalies to the integrity queue, and sync records transactionally.",
     tags: ["X-API-Key Ingestion", "HMAC-SHA256 Signatures", "Quarantine Logs"],
@@ -195,7 +200,7 @@ const PLATFORM_MODULES = [
   },
   {
     icon: Search,
-    accent: "#06b6d4",
+    accent: "#2dd4bf",
     title: "Semantic Talent Scout Matchmaker",
     body: "Enables conceptual candidate matchmaking using description prompts. Employs a hybrid scoring algorithm indexing roles, departments, skill hierarchies, and matched coordinates.",
     tags: ["Conceptual Skill Search", "Typewriter Token Streaming", "Talent Profile Modal"],
@@ -216,6 +221,107 @@ const PLATFORM_MODULES = [
   }
 ];
 
+const MATH_PILLARS = [
+  {
+    title: "Semantic Skills Graph & Adjacencies",
+    formula: "G = (V, E) | min(D_ij)",
+    accent: "#14b8a6",
+    desc: "Resolves multidimensional skill match requirements by building a weighted directional adjacency matrix. Evaluates skills overlap, identifies critical gaps, and projects the shortest path from candidate vectors to target role nodes.",
+    highlight: "Shortest Path Dijkstra Routing",
+    applied: "Semantic Talent Scout",
+  },
+  {
+    title: "Optimal Team Assembly (Simulated Annealing)",
+    formula: "P = exp(ΔE / T) | T_k = T_0 · α^k",
+    accent: "#fbbf24",
+    desc: "Searches the vast combinatorics space of employee-skill pairings using a stochastic simulated annealing engine. Constrained by strict budget caps, maximum team size limits, and role-skill density matrices.",
+    highlight: "Metropolis-Hastings Solver",
+    applied: "Team Assembly Sandbox",
+  },
+  {
+    title: "Attrition Sandbox & Cox Hazards",
+    formula: "h(t) = h₀(t) · exp(Σ βᵢ·Xᵢ)",
+    accent: "#ef4444",
+    desc: "Estimates cumulative baseline hazards across double-Gaussian peak tenures. Integrates SHAP-covariate weights (morale, salary ratio, workload fatigue) to compute dynamic hazard multipliers and flight risk mitigation paths.",
+    highlight: "Proportional Hazards Regression",
+    applied: "Attrition Risk Scoring",
+  },
+  {
+    title: "Organizational Network Analysis (ONA)",
+    formula: "PR(u) = (1−d)/N + d · Σ (PR(v) / L(v))",
+    accent: "#ec4899",
+    desc: "Maps pull request reviews, collaboration commits, and communication telemetry weights onto an interactive organizational interaction graph. Computes influence via PageRank and bridge-strength via Betweenness.",
+    highlight: "Brandes Betweenness Centrality",
+    applied: "ONA Influence Graph",
+  },
+  {
+    title: "Markov Career Path Horizons",
+    formula: "P⁽ⁿ⁾ = Pⁿ | Σᵢ Pᵢⱼ = 1",
+    accent: "#a78bfa",
+    desc: "Models internal role transitions as a discrete-time Markov chain. Projects state probability matrices over a 3-year horizon, scaling step velocity dynamically with employee skills coverage ratios.",
+    highlight: "Chapman-Kolmogorov Projection",
+    applied: "Career Path Simulator",
+  },
+];
+
+/* ─────────────────────────────────────────
+   HELPERS: PREMIUM DECORATIVE PRIMITIVES
+───────────────────────────────────────── */
+// Mouse-follow spotlight: set --mx/--my CSS vars on the card itself.
+const spotlightMove = (e) => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  e.currentTarget.style.setProperty("--mx", `${e.clientX - rect.left}px`);
+  e.currentTarget.style.setProperty("--my", `${e.clientY - rect.top}px`);
+};
+
+const AuroraBlob = ({ color, className = "", size = 480, delay = "0s" }) => (
+  <div
+    aria-hidden="true"
+    className={`aurora-blob ${className}`}
+    style={{
+      width: size,
+      height: size,
+      background: `radial-gradient(circle at 30% 30%, ${color}, transparent 70%)`,
+      animationDelay: delay,
+    }}
+  />
+);
+
+const GradientWord = ({ children }) => (
+  <span className="gradient-headline">{children}</span>
+);
+
+const CountUp = ({ value, format = (v) => v.toLocaleString(), duration = 950 }) => {
+  const [display, setDisplay] = React.useState(0);
+  const ref = React.useRef(null);
+  const started = React.useRef(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting || started.current) return;
+        started.current = true;
+        const from = 0;
+        const t0 = performance.now();
+        const tick = (now) => {
+          const p = Math.min((now - t0) / duration, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          setDisplay(from + (Number(value) - from) * eased);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+      { threshold: 0.4 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [value, duration]);
+
+  return <span ref={ref}>{format(display)}</span>;
+};
+
 /* ─────────────────────────────────────────
    HELPER COMPONENTS
 ───────────────────────────────────────── */
@@ -226,14 +332,19 @@ const GlassCard = ({ children, className = "", style = {}, delay = 0 }) => (
     viewport={{ once: true, amount: 0.12 }}
     transition={{ duration: 0.6, delay, ease: [0.16, 1, 0.3, 1] }}
     whileHover={{ y: -4, transition: { type: "spring", stiffness: 350, damping: 25 } }}
-    className={`rounded-[22px] ${className}`}
+    className={`group relative rounded-[22px] luxe-card ${className}`}
     style={{
-      background: "rgba(255,255,255,0.025)",
-      border: "1px solid rgba(255,255,255,0.07)",
-      backdropFilter: "blur(14px)",
+      background:
+        "linear-gradient(160deg, rgba(52,122,86,0.14), rgba(4,16,11,0.55) 55%), rgba(255,255,255,0.025)",
+      border: "1px solid rgba(255,255,255,0.08)",
+      backdropFilter: "blur(16px) saturate(130%)",
+      WebkitBackdropFilter: "blur(16px) saturate(130%)",
+      boxShadow:
+        "inset 0 1px 0 0 rgba(255,255,255,0.05), 0 20px 60px rgba(2,10,6,0.55)",
       willChange: "transform, opacity",
       ...style,
     }}
+    onMouseMove={spotlightMove}
   >
     {children}
   </motion.div>
@@ -243,28 +354,33 @@ const SectionLabel = ({ children }) => (
   <p
     className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.25em]"
     style={{
-      background: "rgba(103,232,249,0.08)",
-      border: "1px solid rgba(103,232,249,0.2)",
-      color: "#67e8f9",
+      background: "rgba(110,231,183,0.07)",
+      border: "1px solid rgba(110,231,183,0.22)",
+      color: "#6ee7b7",
+      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
     }}
   >
+    <span
+      className="h-1.5 w-1.5 rounded-full"
+      style={{ background: "#6ee7b7", boxShadow: "0 0 8px rgba(110,231,183,0.9)" }}
+    />
     {children}
   </p>
 );
 
 const SectionHeading = ({ children }) => (
-  <h2 className="mt-5 text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[1.05] tracking-tight text-white">
+  <h2 className="mt-5 text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[1.05] tracking-tight text-white [text-shadow:0_0_40px_rgba(110,231,183,0.15)]">
     {children}
   </h2>
 );
 
-const Tag = ({ children }) => (
+const Tag = ({ children, accent = null }) => (
   <span
     className="rounded-lg px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em]"
     style={{
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      color: "rgba(148,163,184,0.7)",
+      background: accent ? `${accent}0d` : "rgba(255,255,255,0.04)",
+      border: `1px solid ${accent ? `${accent}30` : "rgba(255,255,255,0.08)"}`,
+      color: accent || "rgba(148,163,184,0.7)",
     }}
   >
     {children}
@@ -272,8 +388,342 @@ const Tag = ({ children }) => (
 );
 
 /* ─────────────────────────────────────────
+   CAPABILITY TICKER (endless marquee)
+───────────────────────────────────────── */
+const TICKER_PALETTE = ["#34d399", "#fbbf24", "#2dd4bf", "#a3e635", "#fb7185", "#a78bfa"];
+
+const Ticker = ({ items, className = "" }) => (
+  <div className={`ticker-mask ${className}`} aria-hidden="true">
+    <div className="ticker-track items-center">
+      {[0, 1].map((dup) => (
+        <div key={dup} className="flex items-center gap-10 pr-10">
+          {items.map((item, i) => (
+            <span
+              key={`${dup}-${i}`}
+              className="flex items-center gap-3 whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "rgba(148,163,184,0.55)" }}
+            >
+              <span
+                className="h-1 w-1 rounded-full"
+                style={{
+                  background: TICKER_PALETTE[i % TICKER_PALETTE.length],
+                  boxShadow: `0 0 6px ${TICKER_PALETTE[i % TICKER_PALETTE.length]}80`,
+                }}
+              />
+              {item}
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+/* ─────────────────────────────────────────
+   RADIAL GAUGE (real data driven)
+───────────────────────────────────────── */
+const RadialGauge = ({ value, label, sub, color, format, size = 148, stroke = 8 }) => {
+  const clamped = Math.max(0, Math.min(1, Number(value) || 0));
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="flex flex-col items-center gap-3 select-none">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke="rgba(255,255,255,0.06)"
+            strokeWidth={stroke}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={c}
+            strokeDashoffset={c * (1 - clamped)}
+            className="gauge-track"
+            style={{ filter: `drop-shadow(0 0 8px ${color})` }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div
+            className="text-[22px] font-black tabular-nums"
+            style={{ color, textShadow: `0 0 18px ${color}55` }}
+          >
+            {format ? format(clamped) : `${Math.round(clamped * 100)}%`}
+          </div>
+          {sub && (
+            <div
+              className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.18em]"
+              style={{ color: "rgba(148,163,184,0.5)" }}
+            >
+              {sub}
+            </div>
+          )}
+        </div>
+      </div>
+      <div
+        className="text-[9px] font-black uppercase tracking-[0.2em]"
+        style={{ color: "rgba(148,163,184,0.6)" }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   WAVEFORM (audio-style live bars)
+───────────────────────────────────────── */
+const Waveform = ({ count = 9, color = "#6ee7b7", height = 40 }) => (
+  <div className="flex items-end gap-1.5" style={{ height }} aria-hidden="true">
+    {Array.from({ length: count }).map((_, i) => (
+      <span
+        key={i}
+        className="wave-bar w-1 rounded-full"
+        style={{
+          height: `${12 + ((i * 37) % 26)}px`,
+          background: color,
+          animationDelay: `${(i % 5) * 0.12}s`,
+          opacity: 0.35 + ((i % 3) * 0.2),
+        }}
+      />
+    ))}
+  </div>
+);
+
+/* ─────────────────────────────────────────
+   HERO TELEMETRY ORB (REAL data only)
+───────────────────────────────────────── */
+const HeroOrb = ({ snapshot, sreStatus, pingLatency, onEnterWorkspace }) => {
+  const hasLive = Boolean(snapshot && snapshot.total != null);
+  const ok = sreStatus === "operational";
+
+  return (
+    <div className="relative mx-auto mt-12 flex h-[400px] w-full max-w-[620px] items-center justify-center">
+      {/* Soft glow pool */}
+      <div className="orb-vignette absolute inset-0" aria-hidden="true" />
+
+      {/* Rotating rings */}
+      <div className="orb-ring absolute h-[380px] w-[380px] rounded-full border border-cyan-400/10" aria-hidden="true" />
+      <div
+        className="orb-ring absolute h-[300px] w-[300px] rounded-full border border-dashed border-indigo-400/15"
+        style={{ animationDuration: "58s" }}
+        aria-hidden="true"
+      />
+      <div className="orb-ring reverse absolute h-[236px] w-[236px] rounded-full border border-cyan-300/10" aria-hidden="true" />
+
+      {/* Orbit satellites */}
+      {[
+        { cls: "left-1/2 top-0 -translate-x-1/2", delay: "0s" },
+        { cls: "right-0 top-1/2 -translate-y-1/2", delay: "0.4s" },
+        { cls: "left-[12%] bottom-[16%]", delay: "0.8s" },
+      ].map((dot, i) => (
+        <span
+          key={i}
+          className="absolute h-2 w-2 rounded-full animate-pulse"
+          style={{
+            background: i === 0 ? "#34d399" : i === 1 ? "#a78bfa" : "#6ee7b7",
+            boxShadow: `0 0 14px ${i === 0 ? "rgba(52,211,153,0.9)" : i === 1 ? "rgba(167,139,250,0.9)" : "rgba(110,231,183,0.9)"}`,
+            animationDelay: dot.delay,
+          }}
+          aria-hidden="true"
+        />
+      ))}
+
+      {/* Core */}
+      <div
+        className="core-breathe relative flex h-[172px] w-[172px] flex-col items-center justify-center rounded-full px-4 text-center"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(52,211,153,0.14), rgba(4,16,11,0.6))",
+          border: "1px solid rgba(110,231,183,0.25)",
+          boxShadow:
+            "0 0 60px rgba(52,211,153,0.16), inset 0 0 40px rgba(52,211,153,0.08)",
+        }}
+      >
+        {hasLive ? (
+          <>
+            <div
+              className="text-[9px] font-black uppercase tracking-[0.28em]"
+              style={{ color: "rgba(110,231,183,0.65)" }}
+            >
+              Talent Pool
+            </div>
+            <div
+              className="mt-1 text-4xl font-black tabular-nums"
+              style={{ color: "#6ee7b7", textShadow: "0 0 24px rgba(110,231,183,0.5)" }}
+            >
+              <CountUp
+                value={Number(snapshot.total)}
+                format={(v) => Math.round(v).toLocaleString()}
+              />
+            </div>
+            <div
+              className="mt-1 text-[9px] font-semibold uppercase tracking-wider"
+              style={{ color: "rgba(148,163,184,0.55)" }}
+            >
+              Streaming from your tenant
+            </div>
+          </>
+        ) : (
+          <>
+            <div
+              className="text-[9px] font-black uppercase tracking-[0.28em]"
+              style={{ color: "rgba(110,231,183,0.65)" }}
+            >
+              Aurelinx Core
+            </div>
+            <div className="mt-2.5">
+              <Waveform count={9} />
+            </div>
+            <div
+              className="mt-2.5 text-[9px] font-semibold uppercase tracking-wider"
+              style={{ color: "rgba(148,163,184,0.55)" }}
+            >
+              Standing by · SSE ready
+            </div>
+            <button
+              type="button"
+              onClick={onEnterWorkspace}
+              className="btn-shine mt-2.5 rounded-full px-3.5 py-1.5 text-[9px] font-black uppercase tracking-widest active:scale-95 transition-transform"
+              style={{
+                background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                color: "#020a07",
+              }}
+            >
+              Connect workspace
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Floating chips */}
+      <motion.div
+        animate={{ y: [0, -6, 0] }}
+        transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute left-[4%] top-[20%] flex items-center gap-2 rounded-[14px] px-3.5 py-2.5"
+        style={{
+          background: "rgba(4,16,11,0.88)",
+          border: "1px solid rgba(255,255,255,0.09)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${ok ? "animate-pulse" : ""}`}
+          style={{ background: ok ? "#6ee7b7" : "#f87171", boxShadow: ok ? "0 0 8px rgba(110,231,183,0.8)" : "none" }}
+        />
+        <span
+          className="text-[9px] font-bold uppercase tracking-wider"
+          style={{ color: "rgba(226,232,240,0.85)" }}
+        >
+          SRE Gateway · {ok ? "Operational" : sreStatus}
+          {pingLatency ? ` · ${pingLatency}ms` : ""}
+        </span>
+      </motion.div>
+
+      <motion.div
+        animate={{ y: [0, 5, 0] }}
+        transition={{ duration: 5.2, repeat: Infinity, ease: "easeInOut", delay: 0.7 }}
+        className="absolute right-[3%] top-[14%] flex items-center gap-2 rounded-[14px] px-3.5 py-2.5"
+        style={{
+          background: "rgba(4,16,11,0.88)",
+          border: "1px solid rgba(255,255,255,0.09)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        <BrainCircuit className="h-3.5 w-3.5" style={{ color: "#a78bfa" }} />
+        <span
+          className="text-[9px] font-bold uppercase tracking-wider"
+          style={{ color: "rgba(226,232,240,0.85)" }}
+        >
+          Explainable ML
+        </span>
+      </motion.div>
+
+      <motion.div
+        animate={{ y: [0, -5, 0] }}
+        transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut", delay: 1.4 }}
+        className="absolute bottom-[22%] left-[2%] flex items-center gap-2 rounded-[14px] px-3.5 py-2.5"
+        style={{
+          background: "rgba(4,16,11,0.88)",
+          border: "1px solid rgba(255,255,255,0.09)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#6ee7b7" }} />
+        <span
+          className="text-[9px] font-bold uppercase tracking-wider"
+          style={{ color: "rgba(226,232,240,0.85)" }}
+        >
+          Policy Gates Enforced
+        </span>
+      </motion.div>
+
+      <motion.div
+        animate={{ y: [0, 6, 0] }}
+        transition={{ duration: 5.6, repeat: Infinity, ease: "easeInOut", delay: 2.1 }}
+        className="absolute bottom-[16%] right-[5%] flex items-center gap-2 rounded-[14px] px-3.5 py-2.5"
+        style={{
+          background: "rgba(4,16,11,0.88)",
+          border: "1px solid rgba(255,255,255,0.09)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        <Workflow className="h-3.5 w-3.5" style={{ color: "#6ee7b7" }} />
+        <span
+          className="text-[9px] font-bold uppercase tracking-wider"
+          style={{ color: "rgba(226,232,240,0.85)" }}
+        >
+          Bronze → Gold
+        </span>
+      </motion.div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   FORMULA TYPEWRITER
+───────────────────────────────────────── */
+const FormulaTypewriter = ({ formula, active }) => {
+  const [len, setLen] = useState(0);
+
+  useEffect(() => {
+    if (!active) {
+      setLen(0);
+      return;
+    }
+    let i = 0;
+    const t = setInterval(() => {
+      i += 1;
+      setLen(i);
+      if (i >= formula.length) clearInterval(t);
+    }, 22);
+    return () => clearInterval(t);
+  }, [active, formula]);
+
+  return (
+    <span>
+      {formula.slice(0, len)}
+      {active && len < formula.length && <span className="term-cursor" />}
+    </span>
+  );
+};
+
+/* ─────────────────────────────────────────
    CONNECTOR TILE
 ───────────────────────────────────────── */
+/* Per-tile accent cycle — every connector exposes its own color instead
+   of sharing one monochrome chrome */
+const CONNECTOR_PALETTE = ["#34d399", "#fbbf24", "#2dd4bf", "#a3e635", "#fb7185", "#a78bfa"];
+
 const ConnectorTile = ({ name, type, status, index = 0 }) => {
   const statusStyle = {
     active: {
@@ -292,12 +742,13 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
       border: "rgba(248,113,113,0.2)",
     },
     supported: {
-      color: "#67e8f9",
-      bg: "rgba(103,232,249,0.06)",
-      border: "rgba(103,232,249,0.2)",
+      color: "#6ee7b7",
+      bg: "rgba(110,231,183,0.06)",
+      border: "rgba(110,231,183,0.2)",
     },
   };
   const s = statusStyle[String(status).toLowerCase()] || statusStyle.supported;
+  const accent = CONNECTOR_PALETTE[index % CONNECTOR_PALETTE.length];
 
   return (
     <motion.div
@@ -306,23 +757,34 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
       viewport={{ once: true, amount: 0.15 }}
       transition={{ duration: 0.5, delay: (index % 3) * 0.08, ease: [0.16, 1, 0.3, 1] }}
       whileHover={{ scale: 1.02, y: -4, transition: { type: "spring", stiffness: 400, damping: 25 } }}
-      className="group relative overflow-hidden rounded-[18px] px-5 py-5 border border-white/10 bg-white/[0.02] hover:border-cyan-400/40 hover:bg-cyan-500/[0.03] transition-colors duration-300 shadow-xl"
-      style={{ willChange: "transform, opacity" }}
+      onMouseMove={spotlightMove}
+      className="group spotlight-card luxe-card relative overflow-hidden rounded-[18px] px-5 py-5 border border-white/10 bg-white/[0.02] hover:border-white/15 transition-colors duration-300 shadow-xl"
+      style={{ willChange: "transform, opacity", "--card-accent": accent }}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
-            className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shadow-[0_0_12px_rgba(103,232,249,0.15)] group-hover:scale-110 transition-transform duration-300"
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110"
+            style={{
+              background: `${accent}14`,
+              border: `1px solid ${accent}30`,
+              boxShadow: `0 0 12px ${accent}20`,
+            }}
           >
             <span
               className="text-[10px] font-black uppercase tracking-widest"
-              style={{ color: "#67e8f9" }}
+              style={{ color: accent }}
             >
               {name.slice(0, 2)}
             </span>
           </div>
           <div>
-            <div className="text-sm font-semibold text-white group-hover:text-cyan-200 transition-colors">{name}</div>
+            <div
+              className="text-sm font-semibold text-white transition-colors duration-200 group-hover:text-white"
+              style={{ color: accent }}
+            >
+              {name}
+            </div>
             <div
               className="mt-0.5 text-[10px] uppercase tracking-widest"
               style={{ color: "rgba(148,163,184,0.5)" }}
@@ -347,41 +809,289 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
 };
 
 /* ─────────────────────────────────────────
-   MINI SIGNAL ROW
+   SLIDER FILL (gradient progress thumb track)
 ───────────────────────────────────────── */
-const MiniSignal = ({ index, active, label, value }) => (
-  <div
-    className="flex flex-col gap-1 rounded-[14px] px-3.5 py-2.5 transition-all duration-300 min-w-0"
-    style={{
-      background: active ? "rgba(103,232,249,0.06)" : "rgba(255,255,255,0.02)",
-      border: `1px solid ${active ? "rgba(103,232,249,0.25)" : "rgba(255,255,255,0.06)"}`,
-    }}
-  >
-    <div className="flex items-center justify-between gap-2 min-w-0">
-      <div className="flex items-center gap-2 min-w-0">
-        <span
-          className={`h-2 w-2 flex-none rounded-full ${active ? "animate-pulse" : ""}`}
-          style={{
-            background: active ? "#67e8f9" : "rgba(255,255,255,0.2)",
-            boxShadow: active ? "0 0 10px rgba(103,232,249,0.8)" : "none",
-          }}
-        />
-        <span
-          className="text-[9px] font-mono font-bold uppercase tracking-[0.2em]"
-          style={{ color: active ? "#67e8f9" : "rgba(148,163,184,0.5)" }}
-        >
-          0{index + 1}
-        </span>
-      </div>
-      <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-400 truncate max-w-[130px]" title={value}>
-        {value}
-      </span>
-    </div>
-    <div className="text-xs font-extrabold text-white truncate" title={label}>
-      {label}
-    </div>
+const sliderFill = (min, max, value, color1 = "rgba(52,211,153,0.6)", color2 = "rgba(163,230,53,0.6)") => {
+  const pct = ((value - min) / (max - min)) * 100;
+  return {
+    background: `linear-gradient(90deg, ${color1}, ${color2} ${pct}%, rgba(255,255,255,0.08) ${pct}%)`,
+  };
+};
+
+/* ─────────────────────────────────────────
+   FOOTER LINK (enterprise-style anchor)
+───────────────────────────────────────── */
+const FooterLink = ({ onClick, href = null, children }) => {
+  const inner = (
+    <>
+      <span
+        className="h-px w-0 rounded-full transition-all duration-200 group-hover:w-3"
+        style={{ background: "#34d399", boxShadow: "0 0 6px rgba(52,211,153,0.7)" }}
+      />
+      <span>{children}</span>
+    </>
+  );
+  if (href) {
+    return (
+      <a
+        href={href}
+        target={href.startsWith("http") ? "_blank" : undefined}
+        rel={href.startsWith("http") ? "noreferrer noopener" : undefined}
+        className="group inline-flex items-center gap-1.5 text-xs transition-colors duration-150 hover:text-cyan-300"
+        style={{ color: "rgba(148,163,184,0.7)" }}
+      >
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group inline-flex items-center gap-1.5 text-left text-xs transition-colors duration-150 hover:text-cyan-300 cursor-pointer"
+      style={{ color: "rgba(148,163,184,0.7)" }}
+    >
+      {inner}
+    </button>
+  );
+};
+
+const FooterColumn = ({ title, children }) => (
+  <div>
+    <h5 className="text-[11px] font-black uppercase tracking-[0.22em] text-white/80">
+      {title}
+    </h5>
+    <ul className="mt-4 space-y-3">{children}</ul>
   </div>
 );
+
+/* ─────────────────────────────────────────
+   BRAND ICON (official brand mark paths)
+───────────────────────────────────────── */
+const BRAND_PATHS = {
+  github:
+    "M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12",
+  x: "M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z",
+  linkedin:
+    "M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.225 0z",
+  youtube:
+    "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z",
+};
+
+const BrandIcon = ({ name, size = 15 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    aria-hidden="true"
+  >
+    <path d={BRAND_PATHS[name]} />
+  </svg>
+);
+
+/* ─────────────────────────────────────────
+   LUXE VERTICAL SCROLLBAR (interactive)
+   - clickable track (smooth jump to position)
+   - draggable glowing thumb
+   - hover expands + live percentage bubble
+   - ZERO React re-renders while scrolling:
+     thumb/progress sync via rAF + direct DOM writes
+   - Drag uses window-level pointer listeners and
+     forces instant scroll (scroll-behavior:auto),
+     so the thumb never fights a smooth-scroll tween
+───────────────────────────────────────── */
+const getThumbGeometry = (el) => {
+  const viewport = window.innerHeight;
+  const trackHeight = Math.max(0, viewport - 20); /* 10px pad top/bottom */
+  const max = Math.max(0, el.scrollHeight - viewport);
+  const thumbHeight =
+    max <= 0
+      ? 0
+      : Math.max(56, Math.min(trackHeight, trackHeight * (viewport / el.scrollHeight)));
+  return {
+    viewport,
+    trackHeight,
+    max,
+    thumbHeight,
+    travel: Math.max(1, trackHeight - thumbHeight),
+  };
+};
+
+const LuxeScrollbar = () => {
+  const trackRef = useRef(null);
+  const thumbRef = useRef(null);
+  const bubbleRef = useRef(null);
+  const dragStart = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  const [hovering, setHovering] = useState(false);
+
+  /* Imperative sync loop — no setState on scroll, so the page never re-renders */
+  useEffect(() => {
+    const el = document.getElementById("landing-scroll-root");
+    if (!el) return;
+
+    let rafId = 0;
+
+    const update = () => {
+      rafId = 0;
+      const { trackHeight, max, thumbHeight } = getThumbGeometry(el);
+      const thumbTop = max <= 0 ? 0 : (el.scrollTop / max) * (trackHeight - thumbHeight);
+      const pct = max <= 0 ? 0 : Math.round((el.scrollTop / max) * 100);
+
+      const thumb = thumbRef.current;
+      const bubble = bubbleRef.current;
+      if (thumb) {
+        thumb.style.top = `${thumbTop}px`;
+        thumb.style.height = `${thumbHeight}px`;
+        thumb.style.opacity = max <= 0 ? "0" : "1";
+      }
+      if (bubble) {
+        bubble.style.top = `${thumbTop + thumbHeight / 2}px`;
+        bubble.textContent = `${pct}%`;
+      }
+      const track = trackRef.current;
+      if (track) track.setAttribute("aria-valuenow", pct);
+      const bar = document.querySelector(".scroll-progress-bar");
+      if (bar) bar.style.width = `${pct}%`;
+    };
+
+    const schedule = () => {
+      if (!rafId) rafId = requestAnimationFrame(update);
+    };
+
+    el.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule, { passive: true });
+    schedule();
+
+    return () => {
+      el.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  /* Window-level drag — thumb tracks the cursor 1:1, zero latency:
+     content scrolls proportionally to the thumb, so drag speed is
+     exactly under the user's control (like a native scrollbar) */
+  useEffect(() => {
+    const onMove = (e) => {
+      const drag = dragStart.current;
+      if (!drag) return;
+      const el = document.getElementById("landing-scroll-root");
+      if (!el) return;
+      const { max, travel } = getThumbGeometry(el);
+      if (max <= 0) return;
+      const thumbTop = Math.max(0, Math.min(travel, e.clientY + drag.offset));
+      // Instant scrubbing — never let scroll-behavior:smooth tween fight the drag
+      el.style.scrollBehavior = "auto";
+      el.scrollTop = (thumbTop / travel) * max;
+    };
+    const onEnd = () => {
+      if (!dragStart.current) return;
+      dragStart.current = null;
+      setDragging(false);
+      const el = document.getElementById("landing-scroll-root");
+      if (el) el.style.scrollBehavior = "";
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerup", onEnd);
+    window.addEventListener("pointercancel", onEnd);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      const el = document.getElementById("landing-scroll-root");
+      if (el) el.style.scrollBehavior = "";
+    };
+  }, []);
+
+  const jump = (clientY) => {
+    const el = document.getElementById("landing-scroll-root");
+    const track = trackRef.current;
+    if (!el || !track) return;
+    const rect = track.getBoundingClientRect();
+    const { trackHeight, thumbHeight } = getThumbGeometry(el);
+    const ratio = (clientY - rect.top - thumbHeight / 2) / trackHeight;
+    const target = ratio * (el.scrollHeight - el.clientHeight);
+    el.scrollTo({ top: target, behavior: "smooth" });
+  };
+
+  return (
+    <div
+      className="pointer-events-none fixed inset-y-0 right-0 z-[70] flex w-[20px] items-stretch justify-center"
+      aria-hidden="true"
+    >
+      <div
+        ref={trackRef}
+        role="scrollbar"
+        aria-controls="landing-scroll-root"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={0}
+        className={`pointer-events-auto relative select-none self-stretch rounded-full transition-all duration-300 ${hovering || dragging ? "w-[10px]" : "w-[6px]"}`}
+        style={{
+          top: 10,
+          bottom: 10,
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.06)",
+          boxShadow: "inset 0 1px 3px rgba(0,0,0,0.45)",
+        }}
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
+        onPointerDown={(e) => {
+          if (e.target === thumbRef.current) return;
+          jump(e.clientY);
+        }}
+      >
+        {/* Thumb */}
+        <div
+          ref={thumbRef}
+          className={`absolute left-1/2 w-full -translate-x-1/2 rounded-full touch-none will-change-[top,height] ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
+          style={{
+            top: 0,
+            height: 56,
+            background: "linear-gradient(180deg, #34d399 0%, #a3e635 100%)",
+            boxShadow: dragging
+              ? "0 0 20px rgba(52,211,153,0.65), inset 0 0 6px rgba(255,255,255,0.3)"
+              : "0 0 12px rgba(52,211,153,0.4), inset 0 0 6px rgba(255,255,255,0.22)",
+            opacity: 0,
+            transition: "box-shadow 0.2s ease",
+          }}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const el = document.getElementById("landing-scroll-root");
+            if (!el) return;
+            const { max, travel } = getThumbGeometry(el);
+            const currentThumbTop = max <= 0 ? 0 : (el.scrollTop / max) * travel;
+            // Preserve the grab point: thumb follows the cursor 1:1 from here
+            dragStart.current = { offset: currentThumbTop - e.clientY };
+            setDragging(true);
+          }}
+        />
+
+        {/* Live percentage bubble */}
+        <div
+          ref={bubbleRef}
+          className="pointer-events-none absolute right-full mr-3 rounded-md border px-2 py-1 text-[9px] font-black tabular-nums tracking-wider"
+          style={{
+            top: 28,
+            background: "rgba(4,16,11,0.94)",
+            borderColor: "rgba(110,231,183,0.25)",
+            color: "#6ee7b7",
+            boxShadow: "0 6px 18px rgba(2,10,6,0.55), 0 0 12px rgba(52,211,153,0.18)",
+            opacity: hovering || dragging ? 1 : 0,
+            transform: `translateY(-50%) ${hovering || dragging ? "translateX(0)" : "translateX(8px)"}`,
+            transition: "opacity 0.2s ease, transform 0.2s ease",
+          }}
+        >
+          0%
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /* ─────────────────────────────────────────
    MAIN COMPONENT
@@ -401,19 +1111,15 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
   const [simActiveStep, setSimActiveStep] = useState(0);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simLogs, setSimLogs] = useState([]);
-  const [systemEpoch, setSystemEpoch] = useState(new Date().toISOString());
   const [calcWorkforce, setCalcWorkforce] = useState(1500);
   const [calcSalary, setCalcSalary] = useState(120000);
   const [calcTurnover, setCalcTurnover] = useState(15);
   const [calcReduction, setCalcReduction] = useState(25);
-
-  useEffect(() => {
-    const timer = setInterval(
-      () => setSystemEpoch(new Date().toISOString()),
-      1000,
-    );
-    return () => clearInterval(timer);
-  }, []);
+  const [activePillar, setActivePillar] = useState(0);
+  const [activeModule, setActiveModule] = useState(0);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [subscribed, setSubscribed] = useState(false);
+  const simSectionRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -509,20 +1215,26 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
     ]);
   };
 
-  const displayStats = snapshot
-    ? [
-      { label: "Workforce Size", value: snapshot.total },
-      { label: "Risk Cluster", value: snapshot.atRisk },
-      {
-        label: "Avg Morale",
-        value: Number(snapshot.avgSentiment).toFixed(2),
+  /* Auto-play the pipeline once when it scrolls into view */
+  useEffect(() => {
+    const node = simSectionRef.current;
+    if (!node) return;
+    let triggered = false;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !triggered && !isSimulating) {
+          triggered = true;
+          setTimeout(startSimulation, 700);
+          obs.disconnect();
+        }
       },
-    ]
-    : [
-      { label: "Workforce Size", value: "1,240" },
-      { label: "Risk Cluster", value: "42" },
-      { label: "Avg Morale", value: "0.78" },
-    ];
+      { threshold: 0.3 }
+    );
+    obs.observe(node);
+    return () => obs.disconnect();
+  }, []);
+
+  const hasLive = Boolean(snapshot && snapshot.total != null);
 
   const displayConnectors =
     connections.length > 0
@@ -611,14 +1323,50 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
     },
   ];
 
+  /* ROI computations */
+  const departures = Math.round((calcWorkforce * calcTurnover) / 100);
+  const costToday = departures * calcSalary * 1.5;
+  const retainedCount = Math.round(departures * (calcReduction / 100));
+  const savings = retainedCount * calcSalary * 1.5;
+  const afterCost = costToday - savings;
+  const afterPct = costToday > 0 ? Math.max(0, (afterCost / costToday) * 100) : 0;
+
+  /* Capability ticker items */
+  const tickerItems = [
+    "Workday HRIS",
+    "Greenhouse ATS",
+    "SAP SuccessFactors",
+    "Oracle HCM Cloud",
+    "BambooHR",
+    "ADP Workforce",
+    "Slack Morale Pipeline",
+    "Jira PR Telemetry",
+    "REST API & Webhooks",
+    "Bronze → Silver → Gold",
+    "Policy Release Gates",
+    "Retention Intervention Loops",
+    "Explainable ML Model Cards",
+  ];
+
+  /* Illustrative risk pattern (decorative narrative visual) */
+  const RISK_SIGNAL = [3.1, 2.2, 3.6, 2.8, 4.2, 3.4, 5.1, 4.0, 6.3, 5.2, 7.4, 6.8];
+  const RISK_MAX = Math.max(...RISK_SIGNAL);
+
   /* ─────────────────────────────────────────
      RENDER
   ───────────────────────────────────────── */
   return (
     <div
-      className="relative h-screen w-full overflow-x-hidden overflow-y-auto text-slate-100 scroll-smooth"
-      style={{ background: "#07111f" }}
+      id="landing-scroll-root"
+      className="relative h-screen w-full overflow-x-hidden overflow-y-auto text-slate-100"
+      style={{ background: "#04100b" }}
     >
+      {/* Scroll progress hairline — width synced imperatively by LuxeScrollbar */}
+      <div className="scroll-progress-bar" aria-hidden="true" />
+
+      {/* Interactive vertical scrollbar (zero-re-render sync) */}
+      <LuxeScrollbar />
+
       {/* ── AMBIENT BACKGROUND ── */}
       <div
         className="pointer-events-none fixed inset-0 z-0 select-none"
@@ -629,7 +1377,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           className="absolute inset-0"
           style={{
             backgroundImage:
-              "radial-gradient(rgba(103,232,249,0.04) 1px, transparent 1px)",
+              "radial-gradient(rgba(110,231,183,0.04) 1px, transparent 1px)",
             backgroundSize: "30px 30px",
           }}
         />
@@ -652,7 +1400,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           <div
             className="flex items-center justify-between rounded-full px-5 py-3"
             style={{
-              background: "rgba(7,17,31,0.8)",
+              background: "rgba(4,16,11,0.8)",
               border: "1px solid rgba(255,255,255,0.07)",
               backdropFilter: "blur(20px)",
             }}
@@ -713,7 +1461,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
             {/* Right actions */}
             <div className="flex items-center gap-3">
-              {/* SRE ping */}
+              {/* SRE ping (REAL) */}
               <div
                 className="hidden sm:flex items-center gap-2 rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest"
                 style={{
@@ -735,13 +1483,17 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               <button
                 type="button"
                 onClick={onEnterWorkspace}
-                className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95"
-                style={{ background: "#67e8f9", color: "#07111f" }}
+                className="btn-shine inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95"
+                style={{
+                  background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                  color: "#020a07",
+                  boxShadow: "0 8px 24px -8px rgba(52,211,153,0.5)",
+                }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#a5f3fc";
+                  e.currentTarget.style.filter = "brightness(1.15)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#67e8f9";
+                  e.currentTarget.style.filter = "none";
                 }}
               >
                 Workspace <ChevronRight className="h-3.5 w-3.5" />
@@ -751,7 +1503,15 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         </header>
 
         {/* ══════════ HERO ══════════ */}
-        <section id="section-0" className="relative pb-16 pt-16 lg:pt-20 overflow-hidden">
+        <section id="section-0" className="relative pb-8 pt-16 lg:pt-20 overflow-hidden">
+          {/* Aurora glows + center beam behind the hero copy (particles stay on top) */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[640px] overflow-hidden" aria-hidden="true">
+            <AuroraBlob color="rgba(52,211,153,0.5)" className="left-[8%] -top-40" size={520} />
+            <AuroraBlob color="rgba(251,191,36,0.4)" className="right-[6%] -top-24" size={560} delay="4s" />
+            <AuroraBlob color="rgba(163,230,53,0.3)" className="left-[42%] top-10" size={420} delay="8s" />
+            <div className="hero-beam" />
+          </div>
+
           <div className="relative z-10 mx-auto flex max-w-[860px] flex-col items-center text-center">
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -760,7 +1520,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             >
               <SectionLabel>
                 <Activity className="h-3.5 w-3.5" />
-                Live workforce analytics & policy governance
+                Live workforce analytics &amp; policy governance
               </SectionLabel>
             </motion.div>
 
@@ -772,10 +1532,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             >
               Operational HR intelligence
               <br />
-              with a <span style={{ color: "#67e8f9" }}>
-                calmer, sharper
-              </span>{" "}
-              workflow.
+              with a <GradientWord>calmer, sharper</GradientWord> workflow.
             </motion.h1>
 
             <motion.p
@@ -799,13 +1556,17 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               <button
                 type="button"
                 onClick={onEnterWorkspace}
-                className="inline-flex h-11 items-center gap-2 rounded-xl px-6 text-sm font-bold transition-all active:scale-[0.98]"
-                style={{ background: "#67e8f9", color: "#07111f" }}
+                className="btn-shine inline-flex h-11 items-center gap-2 rounded-xl px-6 text-sm font-bold transition-all active:scale-[0.98]"
+                style={{
+                  background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                  color: "#020a07",
+                  boxShadow: "0 12px 34px -8px rgba(52,211,153,0.5)",
+                }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#a5f3fc";
+                  e.currentTarget.style.background = "linear-gradient(100deg, #34d399 0%, #fbbf24 100%)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#67e8f9";
+                  e.currentTarget.style.background = "linear-gradient(100deg, #34d399 0%, #a3e635 100%)";
                 }}
               >
                 Enter Workspace <ArrowRight className="h-4 w-4" />
@@ -816,8 +1577,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 className="inline-flex h-11 items-center gap-2 rounded-xl px-6 text-sm font-semibold transition-all active:scale-[0.98]"
                 style={{
                   background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.1)",
+                  border: "1px solid rgba(255,255,255,0.12)",
                   color: "rgba(226,232,240,0.85)",
+                  backdropFilter: "blur(8px)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "rgba(255,255,255,0.08)";
@@ -830,6 +1593,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               </button>
             </motion.div>
 
+            {/* Capability tags */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -837,366 +1601,243 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-7 flex flex-wrap items-center justify-center gap-2"
             >
               {[
-                "Live PostgreSQL Sync",
-                "Policy Release Gates",
-                "Explainable ML Model Cards",
-              ].map((label) => (
-                <Tag key={label}>{label}</Tag>
+                ["Live PostgreSQL Sync", null],
+                ["Policy Release Gates", "#6ee7b7"],
+                ["Explainable ML Model Cards", "#a78bfa"],
+              ].map(([label, accent]) => (
+                <Tag key={label} accent={accent}>{label}</Tag>
               ))}
             </motion.div>
+
+            {/* HONEST LIVE STATUS LINE (real SRE + real data source) */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="mt-7 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[10px] font-bold uppercase tracking-[0.2em]"
+              style={{ color: "rgba(148,163,184,0.45)" }}
+            >
+              <span className="flex items-center gap-1.5">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${sreStatus === "operational" ? "animate-pulse" : ""}`}
+                  style={{
+                    background: sreStatus === "operational" ? "#6ee7b7" : "#f87171",
+                  }}
+                />
+                Gateway {sreStatus}
+                {pingLatency ? ` · ${pingLatency}ms` : ""}
+              </span>
+              <span className="opacity-40">·</span>
+              <span>Your live tenant telemetry appears here when you connect</span>
+            </motion.div>
+
+            {/* TELEMETRY ORB — real data when connected, no invented numbers */}
+            <HeroOrb
+              snapshot={snapshot}
+              sreStatus={sreStatus}
+              pingLatency={pingLatency}
+              onEnterWorkspace={onEnterWorkspace}
+            />
           </div>
 
-          {/* ── LIVE PREVIEW GRID ── */}
-          <div className="mx-auto mt-14 grid max-w-[1600px] gap-5 md:grid-cols-2 lg:grid-cols-[260px_1fr_230px]">
-            {/* LEFT — Workspace streams */}
+          {/* Capability ticker */}
+          <div
+            className="mt-10 border-y border-white/5 py-1"
+            aria-hidden="true"
+          >
+            <Ticker items={tickerItems} />
+          </div>
+
+          {/* Scroll hint */}
+          <div className="mt-8 flex justify-center">
             <motion.div
-              initial={{ opacity: 0, x: -14 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.45, delay: 0.22 }}
-              className="md:col-span-1"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1 }}
+              className="scroll-hint flex flex-col items-center gap-1.5 select-none"
+              aria-hidden="true"
             >
-              <GlassCard className="p-5 h-full">
-                <div className="flex items-center justify-between">
-                  <span
-                    className="text-[10px] font-black uppercase tracking-[0.24em]"
-                    style={{ color: "rgba(148,163,184,0.4)" }}
-                  >
-                    Workspace Streams
-                  </span>
-                  <span
-                    className="h-2 w-2 animate-pulse rounded-full"
-                    style={{
-                      background: "#67e8f9",
-                      boxShadow: "0 0 10px rgba(103,232,249,0.8)",
-                    }}
-                  />
-                </div>
-                <div className="mt-4 space-y-2">
-                  {[
-                    ["Workspace View", "Executive control"],
-                    ["Directory Ingest", "Live people records"],
-                    ["Policy Enforcer", "Blocked compliance gates"],
-                    ["Enterprise Sync", "Secure connector status"],
-                  ].map(([label, note], i) => (
-                    <MiniSignal
-                      key={label}
-                      index={i}
-                      active={i === 0}
-                      label={label}
-                      value={note}
-                    />
-                  ))}
-                </div>
-                <div
-                  className="mt-4 rounded-[16px] p-4"
-                  style={{
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                  }}
-                >
+              <span
+                className="text-[9px] font-bold uppercase tracking-[0.3em]"
+                style={{ color: "rgba(148,163,184,0.4)" }}
+              >
+                Scroll
+              </span>
+              <ChevronRight
+                className="h-4 w-4 rotate-90"
+                style={{ color: "#6ee7b7" }}
+              />
+            </motion.div>
+          </div>
+        </section>
+
+        {/* ══════════ PROBLEM → SOLUTION NARRATIVE BAND ══════════ */}
+        <section
+          className="py-20"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+        >
+          <div className="mx-auto grid max-w-[1400px] items-center gap-12 lg:grid-cols-2">
+            {/* Left: the silent problem */}
+            <div>
+              <SectionLabel>
+                <AlertTriangle className="h-3.5 w-3.5" /> The Cost of Silence
+              </SectionLabel>
+              <h2 className="mt-5 text-[clamp(1.9rem,3.5vw,2.8rem)] font-extrabold leading-[1.08] tracking-tight text-white">
+                Attrition never sends a <GradientWord>memo</GradientWord>.
+              </h2>
+              <p
+                className="mt-5 max-w-[540px] text-sm leading-relaxed"
+                style={{ color: "rgba(148,163,184,0.65)" }}
+              >
+                Risk signals drift through sentiment, engagement, and workload
+                data for weeks before a resignation lands. Spreadsheets and
+                quarterly reviews catch it after the exit interview — when the
+                cost is already sunk.
+              </p>
+
+              <div className="mt-8 space-y-4">
+                {[
+                  {
+                    icon: Zap,
+                    accent: "#6ee7b7",
+                    title: "Detect early",
+                    desc: "Morale, retention probability, and burnout vectors scored continuously — not quarterly.",
+                  },
+                  {
+                    icon: ShieldCheck,
+                    accent: "#6ee7b7",
+                    title: "Act with control",
+                    desc: "Policy gates govern every sensitive action, with approval chains and full audit trails.",
+                  },
+                  {
+                    icon: TrendingUp,
+                    accent: "#a78bfa",
+                    title: "Recover the value",
+                    desc: "30/60/90-day retention loops with tracked costs and measurable ROI.",
+                  },
+                ].map(({ icon: Icon, accent, title, desc }) => (
                   <div
-                    className="text-[9px] font-bold uppercase tracking-[0.22em]"
-                    style={{ color: "rgba(148,163,184,0.4)" }}
-                  >
-                    Primary Core Task
-                  </div>
-                  <div className="mt-2 text-base font-black text-white">
-                    Risk Mitigation
-                  </div>
-                  <p
-                    className="mt-1 text-xs leading-relaxed"
-                    style={{ color: "rgba(148,163,184,0.6)" }}
-                  >
-                    Continuous analysis of organizational sentiment drifts and
-                    attrition risks.
-                  </p>
-                </div>
-              </GlassCard>
-            </motion.div>
-
-            {/* CENTER — Main telemetry dock */}
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, delay: 0.27 }}
-              className="md:col-span-1"
-            >
-              <GlassCard className="p-5 h-full flex flex-col">
-                {/* Card header */}
-                <div
-                  className="flex items-center justify-between border-b pb-4"
-                  style={{ borderColor: "rgba(255,255,255,0.06)" }}
-                >
-                  <div>
-                    <div
-                      className="text-[10px] font-black uppercase tracking-[0.24em]"
-                      style={{ color: "rgba(148,163,184,0.4)" }}
-                    >
-                      Live Telemetry Control
-                    </div>
-                    <div className="mt-1 text-base font-bold text-white">
-                      Aurelinx Management OS
-                    </div>
-                  </div>
-                  <span
-                    className="rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5"
+                    key={title}
+                    className="flex items-start gap-4 rounded-[18px] p-4 transition-colors duration-300"
                     style={{
-                      background: "rgba(110,231,183,0.08)",
-                      border: "1px solid rgba(110,231,183,0.2)",
-                      color: "#6ee7b7",
+                      background: "rgba(255,255,255,0.02)",
+                      border: "1px solid rgba(255,255,255,0.06)",
                     }}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Gateway: 99.99% Online</span>
-                  </span>
-                </div>
-
-                {/* Radar ring */}
-                <div
-                  className="relative mt-5 flex flex-1 min-h-[320px] items-center justify-center rounded-[18px] overflow-hidden"
-                  style={{
-                    background: "rgba(0,0,0,0.25)",
-                    border: "1px solid rgba(255,255,255,0.04)",
-                  }}
-                >
-                  {/* Rotating rings */}
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{
-                      duration: 50,
-                      repeat: Infinity,
-                      ease: "linear",
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(255,255,255,0.035)";
+                      e.currentTarget.style.borderColor = accent + "35";
                     }}
-                    className="absolute h-[300px] w-[300px] rounded-full pointer-events-none"
-                    style={{ border: "1px solid rgba(103,232,249,0.06)" }}
-                  />
-                  <motion.div
-                    animate={{ rotate: -360 }}
-                    transition={{
-                      duration: 70,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
-                    className="absolute h-[220px] w-[220px] rounded-full pointer-events-none"
-                    style={{ border: "1px dashed rgba(255,255,255,0.04)" }}
-                  />
-
-                  {/* Core metric blob */}
-                  <motion.div
-                    animate={{ scale: [1, 1.02, 1] }}
-                    transition={{
-                      duration: 9,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                    className="absolute flex h-[155px] w-[155px] flex-col items-center justify-center rounded-[24px]"
-                    style={{
-                      background: "rgba(103,232,249,0.04)",
-                      border: "1px solid rgba(103,232,249,0.15)",
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "rgba(255,255,255,0.02)";
+                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
                     }}
                   >
                     <div
-                      className="text-[9px] font-black uppercase tracking-[0.26em]"
-                      style={{ color: "rgba(103,232,249,0.5)" }}
-                    >
-                      Talent Pool
-                    </div>
-                    <div
-                      className="mt-2 text-5xl font-black"
-                      style={{ color: "#67e8f9" }}
-                    >
-                      {snapshot ? snapshot.total : "1,240"}
-                    </div>
-                    <div
-                      className="mt-1.5 text-[10px] font-semibold uppercase tracking-wider"
-                      style={{ color: "rgba(148,163,184,0.5)" }}
-                    >
-                      Active Records
-                    </div>
-                  </motion.div>
-
-                  {/* Float widget — top left */}
-                  <motion.div
-                    animate={{ y: [0, -5, 0] }}
-                    transition={{
-                      duration: 5,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                    className="absolute left-4 top-4 w-[130px] rounded-[16px] p-3.5"
-                    style={{
-                      background: "rgba(7,17,31,0.9)",
-                      border: "1px solid rgba(255,255,255,0.07)",
-                    }}
-                  >
-                    <div
-                      className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider"
-                      style={{ color: "#f87171" }}
-                    >
-                      <TrendingUp className="h-3 w-3" /> Risk High
-                    </div>
-                    <div className="mt-2 text-lg font-black text-white">
-                      {snapshot ? `${snapshot.atRisk} cases` : "42 cases"}
-                    </div>
-                    <div
-                      className="mt-0.5 text-[10px]"
-                      style={{ color: "rgba(148,163,184,0.5)" }}
-                    >
-                      Flagged exit alerts
-                    </div>
-                  </motion.div>
-
-                  {/* Float widget — bottom right */}
-                  <motion.div
-                    animate={{ y: [0, 5, 0] }}
-                    transition={{
-                      duration: 6,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                    className="absolute bottom-4 right-4 w-[130px] rounded-[16px] p-3.5"
-                    style={{
-                      background: "rgba(7,17,31,0.9)",
-                      border: "1px solid rgba(255,255,255,0.07)",
-                    }}
-                  >
-                    <div
-                      className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider"
-                      style={{ color: "#6ee7b7" }}
-                    >
-                      <Workflow className="h-3 w-3" /> Policy Gate
-                    </div>
-                    <div className="mt-2 text-lg font-black text-white">
-                      Enforced
-                    </div>
-                    <div
-                      className="mt-0.5 text-[10px]"
-                      style={{ color: "rgba(148,163,184,0.5)" }}
-                    >
-                      Gates Operational
-                    </div>
-                  </motion.div>
-                </div>
-
-                {/* Bottom metric cards */}
-                <div className="mt-4 grid grid-cols-3 gap-3">
-                  {[
-                    {
-                      label: "Risk Overview",
-                      value: snapshot ? snapshot.atRisk : "42 cases",
-                      sub: "Exit prob > 70%",
-                    },
-                    {
-                      label: "Retention Pulse",
-                      value: snapshot
-                        ? `${(100 - snapshot.atRiskPct).toFixed(0)}%`
-                        : "96.6%",
-                      sub: "Stable workforce",
-                    },
-                    {
-                      label: "Policy State",
-                      value: "Active",
-                      sub: "Auth required",
-                    },
-                  ].map((card) => (
-                    <div
-                      key={card.label}
-                      className="rounded-[16px] p-3.5"
+                      className="flex h-10 w-10 flex-none items-center justify-center rounded-xl"
                       style={{
-                        background: "rgba(255,255,255,0.02)",
-                        border: "1px solid rgba(255,255,255,0.06)",
+                        background: `${accent}12`,
+                        border: `1px solid ${accent}30`,
                       }}
                     >
-                      <div
-                        className="text-[9px] font-bold uppercase tracking-[0.18em]"
-                        style={{ color: "rgba(148,163,184,0.4)" }}
-                      >
-                        {card.label}
-                      </div>
-                      <div className="mt-2 text-lg font-black text-white">
-                        {card.value}
-                      </div>
-                      <div
-                        className="mt-0.5 text-[9px]"
-                        style={{ color: "rgba(148,163,184,0.5)" }}
-                      >
-                        {card.sub}
-                      </div>
+                      <Icon className="h-4.5 w-4.5" style={{ color: accent }} />
                     </div>
-                  ))}
-                </div>
-              </GlassCard>
-            </motion.div>
-
-            {/* RIGHT — Access governance */}
-            <motion.div
-              initial={{ opacity: 0, x: 14 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.45, delay: 0.27 }}
-              className="md:col-span-2 lg:col-span-1"
-            >
-              <GlassCard className="p-5 h-full">
-                <div
-                  className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em]"
-                  style={{ color: "rgba(148,163,184,0.4)" }}
-                >
-                  <ShieldCheck
-                    className="h-3.5 w-3.5"
-                    style={{ color: "#67e8f9" }}
-                  />
-                  Access Governance
-                </div>
-                <div
-                  className="mt-4 rounded-[16px] p-4"
-                  style={{
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                  }}
-                >
-                  <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-400">
-                    Tenant Data Isolation
-                  </div>
-                  <div className="mt-2 text-lg font-extrabold text-white uppercase tracking-wider">
-                    Zero-Trust Partition
-                  </div>
-                  <p
-                    className="mt-1.5 text-xs leading-relaxed"
-                    style={{ color: "rgba(148,163,184,0.6)" }}
-                  >
-                    System partitions all analytics queries utilizing
-                    high-isolation schemas.
-                  </p>
-                </div>
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-2.5">
-                  {displayStats.map((stat) => (
-                    <div
-                      key={stat.label}
-                      className="flex items-center justify-between rounded-[14px] px-4 py-3"
-                      style={{
-                        background: "rgba(255,255,255,0.02)",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                      }}
-                    >
-                      <div
-                        className="text-xs font-semibold"
+                    <div>
+                      <div className="text-sm font-bold text-white">{title}</div>
+                      <p
+                        className="mt-1 text-xs leading-relaxed"
                         style={{ color: "rgba(148,163,184,0.6)" }}
                       >
-                        {stat.label}
-                      </div>
-                      <div className="text-sm font-black text-white">
-                        {stat.value}
-                      </div>
+                        {desc}
+                      </p>
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: the pattern you miss */}
+            <div className="rounded-[24px] p-6 sm:p-8" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="flex items-center justify-between">
+                <div
+                  className="text-[10px] font-black uppercase tracking-[0.24em]"
+                  style={{ color: "rgba(148,163,184,0.4)" }}
+                >
+                  What you miss before the resignation
                 </div>
-              </GlassCard>
-            </motion.div>
+                <Tag>Illustrative pattern</Tag>
+              </div>
+
+              {/* Animated bar chart */}
+              <div className="mt-8 flex h-48 items-end gap-2 sm:gap-3">
+                {RISK_SIGNAL.map((v, i) => {
+                  const isPeak = i === 10;
+                  const isRising = i >= 8;
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ scaleY: 0 }}
+                      whileInView={{ scaleY: 1 }}
+                      viewport={{ once: true, amount: 0.4 }}
+                      transition={{
+                        duration: 0.7,
+                        delay: i * 0.06,
+                        ease: [0.16, 1, 0.3, 1],
+                      }}
+                      className="flex-1 origin-bottom"
+                    >
+                      <div
+                        className="w-full rounded-t-md transition-colors duration-300"
+                        style={{
+                          height: `${(v / RISK_MAX) * 100}%`,
+                          minHeight: 6,
+                          background: isPeak
+                            ? "linear-gradient(180deg, #f43f5e, rgba(244,63,94,0.35))"
+                            : isRising
+                              ? "linear-gradient(180deg, #fbbf24, rgba(251,191,36,0.3))"
+                              : "linear-gradient(180deg, #34d399, rgba(52,211,153,0.25))",
+                          boxShadow: isPeak
+                            ? "0 0 18px rgba(244,63,94,0.4)"
+                            : "0 0 12px rgba(52,211,153,0.12)",
+                        }}
+                        title={`Month ${i + 1}`}
+                      />
+                    </motion.div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: "rgba(148,163,184,0.35)" }}>
+                <span>Months before exit</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#f43f5e" }} />
+                  signal spike
+                </span>
+              </div>
+
+              <div
+                className="mt-6 rounded-[16px] p-4"
+                style={{
+                  background: "rgba(244,63,94,0.05)",
+                  border: "1px solid rgba(244,63,94,0.18)",
+                }}
+              >
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider" style={{ color: "#f43f5e" }}>
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  The detection gap
+                </div>
+                <p className="mt-2 text-xs leading-relaxed" style={{ color: "rgba(226,232,240,0.75)" }}>
+                  Sentiment and morale drift are measurable weeks before exit.
+                  Aurelinx scores them continuously and surfaces the signal —
+                  before it becomes a goodbye.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
         {/* ══════════ SIMULATOR ══════════ */}
         <section
           id="section-1"
+          ref={simSectionRef}
           className="py-20"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
         >
@@ -1206,7 +1847,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               <Activity className="h-3.5 w-3.5" /> Continuous Ingest Sync
             </SectionLabel>
             <SectionHeading>
-              Interactive Ingestion Pipeline Simulator
+              Interactive <GradientWord>Ingestion Pipeline</GradientWord> Simulator
             </SectionHeading>
             <p
               className="mt-5 text-sm leading-relaxed"
@@ -1238,9 +1879,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   style={{
                     background:
                       idx === selectedScenarioIdx
-                        ? "rgba(103,232,249,0.05)"
+                        ? "rgba(110,231,183,0.05)"
                         : "rgba(255,255,255,0.02)",
-                    border: `1px solid ${idx === selectedScenarioIdx ? "rgba(103,232,249,0.25)" : "rgba(255,255,255,0.07)"}`,
+                    border: `1px solid ${idx === selectedScenarioIdx ? "rgba(110,231,183,0.25)" : "rgba(255,255,255,0.07)"}`,
                   }}
                   onMouseEnter={(e) => {
                     if (idx !== selectedScenarioIdx)
@@ -1284,15 +1925,18 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 type="button"
                 onClick={startSimulation}
                 disabled={isSimulating}
-                className="mt-3 w-full flex h-12 items-center justify-center gap-2 rounded-[18px] text-xs font-black uppercase tracking-widest transition-all select-none"
+                className="btn-shine mt-3 w-full flex h-12 items-center justify-center gap-2 rounded-[18px] text-xs font-black uppercase tracking-widest transition-all select-none"
                 style={{
                   background: isSimulating
-                    ? "rgba(103,232,249,0.06)"
-                    : "#67e8f9",
-                  border: `1px solid ${isSimulating ? "rgba(103,232,249,0.2)" : "transparent"}`,
-                  color: isSimulating ? "#67e8f9" : "#07111f",
+                    ? "rgba(110,231,183,0.06)"
+                    : "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                  border: `1px solid ${isSimulating ? "rgba(110,231,183,0.2)" : "transparent"}`,
+                  color: isSimulating ? "#6ee7b7" : "#020a07",
                   cursor: isSimulating ? "not-allowed" : "pointer",
                   opacity: isSimulating ? 0.7 : 1,
+                  boxShadow: isSimulating
+                    ? "none"
+                    : "0 12px 34px -10px rgba(52,211,153,0.45)",
                 }}
               >
                 <RefreshCw
@@ -1302,6 +1946,12 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   ? "Running Simulation…"
                   : "Trigger Simulation Run"}
               </button>
+              <p
+                className="text-center text-[9px] font-bold uppercase tracking-[0.2em]"
+                style={{ color: "rgba(148,163,184,0.35)" }}
+              >
+                Auto-plays on scroll · run it again anytime
+              </p>
             </div>
 
             {/* State machine + terminal */}
@@ -1315,7 +1965,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em]"
                   style={{ color: "rgba(148,163,184,0.4)" }}
                 >
-                  <Cpu className="h-4 w-4" style={{ color: "#67e8f9" }} />
+                  <Cpu className="h-4 w-4" style={{ color: "#6ee7b7" }} />
                   Pipeline State Monitor
                 </div>
                 <span
@@ -1340,7 +1990,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <div
                   className="absolute top-[18px] left-[10%] h-px transition-all duration-500"
                   style={{
-                    background: "#67e8f9",
+                    background: "#6ee7b7",
                     width: `${simActiveStep * 20}%`,
                   }}
                 />
@@ -1366,20 +2016,20 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                             background: isErr
                               ? "rgba(248,113,113,0.1)"
                               : isDone
-                                ? "rgba(103,232,249,0.1)"
+                                ? "rgba(110,231,183,0.1)"
                                 : isActive
-                                  ? "rgba(103,232,249,0.08)"
+                                  ? "rgba(110,231,183,0.08)"
                                   : "rgba(255,255,255,0.03)",
-                            border: `1px solid ${isErr ? "rgba(248,113,113,0.4)" : isDone ? "rgba(103,232,249,0.4)" : isActive ? "rgba(103,232,249,0.5)" : "rgba(255,255,255,0.08)"}`,
+                            border: `1px solid ${isErr ? "rgba(248,113,113,0.4)" : isDone ? "rgba(110,231,183,0.4)" : isActive ? "rgba(110,231,183,0.5)" : "rgba(255,255,255,0.08)"}`,
                             color: isErr
                               ? "#f87171"
                               : isDone
-                                ? "#67e8f9"
+                                ? "#6ee7b7"
                                 : isActive
-                                  ? "#67e8f9"
+                                  ? "#6ee7b7"
                                   : "rgba(148,163,184,0.4)",
                             boxShadow: isActive
-                              ? "0 0 14px rgba(103,232,249,0.25)"
+                              ? "0 0 14px rgba(110,231,183,0.25)"
                               : "none",
                           }}
                         >
@@ -1389,9 +2039,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                           className="text-[9px] font-black uppercase tracking-widest"
                           style={{
                             color: isActive
-                              ? "#67e8f9"
+                              ? "#6ee7b7"
                               : isDone
-                                ? "rgba(103,232,249,0.6)"
+                                ? "rgba(110,231,183,0.6)"
                                 : "rgba(148,163,184,0.3)",
                           }}
                         >
@@ -1418,7 +2068,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 >
                   <div
                     className="text-[10px] font-black uppercase tracking-wider"
-                    style={{ color: "rgba(103,232,249,0.6)" }}
+                    style={{ color: "rgba(110,231,183,0.6)" }}
                   >
                     {
                       simulatorScenarios[selectedScenarioIdx].steps[
@@ -1453,7 +2103,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   <div className="flex items-center gap-2">
                     <Terminal
                       className="h-3.5 w-3.5"
-                      style={{ color: "#67e8f9" }}
+                      style={{ color: "#6ee7b7" }}
                     />
                     SRE logs console
                   </div>
@@ -1466,10 +2116,13 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   />
                 </div>
                 <div
-                  className="rounded-b-[14px] p-4 font-mono text-[10px] leading-6 text-left overflow-y-auto max-h-[130px]"
+                  className={`rounded-b-[14px] p-4 font-mono text-[10px] leading-6 text-left overflow-y-auto max-h-[130px] ${isSimulating ? "term-cursor" : ""}`}
                   style={{
                     background: "rgba(0,0,0,0.5)",
                     border: "1px solid rgba(255,255,255,0.06)",
+                    boxShadow: isSimulating
+                      ? "inset 0 0 24px rgba(52,211,153,0.04)"
+                      : "none",
                   }}
                 >
                   {simLogs.map((log, i) => (
@@ -1482,7 +2135,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                             : log.includes("SUCCESS")
                               ? "#6ee7b7"
                               : log.includes("ML_ENGINE")
-                                ? "#67e8f9"
+                                ? "#6ee7b7"
                                 : "rgba(148,163,184,0.6)",
                       }}
                     >
@@ -1495,7 +2148,155 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           </div>
         </section>
 
-        {/* ══════════ MATH ENGINE ══════════ */}
+        {/* ══════════ LIVE METRICS BAND (REAL DATA ONLY) ══════════ */}
+        <section
+          className="py-20"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+        >
+          <div className="mx-auto max-w-[700px] text-center">
+            <SectionLabel>
+              <Gauge className="h-3.5 w-3.5" /> Live Tenant Telemetry
+            </SectionLabel>
+            <SectionHeading>
+              Real numbers, <GradientWord>streamed live</GradientWord> from your tenant
+            </SectionHeading>
+            <p
+              className="mt-5 text-sm leading-relaxed"
+              style={{ color: "rgba(148,163,184,0.6)" }}
+            >
+              No demo values — these gauges read directly from the Aurelinx
+              analytics snapshot of your connected workspace, refreshed every
+              15 seconds.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-12 max-w-[1200px]">
+            {hasLive ? (
+              <GlassCard className="p-8">
+                <div className="flex items-center justify-center gap-2 pb-6">
+                  <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: "#6ee7b7", boxShadow: "0 0 10px rgba(110,231,183,0.9)" }} />
+                  <span
+                    className="text-[10px] font-black uppercase tracking-[0.24em]"
+                    style={{ color: "rgba(110,231,183,0.8)" }}
+                  >
+                    Streaming live · refreshes every 15s
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-start justify-center gap-10 lg:gap-16">
+                  <div className="flex flex-col items-center gap-3">
+                    <RadialGauge
+                      value={(100 - Number(snapshot.atRiskPct)) / 100}
+                      label="Retention Pulse"
+                      sub="of workforce"
+                      color="#6ee7b7"
+                      format={(v) => `${(v * 100).toFixed(1)}%`}
+                    />
+                  </div>
+                  <div className="flex flex-col items-center gap-3">
+                    <RadialGauge
+                      value={Number(snapshot.atRiskPct) / 100}
+                      label="Risk Cluster"
+                      sub="flagged cases"
+                      color="#f87171"
+                      format={(v) => `${(v * 100).toFixed(1)}%`}
+                    />
+                  </div>
+                  <div className="flex flex-col items-center gap-3">
+                    <RadialGauge
+                      value={Number(snapshot.avgSentiment)}
+                      label="Avg Morale"
+                      sub="sentiment index"
+                      color="#6ee7b7"
+                      format={(v) => v.toFixed(2)}
+                    />
+                  </div>
+                  <div className="flex flex-col items-center gap-3">
+                    <div
+                      className="flex h-[148px] w-[148px] flex-col items-center justify-center rounded-full"
+                      style={{
+                        background: "rgba(255,255,255,0.02)",
+                        border: "1px solid rgba(110,231,183,0.2)",
+                        boxShadow: "0 0 30px rgba(52,211,153,0.08)",
+                      }}
+                    >
+                      <div
+                        className="text-[26px] font-black tabular-nums"
+                        style={{ color: "#a78bfa", textShadow: "0 0 18px rgba(167,139,250,0.4)" }}
+                      >
+                        <CountUp
+                          value={Number(snapshot.total)}
+                          format={(v) => Math.round(v).toLocaleString()}
+                        />
+                      </div>
+                      <div
+                        className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.18em]"
+                        style={{ color: "rgba(148,163,184,0.5)" }}
+                      >
+                        active records
+                      </div>
+                    </div>
+                    <div
+                      className="text-[9px] font-black uppercase tracking-[0.2em]"
+                      style={{ color: "rgba(148,163,184,0.6)" }}
+                    >
+                      Workforce Size
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+                  {[
+                    [`${snapshot.atRisk} cases above 70% exit probability`, "#f87171"],
+                    ["Served over Server-Sent Events", "#6ee7b7"],
+                    ["Tenant-isolated PostgreSQL core", "#a78bfa"],
+                  ].map(([label, accent]) => (
+                    <Tag key={label} accent={accent}>{label}</Tag>
+                  ))}
+                </div>
+              </GlassCard>
+            ) : (
+              <GlassCard className="p-10 text-center">
+                <div className="flex flex-col items-center gap-5">
+                  <div
+                    className="flex h-16 w-16 items-center justify-center rounded-full"
+                    style={{
+                      background: "rgba(110,231,183,0.06)",
+                      border: "1px solid rgba(110,231,183,0.2)",
+                    }}
+                  >
+                    <Activity className="h-7 w-7" style={{ color: "#6ee7b7" }} />
+                  </div>
+                  <div>
+                    <div className="text-lg font-extrabold text-white">
+                      Your live telemetry appears here
+                    </div>
+                    <p
+                      className="mt-2 mx-auto max-w-[520px] text-sm leading-relaxed"
+                      style={{ color: "rgba(148,163,184,0.6)" }}
+                    >
+                      Connect your workspace and the gauges above fill with
+                      real data from your own tenant — no placeholders, no demo
+                      numbers.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onEnterWorkspace}
+                    className="btn-shine inline-flex h-11 items-center gap-2 rounded-xl px-6 text-sm font-bold transition-all active:scale-[0.98]"
+                    style={{
+                      background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                      color: "#020a07",
+                      boxShadow: "0 12px 34px -8px rgba(52,211,153,0.5)",
+                    }}
+                  >
+                    Enter Workspace <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </GlassCard>
+            )}
+          </div>
+        </section>
+
+        {/* ══════════ MATH ENGINE — INTERACTIVE EXPLORER ══════════ */}
         <section
           id="section-2"
           className="py-20"
@@ -1505,110 +2306,156 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             <SectionLabel>
               <BrainCircuit className="h-3.5 w-3.5" /> Analytical Core
             </SectionLabel>
-            <SectionHeading>Aurelinx Math-Engine Pillars</SectionHeading>
+            <SectionHeading>
+              Aurelinx <GradientWord>Math-Engine</GradientWord> Pillars
+            </SectionHeading>
             <p
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
-              Mathematically-grounded solvers and simulation parameters powering advanced workforce optimizations, career projection pathways, and retention sandbox analytics.
+              Mathematically-grounded solvers and simulation parameters powering advanced workforce optimizations, career projection pathways, and retention sandbox analytics. Select a pillar to explore it.
             </p>
           </div>
 
-          <div className="mx-auto mt-12 grid max-w-[1600px] gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                title: "Semantic Skills Graph & Adjacencies",
-                formula: "G = (V, E) | min(D_ij)",
-                accent: "#0ea5a4",
-                desc: "Resolves multidimensional skill match requirements by building a weighted directional adjacency matrix. Evaluates skills overlap, identifies critical gaps, and projects the shortest path from candidate vectors to target role nodes.",
-                highlight: "Shortest Path Dijkstra Routing",
-              },
-              {
-                title: "Optimal Team Assembly (Simulated Annealing)",
-                formula: "P = exp(ΔE / T) | T_k = T_0 * α^k",
-                accent: "#fbbf24",
-                desc: "Searches the vast combinatorics space of employee-skill pairings using a stochastic simulated annealing engine. Constrained by strict budget caps, maximum team size limits, and role-skill density matrices.",
-                highlight: "Metropolis-Hastings Solver",
-              },
-              {
-                title: "Attrition Sandbox & Cox Hazards",
-                formula: "h(t) = h_0(t) * exp(Σ β_i * X_i)",
-                accent: "#ef4444",
-                desc: "Estimates cumulative baseline hazards across double-Gaussian peak tenures. Integrates SHAP-covariate weights (morale, salary ratio, workload fatigue) to compute dynamic hazard multipliers and flight risk mitigation paths.",
-                highlight: "Proportional Hazards Regression",
-              },
-              {
-                title: "Organizational Network Analysis (ONA)",
-                formula: "PR(u) = (1-d)/N + d * Σ (PR(v) / L(v))",
-                accent: "#ec4899",
-                desc: "Maps pull request reviews, collaboration commits, and communication telemetry weights onto an interactive organizational interaction graph. Computes influence via PageRank and bridge-strength via Betweenness.",
-                highlight: "Brandes Betweenness Centrality",
-              },
-              {
-                title: "Markov Career Path Horizons",
-                formula: "P^(n) = P^n | Σ P_ij = 1",
-                accent: "#a78bfa",
-                desc: "Models internal role transitions as a discrete-time Markov chain. Projects state probability matrices over a 3-year horizon, scaling step velocity dynamically with employee skills coverage ratios.",
-                highlight: "Chapman-Kolmogorov Horizon Projection",
-              }
-            ].map((pillar) => (
-              <div
-                key={pillar.title}
-                className="group relative overflow-hidden rounded-[22px] p-6 transition-all duration-300 flex flex-col justify-between"
-                style={{
-                  background: "rgba(255,255,255,0.02)",
-                  border: "1px solid rgba(255,255,255,0.07)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = pillar.accent + "40";
-                  e.currentTarget.style.background = "rgba(255,255,255,0.035)";
-                  e.currentTarget.style.transform = "translateY(-3px)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
-                  e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
+          <div className="mx-auto mt-12 grid max-w-[1500px] gap-5 lg:grid-cols-[340px_1fr]">
+            {/* Pillar selector */}
+            <div className="space-y-2.5">
+              {MATH_PILLARS.map((pillar, idx) => (
+                <button
+                  key={pillar.title}
+                  type="button"
+                  onClick={() => setActivePillar(idx)}
+                  className="w-full rounded-[18px] p-4 text-left transition-all duration-200 select-none"
+                  style={{
+                    background:
+                      idx === activePillar
+                        ? `${pillar.accent}0d`
+                        : "rgba(255,255,255,0.02)",
+                    border: `1px solid ${idx === activePillar ? `${pillar.accent}40` : "rgba(255,255,255,0.07)"}`,
+                  }}
+                >
+                  <div className="flex items-center gap-3">
                     <span
-                      className="rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest"
+                      className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-[10px] font-black"
                       style={{
-                        background: pillar.accent + "12",
-                        border: "1px solid " + pillar.accent + "30",
+                        background: `${pillar.accent}14`,
+                        border: `1px solid ${pillar.accent}30`,
                         color: pillar.accent,
                       }}
                     >
-                      {pillar.highlight}
+                      {String(idx + 1).padStart(2, "0")}
+                    </span>
+                    <span className="min-w-0">
+                      <span
+                        className="block truncate text-xs font-bold text-white"
+                        title={pillar.title}
+                      >
+                        {pillar.title}
+                      </span>
+                      <span
+                        className="mt-0.5 block truncate text-[9px] font-bold uppercase tracking-wider"
+                        style={{ color: pillar.accent }}
+                      >
+                        {pillar.highlight}
+                      </span>
                     </span>
                   </div>
-                  <h3 className="text-base font-extrabold text-white mb-2 leading-snug">
-                    {pillar.title}
-                  </h3>
-                  <p
-                    className="text-xs leading-relaxed mb-6"
-                    style={{ color: "rgba(148,163,184,0.65)" }}
-                  >
-                    {pillar.desc}
-                  </p>
-                </div>
-                <div
-                  className="rounded-xl p-3 font-mono text-[11px] text-center"
-                  style={{
-                    background: "rgba(0,0,0,0.25)",
-                    border: "1px solid rgba(255,255,255,0.04)",
-                    color: pillar.accent,
-                  }}
+                </button>
+              ))}
+            </div>
+
+            {/* Explorer panel */}
+            <GlassCard className="relative overflow-hidden p-7 sm:p-9">
+              <div className="scan-line" aria-hidden="true" />
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activePillar}
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  className="relative"
                 >
-                  {pillar.formula}
-                </div>
-              </div>
-            ))}
+                  {(() => {
+                    const pillar = MATH_PILLARS[activePillar];
+                    return (
+                      <>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <span
+                            className="rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest"
+                            style={{
+                              background: `${pillar.accent}12`,
+                              border: `1px solid ${pillar.accent}30`,
+                              color: pillar.accent,
+                            }}
+                          >
+                            {pillar.highlight}
+                          </span>
+                          <span
+                            className="text-[9px] font-bold uppercase tracking-[0.2em]"
+                            style={{ color: "rgba(148,163,184,0.4)" }}
+                          >
+                            Applied in: {pillar.applied}
+                          </span>
+                        </div>
+
+                        <h3 className="mt-5 text-2xl font-extrabold tracking-tight text-white">
+                          {pillar.title}
+                        </h3>
+                        <p
+                          className="mt-4 max-w-[760px] text-sm leading-relaxed"
+                          style={{ color: "rgba(148,163,184,0.7)" }}
+                        >
+                          {pillar.desc}
+                        </p>
+
+                        <div
+                          className="mt-7 rounded-2xl p-5 font-mono text-[15px] sm:text-base"
+                          style={{
+                            background: "rgba(0,0,0,0.35)",
+                            border: `1px solid ${pillar.accent}25`,
+                            color: pillar.accent,
+                            boxShadow: `inset 0 0 30px ${pillar.accent}08`,
+                            textShadow: `0 0 20px ${pillar.accent}30`,
+                          }}
+                        >
+                          <FormulaTypewriter
+                            formula={pillar.formula}
+                            active
+                          />
+                        </div>
+
+                        <div className="mt-6 flex items-center justify-between">
+                          <span
+                            className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em]"
+                            style={{ color: "rgba(148,163,184,0.4)" }}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: "#6ee7b7" }} />
+                            Live in the executive workspace
+                          </span>
+                          <button
+                            type="button"
+                            onClick={onEnterWorkspace}
+                            className="flex items-center gap-1.5 rounded-full px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                            style={{
+                              background: `${pillar.accent}12`,
+                              border: `1px solid ${pillar.accent}30`,
+                              color: pillar.accent,
+                            }}
+                          >
+                            Open workspace <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </motion.div>
+              </AnimatePresence>
+            </GlassCard>
           </div>
         </section>
 
-        {/* ══════════ MODULES ══════════ */}
+        {/* ══════════ MODULES — INTERACTIVE PLATFORM TOUR ══════════ */}
         <section
           id="section-3"
           className="py-20"
@@ -1618,74 +2465,181 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             <SectionLabel>
               <Settings className="h-3.5 w-3.5" /> Platform Specs
             </SectionLabel>
-            <SectionHeading>Core Platform Modules</SectionHeading>
+            <SectionHeading>
+              Core <GradientWord>Platform Modules</GradientWord>
+            </SectionHeading>
             <p
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
               Aurelinx converts raw talent inputs, risk indicators, and
               compliance gate parameters into a beautifully unified, highly
-              dense control panel.
+              dense control panel. Explore each module.
             </p>
           </div>
 
-          <div className="mx-auto mt-12 grid max-w-[1600px] gap-5 sm:grid-cols-2">
-            {PLATFORM_MODULES.map((mod, idx) => {
-              const Icon = mod.icon;
-              return (
-                <motion.div
-                  key={mod.title}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.15 }}
-                  transition={{ duration: 0.5, delay: (idx % 2) * 0.08, ease: [0.16, 1, 0.3, 1] }}
-                  whileHover={{ y: -5, scale: 1.01, transition: { type: "spring", stiffness: 350, damping: 25 } }}
-                  className="group rounded-[20px] p-6 border border-white/10 bg-white/[0.02] hover:border-cyan-400/30 hover:bg-white/[0.04] transition-colors duration-300 backdrop-blur-xl shadow-xl"
-                  style={{ willChange: "transform, opacity" }}
-                >
-                  <div
-                    className="flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110"
+          <div className="mx-auto mt-12 grid max-w-[1500px] gap-5 lg:grid-cols-[300px_1fr]">
+            {/* Module selector */}
+            <div className="space-y-2">
+              {PLATFORM_MODULES.map((mod, idx) => {
+                const Icon = mod.icon;
+                const isActive = idx === activeModule;
+                return (
+                  <button
+                    key={mod.title}
+                    type="button"
+                    onClick={() => setActiveModule(idx)}
+                    className="w-full rounded-[16px] p-3.5 text-left transition-all duration-200 select-none"
                     style={{
-                      background: `${mod.accent}15`,
-                      border: `1px solid ${mod.accent}35`,
-                      boxShadow: `0 0 16px ${mod.accent}20`,
+                      background: isActive
+                        ? `${mod.accent}0d`
+                        : "rgba(255,255,255,0.02)",
+                      border: `1px solid ${isActive ? `${mod.accent}40` : "rgba(255,255,255,0.07)"}`,
                     }}
                   >
-                    <Icon className="h-5 w-5" style={{ color: mod.accent }} />
-                  </div>
-                  <h3 className="mt-4 text-base font-bold text-white group-hover:text-cyan-200 transition-colors">
-                    {mod.title}
-                  </h3>
-                  <p
-                    className="mt-2 text-[13px] leading-relaxed"
-                    style={{ color: "rgba(148,163,184,0.65)" }}
-                  >
-                    {mod.body}
-                  </p>
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {mod.tags.map((t) => (
-                      <Tag key={t}>{t}</Tag>
-                    ))}
-                  </div>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="flex h-9 w-9 flex-none items-center justify-center rounded-xl transition-transform duration-300"
+                        style={{
+                          background: `${mod.accent}14`,
+                          border: `1px solid ${mod.accent}30`,
+                          transform: isActive ? "scale(1.08)" : "scale(1)",
+                        }}
+                      >
+                        <Icon className="h-4 w-4" style={{ color: mod.accent }} />
+                      </span>
+                      <span className="min-w-0">
+                        <span
+                          className="block truncate text-[11px] font-bold text-white"
+                          title={mod.title}
+                        >
+                          {mod.title}
+                        </span>
+                        <span
+                          className="mt-0.5 block text-[9px] font-bold uppercase tracking-wider"
+                          style={{ color: "rgba(148,163,184,0.4)" }}
+                        >
+                          Module {String(idx + 1).padStart(2, "0")}
+                        </span>
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tour panel */}
+            <GlassCard className="relative overflow-hidden p-7 sm:p-9">
+              <div className="scan-line" aria-hidden="true" />
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeModule}
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  className="relative"
+                >
+                  {(() => {
+                    const mod = PLATFORM_MODULES[activeModule];
+                    const Icon = mod.icon;
+                    return (
+                      <>
+                        <div className="flex items-start gap-5">
+                          <div
+                            className="flex h-14 w-14 flex-none items-center justify-center rounded-2xl"
+                            style={{
+                              background: `${mod.accent}14`,
+                              border: `1px solid ${mod.accent}35`,
+                              boxShadow: `0 0 24px ${mod.accent}20`,
+                            }}
+                          >
+                            <Icon className="h-6 w-6" style={{ color: mod.accent }} />
+                          </div>
+                          <div>
+                            <div
+                              className="text-[9px] font-black uppercase tracking-[0.24em]"
+                              style={{ color: mod.accent }}
+                            >
+                              Module {String(activeModule + 1).padStart(2, "0")} · {PLATFORM_MODULES.length} modules
+                            </div>
+                            <h3 className="mt-1.5 text-2xl font-extrabold tracking-tight text-white">
+                              {mod.title}
+                            </h3>
+                          </div>
+                        </div>
+
+                        <p
+                          className="mt-6 max-w-[820px] text-sm leading-relaxed"
+                          style={{ color: "rgba(148,163,184,0.7)" }}
+                        >
+                          {mod.body}
+                        </p>
+
+                        <div className="mt-7 flex flex-wrap gap-2">
+                          {mod.tags.map((t) => (
+                            <Tag key={t} accent={mod.accent}>{t}</Tag>
+                          ))}
+                        </div>
+
+                        <div
+                          className="mt-7 rounded-[16px] p-4"
+                          style={{
+                            background: "rgba(255,255,255,0.02)",
+                            border: "1px solid rgba(255,255,255,0.06)",
+                          }}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <span
+                              className="text-[9px] font-bold uppercase tracking-[0.2em]"
+                              style={{ color: "rgba(148,163,184,0.4)" }}
+                            >
+                              Deep-dive available inside the workspace
+                            </span>
+                            <button
+                              type="button"
+                              onClick={onEnterWorkspace}
+                              className="flex items-center gap-1.5 rounded-full px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                              style={{
+                                background: `${mod.accent}12`,
+                                border: `1px solid ${mod.accent}30`,
+                                color: mod.accent,
+                              }}
+                            >
+                              Explore module <ChevronRight className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </motion.div>
-              );
-            })}
+              </AnimatePresence>
+            </GlassCard>
           </div>
         </section>
 
-        {/* ══════════ ROI CALCULATOR ══════════ */}
+        {/* ══════════ ROI CALCULATOR — ENTERPRISE GRADE ══════════ */}
         <section
           className="py-20"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
         >
           <div className="mx-auto max-w-[700px] text-center mb-12">
-            <SectionLabel>Value Realization</SectionLabel>
-            <SectionHeading>Interactive Turnover ROI Calculator</SectionHeading>
+            <SectionLabel>
+              <Gauge className="h-3.5 w-3.5" /> Value Realization
+            </SectionLabel>
+            <SectionHeading>
+              Interactive <GradientWord>Turnover ROI</GradientWord> Calculator
+            </SectionHeading>
             <p
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
-              Industry metrics show employee replacement costs (recruiting, onboarding, productivity lag) average 1.5x base salary. Adjust variables to see your organization's potential savings.
+              Benchmark model based on industry research: employee replacement
+              costs (recruiting, onboarding, productivity lag) average{" "}
+              <span className="text-cyan-300 font-semibold">1.5x base salary</span>{" "}
+              (SHRM / Gallup). Adjust the variables and watch the forecast
+              update live.
             </p>
           </div>
 
@@ -1705,7 +2659,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     step="100"
                     value={calcWorkforce}
                     onChange={(e) => setCalcWorkforce(Number(e.target.value))}
-                    className="w-full h-1.5 bg-slate-950/70 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none"
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none"
+                    style={sliderFill(100, 10000, calcWorkforce)}
                   />
                   <div className="flex justify-between text-[10px] text-slate-500 mt-1">
                     <span>100</span>
@@ -1725,7 +2680,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     step="5000"
                     value={calcSalary}
                     onChange={(e) => setCalcSalary(Number(e.target.value))}
-                    className="w-full h-1.5 bg-slate-950/70 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none"
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none"
+                    style={sliderFill(40000, 300000, calcSalary)}
                   />
                   <div className="flex justify-between text-[10px] text-slate-500 mt-1">
                     <span>$40,000</span>
@@ -1745,7 +2701,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     step="1"
                     value={calcTurnover}
                     onChange={(e) => setCalcTurnover(Number(e.target.value))}
-                    className="w-full h-1.5 bg-slate-950/70 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none"
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none"
+                    style={sliderFill(5, 45, calcTurnover)}
                   />
                   <div className="flex justify-between text-[10px] text-slate-500 mt-1">
                     <span>5% (Healthy)</span>
@@ -1765,48 +2722,114 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     step="5"
                     value={calcReduction}
                     onChange={(e) => setCalcReduction(Number(e.target.value))}
-                    className="w-full h-1.5 bg-slate-950/70 rounded-lg appearance-none cursor-pointer accent-emerald-400 focus:outline-none"
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-emerald-400 focus:outline-none"
+                    style={sliderFill(10, 50, calcReduction, "rgba(52,211,153,0.6)", "rgba(16,185,129,0.6)")}
                   />
                   <div className="flex justify-between text-[10px] text-slate-500 mt-1">
                     <span>10% (Conservative)</span>
                     <span>50% (Ambitious)</span>
                   </div>
                 </div>
+
+                <div
+                  className="rounded-[16px] p-4"
+                  style={{
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                  }}
+                >
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider" style={{ color: "rgba(148,163,184,0.4)" }}>
+                    <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#6ee7b7" }} />
+                    How the model works
+                  </div>
+                  <p className="mt-2 text-[11px] leading-relaxed" style={{ color: "rgba(148,163,184,0.6)" }}>
+                    Annual departures × 1.5× salary = total attrition cost.
+                    Aurelinx retention loops (30/60/90-day interventions) are
+                    modeled to recover a share of those departures, which is
+                    your direct savings.
+                  </p>
+                </div>
               </div>
 
               {/* Computations Side */}
               <div className="flex flex-col justify-between rounded-2xl bg-slate-950/40 border border-white/5 p-6">
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500 mb-6">
-                    AURELINX IMPACT FORECAST
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">
+                      AURELINX IMPACT FORECAST
+                    </div>
+                    <span
+                      className="rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest"
+                      style={{
+                        background: "rgba(110,231,183,0.08)",
+                        border: "1px solid rgba(110,231,183,0.2)",
+                        color: "#6ee7b7",
+                      }}
+                    >
+                      Updates live
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 mb-6">
                     <div>
                       <div className="text-xs text-slate-400 mb-1">Annual Departures</div>
                       <div className="text-xl font-bold text-white font-mono">
-                        {Math.round(calcWorkforce * (calcTurnover / 100))} <span className="text-xs font-normal text-slate-400">exits/yr</span>
+                        {departures} <span className="text-xs font-normal text-slate-400">exits/yr</span>
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-400 mb-1">Total Attrition Cost</div>
-                      <div className="text-xl font-bold text-rose-400 font-mono">
-                        ${(Math.round(calcWorkforce * (calcTurnover / 100)) * calcSalary * 1.5).toLocaleString()}
+                      <div className="text-xs text-slate-400 mb-1">Retained via Aurelinx</div>
+                      <div className="text-xl font-bold text-emerald-400 font-mono">
+                        +{retainedCount} <span className="text-xs font-normal text-slate-400">/ yr</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="border-t border-white/5 pt-6 space-y-4">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-400">Retained Employees via Aurelinx</span>
-                      <span className="font-bold text-emerald-400 font-mono">
-                        +{Math.round(calcWorkforce * (calcTurnover / 100) * (calcReduction / 100))} / year
-                      </span>
+                  {/* Cost comparison bars */}
+                  <div className="space-y-5">
+                    <div>
+                      <div className="flex justify-between items-center text-xs mb-1.5">
+                        <span className="text-slate-400">Current annual attrition cost</span>
+                        <span className="font-mono text-rose-400 font-bold">${costToday.toLocaleString()}</span>
+                      </div>
+                      <div className="h-3 rounded-full bg-white/5 overflow-hidden">
+                        <div
+                          className="bar-fill h-full rounded-full"
+                          style={{
+                            width: "100%",
+                            background: "linear-gradient(90deg, rgba(244,63,94,0.75), rgba(244,63,94,0.3))",
+                          }}
+                        />
+                      </div>
                     </div>
+                    <div>
+                      <div className="flex justify-between items-center text-xs mb-1.5">
+                        <span className="text-slate-400">With Aurelinx retention loops</span>
+                        <span className="font-mono text-emerald-400 font-bold">${afterCost.toLocaleString()}</span>
+                      </div>
+                      <div className="h-3 rounded-full bg-white/5 overflow-hidden">
+                        <div
+                          className="bar-fill h-full rounded-full"
+                          style={{
+                            width: `${afterPct}%`,
+                            background: "linear-gradient(90deg, rgba(52,211,153,0.75), rgba(52,211,153,0.3))",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/5 pt-5 mt-6 space-y-4">
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-slate-400">Cost Per Exit (1.5x Multiplier)</span>
                       <span className="font-bold text-slate-300 font-mono">
                         ${(calcSalary * 1.5).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-400">Avg Retention Loop Cost</span>
+                      <span className="font-bold text-slate-300 font-mono">
+                        $4,500 / intervention
                       </span>
                     </div>
                   </div>
@@ -1816,8 +2839,16 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   <div className="text-xs text-emerald-400 font-bold uppercase tracking-widest mb-1">
                     ESTIMATED NET ANNUAL SAVINGS
                   </div>
-                  <div className="text-4xl sm:text-5xl font-black text-white font-mono tracking-tight glow-text">
-                    ${(Math.round(calcWorkforce * (calcTurnover / 100) * (calcReduction / 100)) * calcSalary * 1.5).toLocaleString()}
+                  <div
+                    className="text-4xl sm:text-5xl font-black text-white font-mono tracking-tight"
+                    style={{ textShadow: "0 0 32px rgba(52,211,153,0.35)" }}
+                  >
+                    ${" "}
+                    <CountUp
+                      key={`${calcWorkforce}-${calcSalary}-${calcTurnover}-${calcReduction}`}
+                      value={savings}
+                      format={(v) => Math.round(v).toLocaleString()}
+                    />
                   </div>
                   <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
                     *Savings projection based on standard organizational replacement cost indexes (SHRM, Gallup). Net returns vary by department role specificity.
@@ -1835,8 +2866,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
         >
           <div className="mx-auto max-w-[700px] text-center">
-            <SectionLabel>Connectors & Integrations</SectionLabel>
-            <SectionHeading>Enterprise Data Integrations Hub</SectionHeading>
+            <SectionLabel>Connectors &amp; Integrations</SectionLabel>
+            <SectionHeading>
+              Enterprise <GradientWord>Data Integrations</GradientWord> Hub
+            </SectionHeading>
             <p
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
@@ -1845,10 +2878,14 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               HRIS, ATS, and directory systems with live validation.
             </p>
           </div>
-          <div className="mx-auto mt-12 grid max-w-[1600px] gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {displayConnectors.slice(0, 6).map((c, i) => (
-              <ConnectorTile key={`${c.name}-${i}`} {...c} />
-            ))}
+
+          <div className="mt-12 mx-auto max-w-[1600px]">
+            <Ticker items={tickerItems} className="mb-8" />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {displayConnectors.slice(0, 6).map((c, i) => (
+                <ConnectorTile key={`${c.name}-${i}`} {...c} />
+              ))}
+            </div>
           </div>
         </section>
 
@@ -1860,10 +2897,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         >
           <div className="mx-auto max-w-[700px] text-center">
             <SectionLabel>
-              <ShieldCheck className="h-3.5 w-3.5" /> SRE & Security Compliance
+              <ShieldCheck className="h-3.5 w-3.5" /> SRE &amp; Security Compliance
             </SectionLabel>
             <SectionHeading>
-              System Specifications & Audit Readiness
+              System Specifications &amp; <GradientWord>Audit Readiness</GradientWord>
             </SectionHeading>
             <p
               className="mt-5 text-sm leading-relaxed"
@@ -1896,12 +2933,12 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     style={{
                       background:
                         activeAccordionTab === id
-                          ? "rgba(103,232,249,0.08)"
+                          ? "rgba(110,231,183,0.08)"
                           : "transparent",
-                      border: `1px solid ${activeAccordionTab === id ? "rgba(103,232,249,0.25)" : "transparent"}`,
+                      border: `1px solid ${activeAccordionTab === id ? "rgba(110,231,183,0.25)" : "transparent"}`,
                       color:
                         activeAccordionTab === id
-                          ? "#67e8f9"
+                          ? "#6ee7b7"
                           : "rgba(148,163,184,0.5)",
                       cursor: "pointer",
                     }}
@@ -2111,9 +3148,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                             <span
                               className="rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-widest"
                               style={{
-                                background: "rgba(103,232,249,0.08)",
-                                border: "1px solid rgba(103,232,249,0.2)",
-                                color: "#67e8f9",
+                                background: "rgba(110,231,183,0.08)",
+                                border: "1px solid rgba(110,231,183,0.2)",
+                                color: "#6ee7b7",
                               }}
                             >
                               {card.status}
@@ -2152,145 +3189,394 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           </div>
         </section>
 
+        {/* ══════════ CLOSING CTA PANEL ══════════ */}
+        <section
+          className="py-20"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+        >
+          <div
+            className="relative mx-auto max-w-[1100px] overflow-hidden rounded-[28px] p-10 sm:p-14 text-center"
+            style={{
+              background:
+                "radial-gradient(120% 130% at 50% 0%, rgba(52,211,153,0.14), rgba(4,16,11,0.9) 60%)",
+              border: "1px solid rgba(110,231,183,0.22)",
+              boxShadow: "0 30px 90px -25px rgba(52,211,153,0.3)",
+            }}
+          >
+            <div className="pointer-events-none absolute inset-x-0 -top-40 flex justify-center" aria-hidden="true">
+              <AuroraBlob color="rgba(52,211,153,0.4)" size={460} />
+            </div>
+            <div className="relative">
+              <SectionLabel>
+                <CheckCircle2 className="h-3.5 w-3.5" /> Ready when you are
+              </SectionLabel>
+              <h2 className="mt-6 text-[clamp(1.9rem,4vw,3rem)] font-extrabold leading-[1.08] tracking-tight text-white">
+                See your workforce <GradientWord>clearly</GradientWord> — no blind spots.
+              </h2>
+              <p
+                className="mx-auto mt-5 max-w-[560px] text-sm leading-relaxed"
+                style={{ color: "rgba(148,163,184,0.7)" }}
+              >
+                Connect your HRIS and stream real-time attrition, morale, and
+                policy telemetry into one calm, sharp control panel.
+              </p>
+              <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={onEnterWorkspace}
+                  className="btn-shine inline-flex h-12 items-center gap-2 rounded-xl px-7 text-sm font-bold transition-all active:scale-[0.98]"
+                  style={{
+                    background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                    color: "#020a07",
+                    boxShadow: "0 12px 34px -8px rgba(52,211,153,0.5)",
+                  }}
+                >
+                  Enter Workspace <ArrowRight className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenEnterprise}
+                  className="inline-flex h-12 items-center gap-2 rounded-xl px-7 text-sm font-semibold transition-all active:scale-[0.98]"
+                  style={{
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    color: "rgba(226,232,240,0.85)",
+                    backdropFilter: "blur(8px)",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
+                  }}
+                >
+                  <Settings className="h-4 w-4" /> Operations Setup
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ══════════ PRODUCTION ENTERPRISE FOOTER ══════════ */}
         <footer
           className="mt-20 pt-16 pb-12 relative overflow-hidden"
           style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "rgba(5, 12, 24, 0.6)" }}
         >
+          {/* Gradient hairline top edge */}
+          <div
+            className="pointer-events-none absolute top-0 inset-x-0 h-px"
+            style={{ background: "linear-gradient(90deg, transparent, rgba(110,231,183,0.45), rgba(163,230,53,0.35), transparent)" }}
+            aria-hidden="true"
+          />
+
           {/* Ambient Glow */}
           <div
             className="pointer-events-none absolute -bottom-24 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full blur-[140px] opacity-20"
-            style={{ background: "radial-gradient(circle, #67e8f9 0%, #3b82f6 50%, transparent 80%)" }}
+            style={{ background: "radial-gradient(circle, #6ee7b7 0%, #2dd4bf 50%, transparent 80%)" }}
           />
 
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 relative z-10">
-            
-            {/* Top Row: Brand Info + Newsletter / Action Card */}
-            <div className="grid gap-10 lg:grid-cols-12 items-start">
-              
-              {/* Brand & Mission Statement (5 Cols) */}
-              <div className="lg:col-span-5 space-y-4 text-left">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+
+            {/* CTA strip */}
+            <div
+              className="flex flex-col gap-6 rounded-2xl p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between"
+              style={{
+                background: "rgba(255,255,255,0.02)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                backdropFilter: "blur(10px)",
+              }}
+            >
+              <div className="space-y-1 text-left">
+                <h4 className="text-lg font-extrabold tracking-tight text-white">
+                  Ready to see your workforce clearly?
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Launch the workspace console or configure enterprise webhook
+                  gateways in seconds.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div
+                  className="inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider"
+                  style={{
+                    background: sreStatus === "operational" ? "rgba(110,231,183,0.08)" : "rgba(248,113,113,0.08)",
+                    border: `1px solid ${sreStatus === "operational" ? "rgba(110,231,183,0.25)" : "rgba(248,113,113,0.25)"}`,
+                    color: sreStatus === "operational" ? "#6ee7b7" : "#f87171",
+                  }}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${sreStatus === "operational" ? "animate-pulse" : ""}`}
+                    style={{ background: sreStatus === "operational" ? "#6ee7b7" : "#f87171" }}
+                  />
+                  All systems operational
+                  {pingLatency ? ` · ${pingLatency}ms` : ""}
+                </div>
+                <button
+                  type="button"
+                  onClick={onEnterWorkspace}
+                  className="btn-shine px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all duration-200 active:scale-95"
+                  style={{
+                    background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                    color: "#020a07",
+                    boxShadow: "0 8px 24px -8px rgba(52,211,153,0.5)",
+                  }}
+                >
+                  Launch App <ArrowRight size={14} className="inline" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenEnterprise}
+                  className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs uppercase tracking-wider transition-all duration-200 active:scale-95"
+                >
+                  <Settings size={14} className="inline text-cyan-400 mr-1.5" />
+                  Ops Setup
+                </button>
+              </div>
+            </div>
+
+            {/* Main grid */}
+            <div className="mt-14 grid gap-12 lg:grid-cols-12">
+
+              {/* Brand column */}
+              <div className="lg:col-span-4 space-y-5 text-left">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 shadow-[0_0_15px_rgba(103,232,249,0.25)]">
-                    <Cpu size={22} />
+                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl">
+                    <img
+                      src="/aurelinx-logo-4k.svg"
+                      alt="Aurelinx Logo"
+                      style={{ width: "120%", height: "120%", objectFit: "contain" }}
+                    />
                   </div>
-                  <span className="text-xl font-black tracking-tight text-white uppercase">
-                    Aurelinx<span className="text-cyan-400 font-extrabold text-xs ml-1.5 px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20">OS v4.4</span>
-                  </span>
+                  <div>
+                    <div className="text-sm font-black tracking-[0.24em] text-white">
+                      AURELINX
+                    </div>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                      Management OS · v4.4
+                    </div>
+                  </div>
                 </div>
 
-                <p className="text-xs text-slate-400 leading-relaxed max-w-md">
-                  Autonomous Talent Intelligence &amp; HRIS Ingestion Middleware. Powered by Cox Proportional Hazards, PageRank ONA Centrality, and Explainable ML Risk Diagnostics.
+                <p className="max-w-[360px] text-xs leading-relaxed text-slate-400">
+                  Autonomous talent intelligence and HRIS ingestion middleware
+                  for security-conscious enterprise teams — real-time attrition,
+                  morale, and policy telemetry in one calm, sharp control panel.
                 </p>
 
-                {/* SRE Live Operational Status Pill */}
-                <div className="inline-flex items-center gap-2.5 rounded-full px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
-                  <span>SRE Status: All Systems Operational ({pingLatency ? `${pingLatency}ms` : "12ms"})</span>
+                {/* Socials */}
+                <div className="flex items-center gap-2.5">
+                  {[
+                    { name: "github", label: "GitHub", href: "https://github.com/sainibhaowal/Aurelinx" },
+                    { name: "x", label: "X (Twitter)", href: null },
+                    { name: "linkedin", label: "LinkedIn", href: null },
+                    { name: "youtube", label: "YouTube", href: null },
+                  ].map(({ name, label, href }) =>
+                    href ? (
+                      <a
+                        key={name}
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        title={label}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-400 transition-all duration-200 hover:border-cyan-400/40 hover:text-cyan-300 hover:shadow-[0_0_12px_rgba(52,211,153,0.2)]"
+                      >
+                        <BrandIcon name={name} />
+                      </a>
+                    ) : (
+                      <button
+                        key={name}
+                        type="button"
+                        title={label}
+                        onClick={onOpenEnterprise}
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-500 transition-all duration-200 hover:border-cyan-400/40 hover:text-cyan-300 hover:shadow-[0_0_12px_rgba(52,211,153,0.2)]"
+                      >
+                        <BrandIcon name={name} />
+                      </button>
+                    )
+                  )}
+                </div>
+
+                {/* Newsletter */}
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    Product updates
+                  </div>
+                  {subscribed ? (
+                    <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-2.5 text-xs text-emerald-300">
+                      <CheckCircle2 size={14} />
+                      Subscribed — product updates on the way.
+                    </div>
+                  ) : (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        setSubscribed(true);
+                      }}
+                      className="mt-2.5 flex gap-2"
+                    >
+                      <input
+                        type="email"
+                        required
+                        placeholder="Work email"
+                        className="h-9 w-full min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-3 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400/50"
+                      />
+                      <button
+                        type="submit"
+                        className="btn-shine h-9 flex-none rounded-lg px-4 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                        style={{
+                          background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                          color: "#020a07",
+                        }}
+                      >
+                        Subscribe
+                      </button>
+                    </form>
+                  )}
                 </div>
               </div>
 
-              {/* Quick Actions Card (7 Cols) */}
-              <div className="lg:col-span-7 rounded-2xl p-6 border border-white/10 bg-slate-950/60 backdrop-blur-xl flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="space-y-1 text-left">
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">Ready to Ingest Telemetry?</h4>
-                  <p className="text-xs text-slate-400">Launch the workspace console or configure enterprise webhook gateways in seconds.</p>
-                </div>
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                  <button
-                    type="button"
-                    onClick={onEnterWorkspace}
-                    className="flex-1 md:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold text-xs uppercase tracking-wider transition-all duration-200 shadow-lg shadow-cyan-500/20 cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <span>Launch App</span>
-                    <ArrowRight size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onOpenEnterprise}
-                    className="flex-1 md:flex-none px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <Settings size={14} className="text-cyan-400" />
-                    <span>Ops Setup</span>
-                  </button>
-                </div>
-              </div>
+              {/* Link columns */}
+              <div className="grid grid-cols-2 gap-10 sm:grid-cols-4 lg:col-span-8">
+                <FooterColumn title="Product">
+                  <li>
+                    <FooterLink onClick={() => {
+                      const el = document.getElementById("section-0");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }}>Platform Overview</FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink onClick={() => {
+                      const el = document.getElementById("section-1");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }}>Ingest Pipeline</FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink onClick={() => {
+                      const el = document.getElementById("section-2");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }}>Math Engine</FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink onClick={() => {
+                      const el = document.getElementById("section-3");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }}>Platform Modules</FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink onClick={() => {
+                      const el = document.getElementById("section-4");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }}>Connectors</FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink onClick={() => {
+                      const el = document.getElementById("section-5");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }}>Compliance &amp; Audit</FooterLink>
+                  </li>
+                </FooterColumn>
 
+                <FooterColumn title="Solutions">
+                  <li><FooterLink onClick={onEnterWorkspace}>Enterprise Suite</FooterLink></li>
+                  <li><FooterLink onClick={onEnterWorkspace}>Attrition Analytics</FooterLink></li>
+                  <li><FooterLink onClick={onEnterWorkspace}>Talent Intelligence</FooterLink></li>
+                  <li><FooterLink onClick={onOpenEnterprise}>Data Governance</FooterLink></li>
+                  <li>
+                    <FooterLink onClick={() => {
+                      const el = document.getElementById("section-5");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }}>Security &amp; Policy</FooterLink>
+                  </li>
+                </FooterColumn>
+
+                <FooterColumn title="Resources">
+                  <li><FooterLink onClick={() => setManualOpen(true)}>Documentation</FooterLink></li>
+                  <li><FooterLink onClick={onOpenEnterprise}>API Reference</FooterLink></li>
+                  <li>
+                    <FooterLink onClick={() => {
+                      const el = document.getElementById("section-0");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }}>System Status</FooterLink>
+                  </li>
+                  <li><FooterLink onClick={onEnterWorkspace}>Changelog</FooterLink></li>
+                  <li><FooterLink href="mailto:support@aurelinx.com">Support</FooterLink></li>
+                </FooterColumn>
+
+                <FooterColumn title="Company">
+                  <li>
+                    <FooterLink onClick={() => {
+                      const el = document.getElementById("landing-scroll-root");
+                      if (el) el.scrollTo({ top: 0, behavior: "smooth" });
+                    }}>About</FooterLink>
+                  </li>
+                  <li><FooterLink onClick={onOpenEnterprise}>Careers</FooterLink></li>
+                  <li><FooterLink onClick={onEnterWorkspace}>Blog</FooterLink></li>
+                  <li><FooterLink href="mailto:sales@aurelinx.com">Contact Sales</FooterLink></li>
+                  <li><FooterLink onClick={onOpenEnterprise}>Press Kit</FooterLink></li>
+                </FooterColumn>
+              </div>
             </div>
 
-            {/* Middle Row: 4 Column Navigation */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-8 border-t border-white/5 text-left">
-              
-              {/* Column 1: Platform Modules */}
-              <div className="space-y-3">
-                <h5 className="text-[11px] font-black uppercase tracking-[0.2em] text-cyan-300">Platform Suite</h5>
-                <ul className="space-y-2 text-xs text-slate-400">
-                  <li><button type="button" onClick={onEnterWorkspace} className="hover:text-cyan-300 transition-colors cursor-pointer">Executive Intelligence</button></li>
-                  <li><button type="button" onClick={onEnterWorkspace} className="hover:text-cyan-300 transition-colors cursor-pointer">Cox Attrition Curves</button></li>
-                  <li><button type="button" onClick={onEnterWorkspace} className="hover:text-cyan-300 transition-colors cursor-pointer">PageRank ONA Centrality</button></li>
-                  <li><button type="button" onClick={onEnterWorkspace} className="hover:text-cyan-300 transition-colors cursor-pointer">Semantic Talent Scout</button></li>
-                  <li><button type="button" onClick={onEnterWorkspace} className="hover:text-cyan-300 transition-colors cursor-pointer">ReAct Agentic Workspace</button></li>
-                </ul>
+            {/* Trust & compliance band */}
+            <div
+              className="mt-14 flex flex-col gap-5 border-y py-6 md:flex-row md:items-center md:justify-between"
+              style={{ borderColor: "rgba(255,255,255,0.06)" }}
+            >
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                {[
+                  ["SOC 2 Type II", "#6ee7b7"],
+                  ["GDPR Compliant", "#6ee7b7"],
+                  ["EU AI Act Ready", "#a78bfa"],
+                  ["Zero-Knowledge Isolation", null],
+                  ["HMAC-SHA256 Signatures", null],
+                ].map(([label, accent]) => (
+                  <span
+                    key={label}
+                    className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em]"
+                    style={{ color: "rgba(148,163,184,0.6)" }}
+                  >
+                    <ShieldCheck size={12} style={{ color: accent || "#6ee7b7" }} />
+                    {label}
+                  </span>
+                ))}
               </div>
-
-              {/* Column 2: Ingestions & Middleware */}
-              <div className="space-y-3">
-                <h5 className="text-[11px] font-black uppercase tracking-[0.2em] text-cyan-300">Integrations</h5>
-                <ul className="space-y-2 text-xs text-slate-400">
-                  <li><button type="button" onClick={onOpenEnterprise} className="hover:text-cyan-300 transition-colors cursor-pointer">Workday HRIS Directory</button></li>
-                  <li><button type="button" onClick={onOpenEnterprise} className="hover:text-cyan-300 transition-colors cursor-pointer">Jira PR Telemetry Sync</button></li>
-                  <li><button type="button" onClick={onOpenEnterprise} className="hover:text-cyan-300 transition-colors cursor-pointer">Slack Morale Pipeline</button></li>
-                  <li><button type="button" onClick={onOpenEnterprise} className="hover:text-cyan-300 transition-colors cursor-pointer">Greenhouse ATS Gateway</button></li>
-                  <li><button type="button" onClick={onOpenEnterprise} className="hover:text-cyan-300 transition-colors cursor-pointer">REST API &amp; Webhooks</button></li>
-                </ul>
+              <div
+                className="flex items-center gap-2.5 rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider"
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "rgba(148,163,184,0.6)",
+                }}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
+                System Status: Operational ({pingLatency ? `${pingLatency}ms` : "checking…"})
               </div>
-
-              {/* Column 3: Security & Compliance */}
-              <div className="space-y-3">
-                <h5 className="text-[11px] font-black uppercase tracking-[0.2em] text-cyan-300">Security &amp; Policy</h5>
-                <ul className="space-y-2 text-xs text-slate-400">
-                  <li className="flex items-center gap-1.5"><ShieldCheck size={12} className="text-emerald-400" /><span>SOC2 Type II Certified</span></li>
-                  <li className="flex items-center gap-1.5"><Lock size={12} className="text-cyan-400" /><span>GDPR / EU AI Act Compliant</span></li>
-                  <li><span className="text-slate-400">Zero-Knowledge Isolation</span></li>
-                  <li><span className="text-slate-400">Multi-Party Admin Approval</span></li>
-                  <li><span className="text-slate-400">HMAC-SHA256 Signatures</span></li>
-                </ul>
-              </div>
-
-              {/* Column 4: Infrastructure Telemetry */}
-              <div className="space-y-3 font-mono text-[11px]">
-                <h5 className="text-[11px] font-black uppercase tracking-[0.2em] text-cyan-300 font-sans">SRE Telemetry</h5>
-                <div className="space-y-2 text-slate-400">
-                  <div className="p-2.5 rounded-lg border border-white/5 bg-black/40">
-                    <span className="text-[9px] uppercase tracking-wider text-slate-400 block mb-0.5">Isolated Tenant</span>
-                    <span className="text-cyan-300 font-bold">default_isolated_prod</span>
-                  </div>
-                  <div className="p-2.5 rounded-lg border border-white/5 bg-black/40">
-                    <span className="text-[9px] uppercase tracking-wider text-slate-400 block mb-0.5">Epoch System Clock</span>
-                    <span className="text-emerald-300 font-bold">{systemEpoch}</span>
-                  </div>
-                </div>
-              </div>
-
             </div>
 
-            {/* Bottom Row: Copyright & Metadata */}
-            <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-[11px] text-slate-400">
-              <div className="flex items-center gap-2">
+            {/* Legal row */}
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between pt-6 text-[11px] text-slate-500">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span>&copy; {new Date().getFullYear()} Aurelinx Inc. All rights reserved.</span>
-                <span className="hidden md:inline">•</span>
-                <span className="text-slate-400">Enterprise HRIS Middleware Architecture</span>
+                <span className="opacity-40">•</span>
+                <span className="cursor-default hover:text-slate-300">Privacy Policy</span>
+                <span className="opacity-40">•</span>
+                <span className="cursor-default hover:text-slate-300">Terms of Service</span>
+                <span className="opacity-40">•</span>
+                <span className="cursor-default hover:text-slate-300">Security</span>
+                <span className="opacity-40">•</span>
+                <span className="cursor-default hover:text-slate-300">Cookies</span>
               </div>
-
-              <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider">
-                <span className="px-2.5 py-1 rounded bg-slate-900 border border-white/10 text-cyan-400">
-                  🌐 Ingestion Region: us-east-1 (Multi-AZ Encrypted)
+              <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider">
+                <span className="px-2.5 py-1 rounded-md bg-slate-900 border border-white/10 text-cyan-400">
+                  Ingestion Region: us-east-1 (Multi-AZ Encrypted)
                 </span>
               </div>
             </div>
 
           </div>
         </footer>
+
+        {/* User manual modal (opened from footer Documentation link) */}
+        <UserManualModal
+          isOpen={manualOpen}
+          onClose={() => setManualOpen(false)}
+          defaultTab="overview"
+        />
       </div>
     </div>
   );

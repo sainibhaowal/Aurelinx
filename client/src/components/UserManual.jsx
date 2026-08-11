@@ -279,7 +279,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                   
                   {/* Step 1 */}
                   <div className="relative">
-                    <div className="absolute -left-[31px] top-0 h-4 w-4 rounded-full bg-cyan-500 border-4 border-slate-950 shadow-[0_0_8px_rgba(6,182,212,0.6)]" />
+                    <div className="absolute -left-[31px] top-0 h-4 w-4 rounded-full bg-cyan-500 border-4 border-slate-950 shadow-[0_0_8px_rgba(45,212,191,0.6)]" />
                     <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-widest block">1. INGESTION ENGINE</span>
                     <h5 className="text-xs text-white font-bold mt-0.5">Context Gathering & Parser</h5>
                     <p className="text-[11px] text-slate-400 mt-1">Accepts user natural language prompts + rich file attachments (PDFs, DOCX, CSV, Image OCR).</p>
@@ -428,7 +428,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                   
                   {/* Step 1 */}
                   <div className="p-3.5 bg-slate-900/60 border border-cyan-500/20 rounded-xl relative hover:border-cyan-500/40 transition-colors">
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(6,182,212,0.5)]">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(45,212,191,0.5)]">
                       1
                     </span>
                     <span className="text-[9px] font-black text-cyan-300 uppercase tracking-wider block mt-1">INPUT STAGE</span>
@@ -438,7 +438,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
 
                   {/* Step 2 */}
                   <div className="p-3.5 bg-slate-900/60 border border-cyan-500/20 rounded-xl relative hover:border-cyan-500/40 transition-colors">
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(6,182,212,0.5)]">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(45,212,191,0.5)]">
                       2
                     </span>
                     <span className="text-[9px] font-black text-cyan-300 uppercase tracking-wider block mt-1">MATCHING</span>
@@ -448,7 +448,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
 
                   {/* Step 3 */}
                   <div className="p-3.5 bg-slate-900/60 border border-cyan-500/20 rounded-xl relative hover:border-cyan-500/40 transition-colors">
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(6,182,212,0.5)]">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(45,212,191,0.5)]">
                       3
                     </span>
                     <span className="text-[9px] font-black text-cyan-300 uppercase tracking-wider block mt-1">SAFETY</span>
@@ -458,7 +458,7 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
 
                   {/* Step 4 */}
                   <div className="p-3.5 bg-slate-900/60 border border-cyan-500/20 rounded-xl relative hover:border-cyan-500/40 transition-colors">
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(6,182,212,0.5)]">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-[0_0_6px_rgba(45,212,191,0.5)]">
                       4
                     </span>
                     <span className="text-[9px] font-black text-cyan-300 uppercase tracking-wider block mt-1">OUTPUT STAGE</span>
@@ -1502,8 +1502,8 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                     <line x1="20%" y1="50%" x2="40%" y2="75%" stroke="rgba(244,63,94,0.3)" strokeWidth="2" strokeDasharray="3 3" />
                     <line x1="40%" y1="25%" x2="60%" y2="50%" stroke="rgba(236,72,153,0.8)" strokeWidth="3" />
                     <line x1="40%" y1="75%" x2="60%" y2="50%" stroke="rgba(236,72,153,0.8)" strokeWidth="3" />
-                    <line x1="60%" y1="50%" x2="80%" y2="30%" stroke="rgba(6,182,212,0.4)" strokeWidth="2" />
-                    <line x1="60%" y1="50%" x2="80%" y2="70%" stroke="rgba(6,182,212,0.4)" strokeWidth="2" />
+                    <line x1="60%" y1="50%" x2="80%" y2="30%" stroke="rgba(45,212,191,0.4)" strokeWidth="2" />
+                    <line x1="60%" y1="50%" x2="80%" y2="70%" stroke="rgba(45,212,191,0.4)" strokeWidth="2" />
                   </svg>
 
                   <div className="absolute left-[15%] top-[40%] flex flex-col items-center">
@@ -1514,14 +1514,14 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                   </div>
 
                   <div className="absolute left-[36%] top-[15%] flex flex-col items-center">
-                    <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(6,182,212,0.4)]">
+                    <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(45,212,191,0.4)]">
                       B
                     </div>
                     <span className="text-[9px] text-cyan-300 mt-1">High PageRank</span>
                   </div>
 
                   <div className="absolute left-[36%] top-[65%] flex flex-col items-center">
-                    <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(6,182,212,0.4)]">
+                    <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(45,212,191,0.4)]">
                       C
                     </div>
                     <span className="text-[9px] text-cyan-300 mt-1">Team Hub</span>

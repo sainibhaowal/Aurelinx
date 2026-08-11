@@ -29,7 +29,7 @@ const Badge = ({
     },
     glow: {
       primary:
-        "bg-indigo-500/5 border-indigo-500/20 text-indigo-300 shadow-[0_0_12px_rgba(99,102,241,0.06)]",
+        "bg-indigo-500/5 border-indigo-500/20 text-indigo-300 shadow-[0_0_12px_rgba(163,230,53,0.06)]",
       secondary: "bg-white/2 border-white/8 text-slate-300 shadow-sm",
       success:
         "bg-emerald-500/5 border-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.06)]",

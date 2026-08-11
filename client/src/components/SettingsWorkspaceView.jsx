@@ -39,7 +39,7 @@ const LineInput = ({ value, onChange, placeholder, tone = "neutral" }) => {
       ? "rgba(248,113,113,0.5)"
       : tone === "warning"
         ? "rgba(251,191,36,0.5)"
-        : "rgba(103,232,249,0.5)";
+        : "rgba(110,231,183,0.5)";
   return (
     <input
       value={value}
@@ -138,7 +138,7 @@ const SettingsWorkspaceView = () => {
         <div>
           <p
             className="text-[10px] font-bold uppercase tracking-[0.28em]"
-            style={{ color: "#67e8f9" }}
+            style={{ color: "#6ee7b7" }}
           >
             Workspace Settings
           </p>
@@ -172,7 +172,7 @@ const SettingsWorkspaceView = () => {
                 background: "none",
                 border: "none",
                 borderBottom:
-                  tab === id ? "2px solid #67e8f9" : "2px solid transparent",
+                  tab === id ? "2px solid #6ee7b7" : "2px solid transparent",
                 marginBottom: "-1px",
                 color: tab === id ? "#ffffff" : "rgba(148,163,184,0.5)",
                 cursor: "pointer",
@@ -199,10 +199,10 @@ const SettingsWorkspaceView = () => {
             {/* Left — profile card */}
             <GlassCard className="p-6">
               <div className="flex items-center gap-2.5 mb-6">
-                <UserRound size={16} style={{ color: "#67e8f9" }} />
+                <UserRound size={16} style={{ color: "#6ee7b7" }} />
                 <span
                   className="text-[10px] font-black uppercase tracking-[0.22em]"
-                  style={{ color: "#67e8f9" }}
+                  style={{ color: "#6ee7b7" }}
                 >
                   Profile
                 </span>

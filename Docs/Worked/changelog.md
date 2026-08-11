@@ -297,3 +297,24 @@ This file tracks every single technical step taken in the development of Aurelin
 - **Location:** `client/src/App.jsx`, `client/src/components/LaunchPadView.jsx`, `client/src/components/LandingPage.jsx`
 - **Why:** The user requested that the launch page be removed entirely from the product.
 - **Verification:** Frontend build passed with `npm run build`.
+
+## [2026-08-11] - Agentic Chat Thinking Cards + Landing Page Premium Redesign
+
+### Step 55: Chat Thinking Cards Fixed End to End (No Duplicates)
+- **Action:** Each controller round now gets its OWN thinking card and the answer phase gets its own — restoring the real agent loop UX (think → tool call → think → tool call → think → final). Cards are finalized in place via `update_workflow_event` (same `event_id`), eliminating duplicate running/completed sibling rows. Fixed the unbound `reasoning_event_text` NameError in failure paths and shipped the 3-dot thinking animation to the stylesheet the Next.js build actually loads.
+- **Location:** `server/app/api/v1/chat.py`, `server/app/workflows/events.py`, `client/src/components/IntelligenceChatView.jsx`, `client/src/index.css`
+- **Why:** The "double double thinking" bug was caused by per-round card state re-initialization and completion events being inserted as new rows instead of updating the running card.
+- **Verification:** Fake-provider harness asserts 3 distinct cards (2 tool rounds + answer), each running→completed in place with real durations; live SSE stream shows one card per phase, zero errors. Commits: `f1931f4`, `64b26c1`.
+
+### Step 56: Landing Page Premium Redesign (Neon Particles Preserved)
+- **Action:** Redesigned the landing page hero and global styling: aurora glow blobs + hero beam behind the headline, animated gradient headline, shine-sweep gradient CTAs, live count-up stats strip, mouse-follow spotlight + calm accent-glow card hover (`.luxe-card`), gradient accents in all section headings, simulator glow + blinking terminal cursor, ROI count-up on slider change, scroll progress bar, scroll-down hint, footer hairline glow. All existing content and logic preserved; `NeonParticlesWave.jsx` untouched.
+- **Action (revision):** Removed the rotating conic-gradient border beam after user feedback — rotating/looping card motion read as irritating, not premium. Replaced with a quiet hover: soft lift, accent-tinted border, gentle light bloom (no looping animation).
+- **Location:** `client/src/components/LandingPage.jsx`, `client/src/index.css`
+- **Why:** User requested a powerful, accurate, beautiful, premium landing page with full animation/effects while keeping the existing neon particle hero animation and not damaging any other system.
+- **Verification:** `npx next build` passes; web image rebuilt + deployed; HTTP 200; bundle confirmed to contain `luxe-card` and zero `border-beam` references.
+
+### Step 57: Scrollbar Drag 1:1 Fix, Particle Interaction Refine, "Verdant & Ember" Theme Overhaul
+- **Action:** (1) Custom scrollbar drag rewritten — removed `scroll-smooth` from `#landing-scroll-root` and switched the thumb to cursor-locked 1:1 dragging with proportional content scrolling (`getThumbGeometry` shared helper), so drag speed is fully under user control at zero latency; track clicks now `scrollTo({behavior:"smooth"})`. (2) Hero particle mouse interaction shrunk from "torch" to subtle (radius 210→110, halo 95→48, softer push/lines/burst) and confined to the canvas bounds; scroll listener now attached to `#landing-scroll-root` so effects never fire while scrolled down. (3) Full palette overhaul away from blue: deep-green-tinted shell (`#04100b`), cyan→emerald and blue→teal remapped globally via `@theme` overrides in `index.css` plus every hardcoded hex replaced (zero blue hexes remain in `src/`); headings moved to Space Grotesk with mint→amber→emerald gradient accents; connectors/ticker now cycle per-tile colors (emerald/amber/teal/lime/rose/violet) so each card exposes its own accent.
+- **Location:** `client/src/components/LandingPage.jsx`, `client/src/components/NeonParticlesWave.jsx`, `client/src/index.css`, `client/app/layout.jsx`, `client/src/components/*.jsx` (12 workspace views), `client/src/styles/{tokens,global}.css`
+- **Why:** User reported the scrollbar thumb lagged the cursor (no speed control), the particle cursor effect was too large and persisted when scrolled past the hero, and the "always blue" theme felt generic — requested a green-tinted shell with colorful per-card accents.
+- **Verification:** `npx next build` passes; `npx eslint` clean on changed components; dev server HTTP 200 with zero errors; grep confirms 0 remaining blue chrome hexes (`#22d3ee|#67e8f9|#6366f1|#818cf8|#3b82f6|#06b6d4|rgba(34,211,238|rgba(103,232,249|rgba(99,102,241|rgba(6,182,212`).

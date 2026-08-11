@@ -565,7 +565,7 @@ const TalentScoutView = () => {
                             key={lvl} 
                             className={`h-1.5 flex-1 rounded-sm ${
                               lvl <= skill.level 
-                                ? "bg-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.5)]" 
+                                ? "bg-cyan-400 shadow-[0_0_4px_rgba(52,211,153,0.5)]" 
                                 : "bg-slate-800"
                             }`}
                           />
@@ -615,7 +615,7 @@ const TalentScoutView = () => {
                 <span>AURELINX SECURITY SYSTEM // candidate_dossier_v3</span>
                 <button
                   onClick={() => setSelectedTalent(null)}
-                  className="h-9 px-5 rounded bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/20 hover:text-white transition-colors text-xs font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(6,182,212,0.1)]"
+                  className="h-9 px-5 rounded bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/20 hover:text-white transition-colors text-xs font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(45,212,191,0.1)]"
                 >
                   Close Dossier
                 </button>

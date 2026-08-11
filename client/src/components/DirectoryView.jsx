@@ -453,7 +453,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
               <ChevronDown size={12} />
             </button>
             {exportMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-white/10 bg-[#0f1f33] shadow-2xl overflow-hidden z-50">
+              <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-white/10 bg-[#0a1a12] shadow-2xl overflow-hidden z-50">
                 <button
                   onClick={() => {
                     setExportMenuOpen(false);
@@ -838,7 +838,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                           key={lvl} 
                           className={`h-1.5 flex-1 rounded-sm ${
                             lvl <= skill.level 
-                              ? "bg-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.5)]" 
+                              ? "bg-cyan-400 shadow-[0_0_4px_rgba(52,211,153,0.5)]" 
                               : "bg-slate-800"
                           }`}
                         />
@@ -899,7 +899,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
               <span>AURELINX SECURITY SYSTEM // PROTOCOL_V3</span>
               <button
                 onClick={() => setSelectedProfile(null)}
-                className="h-9 px-5 rounded bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/20 hover:text-white transition-colors text-xs font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(6,182,212,0.1)]"
+                className="h-9 px-5 rounded bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/20 hover:text-white transition-colors text-xs font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(45,212,191,0.1)]"
               >
                 Close Dossier
               </button>
