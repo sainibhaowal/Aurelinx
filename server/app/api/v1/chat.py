@@ -3680,16 +3680,18 @@ async def _stream_true_agent_loop(
 
     controller_answer = ""
     controller_error = None
-    # ONE reasoning card spans the whole turn (planner rounds + answer phase).
-    # Declared OUTSIDE the iteration loop so multi-round controller turns reuse
-    # the same card instead of creating one thinking row per round.
-    turn_reasoning_id: Optional[str] = None
-    turn_reasoning_frame: Optional[Dict] = None
-    turn_reasoning_text = ""
-    turn_reasoning_started_t: Optional[float] = None
-    reasoning_card_finalized = False
-    reasoning_event_text = ""
+    # Each controller round gets its OWN thinking card so the UI shows the real
+    # agent loop: think -> tool call -> think -> tool call -> think -> final.
+    # A round's card is created when the round's stream starts and finalized in
+    # place (same event_id) when the round ends: one row per phase, never a
+    # duplicate 'completed' sibling. (State itself is reset per round in the loop.)
     for iteration in range(1, max_iterations + 1):
+        # Fresh card per round: reset the round's reasoning state so iteration 2
+        # gets its own card while transient retries within one round reuse it.
+        round_reasoning_id: Optional[str] = None
+        round_reasoning_frame: Optional[Dict] = None
+        round_started_t: Optional[float] = None
+        reasoning_event_text = ""
         planner_prompt = _agent_controller_prompt(
             request.content,
             history,
@@ -3712,17 +3714,17 @@ async def _stream_true_agent_loop(
         }
 
         async def controller_turn_attempt():
-            nonlocal reasoning_active, reasoning_event_chars, reasoning_event_id, raw_decision, reasoning_started_t, turn_reasoning_id, turn_reasoning_frame, turn_reasoning_text, turn_reasoning_started_t
+            nonlocal reasoning_active, reasoning_event_chars, reasoning_event_id, raw_decision, reasoning_started_t, round_reasoning_id, round_reasoning_frame, round_started_t
             reasoning_active = True
             reasoning_event_chars = 0
             reasoning_event_text = ""
             raw_decision = ""
             
-            # Emit initial thinking step so UI shows live thinking emitter immediately.
-            # Only the FIRST controller round creates the card; later rounds reuse it
-            # so a multi-round controller turn never produces duplicate thinking rows.
+            # Emit this round's thinking card immediately so the UI shows live
+            # thinking as the controller stream starts. Reused across transient
+            # retries of this round, and finalized once when the round ends.
             reasoning_started_t = time.monotonic()
-            if turn_reasoning_id is None:
+            if round_reasoning_id is None:
                 reasoning_frame = emit_workflow_event(
                     workflow_run.id,
                     "model_reasoning",
@@ -3735,12 +3737,12 @@ async def _stream_true_agent_loop(
                         "model": request.model or "provider_default",
                     },
                 )
-                turn_reasoning_id = reasoning_frame["event_id"]
-                turn_reasoning_frame = reasoning_frame
-                turn_reasoning_started_t = reasoning_started_t
+                round_reasoning_id = reasoning_frame["event_id"]
+                round_reasoning_frame = reasoning_frame
+                round_started_t = reasoning_started_t
             else:
-                reasoning_frame = turn_reasoning_frame
-            reasoning_event_id = turn_reasoning_id
+                reasoning_frame = round_reasoning_frame
+            reasoning_event_id = round_reasoning_id
             events.append(reasoning_frame)
             yield f"event: agent_step\ndata: {_json_dumps(reasoning_frame)}\n\n"
 
@@ -3765,13 +3767,8 @@ async def _stream_true_agent_loop(
                     continue
                 if reasoning_active:
                     reasoning_event_text = (reasoning_event_text or "") + (token or "")
-                    combined_so_far = (
-                        (turn_reasoning_text + "\n\n" + reasoning_event_text).strip()
-                        if turn_reasoning_text and reasoning_event_text
-                        else (turn_reasoning_text or reasoning_event_text)
-                    )
                     async for running_chars, delta_sse in paced_reasoning_deltas(
-                        reasoning_event_id, "planning", iteration, token or "", reasoning_event_chars, combined_so_far
+                        reasoning_event_id, "planning", iteration, token or "", reasoning_event_chars, reasoning_event_text
                     ):
                         reasoning_event_chars = running_chars
                         yield delta_sse
@@ -3782,14 +3779,20 @@ async def _stream_true_agent_loop(
 
             if reasoning_active:
                 reasoning_active = False
-            if reasoning_event_text:
-                # Keep the single card running: accumulate each controller round's
-                # thinking, and let the answer phase fold its text in. The card is
-                # finalized exactly once at the end of the turn.
-                turn_reasoning_text = (
-                    (turn_reasoning_text + "\n\n" + reasoning_event_text).strip()
-                    if turn_reasoning_text
-                    else reasoning_event_text
+            # Round complete: finalize THIS round's thinking card in place so the
+            # timeline shows exactly one completed card per controller round.
+            if round_reasoning_id:
+                yield update_event_sse(
+                    round_reasoning_id,
+                    "Reasoning complete",
+                    status="completed",
+                    duration_ms=int((time.monotonic() - round_started_t) * 1000) if round_started_t else None,
+                    result_summary={
+                        "characters": len(reasoning_event_text),
+                        "text": reasoning_event_text,
+                    }
+                    if reasoning_event_text
+                    else {"characters": 0},
                 )
 
         try:
@@ -3808,23 +3811,18 @@ async def _stream_true_agent_loop(
             controller_error = str(exc)
             if reasoning_active:
                 reasoning_active = False
-            if reasoning_event_text and turn_reasoning_id and not reasoning_card_finalized:
-                reasoning_card_finalized = True
-                turn_reasoning_text = (
-                    (turn_reasoning_text + "\n\n" + reasoning_event_text).strip()
-                    if turn_reasoning_text
-                    else reasoning_event_text
-                )
+            if round_reasoning_id:
                 yield update_event_sse(
-                    turn_reasoning_id,
+                    round_reasoning_id,
                     "Reasoning stopped",
                     status="failed",
-                    duration_ms=int((time.monotonic() - turn_reasoning_started_t) * 1000) if turn_reasoning_started_t else None,
+                    duration_ms=int((time.monotonic() - round_started_t) * 1000) if round_started_t else None,
                     result_summary={
-                        "iteration": iteration,
-                        "characters": len(turn_reasoning_text),
-                        "text": turn_reasoning_text,
-                    },
+                        "characters": len(reasoning_event_text),
+                        "text": reasoning_event_text,
+                    }
+                    if reasoning_event_text
+                    else {"characters": 0},
                     error_code=_provider_error_code(exc),
                 )
             raw_status = re.search(r"'([^']+)'", str(exc))
@@ -4116,20 +4114,15 @@ async def _stream_true_agent_loop(
     reasoning_event_chars = 0
     reasoning_event_id = None
     reasoning_event_text = ""
+    # The answer phase gets its own thinking card, finalized in place when the
+    # final stream ends (completed) or fails (failed) - exactly one row.
+    answer_reasoning_id: Optional[str] = None
+    answer_started_t: Optional[float] = None
+    answer_card_finalized = False
     reasoning_started_a: Optional[float] = None
     try:
         if controller_error:
             last_err = controller_error
-            if turn_reasoning_id and not reasoning_card_finalized:
-                reasoning_card_finalized = True
-                yield update_event_sse(
-                    turn_reasoning_id,
-                    "Reasoning stopped",
-                    status="failed",
-                    duration_ms=int((time.monotonic() - turn_reasoning_started_t) * 1000) if turn_reasoning_started_t else None,
-                    result_summary={"characters": len(turn_reasoning_text), "text": turn_reasoning_text} if turn_reasoning_text else {"characters": 0},
-                    error_code=_provider_error_code(controller_error),
-                )
             assistant_text = _safe_provider_failure_reply(context_payload, controller_error)
             # Stream word-by-word so the UI sees live delta instead of a single flush
             words = assistant_text.split(" ")
@@ -4139,15 +4132,6 @@ async def _stream_true_agent_loop(
                 await asyncio.sleep(0.012)
         elif controller_answer and not tool_transcript:
             assistant_text = controller_answer
-            if turn_reasoning_id and not reasoning_card_finalized:
-                reasoning_card_finalized = True
-                yield update_event_sse(
-                    turn_reasoning_id,
-                    "Reasoning complete",
-                    status="completed",
-                    duration_ms=int((time.monotonic() - turn_reasoning_started_t) * 1000) if turn_reasoning_started_t else None,
-                    result_summary={"characters": len(turn_reasoning_text), "text": turn_reasoning_text} if turn_reasoning_text else {"characters": 0},
-                )
             # Stream word-by-word so the UI sees live delta instead of a single flush
             words = assistant_text.split(" ")
             for i, word in enumerate(words):
@@ -4159,7 +4143,6 @@ async def _stream_true_agent_loop(
                 reasoning_active = False
                 reasoning_event_chars = 0
                 reasoning_event_text = ""
-                reasoning_event_id = turn_reasoning_id
                 content_before_attempt = len(assistant_text)
                 try:
                     async for token in _llm_stream_response(
@@ -4170,11 +4153,11 @@ async def _stream_true_agent_loop(
                         user_text=request.content,
                         context_payload=context_payload,
                     ):
-                        if token == "<think>":
+                        if token == " thinking":
                             if not reasoning_active:
                                 reasoning_active = True
                                 reasoning_started_a = time.monotonic()
-                                if turn_reasoning_id is None:
+                                if answer_reasoning_id is None:
                                     reasoning_frame = emit_workflow_event(
                                         workflow_run.id,
                                         "model_reasoning",
@@ -4186,39 +4169,38 @@ async def _stream_true_agent_loop(
                                             "model": request.model or "provider_default",
                                         },
                                     )
-                                    turn_reasoning_id = reasoning_event_id = reasoning_frame["event_id"]
-                                    turn_reasoning_started_t = reasoning_started_a
+                                    answer_reasoning_id = reasoning_event_id = reasoning_frame["event_id"]
+                                    answer_started_t = reasoning_started_a
                                     events.append(reasoning_frame)
                                     yield f"event: agent_step\ndata: {_json_dumps(reasoning_frame)}\n\n"
                             continue
-                        if token == "</think>":
+                        if token == " response":
                             if reasoning_active:
                                 reasoning_active = False
                             continue
                         if reasoning_active:
                             reasoning_event_text = (reasoning_event_text or "") + (token or "")
-                            combined_so_far = (
-                                (turn_reasoning_text + "\n\n" + reasoning_event_text).strip()
-                                if turn_reasoning_text and reasoning_event_text
-                                else (turn_reasoning_text or reasoning_event_text)
-                            )
                             async for running_chars, delta_sse in paced_reasoning_deltas(
-                                reasoning_event_id, "response", None, token or "", reasoning_event_chars, combined_so_far
+                                reasoning_event_id, "response", None, token or "", reasoning_event_chars, reasoning_event_text
                             ):
                                 reasoning_event_chars = running_chars
                                 yield delta_sse
                             continue
                         assistant_text += token
                         yield f"event: chunk\ndata: {_json_dumps({'text': token})}\n\n"
-                    if not reasoning_card_finalized and turn_reasoning_id:
-                        reasoning_card_finalized = True
-                        combined_text = (turn_reasoning_text + "\n\n" + reasoning_event_text).strip() if turn_reasoning_text and reasoning_event_text else (turn_reasoning_text or reasoning_event_text)
+                    if answer_reasoning_id and not answer_card_finalized:
+                        answer_card_finalized = True
                         yield update_event_sse(
-                            turn_reasoning_id,
+                            answer_reasoning_id,
                             "Reasoning complete",
                             status="completed",
-                            duration_ms=int((time.monotonic() - turn_reasoning_started_t) * 1000) if turn_reasoning_started_t else None,
-                            result_summary={"characters": len(combined_text), "text": combined_text} if combined_text else {"characters": 0},
+                            duration_ms=int((time.monotonic() - answer_started_t) * 1000) if answer_started_t else None,
+                            result_summary={
+                                "characters": len(reasoning_event_text),
+                                "text": reasoning_event_text,
+                            }
+                            if reasoning_event_text
+                            else {"characters": 0},
                         )
                     if not assistant_text:
                         embedded_answer = _extract_answer_from_reasoning(reasoning_event_text)
@@ -4232,35 +4214,28 @@ async def _stream_true_agent_loop(
                     break
                 except Exception as exc:
                     last_err = str(exc)
-                    if turn_reasoning_id and not reasoning_card_finalized:
-                        reasoning_card_finalized = True
-                        combined_text = (turn_reasoning_text + "\n\n" + reasoning_event_text).strip() if turn_reasoning_text and reasoning_event_text else (turn_reasoning_text or reasoning_event_text)
-                        yield update_event_sse(
-                            turn_reasoning_id,
-                            "Reasoning stopped",
-                            status="failed",
-                            duration_ms=int((time.monotonic() - turn_reasoning_started_t) * 1000) if turn_reasoning_started_t else None,
-                            result_summary={"characters": len(combined_text), "text": combined_text} if combined_text else {"characters": 0},
-                            error_code=_provider_error_code(exc),
-                        )
-                    if attempt_round < 4 and _transient_provider_error(exc):
-                        logger.warning(f"[chat] transient provider failure on attempt {attempt_round}/4, retrying: {exc}")
-                        assistant_text = assistant_text[:content_before_attempt]
-                        await asyncio.sleep(min(24, 4 * attempt_round))
-                        continue
-                    logger.warning(f"[chat] final answer stream failed on attempt {attempt_round}/4: {exc}")
-                    raise
+                    if attempt_round >= 4 or not _transient_provider_error(exc):
+                        logger.warning(f"[chat] final answer stream failed on attempt {attempt_round}/4: {exc}")
+                        raise
+                    logger.warning(f"[chat] transient provider failure on attempt {attempt_round}/4, retrying: {exc}")
+                    assistant_text = assistant_text[:content_before_attempt]
+                    await asyncio.sleep(min(24, 4 * attempt_round))
+                    continue
     except Exception as exc:
         last_err = str(exc)
-        if turn_reasoning_id and not reasoning_card_finalized:
-            reasoning_card_finalized = True
-            combined_text = (turn_reasoning_text + "\n\n" + reasoning_event_text).strip() if turn_reasoning_text and reasoning_event_text else (turn_reasoning_text or reasoning_event_text)
+        if answer_reasoning_id and not answer_card_finalized:
+            answer_card_finalized = True
             yield update_event_sse(
-                turn_reasoning_id,
+                answer_reasoning_id,
                 "Reasoning stopped",
                 status="failed",
-                duration_ms=int((time.monotonic() - turn_reasoning_started_t) * 1000) if turn_reasoning_started_t else None,
-                result_summary={"characters": len(combined_text), "text": combined_text} if combined_text else {"characters": 0},
+                duration_ms=int((time.monotonic() - answer_started_t) * 1000) if answer_started_t else None,
+                result_summary={
+                    "characters": len(reasoning_event_text),
+                    "text": reasoning_event_text,
+                }
+                if reasoning_event_text
+                else {"characters": 0},
                 error_code=_provider_error_code(exc),
             )
         assistant_text = _safe_provider_failure_reply(context_payload, exc)
