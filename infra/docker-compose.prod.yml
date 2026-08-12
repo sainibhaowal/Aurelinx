@@ -124,6 +124,7 @@ services:
     build:
       context: ../client
       dockerfile: ../infra/frontend.Dockerfile
+      network: host
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5100}
     restart: unless-stopped
@@ -137,7 +138,7 @@ services:
     ports:
       - "${WEB_PORT:-3100}:3000"
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:3000 || exit 1"]
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 15s
       timeout: 5s
       retries: 10

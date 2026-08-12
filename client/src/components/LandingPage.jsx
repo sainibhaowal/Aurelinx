@@ -24,13 +24,7 @@ import {
   CheckCircle2,
   Gauge,
 } from "lucide-react";
-import {
-  analysisAPI,
-  enterpriseAPI,
-  leanAPI,
-  healthAPI,
-} from "../services/apiClient";
-import { useAuth } from "../contexts/AuthContext";
+import { healthAPI } from "../services/apiClient";
 import NeonParticlesWave from "./NeonParticlesWave";
 import { UserManualModal } from "./UserManual";
 
@@ -420,66 +414,6 @@ const Ticker = ({ items, className = "" }) => (
 );
 
 /* ─────────────────────────────────────────
-   RADIAL GAUGE (real data driven)
-───────────────────────────────────────── */
-const RadialGauge = ({ value, label, sub, color, format, size = 148, stroke = 8 }) => {
-  const clamped = Math.max(0, Math.min(1, Number(value) || 0));
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  return (
-    <div className="flex flex-col items-center gap-3 select-none">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke="rgba(255,255,255,0.06)"
-            strokeWidth={stroke}
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke={color}
-            strokeWidth={stroke}
-            strokeLinecap="round"
-            strokeDasharray={c}
-            strokeDashoffset={c * (1 - clamped)}
-            className="gauge-track"
-            style={{ filter: `drop-shadow(0 0 8px ${color})` }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div
-            className="text-[22px] font-black tabular-nums"
-            style={{ color, textShadow: `0 0 18px ${color}55` }}
-          >
-            {format ? format(clamped) : `${Math.round(clamped * 100)}%`}
-          </div>
-          {sub && (
-            <div
-              className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.18em]"
-              style={{ color: "rgba(148,163,184,0.5)" }}
-            >
-              {sub}
-            </div>
-          )}
-        </div>
-      </div>
-      <div
-        className="text-[9px] font-black uppercase tracking-[0.2em]"
-        style={{ color: "rgba(148,163,184,0.6)" }}
-      >
-        {label}
-      </div>
-    </div>
-  );
-};
-
-/* ─────────────────────────────────────────
    WAVEFORM (audio-style live bars)
 ───────────────────────────────────────── */
 const Waveform = ({ count = 9, color = "#6ee7b7", height = 40 }) => (
@@ -502,8 +436,7 @@ const Waveform = ({ count = 9, color = "#6ee7b7", height = 40 }) => (
 /* ─────────────────────────────────────────
    HERO TELEMETRY ORB (REAL data only)
 ───────────────────────────────────────── */
-const HeroOrb = ({ snapshot, sreStatus, pingLatency, onEnterWorkspace }) => {
-  const hasLive = Boolean(snapshot && snapshot.total != null);
+const HeroOrb = ({ sreStatus, pingLatency, onEnterWorkspace }) => {
   const ok = sreStatus === "operational";
 
   return (
@@ -549,60 +482,32 @@ const HeroOrb = ({ snapshot, sreStatus, pingLatency, onEnterWorkspace }) => {
             "0 0 60px rgba(52,211,153,0.16), inset 0 0 40px rgba(52,211,153,0.08)",
         }}
       >
-        {hasLive ? (
-          <>
-            <div
-              className="text-[9px] font-black uppercase tracking-[0.28em]"
-              style={{ color: "rgba(110,231,183,0.65)" }}
-            >
-              Talent Pool
-            </div>
-            <div
-              className="mt-1 text-4xl font-black tabular-nums"
-              style={{ color: "#6ee7b7", textShadow: "0 0 24px rgba(110,231,183,0.5)" }}
-            >
-              <CountUp
-                value={Number(snapshot.total)}
-                format={(v) => Math.round(v).toLocaleString()}
-              />
-            </div>
-            <div
-              className="mt-1 text-[9px] font-semibold uppercase tracking-wider"
-              style={{ color: "rgba(148,163,184,0.55)" }}
-            >
-              Streaming from your tenant
-            </div>
-          </>
-        ) : (
-          <>
-            <div
-              className="text-[9px] font-black uppercase tracking-[0.28em]"
-              style={{ color: "rgba(110,231,183,0.65)" }}
-            >
-              Aurelinx Core
-            </div>
-            <div className="mt-2.5">
-              <Waveform count={9} />
-            </div>
-            <div
-              className="mt-2.5 text-[9px] font-semibold uppercase tracking-wider"
-              style={{ color: "rgba(148,163,184,0.55)" }}
-            >
-              Standing by · SSE ready
-            </div>
-            <button
-              type="button"
-              onClick={onEnterWorkspace}
-              className="btn-shine mt-2.5 rounded-full px-3.5 py-1.5 text-[9px] font-black uppercase tracking-widest active:scale-95 transition-transform"
-              style={{
-                background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
-                color: "#020a07",
-              }}
-            >
-              Connect workspace
-            </button>
-          </>
-        )}
+        <div
+          className="text-[9px] font-black uppercase tracking-[0.28em]"
+          style={{ color: "rgba(110,231,183,0.65)" }}
+        >
+          Aurelinx Core
+        </div>
+        <div className="mt-2.5">
+          <Waveform count={9} />
+        </div>
+        <div
+          className="mt-2.5 text-[9px] font-semibold uppercase tracking-wider"
+          style={{ color: "rgba(148,163,184,0.55)" }}
+        >
+          Standing by · SSE ready
+        </div>
+        <button
+          type="button"
+          onClick={onEnterWorkspace}
+          className="btn-shine mt-2.5 rounded-full px-3.5 py-1.5 text-[9px] font-black uppercase tracking-widest active:scale-95 transition-transform"
+          style={{
+            background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+            color: "#020a07",
+          }}
+        >
+          Connect workspace
+        </button>
       </div>
 
       {/* Floating chips */}
@@ -1097,16 +1002,13 @@ const LuxeScrollbar = () => {
    MAIN COMPONENT
 ───────────────────────────────────────── */
 const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
-  const { token, isAuthenticated } = useAuth();
-  const [snapshot, setSnapshot] = useState(null);
-  const [connections, setConnections] = useState([]);
-  const [drRunbooks, setDrRunbooks] = useState([]);
-  const [procurement, setProcurement] = useState([]);
-  const [driftLogs, setDriftLogs] = useState([]);
-  const [modelCards, setModelCards] = useState([]);
-  const [activeAccordionTab, setActiveAccordionTab] = useState("dr");
+  /* PUBLIC-FACING ONLY: the landing page is a marketing surface and must
+     never fetch, display, or expose tenant/company data. The only network
+     call is the public health ping for the SRE pill — no auth token is
+     read, no analytics/enterprise endpoints are ever invoked. */
   const [pingLatency, setPingLatency] = useState(null);
   const [sreStatus, setSreStatus] = useState("offline");
+  const [activeAccordionTab, setActiveAccordionTab] = useState("dr");
   const [selectedScenarioIdx, setSelectedScenarioIdx] = useState(0);
   const [simActiveStep, setSimActiveStep] = useState(0);
   const [isSimulating, setIsSimulating] = useState(false);
@@ -1123,7 +1025,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
   useEffect(() => {
     let active = true;
-    const fetchData = async () => {
+    const fetchHealth = async () => {
       try {
         const t0 = Date.now();
         const healthCheck = await healthAPI.check();
@@ -1133,50 +1035,17 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           setPingLatency(Date.now() - t0);
           setSreStatus(isHealthy ? "operational" : "degraded");
         }
-        if (!isHealthy) {
-          return;
-        }
-
-        if (!token || !isAuthenticated) {
-          if (active) {
-            setSnapshot(null);
-            setConnections([]);
-            setDrRunbooks([]);
-            setProcurement([]);
-            setDriftLogs([]);
-            setModelCards([]);
-          }
-          return;
-        }
-
-        const [snapData, connData, runbookData, procData, driftData, cardData] =
-          await Promise.all([
-            analysisAPI.getAnalyticsSnapshot().catch(() => null),
-            enterpriseAPI.listConnections().catch(() => []),
-            leanAPI.listDRRunbooks().catch(() => []),
-            leanAPI.listProcurementArtifacts().catch(() => []),
-            leanAPI.listDrift().catch(() => []),
-            leanAPI.listModelCards().catch(() => []),
-          ]);
-        if (active) {
-          if (snapData) setSnapshot(snapData);
-          if (connData) setConnections(connData);
-          if (runbookData) setDrRunbooks(runbookData);
-          if (procData) setProcurement(procData);
-          if (driftData) setDriftLogs(driftData);
-          if (cardData) setModelCards(cardData);
-        }
       } catch {
         if (active) setSreStatus("offline");
       }
     };
-    fetchData();
-    const t = setInterval(fetchData, 15000);
+    fetchHealth();
+    const t = setInterval(fetchHealth, 15000);
     return () => {
       active = false;
       clearInterval(t);
     };
-  }, [token, isAuthenticated]);
+  }, []);
 
   const startSimulation = () => {
     if (isSimulating) return;
@@ -1234,21 +1103,14 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
     return () => obs.disconnect();
   }, []);
 
-  const hasLive = Boolean(snapshot && snapshot.total != null);
-
-  const displayConnectors =
-    connections.length > 0
-      ? connections.map((c) => ({
-        name: c.name,
-        type: String(c.source_type).toUpperCase(),
-        status: String(c.status).toUpperCase(),
-      }))
-      : [
-        {
-          name: "Workday HRIS API",
-          type: "Core Employee DB",
-          status: "ACTIVE",
-        },
+  /* Static connector showcase — the landing page never reads the tenant's
+     live connection registry (public-facing surface must expose nothing) */
+  const displayConnectors = [
+    {
+      name: "Workday HRIS API",
+      type: "Core Employee DB",
+      status: "ACTIVE",
+    },
         {
           name: "Greenhouse ATS",
           type: "Candidate Pipeline",
@@ -1530,9 +1392,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               transition={{ duration: 0.5, delay: 0.06 }}
               className="mt-7 text-[clamp(2.6rem,5.5vw,4.2rem)] font-extrabold leading-[1.02] tracking-tight text-white"
             >
-              Operational HR intelligence
+              Autonomous HR intelligence
               <br />
-              with a <GradientWord>calmer, sharper</GradientWord> workflow.
+              for <GradientWord>modern enterprise</GradientWord> teams.
             </motion.h1>
 
             <motion.p
@@ -1542,9 +1404,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-6 max-w-[580px] text-base leading-relaxed"
               style={{ color: "rgba(148,163,184,0.7)" }}
             >
-              Aurelinx converts raw talent inputs, risk indicators, and
-              compliance gate parameters into a unified, dense control panel
-              built for security-conscious enterprise teams.
+              Aurelinx unifies live workforce analytics, AI agent governance, and
+              automated risk parameters into a high-precision executive control panel.
             </motion.p>
 
             <motion.div
@@ -1628,12 +1489,11 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 {pingLatency ? ` · ${pingLatency}ms` : ""}
               </span>
               <span className="opacity-40">·</span>
-              <span>Your live tenant telemetry appears here when you connect</span>
+              <span>Workforce telemetry lives inside your workspace, never on this page</span>
             </motion.div>
 
-            {/* TELEMETRY ORB — real data when connected, no invented numbers */}
+            {/* TELEMETRY ORB — purely decorative on this public page */}
             <HeroOrb
-              snapshot={snapshot}
               sreStatus={sreStatus}
               pingLatency={pingLatency}
               onEnterWorkspace={onEnterWorkspace}
@@ -2155,144 +2015,61 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         >
           <div className="mx-auto max-w-[700px] text-center">
             <SectionLabel>
-              <Gauge className="h-3.5 w-3.5" /> Live Tenant Telemetry
+              <Gauge className="h-3.5 w-3.5" /> Tenant Telemetry
             </SectionLabel>
             <SectionHeading>
-              Real numbers, <GradientWord>streamed live</GradientWord> from your tenant
+              Your numbers stay <GradientWord>inside your tenant</GradientWord>
             </SectionHeading>
             <p
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
-              No demo values — these gauges read directly from the Aurelinx
-              analytics snapshot of your connected workspace, refreshed every
-              15 seconds.
+              This page is public-facing and never touches your workspace data.
+              Real-time retention, risk, and morale gauges render only inside
+              your authenticated workspace — zero tenant data is exposed here,
+              by design.
             </p>
           </div>
 
           <div className="mx-auto mt-12 max-w-[1200px]">
-            {hasLive ? (
-              <GlassCard className="p-8">
-                <div className="flex items-center justify-center gap-2 pb-6">
-                  <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: "#6ee7b7", boxShadow: "0 0 10px rgba(110,231,183,0.9)" }} />
-                  <span
-                    className="text-[10px] font-black uppercase tracking-[0.24em]"
-                    style={{ color: "rgba(110,231,183,0.8)" }}
+            <GlassCard className="p-10 text-center">
+              <div className="flex flex-col items-center gap-5">
+                <div
+                  className="flex h-16 w-16 items-center justify-center rounded-full"
+                  style={{
+                    background: "rgba(110,231,183,0.06)",
+                    border: "1px solid rgba(110,231,183,0.2)",
+                  }}
+                >
+                  <Lock className="h-7 w-7" style={{ color: "#6ee7b7" }} />
+                </div>
+                <div>
+                  <div className="text-lg font-extrabold text-white">
+                    Telemetry stays behind the login
+                  </div>
+                  <p
+                    className="mt-2 mx-auto max-w-[520px] text-sm leading-relaxed"
+                    style={{ color: "rgba(148,163,184,0.6)" }}
                   >
-                    Streaming live · refreshes every 15s
-                  </span>
+                    Retention, risk, and morale gauges stream in your private
+                    workspace only. This public page ships zero tenant data —
+                    nothing here is fetched from your company, by design.
+                  </p>
                 </div>
-                <div className="flex flex-wrap items-start justify-center gap-10 lg:gap-16">
-                  <div className="flex flex-col items-center gap-3">
-                    <RadialGauge
-                      value={(100 - Number(snapshot.atRiskPct)) / 100}
-                      label="Retention Pulse"
-                      sub="of workforce"
-                      color="#6ee7b7"
-                      format={(v) => `${(v * 100).toFixed(1)}%`}
-                    />
-                  </div>
-                  <div className="flex flex-col items-center gap-3">
-                    <RadialGauge
-                      value={Number(snapshot.atRiskPct) / 100}
-                      label="Risk Cluster"
-                      sub="flagged cases"
-                      color="#f87171"
-                      format={(v) => `${(v * 100).toFixed(1)}%`}
-                    />
-                  </div>
-                  <div className="flex flex-col items-center gap-3">
-                    <RadialGauge
-                      value={Number(snapshot.avgSentiment)}
-                      label="Avg Morale"
-                      sub="sentiment index"
-                      color="#6ee7b7"
-                      format={(v) => v.toFixed(2)}
-                    />
-                  </div>
-                  <div className="flex flex-col items-center gap-3">
-                    <div
-                      className="flex h-[148px] w-[148px] flex-col items-center justify-center rounded-full"
-                      style={{
-                        background: "rgba(255,255,255,0.02)",
-                        border: "1px solid rgba(110,231,183,0.2)",
-                        boxShadow: "0 0 30px rgba(52,211,153,0.08)",
-                      }}
-                    >
-                      <div
-                        className="text-[26px] font-black tabular-nums"
-                        style={{ color: "#a78bfa", textShadow: "0 0 18px rgba(167,139,250,0.4)" }}
-                      >
-                        <CountUp
-                          value={Number(snapshot.total)}
-                          format={(v) => Math.round(v).toLocaleString()}
-                        />
-                      </div>
-                      <div
-                        className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.18em]"
-                        style={{ color: "rgba(148,163,184,0.5)" }}
-                      >
-                        active records
-                      </div>
-                    </div>
-                    <div
-                      className="text-[9px] font-black uppercase tracking-[0.2em]"
-                      style={{ color: "rgba(148,163,184,0.6)" }}
-                    >
-                      Workforce Size
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-                  {[
-                    [`${snapshot.atRisk} cases above 70% exit probability`, "#f87171"],
-                    ["Served over Server-Sent Events", "#6ee7b7"],
-                    ["Tenant-isolated PostgreSQL core", "#a78bfa"],
-                  ].map(([label, accent]) => (
-                    <Tag key={label} accent={accent}>{label}</Tag>
-                  ))}
-                </div>
-              </GlassCard>
-            ) : (
-              <GlassCard className="p-10 text-center">
-                <div className="flex flex-col items-center gap-5">
-                  <div
-                    className="flex h-16 w-16 items-center justify-center rounded-full"
-                    style={{
-                      background: "rgba(110,231,183,0.06)",
-                      border: "1px solid rgba(110,231,183,0.2)",
-                    }}
-                  >
-                    <Activity className="h-7 w-7" style={{ color: "#6ee7b7" }} />
-                  </div>
-                  <div>
-                    <div className="text-lg font-extrabold text-white">
-                      Your live telemetry appears here
-                    </div>
-                    <p
-                      className="mt-2 mx-auto max-w-[520px] text-sm leading-relaxed"
-                      style={{ color: "rgba(148,163,184,0.6)" }}
-                    >
-                      Connect your workspace and the gauges above fill with
-                      real data from your own tenant — no placeholders, no demo
-                      numbers.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onEnterWorkspace}
-                    className="btn-shine inline-flex h-11 items-center gap-2 rounded-xl px-6 text-sm font-bold transition-all active:scale-[0.98]"
-                    style={{
-                      background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
-                      color: "#020a07",
-                      boxShadow: "0 12px 34px -8px rgba(52,211,153,0.5)",
-                    }}
-                  >
-                    Enter Workspace <ArrowRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </GlassCard>
-            )}
+                <button
+                  type="button"
+                  onClick={onEnterWorkspace}
+                  className="btn-shine inline-flex h-11 items-center gap-2 rounded-xl px-6 text-sm font-bold transition-all active:scale-[0.98]"
+                  style={{
+                    background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                    color: "#020a07",
+                    boxShadow: "0 12px 34px -8px rgba(52,211,153,0.5)",
+                  }}
+                >
+                  Enter Workspace <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </GlassCard>
           </div>
         </section>
 
@@ -2957,21 +2734,11 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       className="mb-4 text-xs"
                       style={{ color: "rgba(148,163,184,0.5)" }}
                     >
-                      Real disaster recovery runbooks extracted from the system
-                      database. DR tests are automatically scheduled.
+                      Representative disaster recovery runbook registry — your
+                      workspace holds the live runbooks for your own tenant.
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      {(drRunbooks.length > 0
-                        ? drRunbooks.map((r) => ({
-                          name: r.runbook_name,
-                          env: r.environment,
-                          rto: r.rto_minutes,
-                          rpo: r.rpo_minutes,
-                          note: r.notes,
-                          status: r.status,
-                        }))
-                        : fallbackRunbooks
-                      ).map((rb, i) => (
+                      {fallbackRunbooks.map((rb, i) => (
                         <div
                           key={i}
                           className="rounded-[16px] p-4"
@@ -3030,20 +2797,11 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       className="mb-4 text-xs"
                       style={{ color: "rgba(148,163,184,0.5)" }}
                     >
-                      Review procurement checklists and standard compliance
-                      artifacts.
+                      Representative compliance artifact library — your
+                      workspace holds the signed documents for your tenant.
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      {(procurement.length > 0
-                        ? procurement.map((p) => ({
-                          title: p.title,
-                          type: p.artifact_type,
-                          ver: p.version,
-                          status: p.status,
-                          notes: p.notes,
-                        }))
-                        : fallbackProcurement
-                      ).map((pa, i) => (
+                      {fallbackProcurement.map((pa, i) => (
                         <div
                           key={i}
                           className="rounded-[16px] p-4"
@@ -3092,8 +2850,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       className="mb-4 text-xs"
                       style={{ color: "rgba(148,163,184,0.5)" }}
                     >
-                      Review explainable ML model cards, metrics calibrations,
-                      and structural data drift checks.
+                      Illustrative model-card monitoring excerpts — live drift
+                      and calibration metrics render inside your workspace only.
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
                       {[
@@ -3104,9 +2862,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                           rows: [
                             [
                               "Drift score baseline",
-                              driftLogs.length > 0
-                                ? driftLogs[0].drift_score
-                                : "0.0815",
+                              "0.0815",
                             ],
                             ["Calibration error", "0.024"],
                             ["Retraining Status", "Not Needed"],
@@ -3119,15 +2875,11 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                           rows: [
                             [
                               "PR-AUC accuracy",
-                              modelCards.length > 0
-                                ? modelCards[0].pr_auc
-                                : "0.94",
+                              "0.94",
                             ],
                             [
                               "Fairness discrepancy gap",
-                              modelCards.length > 0
-                                ? modelCards[0].fairness_gap
-                                : "0.04",
+                              "0.04",
                             ],
                             ["Calibration Score", "99.8% Compliant"],
                           ],

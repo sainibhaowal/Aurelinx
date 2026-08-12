@@ -1085,13 +1085,29 @@ const IntelligenceChatView = () => {
     return { tools: tools.size, approvals, errors, records };
   }, [messages]);
 
+  const makeOpaqueSid = (id) => {
+    if (!id) return "";
+    const clean = String(id).replaceAll("-", "");
+    return `sess_${clean.slice(0, 8)}`;
+  };
+
   const loadSessions = async () => {
     const data = await chatAPI.listSessions();
     setSessions(data);
     if (data.length) {
-      if (!selectedSessionId || !data.some((s) => s.id === selectedSessionId)) {
-        setSelectedSessionId(data[0].id);
+      let targetId = null;
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const sidParam = params.get("sid") || params.get("session");
+        if (sidParam) {
+          const matched = data.find((s) => makeOpaqueSid(s.id) === sidParam || String(s.id).startsWith(sidParam.replace("sess_", "")));
+          if (matched) targetId = matched.id;
+        }
       }
+      if (!targetId && (!selectedSessionId || !data.some((s) => s.id === selectedSessionId))) {
+        targetId = data[0].id;
+      }
+      if (targetId) setSelectedSessionId(targetId);
     } else {
       setSelectedSessionId(null);
     }
@@ -1113,6 +1129,14 @@ const IntelligenceChatView = () => {
 
   useEffect(() => {
     loadMessages(selectedSessionId).catch(console.error);
+    if (typeof window !== "undefined" && selectedSessionId) {
+      const sidToken = makeOpaqueSid(selectedSessionId);
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("sid") !== sidToken) {
+        url.searchParams.set("sid", sidToken);
+        window.history.replaceState({}, "", url.pathname + url.search);
+      }
+    }
   }, [selectedSessionId]);
 
   const scrollToBottom = () => {

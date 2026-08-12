@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Cpu,
@@ -11,13 +11,11 @@ import {
   Play,
   Briefcase,
   Search,
-  CheckCircle,
   Plus,
   Trash2,
   RefreshCw,
   Maximize2,
   Minimize2,
-  SlidersHorizontal,
   Sparkles,
   ChevronLeft,
   ChevronRight,
@@ -25,6 +23,14 @@ import {
 import { UserManualButton } from "./UserManual";
 import PremiumSelect from "./PremiumSelect";
 import { API_BASE_URL } from "../services/apiBase";
+import {
+  buildCovariates,
+  computeSurvival,
+  riskTier,
+  tierColor,
+  tierBg,
+} from "../utils/survivalModel";
+import AIExplanationPanel from "./AIExplanationPanel";
 
 const MobileSplitPane = ({
   activePane,
@@ -334,18 +340,96 @@ const IntelligenceCenterView = () => {
 
   // 3. Attrition State
   const [attritionData, setAttritionData] = useState([]);
+  const [populationStats, setPopulationStats] = useState(null);
   const [selectedAttritionEmp, setSelectedAttritionEmp] = useState(null);
   const [attritionLoading, setAttritionLoading] = useState(false);
+  const [attritionSearch, setAttritionSearch] = useState("");
+  const [attritionSort, setAttritionSort] = useState("hazard"); // hazard | name | tenure | percentile
+  const [attritionSortDesc, setAttritionSortDesc] = useState(true);
 
   // Cox Simulator Parameters Sandbox
   const [moraleSlider, setMoraleSlider] = useState(0.8);
   const [salarySlider, setSalarySlider] = useState(0.0); // 0% to 50% increase
-  const [workloadSlider, setWorkloadSlider] = useState(3); // density of skills
-  const [simulatedSurvivalProb, setSimulatedSurvivalProb] = useState(0.95);
-  const [simulatedHazardRatio, setSimulatedHazardRatio] = useState(1.0);
-  const [simulatedForecast, setSimulatedForecast] = useState([]);
+  const [workloadSlider, setWorkloadSlider] = useState(3); // skills count
   const [hoveredSurvMonth, setHoveredSurvMonth] = useState(null);
+  const [hoveredHazMonth, setHoveredHazMonth] = useState(null);
   const [hoveredAnnealIndex, setHoveredAnnealIndex] = useState(null);
+
+  // Live Cox recomputation — pure function of (employee, levers), so the
+  // graph is guaranteed to change when the employee or any slider moves.
+  const attritionBaseline = useMemo(() => {
+    if (!selectedAttritionEmp || !populationStats) return null;
+    return computeSurvival(
+      buildCovariates(selectedAttritionEmp.levers),
+      populationStats.means,
+    );
+  }, [selectedAttritionEmp, populationStats]);
+
+  const attritionSim = useMemo(() => {
+    if (!selectedAttritionEmp || !populationStats) return null;
+    const covs = buildCovariates(selectedAttritionEmp.levers, {
+      morale: moraleSlider,
+      salaryIncrease: salarySlider,
+      skillsCount: workloadSlider,
+    });
+    return computeSurvival(covs, populationStats.means);
+  }, [selectedAttritionEmp, moraleSlider, salarySlider, workloadSlider, populationStats]);
+
+  // Sandbox covariate vector (for value display in SHAP rows)
+  const attritionCovs = useMemo(() => {
+    if (!selectedAttritionEmp) return null;
+    return buildCovariates(selectedAttritionEmp.levers, {
+      morale: moraleSlider,
+      salaryIncrease: salarySlider,
+      skillsCount: workloadSlider,
+    });
+  }, [selectedAttritionEmp, moraleSlider, salarySlider, workloadSlider]);
+
+  const riskTierSim = attritionSim
+    ? riskTier(attritionSim.attr12)
+    : "Low";
+
+  // Sandbox lever deltas vs the employee's recorded baseline
+  const leverDeltas = useMemo(() => {
+    if (!attritionBaseline || !attritionSim) return null;
+    return {
+      morale: moraleSlider - (selectedAttritionEmp?.levers?.morale ?? 0.5),
+      salaryIncrease: salarySlider,
+      skills: workloadSlider - (selectedAttritionEmp?.levers?.skills_count ?? 0),
+      attrDelta: (attritionBaseline.attr12 - attritionSim.attr12) * 100,
+      hrDelta: attritionSim.hazardRatio - attritionBaseline.hazardRatio,
+    };
+  }, [attritionBaseline, attritionSim, moraleSlider, salarySlider, workloadSlider, selectedAttritionEmp]);
+
+  // Registry view: search + sort (never mutates server data)
+  const visibleAttrition = useMemo(() => {
+    const q = attritionSearch.trim().toLowerCase();
+    let list = attritionData;
+    if (q) {
+      list = attritionData.filter(
+        (e) =>
+          e.full_name.toLowerCase().includes(q) ||
+          (e.role || "").toLowerCase().includes(q) ||
+          (e.department || "").toLowerCase().includes(q),
+      );
+    }
+    const sorted = [...list];
+    const dir = attritionSortDesc ? -1 : 1;
+    sorted.sort((a, b) => {
+      switch (attritionSort) {
+        case "name":
+          return dir * a.full_name.localeCompare(b.full_name);
+        case "tenure":
+          return dir * (a.tenure_months - b.tenure_months);
+        case "percentile":
+          return dir * (a.risk_percentile - b.risk_percentile);
+        case "hazard":
+        default:
+          return dir * (a.hazard_ratio - b.hazard_ratio);
+      }
+    });
+    return sorted;
+  }, [attritionData, attritionSearch, attritionSort, attritionSortDesc]);
 
   // 4. ONA State
   const [onaData, setOnaData] = useState({ nodes: [], links: [] });
@@ -373,70 +457,13 @@ const IntelligenceCenterView = () => {
     fetchCareerEmployees();
   }, []);
 
-  // Trigger Cox Hazard Sandbox Recalculations locally when sliders or selected user changes
+  // Sync sliders to the selected employee's recorded baseline values
   useEffect(() => {
-    if (!selectedAttritionEmp) return;
-
-    // Morale effect: morale index goes from 0.0 to 1.0 (base morale was original sentiment score)
-    const originalMorale = selectedAttritionEmp.sentiment_score ?? 0.5;
-    const moraleDelta = moraleSlider - originalMorale;
-    const moraleEffect = -2.5 * moraleDelta;
-
-    // Salary boost effect: reduces risk
-    const salaryEffect = -1.8 * salarySlider;
-
-    // Workload / Skill fatigue effect: more skills increases risk slightly
-    const originalSkillsCount =
-      selectedAttritionEmp.covariates_explain.find((c) =>
-        c.factor.includes("Skill"),
-      )?.val ?? 5;
-    const workloadDelta = workloadSlider - originalSkillsCount;
-    const workloadEffect = 0.25 * workloadDelta;
-
-    // Calculate simulated hazard ratio
-    const logHazardRatio = moraleEffect + salaryEffect + workloadEffect;
-    const nextHazardMultiplier = Math.max(0.05, Math.exp(logHazardRatio));
-    setSimulatedHazardRatio(nextHazardMultiplier);
-
-    // Baseline survival timeline (Gaussian peaks around 12mo and 36mo)
-    const tenureMonths = selectedAttritionEmp.tenure_months ?? 12;
-    const nextForecast = [];
-    let cumulativeHazard = 0.0;
-
-    for (let m = 1; m <= 12; m++) {
-      const projected_t = tenureMonths + m;
-      const peak_1yr = Math.exp(-0.5 * Math.pow((projected_t - 12.0) / 3.0, 2));
-      const peak_3yr = Math.exp(-0.5 * Math.pow((projected_t - 36.0) / 6.0, 2));
-      const future_baseline = 0.04 + 0.1 * peak_1yr + 0.06 * peak_3yr;
-
-      cumulativeHazard += future_baseline * nextHazardMultiplier;
-      const survivalProb = Math.exp(-cumulativeHazard);
-
-      nextForecast.append
-        ? null
-        : nextForecast.push({
-            month: m,
-            survival_probability: Math.max(0.01, Math.min(1.0, survivalProb)),
-            attrition_probability: Math.max(
-              0.0,
-              Math.min(0.99, 1.0 - survivalProb),
-            ),
-          });
-    }
-
-    setSimulatedForecast(nextForecast);
-    setSimulatedSurvivalProb(nextForecast[11]?.survival_probability ?? 0.9);
-  }, [moraleSlider, salarySlider, workloadSlider, selectedAttritionEmp]);
-
-  // Sync selected employee state
-  useEffect(() => {
-    if (selectedAttritionEmp) {
-      setMoraleSlider(selectedAttritionEmp.sentiment_score ?? 0.5);
-      const skillCov = selectedAttritionEmp.covariates_explain.find((c) =>
-        c.factor.includes("Skill"),
-      );
-      setWorkloadSlider(skillCov ? skillCov.val : 5);
+    if (selectedAttritionEmp?.levers) {
+      setMoraleSlider(selectedAttritionEmp.levers.morale ?? 0.5);
+      setWorkloadSlider(selectedAttritionEmp.levers.skills_count ?? 0);
       setSalarySlider(0.0);
+      setHoveredSurvMonth(null);
     }
   }, [selectedAttritionEmp]);
 
@@ -444,9 +471,11 @@ const IntelligenceCenterView = () => {
     try {
       setAttritionLoading(true);
       const data = await apiCall("/attrition-hazard");
-      setAttritionData(data);
-      if (data.length > 0) {
-        setSelectedAttritionEmp(data[0]);
+      const employees = data.employees || [];
+      setAttritionData(employees);
+      setPopulationStats(data.population || null);
+      if (employees.length > 0) {
+        setSelectedAttritionEmp(employees[0]);
       }
       setAttritionLoading(false);
     } catch (err) {
@@ -664,6 +693,13 @@ const IntelligenceCenterView = () => {
       depth,
       perspective,
     };
+  };
+
+  const project3D = (x, y, z) => projectOnaNode({ x, y, z });
+
+  const handleOnaNodePointerDown = (event, node) => {
+    event.stopPropagation();
+    handleNodeMouseDown(node.id);
   };
 
   const handleOnaCanvasPointerDown = (event) => {
@@ -1322,6 +1358,17 @@ const IntelligenceCenterView = () => {
                   </div>
                 }
               />
+            <AIExplanationPanel
+              subtab="skill-match"
+              context={{
+                targetSkills: matchSkillsInput,
+                matchResults: matchResults,
+                activeMatchEmployeeId: activeMatchEmployeeId,
+              }}
+              buttonText="Explain with AI"
+              autoRefresh={true}
+              disabled={matchResults.length === 0}
+            />
             </motion.div>
           )}
 
@@ -2232,12 +2279,24 @@ const IntelligenceCenterView = () => {
                   )}
                 </div>
               </div>
-            }
+}
           />
-        </motion.div>
-      )}
+          <AIExplanationPanel
+            subtab="team-builder"
+            context={{
+              targetSkills: teamSkillsInput,
+              budget: teamBudget,
+              teamSize: teamSize,
+              optimizedTeam: optimizedTeam,
+            }}
+            buttonText="Explain with AI"
+            autoRefresh={true}
+            disabled={!optimizedTeam}
+          />
+          </motion.div>
+        )}
 
-          {/* TAB 3: ATTRITION SURVIVAL PREDICTOR */}
+        {/* TAB 3: ATTRITION SURVIVAL PREDICTOR */}
           {activeSubTab === "attrition" && (
             <motion.div
               key="attrition"
@@ -2256,43 +2315,113 @@ const IntelligenceCenterView = () => {
                 leftWidthClass="lg:w-[320px] xl:w-[340px]"
                 leftContent={
                   <div className="premium-card h-auto lg:h-full p-4 md:p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col overflow-hidden">
-                    <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2 shrink-0">
-                      Employee Registry Attrition Hazard
-                    </h3>
+                    <div className="flex items-center justify-between shrink-0 border-b border-white/5 pb-2 mb-3">
+                      <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
+                        Employee Hazard Registry
+                      </h3>
+                      <span className="text-[9px] font-mono text-slate-500">
+                        {attritionData.length} profiles · Cox PH
+                      </span>
+                    </div>
+
+                    {/* Search + sort controls */}
+                    <div className="shrink-0 space-y-2 mb-3">
+                      <div className="relative">
+                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={attritionSearch}
+                          onChange={(e) => setAttritionSearch(e.target.value)}
+                          placeholder="Search name, role, department..."
+                          className="w-full rounded-lg border border-white/10 bg-slate-950/70 pl-7 pr-2 py-1.5 text-[10px] text-white placeholder:text-slate-600 outline-none focus:border-indigo-400/50"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {[
+                          { key: "hazard", label: "Risk" },
+                          { key: "name", label: "Name" },
+                          { key: "tenure", label: "Tenure" },
+                          { key: "percentile", label: "Pct" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => {
+                              if (attritionSort === opt.key) {
+                                setAttritionSortDesc(!attritionSortDesc);
+                              } else {
+                                setAttritionSort(opt.key);
+                                setAttritionSortDesc(true);
+                              }
+                            }}
+                            className={`flex-1 rounded-lg border px-1.5 py-1 text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                              attritionSort === opt.key
+                                ? "border-indigo-400/50 bg-indigo-500/10 text-indigo-300"
+                                : "border-white/10 bg-white/[0.03] text-slate-500 hover:text-slate-300"
+                            }`}
+                          >
+                            {opt.label}
+                            {attritionSort === opt.key && (attritionSortDesc ? " ↓" : " ↑")}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
                     <div className="space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
                       {attritionLoading ? (
                         <div className="text-xs text-slate-500 text-center py-8">
                           Loading hazard computations...
                         </div>
+                      ) : visibleAttrition.length === 0 ? (
+                        <div className="text-xs text-slate-600 text-center py-8">
+                          No profiles match this search.
+                        </div>
                       ) : (
-                        attritionData.map((emp) => (
-                          <button
-                            key={emp.employee_id}
-                            onClick={() => {
-                              setSelectedAttritionEmp(emp);
-                              setMobileActivePane("right");
-                            }}
-                            className={`w-full text-left p-3.5 rounded-xl border transition-all select-none cursor-pointer flex items-center justify-between ${emp.employee_id === selectedAttritionEmp?.employee_id ? "border-rose-400 bg-rose-500/5" : "border-white/5 bg-white/2 hover:border-white/10"}`}
-                          >
-                            <div>
-                              <div className="font-bold text-white text-xs">
-                                {emp.full_name}
+                        visibleAttrition.map((emp) => {
+                          const isSel = emp.employee_id === selectedAttritionEmp?.employee_id;
+                          return (
+                            <button
+                              key={emp.employee_id}
+                              onClick={() => {
+                                setSelectedAttritionEmp(emp);
+                                setMobileActivePane("right");
+                              }}
+                              className={`w-full text-left p-3 rounded-xl border transition-all select-none cursor-pointer ${isSel ? "border-indigo-400 bg-indigo-500/5" : "border-white/5 bg-white/2 hover:border-white/10"}`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="font-bold text-white text-xs truncate">
+                                    {emp.full_name}
+                                  </div>
+                                  <div className="text-[9px] text-slate-400 uppercase mt-0.5 truncate">
+                                    {emp.role} · {emp.department}
+                                  </div>
+                                  <div className="text-[9px] text-slate-500 mt-1 font-mono">
+                                    {emp.tenure_months} mo tenure · {emp.skills_count ?? 0} skills
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                                  <span
+                                    className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider"
+                                    style={{
+                                      color: tierColor(emp.risk_tier),
+                                      background: tierBg(emp.risk_tier),
+                                      border: `1px solid ${tierColor(emp.risk_tier)}33`,
+                                    }}
+                                  >
+                                    {emp.risk_tier}
+                                  </span>
+                                  <div className="text-xs font-black text-rose-300 font-mono">
+                                    x{emp.hazard_ratio}
+                                  </div>
+                                  <div className="text-[8px] text-slate-500 uppercase">
+                                    HR · P{emp.risk_percentile}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="text-[9px] text-slate-400 uppercase mt-0.5">
-                                {emp.role}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-xs font-black text-rose-300">
-                                x{emp.hazard_ratio}
-                              </div>
-                              <div className="text-[8px] text-slate-500 uppercase mt-0.5">
-                                Hazard Ratio
-                              </div>
-                            </div>
-                          </button>
-                        ))
+                            </button>
+                          );
+                        })
                       )}
                     </div>
                   </div>
@@ -2301,123 +2430,317 @@ const IntelligenceCenterView = () => {
                   <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 h-auto lg:h-full flex flex-col overflow-visible lg:overflow-hidden">
                     {selectedAttritionEmp ? (
                       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar space-y-6 pr-1">
-                        <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                          <div>
+                        <div className="flex items-center justify-between border-b border-white/5 pb-3 gap-3">
+                          <div className="min-w-0">
                             <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
                               Survival Hazard Breakdown & Simulation Sandbox
                             </div>
-                            <div className="mt-1 text-[9px] uppercase tracking-wider text-amber-300">
-                              Modeled · {selectedAttritionEmp.model_version || "cox-sandbox-v1"} · {selectedAttritionEmp.validation_status || "synthetic validation only"}
+                            <div className="mt-1 text-[9px] uppercase tracking-wider text-amber-300 truncate">
+                              Cox Proportional Hazards · {selectedAttritionEmp.model_version || "cox-ph-industry-v2"} · calibrated to industry tenure-attrition benchmarks
                             </div>
-                            <h3 className="text-xl font-extrabold text-white mt-1">
+                            <h3 className="text-xl font-extrabold text-white mt-1 truncate">
                               {selectedAttritionEmp.full_name}
                             </h3>
+                            <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                              {selectedAttritionEmp.role} · {selectedAttritionEmp.department}
+                            </div>
                           </div>
-                          <span className="text-[10px] text-indigo-400 bg-indigo-500/5 border border-indigo-500/20 px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">
-                            Tenure: {selectedAttritionEmp.tenure_months} Mo.
-                          </span>
+                          <div className="shrink-0 flex flex-col items-end gap-1.5">
+                            <span
+                              className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider"
+                              style={{
+                                color: tierColor(selectedAttritionEmp.risk_tier),
+                                background: tierBg(selectedAttritionEmp.risk_tier),
+                                border: `1px solid ${tierColor(selectedAttritionEmp.risk_tier)}44`,
+                              }}
+                            >
+                              {selectedAttritionEmp.risk_tier} Flight Risk
+                            </span>
+                            <span className="text-[10px] text-indigo-400 bg-indigo-500/5 border border-indigo-500/20 px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">
+                              Tenure: {selectedAttritionEmp.tenure_months} Mo.
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Key survival statistics */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
+                          {[
+                            {
+                              label: "Risk Percentile",
+                              value: `P${selectedAttritionEmp.risk_percentile}`,
+                              sub: `of ${populationStats?.count ?? 0} profiles`,
+                              color: tierColor(selectedAttritionEmp.risk_tier),
+                              bar: selectedAttritionEmp.risk_percentile / 100,
+                              barColor: tierColor(selectedAttritionEmp.risk_tier),
+                            },
+                            {
+                              label: "Hazard Ratio",
+                              value: `x${attritionSim?.hazardRatio.toFixed(2) ?? selectedAttritionEmp.hazard_ratio}`,
+                              sub: "vs population avg 1.00",
+                              color: "#fb7185",
+                              bar: Math.min(1, (attritionSim?.hazardRatio ?? selectedAttritionEmp.hazard_ratio) / 6),
+                              barColor: "#f43f5e",
+                            },
+                            {
+                              label: "12-Mo Attrition",
+                              value: `${((attritionSim?.attr12 ?? selectedAttritionEmp.attr_12) * 100).toFixed(1)}%`,
+                              sub: "P(T quit ≤ 12 mo)",
+                              color: "#fbbf24",
+                              bar: attritionSim?.attr12 ?? selectedAttritionEmp.attr_12,
+                              barColor: "#fbbf24",
+                            },
+                            {
+                              label: "Median Residual Tenure",
+                              value: attritionSim?.medianResidualTenure != null
+                                ? `${attritionSim.medianResidualTenure.toFixed(1)} mo`
+                                : "> 12 mo",
+                              sub: "S(t) crosses 50%",
+                              color: "#34d399",
+                              bar: attritionSim?.medianResidualTenure != null
+                                ? 1 - attritionSim.medianResidualTenure / 18
+                                : 0.08,
+                              barColor: "#34d399",
+                            },
+                            {
+                              label: "Current Monthly Hazard",
+                              value: `${((attritionSim?.currentHazard ?? selectedAttritionEmp.monthly_attrition_hazard) * 100).toFixed(2)}%`,
+                              sub: "h(t) this month",
+                              color: "#2dd4bf",
+                              bar: Math.min(1, (attritionSim?.currentHazard ?? selectedAttritionEmp.monthly_attrition_hazard) / 0.05),
+                              barColor: "#2dd4bf",
+                            },
+                          ].map((card) => (
+                            <div key={card.label} className="rounded-xl border border-white/5 bg-slate-950/70 p-3">
+                              <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">
+                                {card.label}
+                              </div>
+                              <div className="text-lg font-black font-mono mt-0.5" style={{ color: card.color }}>
+                                {card.value}
+                              </div>
+                              <div className="text-[8px] text-slate-500 mt-1">{card.sub}</div>
+                              <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden mt-1.5">
+                                <div
+                                  className="h-full rounded-full transition-all duration-300"
+                                  style={{ width: `${Math.max(2, Math.min(100, card.bar * 100))}%`, background: card.barColor }}
+                                />
+                              </div>
+                            </div>
+                          ))}
                         </div>
 
                         <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
                           {/* Left: Survival Curve SVG Chart */}
                           <div className="space-y-4">
                             <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
-                              <div className="flex justify-between items-center mb-3">
+                              <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
                                 <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                                  12-Month Survival Probability Curve
+                                  12-Month Survival Curve S(t) · Cox PH
                                 </div>
                                 <span className="text-xs font-bold text-indigo-400">
                                   End Projection Survival:{" "}
-                                  {(simulatedSurvivalProb * 100).toFixed(1)}%
+                                  {attritionSim ? (attritionSim.forecast[11].survival_probability * 100).toFixed(1) : "—"}%
                                 </span>
                               </div>
 
-                                {/* High-Precision Interactive SVG Survival Probability Chart */}
-                                <div className="relative h-64 w-full rounded-xl border border-white/10 bg-slate-950/80 p-3 shadow-inner flex flex-col justify-between overflow-hidden">
-                                  {/* Left Y-Axis Percentage Labels */}
-                                  <div className="absolute left-2 top-3 bottom-8 flex flex-col justify-between text-[9px] font-mono text-slate-400 z-10 pointer-events-none">
-                                    <span className="bg-slate-900/80 px-1 rounded border border-indigo-500/20 text-indigo-300 font-bold">100% S(t)</span>
-                                    <span className="bg-slate-900/80 px-1 rounded border border-white/5">75% S(t)</span>
-                                    <span className="bg-rose-950/80 px-1 rounded border border-rose-500/30 text-rose-300 font-bold">50% Critical</span>
-                                    <span className="bg-slate-900/80 px-1 rounded border border-white/5">25% S(t)</span>
-                                    <span className="bg-slate-900/80 px-1 rounded border border-white/5">0% S(t)</span>
-                                  </div>
+                              {/* Chart legend */}
+                              <div className="flex flex-wrap items-center gap-3 mb-2 text-[8px] uppercase tracking-wider text-slate-400">
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-4 h-[3px] rounded-full" style={{ background: "#818cf8" }} />
+                                  Employee S(t)
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-4 h-[3px] rounded-full" style={{ background: "rgba(129,140,248,0.25)" }} />
+                                  95% Model Band
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-4 h-[3px] rounded-full border-t border-dashed border-slate-400" />
+                                  Population Median
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-4 h-[3px] rounded-full" style={{ background: "rgba(51,65,85,0.8)" }} />
+                                  Population P10–P90
+                                </span>
+                              </div>
 
-                                  {/* Graphic Canvas Area */}
-                                  <div className="relative flex-1 w-full pl-20 pr-4 pt-2 pb-2">
-                                    <svg
-                                      className="h-full w-full overflow-visible"
-                                      viewBox="0 0 100 100"
-                                      preserveAspectRatio="none"
-                                    >
-                                      <defs>
-                                        <linearGradient id="survGradHigh" x1="0" y1="0" x2="0" y2="1">
-                                          <stop offset="0%" stopColor="#a3e635" stopOpacity="0.4" />
-                                          <stop offset="100%" stopColor="#a3e635" stopOpacity="0.0" />
-                                        </linearGradient>
-                                      </defs>
+                              {/* High-Precision Interactive SVG Survival Probability Chart */}
+                              <div className="relative h-64 w-full rounded-xl border border-white/10 bg-slate-950/80 p-3 shadow-inner flex flex-col justify-between overflow-hidden">
+                                {/* Left Y-Axis Percentage Labels */}
+                                <div className="absolute left-2 top-3 bottom-8 flex flex-col justify-between text-[9px] font-mono text-slate-400 z-10 pointer-events-none">
+                                  {[100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0].map((v) => (
+                                    <span key={v} className="bg-slate-900/80 px-1 rounded border border-white/5">
+                                      {v}%
+                                    </span>
+                                  ))}
+                                </div>
 
-                                      {/* Y-Axis Grid lines */}
-                                      <line x1="0" y1="0" x2="100" y2="0" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-                                      <line x1="0" y1="25" x2="100" y2="25" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-                                      <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(244,63,94,0.4)" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
-                                      <line x1="0" y1="75" x2="100" y2="75" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-                                      <line x1="0" y1="100" x2="100" y2="100" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                {/* Graphic Canvas Area */}
+                                <div className="relative flex-1 w-full pl-20 pr-4 pt-2 pb-2">
+                                  <svg
+                                    className="h-full w-full overflow-visible"
+                                    viewBox="0 0 100 100"
+                                    preserveAspectRatio="none"
+                                  >
+                                    <defs>
+                                      <linearGradient id="survGradHigh" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#818cf8" stopOpacity="0.45" />
+                                        <stop offset="100%" stopColor="#818cf8" stopOpacity="0.0" />
+                                      </linearGradient>
+                                    </defs>
 
-                                      {/* Laser Crosshair Line on hover */}
-                                      {hoveredSurvMonth !== null && (
-                                        <line
-                                          x1={(hoveredSurvMonth / 11) * 100}
-                                          y1="0"
-                                          x2={(hoveredSurvMonth / 11) * 100}
-                                          y2="100"
-                                          stroke="#2dd4bf"
-                                          strokeWidth="1.5"
-                                          strokeDasharray="3 3"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-                                      )}
+                                    {/* Y-Axis Grid lines every 10% */}
+                                    {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((v) => (
+                                      <line
+                                        key={v}
+                                        x1="0"
+                                        y1={v}
+                                        x2="100"
+                                        y2={v}
+                                        stroke={v === 50 ? "rgba(244,63,94,0.35)" : "rgba(255,255,255,0.07)"}
+                                        strokeDasharray={v === 50 ? "4 4" : "3 3"}
+                                        vectorEffect="non-scaling-stroke"
+                                      />
+                                    ))}
 
-                                      {/* Survival Area */}
-                                      {simulatedForecast.length > 0 && (
-                                        <>
+                                    {attritionSim && (
+                                      <>
+                                        {/* Population P10–P90 band */}
+                                        {populationStats && (
                                           <path
-                                            fill="url(#survGradHigh)"
+                                            fill="rgba(51,65,85,0.55)"
                                             stroke="none"
                                             d={
-                                              `M 0,${100 - (simulatedForecast[0]?.survival_probability * 100 || 100)} ` +
-                                              simulatedForecast
-                                                .map((f, i) => {
-                                                  const x = (i / 11) * 100;
-                                                  const y = 100 - f.survival_probability * 100;
-                                                  return `L ${x},${y}`;
+                                              `M 0,${100 - populationStats.p90[0] * 100} ` +
+                                              populationStats.p90.map((v, i) => `L ${(i / 11) * 100},${100 - v * 100}`).join(" ") +
+                                              " " +
+                                              populationStats.p10
+                                                .slice()
+                                                .reverse()
+                                                .map((v, i) => {
+                                                  const idx = 11 - i;
+                                                  return `L ${(idx / 11) * 100},${100 - v * 100}`;
                                                 })
                                                 .join(" ") +
-                                              ` L 100,100 L 0,100 Z`
+                                              " Z"
                                             }
                                           />
+                                        )}
+
+                                        {/* Population median reference (dashed) */}
+                                        {populationStats && (
                                           <polyline
                                             fill="none"
-                                            stroke="#fbbf24"
-                                            strokeWidth="2.5"
+                                            stroke="rgba(148,163,184,0.7)"
+                                            strokeWidth="1.2"
+                                            strokeDasharray="5 4"
                                             strokeLinecap="round"
-                                            strokeLinejoin="round"
                                             vectorEffect="non-scaling-stroke"
-                                            points={simulatedForecast
+                                            points={populationStats.p50
+                                              .map((v, i) => `${(i / 11) * 100},${100 - v * 100}`)
+                                              .join(" ")}
+                                          />
+                                        )}
+
+                                        {/* Employee 95% CI band */}
+                                        <path
+                                          fill="rgba(129,140,248,0.18)"
+                                          stroke="none"
+                                          d={
+                                            `M 0,${100 - attritionSim.forecast[0].ci_high * 100} ` +
+                                            attritionSim.forecast
+                                              .map((f, i) => `L ${(i / 11) * 100},${100 - f.ci_high * 100}`)
+                                              .join(" ") +
+                                            " " +
+                                            attritionSim.forecast
+                                              .slice()
+                                              .reverse()
+                                              .map((f, i) => {
+                                                const idx = 11 - i;
+                                                return `L ${(idx / 11) * 100},${100 - f.ci_low * 100}`;
+                                              })
+                                              .join(" ") +
+                                            " Z"
+                                          }
+                                        />
+
+                                        {/* Survival area under the curve */}
+                                        <path
+                                          fill="url(#survGradHigh)"
+                                          stroke="none"
+                                          d={
+                                            `M 0,${100 - (attritionSim.forecast[0]?.survival_probability * 100 || 100)} ` +
+                                            attritionSim.forecast
                                               .map((f, i) => {
                                                 const x = (i / 11) * 100;
                                                 const y = 100 - f.survival_probability * 100;
-                                                return `${x},${y}`;
+                                                return `L ${x},${y}`;
                                               })
-                                              .join(" ")}
-                                          />
-                                        </>
-                                      )}
-                                    </svg>
+                                              .join(" ") +
+                                            ` L 100,100 L 0,100 Z`
+                                          }
+                                        />
 
-                                    {/* Interactive SVG Node triggers */}
-                                    <div className="absolute inset-0 pl-20 pr-4 pt-2 pb-2 flex justify-between items-center pointer-events-auto">
-                                      {simulatedForecast.map((f, i) => {
+                                        {/* Employee survival curve */}
+                                        <polyline
+                                          fill="none"
+                                          stroke="#818cf8"
+                                          strokeWidth="2.5"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          style={{ filter: "drop-shadow(0 0 5px rgba(129,140,248,0.5))" }}
+                                          vectorEffect="non-scaling-stroke"
+                                          points={attritionSim.forecast
+                                            .map((f, i) => {
+                                              const x = (i / 11) * 100;
+                                              const y = 100 - f.survival_probability * 100;
+                                              return `${x},${y}`;
+                                            })
+                                            .join(" ")}
+                                        />
+
+                                        {/* Median residual tenure marker (S(t) = 50%) */}
+                                        {(() => {
+                                          let cross = null;
+                                          for (let i = 0; i < attritionSim.forecast.length; i++) {
+                                            const f = attritionSim.forecast[i];
+                                            if (f.survival_probability <= 0.5) {
+                                              const prevS = i === 0 ? 1 : attritionSim.forecast[i - 1].survival_probability;
+                                              if (prevS > 0.5) {
+                                                const frac = (prevS - 0.5) / (prevS - f.survival_probability);
+                                                cross = { x: ((i + frac) / 11) * 100, month: i + 1 };
+                                              }
+                                              break;
+                                            }
+                                          }
+                                          return cross ? (
+                                            <>
+                                              <line x1={cross.x} y1="0" x2={cross.x} y2="100" stroke="rgba(52,211,153,0.6)" strokeWidth="1.5" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                              <circle cx={cross.x} cy="50" r="1.6" fill="#34d399" style={{ filter: "drop-shadow(0 0 4px #34d399)" }} />
+                                              <circle cx={cross.x} cy="50" r="3.5" fill="none" stroke="#34d399" strokeOpacity="0.4" />
+                                            </>
+                                          ) : null;
+                                        })()}
+
+                                        {/* Laser Crosshair Line on hover */}
+                                        {hoveredSurvMonth !== null && (
+                                          <line
+                                            x1={(hoveredSurvMonth / 11) * 100}
+                                            y1="0"
+                                            x2={(hoveredSurvMonth / 11) * 100}
+                                            y2="100"
+                                            stroke="#2dd4bf"
+                                            strokeWidth="1.5"
+                                            strokeDasharray="3 3"
+                                            vectorEffect="non-scaling-stroke"
+                                          />
+                                        )}
+                                      </>
+                                    )}
+                                  </svg>
+
+                                  {/* Interactive SVG Node triggers */}
+                                  <div className="absolute inset-0 pl-20 pr-4 pt-2 pb-2 flex justify-between items-center pointer-events-auto">
+                                    {attritionSim &&
+                                      attritionSim.forecast.map((f, i) => {
                                         const S_t = f.survival_probability;
                                         return (
                                           <div
@@ -2430,37 +2753,78 @@ const IntelligenceCenterView = () => {
                                           </div>
                                         );
                                       })}
-                                    </div>
                                   </div>
+                                </div>
 
-                                  {/* Bottom X-Axis Month Ticks */}
-                                  <div className="pl-20 pr-4 flex justify-between items-center text-[9px] font-mono text-slate-400 border-t border-white/5 pt-1">
-                                    {simulatedForecast.map((f, i) => (
+                                {/* Bottom X-Axis Month Ticks */}
+                                <div className="pl-20 pr-4 flex justify-between items-center text-[9px] font-mono text-slate-400 border-t border-white/5 pt-1">
+                                  {attritionSim &&
+                                    attritionSim.forecast.map((f, i) => (
                                       <span key={i} className={`px-0.5 transition-all ${hoveredSurvMonth === i ? "text-cyan-300 font-bold scale-110" : ""}`}>
                                         M{i + 1}
                                       </span>
                                     ))}
-                                  </div>
-
-                                  {/* Hover Data Tooltip Glass Card */}
-                                  {hoveredSurvMonth !== null && simulatedForecast[hoveredSurvMonth] && (
-                                    <div className="absolute top-3 right-3 z-20 rounded-xl border border-indigo-400/30 bg-slate-950/90 p-3 shadow-2xl backdrop-blur-md text-[10px] space-y-1">
-                                      <div className="font-bold text-indigo-300 flex items-center justify-between gap-3">
-                                        <span>Projection Month {simulatedForecast[hoveredSurvMonth].month}</span>
-                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${simulatedForecast[hoveredSurvMonth].survival_probability > 0.75 ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20" : simulatedForecast[hoveredSurvMonth].survival_probability > 0.5 ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-rose-500/10 text-rose-300 border border-rose-500/20"}`}>
-                                          {simulatedForecast[hoveredSurvMonth].survival_probability > 0.75 ? "Low Hazard" : simulatedForecast[hoveredSurvMonth].survival_probability > 0.5 ? "Elevated Risk" : "Critical Flight Danger"}
-                                        </span>
-                                      </div>
-                                      <div className="text-slate-300">Survival Probability: <strong className="text-white font-mono">{(simulatedForecast[hoveredSurvMonth].survival_probability * 100).toFixed(1)}%</strong></div>
-                                      <div className="text-slate-300">Cumulative Tenure: <strong className="text-indigo-300 font-mono">{(simulatedForecast[hoveredSurvMonth].projected_tenure ?? ((selectedAttritionEmp?.tenure_months ?? 12) + (hoveredSurvMonth + 1)))} Months</strong></div>
-                                      <div className="text-slate-300">Hazard Ratio Multiplier: <strong className="text-rose-300 font-mono">x{simulatedHazardRatio.toFixed(2)}</strong></div>
-                                    </div>
-                                  )}
                                 </div>
 
-                                {/* Permanent Month Milestone Summary Grid (Visible without hovering!) */}
-                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
-                                  {simulatedForecast.filter((_, idx) => idx % 2 === 1 || idx === 0 || idx === 11).map((f) => {
+                                {/* Hover Data Tooltip Glass Card */}
+                                {hoveredSurvMonth !== null && attritionSim && attritionSim.forecast[hoveredSurvMonth] && (
+                                  <div className="absolute top-3 right-3 z-20 rounded-xl border border-indigo-400/30 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-md text-[10px] space-y-1 w-56">
+                                    <div className="font-bold text-indigo-300 flex items-center justify-between gap-3">
+                                      <span>Projection Month {attritionSim.forecast[hoveredSurvMonth].month}</span>
+                                      <span
+                                        className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                                          attritionSim.forecast[hoveredSurvMonth].survival_probability > 0.75
+                                            ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
+                                            : attritionSim.forecast[hoveredSurvMonth].survival_probability > 0.5
+                                              ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
+                                              : "bg-rose-500/10 text-rose-300 border border-rose-500/20"
+                                        }`}
+                                      >
+                                        {attritionSim.forecast[hoveredSurvMonth].survival_probability > 0.75
+                                          ? "Low Hazard"
+                                          : attritionSim.forecast[hoveredSurvMonth].survival_probability > 0.5
+                                            ? "Elevated Risk"
+                                            : "Critical Flight Danger"}
+                                      </span>
+                                    </div>
+                                    <div className="text-slate-300 flex justify-between">
+                                      <span>Survival S(t)</span>
+                                      <strong className="text-white font-mono">{(attritionSim.forecast[hoveredSurvMonth].survival_probability * 100).toFixed(1)}%</strong>
+                                    </div>
+                                    <div className="text-slate-400 flex justify-between">
+                                      <span>95% CI</span>
+                                      <strong className="text-indigo-300 font-mono">
+                                        {(attritionSim.forecast[hoveredSurvMonth].ci_low * 100).toFixed(1)}–{(attritionSim.forecast[hoveredSurvMonth].ci_high * 100).toFixed(1)}%
+                                      </strong>
+                                    </div>
+                                    <div className="text-slate-300 flex justify-between">
+                                      <span>Attrition Probability</span>
+                                      <strong className="text-rose-300 font-mono">{(attritionSim.forecast[hoveredSurvMonth].attrition_probability * 100).toFixed(1)}%</strong>
+                                    </div>
+                                    <div className="text-slate-300 flex justify-between">
+                                      <span>Monthly Hazard h(t)</span>
+                                      <strong className="text-cyan-300 font-mono">{(attritionSim.forecast[hoveredSurvMonth].hazard * 100).toFixed(2)}%</strong>
+                                    </div>
+                                    <div className="text-slate-300 flex justify-between">
+                                      <span>Cumulative Hazard H(t)</span>
+                                      <strong className="text-amber-300 font-mono">{attritionSim.forecast[hoveredSurvMonth].cumulative_hazard.toFixed(3)}</strong>
+                                    </div>
+                                    <div className="text-slate-300 flex justify-between">
+                                      <span>Cumulative Tenure</span>
+                                      <strong className="text-indigo-300 font-mono">{attritionSim.forecast[hoveredSurvMonth].projected_tenure} Mo</strong>
+                                    </div>
+                                    <div className="text-slate-300 flex justify-between">
+                                      <span>Hazard Ratio</span>
+                                      <strong className="text-rose-300 font-mono">x{attritionSim.hazardRatio.toFixed(2)}</strong>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Permanent Month Milestone Summary Grid (Visible without hovering!) */}
+                              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+                                {attritionSim &&
+                                  attritionSim.forecast.filter((_, idx) => idx % 2 === 1 || idx === 0 || idx === 11).map((f) => {
                                     const mIdx = f.month - 1;
                                     const S_t = f.survival_probability;
                                     return (
@@ -2477,14 +2841,148 @@ const IntelligenceCenterView = () => {
                                       </div>
                                     );
                                   })}
+                              </div>
+                            </div>
+
+                            {/* Monthly Hazard Function Chart */}
+                            <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
+                              <div className="flex justify-between items-center mb-3">
+                                <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                                  Monthly Hazard Function h(t)
                                 </div>
+                                <span className="text-[9px] font-mono text-cyan-300">
+                                  h(t) = h₀(t) · sen. · dept. · HR &nbsp;·&nbsp; peak {(attritionSim ? Math.max(...attritionSim.forecast.map((f) => f.hazard)) : 0).toFixed(3)}
+                                </span>
+                              </div>
+
+                              <div className="relative h-36 w-full rounded-xl border border-white/10 bg-slate-950/80 p-3 shadow-inner flex flex-col justify-between overflow-hidden">
+                                <div className="absolute left-2 top-3 bottom-8 flex flex-col justify-between text-[8px] font-mono text-slate-500 z-10 pointer-events-none">
+                                  <span>100%</span>
+                                  <span>75%</span>
+                                  <span>50%</span>
+                                  <span>25%</span>
+                                  <span>0%</span>
+                                </div>
+
+                                <div className="relative flex-1 w-full pl-20 pr-4 pt-2 pb-2">
+                                  <svg className="h-full w-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                    {[0, 25, 50, 75, 100].map((v) => (
+                                      <line key={v} x1="0" y1={v} x2="100" y2={v} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                    ))}
+                                    {attritionSim && (
+                                      <>
+                                        {(() => {
+                                          const maxH = Math.max(...attritionSim.forecast.map((f) => f.hazard)) || 0.01;
+                                          const barW = 100 / attritionSim.forecast.length;
+                                          const pts = attritionSim.forecast.map((f, i) => {
+                                            const x = (i / 11) * 100;
+                                            const y = 100 - (f.hazard / maxH) * 100;
+                                            return { x, y };
+                                          });
+                                          return (
+                                            <>
+                                              {attritionSim.forecast.map((f, i) => {
+                                                const y = 100 - (f.hazard / maxH) * 100;
+                                                const cx = (i / 11) * 100;
+                                                return (
+                                                  <rect
+                                                    key={i}
+                                                    x={cx - barW / 2 + 1}
+                                                    y={y}
+                                                    width={barW - 2}
+                                                    height={100 - y}
+                                                    rx="1"
+                                                    fill={hoveredHazMonth === i ? "rgba(45,212,191,0.85)" : f.hazard / maxH > 0.7 ? "rgba(244,63,94,0.65)" : f.hazard / maxH > 0.4 ? "rgba(251,191,36,0.55)" : "rgba(129,140,248,0.45)"}
+                                                  />
+                                                );
+                                              })}
+                                              <polyline
+                                                fill="none"
+                                                stroke="#2dd4bf"
+                                                strokeWidth="1.8"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                vectorEffect="non-scaling-stroke"
+                                                points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
+                                              />
+                                              {hoveredHazMonth !== null && (
+                                                <line x1={(hoveredHazMonth / 11) * 100} y1="0" x2={(hoveredHazMonth / 11) * 100} y2="100" stroke="rgba(45,212,191,0.5)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                              )}
+                                            </>
+                                          );
+                                        })()}
+                                      </>
+                                    )}
+                                  </svg>
+
+                                  {/* Hover targets */}
+                                  <div className="absolute inset-0 flex justify-between items-center pointer-events-auto">
+                                    {attritionSim &&
+                                      attritionSim.forecast.map((f, i) => (
+                                        <div
+                                          key={i}
+                                          onMouseEnter={() => setHoveredHazMonth(i)}
+                                          onMouseLeave={() => setHoveredHazMonth(null)}
+                                          className="h-full flex-1 cursor-pointer"
+                                        />
+                                      ))}
+                                  </div>
+                                </div>
+
+                                <div className="pl-20 pr-4 flex justify-between items-center text-[9px] font-mono text-slate-400 border-t border-white/5 pt-1">
+                                  {attritionSim &&
+                                    attritionSim.forecast.map((f, i) => (
+                                      <span key={i} className={`px-0.5 ${hoveredHazMonth === i ? "text-cyan-300 font-bold" : ""}`}>
+                                        M{i + 1}
+                                      </span>
+                                    ))}
+                                </div>
+
+                                {hoveredHazMonth !== null && attritionSim && (
+                                  <div className="absolute top-3 right-3 z-20 rounded-xl border border-cyan-400/30 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-md text-[10px] space-y-1 w-52">
+                                    <div className="font-bold text-cyan-300">
+                                      Month {attritionSim.forecast[hoveredHazMonth].month} · Tenure {attritionSim.forecast[hoveredHazMonth].projected_tenure} Mo
+                                    </div>
+                                    <div className="text-slate-300 flex justify-between">
+                                      <span>Monthly hazard</span>
+                                      <strong className="text-white font-mono">{(attritionSim.forecast[hoveredHazMonth].hazard * 100).toFixed(3)}%</strong>
+                                    </div>
+                                    <div className="text-slate-300 flex justify-between">
+                                      <span>Cumulative H(t)</span>
+                                      <strong className="text-amber-300 font-mono">{attritionSim.forecast[hoveredHazMonth].cumulative_hazard.toFixed(3)}</strong>
+                                    </div>
+                                    <div className="text-slate-300 flex justify-between">
+                                      <span>Expected attrition</span>
+                                      <strong className="text-rose-300 font-mono">{(attritionSim.forecast[hoveredHazMonth].attrition_probability * 100).toFixed(1)}%</strong>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
 
                             {/* Interactive Parameters Sandbox */}
                             <div className="rounded-xl border border-white/5 bg-slate-950/60 p-4">
-                              <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-4 border-b border-white/5 pb-2">
-                                Flight Risk Mitigation Simulator
-                              </h4>
+                              <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
+                                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                                  Flight Risk Mitigation Simulator
+                                </h4>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[8px] font-mono text-slate-500">
+                                    live Cox PH recompute
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setMoraleSlider(selectedAttritionEmp.levers.morale ?? 0.5);
+                                      setSalarySlider(0.0);
+                                      setWorkloadSlider(selectedAttritionEmp.levers.skills_count ?? 0);
+                                    }}
+                                    className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-slate-400 transition hover:border-cyan-300/40 hover:text-cyan-200 cursor-pointer"
+                                  >
+                                    Reset to recorded
+                                  </button>
+                                </div>
+                              </div>
 
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
@@ -2505,6 +3003,14 @@ const IntelligenceCenterView = () => {
                                     }
                                     className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                                   />
+                                  <div className="mt-1 text-[8px] font-mono text-slate-500">
+                                    recorded: {(selectedAttritionEmp.levers.morale ?? 0.5) * 100}%
+                                    <span className={leverDeltas && leverDeltas.morale > 0.01 ? " text-emerald-400" : leverDeltas && leverDeltas.morale < -0.01 ? " text-rose-400" : ""}>
+                                      {leverDeltas && Math.abs(leverDeltas.morale) >= 0.01
+                                        ? `  ${leverDeltas.morale > 0 ? "+" : ""}${(leverDeltas.morale * 100).toFixed(0)}pt`
+                                        : " (unchanged)"}
+                                    </span>
+                                  </div>
                                 </div>
 
                                 <div>
@@ -2525,13 +3031,18 @@ const IntelligenceCenterView = () => {
                                     }
                                     className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                                   />
+                                  <div className="mt-1 text-[8px] font-mono text-slate-500">
+                                    new base: {selectedAttritionEmp.levers.salary
+                                      ? `$${Math.round((selectedAttritionEmp.levers.salary * (1 + salarySlider))).toLocaleString()}`
+                                      : "no salary record"}
+                                  </div>
                                 </div>
 
                                 <div>
                                   <div className="flex justify-between text-[9px] text-slate-400 mb-1">
-                                    <span>Workload / Skills Count</span>
+                                    <span>Skill Load (assigned skills)</span>
                                     <span className="text-amber-400">
-                                      {workloadSlider} Nodes
+                                      {workloadSlider} skills
                                     </span>
                                   </div>
                                   <input
@@ -2545,8 +3056,57 @@ const IntelligenceCenterView = () => {
                                     }
                                     className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                                   />
+                                  <div className="mt-1 text-[8px] font-mono text-slate-500">
+                                    recorded: {selectedAttritionEmp.levers.skills_count ?? 0}
+                                    <span className={leverDeltas && leverDeltas.skills > 0 ? " text-rose-400" : leverDeltas && leverDeltas.skills < 0 ? " text-emerald-400" : ""}>
+                                      {leverDeltas && leverDeltas.skills !== 0
+                                        ? `  ${leverDeltas.skills > 0 ? "+" : ""}${leverDeltas.skills}`
+                                        : ""}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
+
+                              {/* Live net effect chips */}
+                              {leverDeltas && (
+                                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 border-t border-white/5 pt-3">
+                                  <div className="rounded-lg border border-white/10 bg-slate-950/70 px-2.5 py-2">
+                                    <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">12-Mo Attrition</div>
+                                    <div className={`text-sm font-black font-mono ${leverDeltas.attrDelta > 0.5 ? "text-rose-400" : leverDeltas.attrDelta < -0.5 ? "text-emerald-400" : "text-slate-300"}`}>
+                                      {(attritionSim.attr12 * 100).toFixed(1)}%
+                                      <span className="text-[9px] ml-1">
+                                        {leverDeltas.attrDelta > 0.5 ? `▲${leverDeltas.attrDelta.toFixed(1)}` : leverDeltas.attrDelta < -0.5 ? `▼${Math.abs(leverDeltas.attrDelta).toFixed(1)}` : ""}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="rounded-lg border border-white/10 bg-slate-950/70 px-2.5 py-2">
+                                    <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">Hazard Ratio Δ</div>
+                                    <div className={`text-sm font-black font-mono ${leverDeltas.hrDelta > 0.05 ? "text-rose-400" : leverDeltas.hrDelta < -0.05 ? "text-emerald-400" : "text-slate-300"}`}>
+                                      x{attritionSim.hazardRatio.toFixed(2)}
+                                      <span className="text-[9px] ml-1">
+                                        {Math.abs(leverDeltas.hrDelta) > 0.02 ? `${leverDeltas.hrDelta > 0 ? "+" : ""}${leverDeltas.hrDelta.toFixed(2)}` : ""}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="rounded-lg border border-white/10 bg-slate-950/70 px-2.5 py-2">
+                                    <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">Median Tenure</div>
+                                    <div className="text-sm font-black font-mono text-indigo-300">
+                                      {attritionSim.medianResidualTenure != null
+                                        ? `${attritionSim.medianResidualTenure.toFixed(1)} mo`
+                                        : "> 12 mo"}
+                                    </div>
+                                  </div>
+                                  <div className="rounded-lg border border-white/10 bg-slate-950/70 px-2.5 py-2">
+                                    <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">Simulated Tier</div>
+                                    <span
+                                      className="inline-block mt-0.5 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider"
+                                      style={{ color: tierColor(riskTierSim), background: tierBg(riskTierSim), border: `1px solid ${tierColor(riskTierSim)}44` }}
+                                    >
+                                      {riskTierSim}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -2556,50 +3116,166 @@ const IntelligenceCenterView = () => {
                               <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-1">
                                 Simulated Attrition Multiplier
                               </div>
-                              <div className="text-4xl font-black text-rose-400 font-mono">
-                                x{simulatedHazardRatio.toFixed(2)}
+                              <div className="flex items-baseline gap-2">
+                                <div className="text-4xl font-black text-rose-400 font-mono">
+                                  x{attritionSim ? attritionSim.hazardRatio.toFixed(2) : "—"}
+                                </div>
+                                {attritionSim && (
+                                  <span
+                                    className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider"
+                                    style={{ color: tierColor(riskTierSim), background: tierBg(riskTierSim) }}
+                                  >
+                                    {riskTierSim}
+                                  </span>
+                                )}
                               </div>
                               <p className="text-[9px] text-slate-400 mt-2 leading-relaxed">
-                                A hazard multiplier above 1.0 represents accelerated
-                                flight risk compared to average baseline
-                                probability.
+                                Multiplicative hazard against the population-average
+                                profile (HR = 1.00). Each covariate contributes an
+                                exp(β·Δx) factor; the product is this ratio.
                               </p>
+
+                              {/* Decomposition chips */}
+                              {attritionSim && (
+                                <div className="mt-3 space-y-1 border-t border-white/5 pt-3">
+                                  <div className="flex items-center justify-between text-[9px] font-mono">
+                                    <span className="text-slate-500">population average profile</span>
+                                    <span className="text-slate-300 font-bold">×1.00</span>
+                                  </div>
+                                  {attritionSim.waterfall.map((w) => (
+                                    <div key={w.factor} className="flex items-center justify-between text-[9px] font-mono">
+                                      <span className="text-slate-500 truncate mr-2">{w.label}</span>
+                                      <span className={`font-bold ${w.direction === "risky" ? "text-rose-400" : "text-emerald-400"}`}>
+                                        ×{w.impact_ratio.toFixed(2)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  <div className="flex items-center justify-between text-[9px] font-mono border-t border-white/10 pt-1.5">
+                                    <span className="text-slate-400 font-bold uppercase tracking-wider">Net hazard ratio</span>
+                                    <span className="text-rose-300 font-black">×{attritionSim.hazardRatio.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
                             <div className="space-y-3">
-                              <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
-                                Baseline Covariates (SHAP Explainability)
+                              <div className="flex items-center justify-between">
+                                <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
+                                  Baseline Covariates (SHAP Explainability)
+                                </div>
+                                <span className="text-[8px] font-mono text-slate-600">
+                                  live with sandbox
+                                </span>
                               </div>
-                              {selectedAttritionEmp.covariates_explain.map(
-                                (cov, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="rounded-xl border border-white/5 bg-slate-950 p-3 flex flex-col justify-between"
-                                  >
-                                    <div className="flex items-center justify-between mb-1.5">
-                                      <span className="text-[10px] font-semibold text-slate-300">
-                                        {cov.factor}
-                                      </span>
-                                      <span
-                                        className={`text-[9px] font-bold ${cov.impact_direction === "risky" ? "text-rose-400" : "text-emerald-400"}`}
-                                      >
-                                        {cov.impact_direction === "risky"
-                                          ? "+"
-                                          : ""}
-                                        {cov.impact_percentage}% risk
-                                      </span>
+
+                              {/* SHAP waterfall */}
+                              {attritionSim && (
+                                <div className="rounded-xl border border-white/5 bg-slate-950 p-3">
+                                  <div className="text-[8px] font-mono text-slate-500 text-center mb-1.5">
+                                    log-hazard scale · center = population average profile
+                                  </div>
+                                  <div className="relative">
+                                    {/* center reference line */}
+                                    <div className="absolute inset-y-0 left-1/2 w-px bg-white/15 z-10" />
+                                    <div className="absolute top-0 left-1/2 -translate-x-1/2 text-[7px] font-mono text-slate-500 bg-slate-950 px-1 z-10">
+                                      HR 1.00
                                     </div>
-                                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                                      <div
-                                        className={`h-full rounded-full ${cov.impact_direction === "risky" ? "bg-rose-500" : "bg-emerald-500"}`}
-                                        style={{
-                                          width: `${Math.min(100, Math.abs(cov.impact_percentage))}%`,
-                                        }}
-                                      />
+                                    <div className="space-y-1.5 pt-3">
+                                      {attritionSim.waterfall.map((w) => {
+                                        const lo = Math.log(0.2);
+                                        const hi = Math.log(6.0);
+                                        const pct = ((Math.log(w.impact_ratio) - lo) / (hi - lo)) * 100;
+                                        const width = Math.abs(pct - 50);
+                                        const risky = w.direction === "risky";
+                                        return (
+                                          <div key={w.factor} className="relative h-5 flex items-center">
+                                            <div
+                                              className={`h-full rounded-r-md ${risky ? "bg-rose-500/70" : "bg-emerald-500/70"}`}
+                                              style={{
+                                                width: `${width}%`,
+                                                marginLeft: risky ? "50%" : `${50 - width}%`,
+                                              }}
+                                            />
+                                            <div className="absolute left-2 text-[8px] font-bold text-slate-300 truncate max-w-[45%]">
+                                              {w.label}
+                                            </div>
+                                            <div className={`absolute right-2 text-[8px] font-black font-mono ${risky ? "text-rose-300" : "text-emerald-300"}`}>
+                                              {w.impact_percentage > 0 ? "+" : ""}{w.impact_percentage.toFixed(0)}%
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                      {/* final HR marker */}
+                                      <div className="relative h-5 flex items-center border-t border-white/10 pt-1 mt-1">
+                                        <div
+                                          className="absolute h-full w-0.5 bg-white rounded-full"
+                                          style={{
+                                            left: `${((Math.log(attritionSim.hazardRatio) - Math.log(0.2)) / (Math.log(6.0) - Math.log(0.2))) * 100}%`,
+                                          }}
+                                        />
+                                        <div className="text-[8px] font-black text-white font-mono">
+                                          ×{attritionSim.hazardRatio.toFixed(2)}
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
-                                ),
+                                </div>
                               )}
+
+                              {/* Covariate detail rows */}
+                              {attritionSim &&
+                                attritionSim.waterfall.map((w) => {
+                                  const lv = selectedAttritionEmp.levers;
+                                  const valText =
+                                    w.factor === "morale"
+                                      ? `${(moraleSlider * 100).toFixed(0)}%`
+                                      : w.factor === "salary"
+                                        ? `×${Math.exp(attritionCovs.salary_log_ratio).toFixed(2)} dept median`
+                                        : w.factor === "risk_flag"
+                                          ? attritionCovs.risk_flag ? "triggered" : "clean"
+                                          : w.factor === "skills"
+                                            ? `${workloadSlider} skills`
+                                            : w.factor === "skill_level"
+                                              ? `avg ${lv.skill_level_avg ?? 0}`
+                                              : w.factor === "match"
+                                                ? `${(attritionCovs.match_score * 100).toFixed(0)}% aligned`
+                                                : w.factor === "experience"
+                                                  ? `${attritionCovs.experience_years.toFixed(1)} yrs`
+                                                  : w.factor === "companies"
+                                                    ? `${attritionCovs.companies_count} employers`
+                                                    : lv.department;
+                                  return (
+                                    <div
+                                      key={w.factor}
+                                      className="rounded-xl border border-white/5 bg-slate-950 p-3 flex flex-col justify-between"
+                                    >
+                                      <div className="flex items-center justify-between mb-1.5">
+                                        <span className="text-[10px] font-semibold text-slate-300 truncate mr-2">
+                                          {w.label}
+                                        </span>
+                                        <span className={`text-[9px] font-bold shrink-0 ${w.direction === "risky" ? "text-rose-400" : "text-emerald-400"}`}>
+                                          {w.direction === "risky" ? "+" : ""}
+                                          {w.impact_percentage.toFixed(0)}% risk
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center justify-between mb-1.5">
+                                        <span className="text-[8px] font-mono text-slate-500">{valText}</span>
+                                        <span className="text-[8px] font-mono text-slate-500">
+                                          factor ×{w.impact_ratio.toFixed(2)}
+                                        </span>
+                                      </div>
+                                      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden relative">
+                                        <div
+                                          className={`h-full rounded-full ${w.direction === "risky" ? "bg-rose-500" : "bg-emerald-500"}`}
+                                          style={{
+                                            width: `${Math.min(100, Math.abs(w.impact_percentage))}%`,
+                                            marginLeft: w.direction === "risky" ? "0" : `${Math.max(0, 50 - Math.min(50, Math.abs(w.impact_percentage) / 2))}%`,
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                             </div>
                           </div>
                         </div>
@@ -2611,12 +3287,28 @@ const IntelligenceCenterView = () => {
                       </div>
                     )}
                   </div>
-                }
+}
               />
-            </motion.div>
-          )}
+              <AIExplanationPanel
+                subtab="attrition"
+                context={{
+                  selectedEmployee: selectedAttritionEmp,
+                  populationStats: populationStats,
+                  baseline: attritionBaseline,
+                  simulation: attritionSim,
+                  covariates: attritionCovs,
+                  moraleSlider: moraleSlider,
+                  salarySlider: salarySlider,
+                  workloadSlider: workloadSlider,
+                }}
+                buttonText="Explain with AI"
+                autoRefresh={true}
+                disabled={!selectedAttritionEmp}
+              />
+              </motion.div>
+            )}
 
-          {/* TAB 4: ORGANIZATIONAL NETWORK ANALYSIS (ONA) */}
+            {/* TAB 4: ORGANIZATIONAL NETWORK ANALYSIS (ONA) */}
           {activeSubTab === "ona" && (
             <motion.div
               key="ona"
@@ -2861,10 +3553,23 @@ const IntelligenceCenterView = () => {
                   </div>
                 )}
               </div>
-            }
-          />
-        </motion.div>
-      )}
+}
+            />
+            <AIExplanationPanel
+              subtab="ona"
+              context={{
+                nodes: onaData?.nodes || [],
+                links: onaData?.links || [],
+                selectedNode: selectedOnaNode,
+                camera: onaCamera,
+                departments: onaData?.departments || [],
+              }}
+              buttonText="Explain with AI"
+              autoRefresh={false}
+              disabled={!onaData || !onaData.nodes || onaData.nodes.length === 0}
+            />
+            </motion.div>
+          )}
 
           {/* TAB 5: MARKOV CAREER PROGRESSION */}
           {activeSubTab === "career-path" && (
@@ -3024,11 +3729,22 @@ const IntelligenceCenterView = () => {
                       </div>
                     )}
                   </div>
-                }
+}
               />
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <AIExplanationPanel
+                subtab="career-path"
+                context={{
+                  employees: careerEmployees,
+                  selectedEmployeeId: selectedCareerEmpId,
+                  careerPathData: careerPathData,
+                }}
+                buttonText="Explain with AI"
+                autoRefresh={false}
+                disabled={!careerPathData}
+              />
+              </motion.div>
+            )}
+          </AnimatePresence>
       </div>
     </div>
   );
