@@ -56,10 +56,43 @@ const SettingsWorkspaceView = lazy(
 );
 const EnterpriseOpsView = lazy(() => import("./components/EnterpriseOpsView"));
 
+const VALID_APP_TABS = [
+  "dashboard",
+  "directory",
+  "sentiment",
+  "analytics",
+  "scout",
+  "intelligence",
+  "intel-center",
+  "enterprise",
+  "providers",
+];
+
 const isAppPath = (pathname = "") =>
   pathname === "/app" ||
+  pathname.startsWith("/app/") ||
   pathname.startsWith("/app?") ||
   pathname.startsWith("/app#");
+
+const getTabFromPathname = (pathname = "") => {
+  if (!isAppPath(pathname)) return null;
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts.length >= 2 && VALID_APP_TABS.includes(parts[1])) {
+    return parts[1];
+  }
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("aurelinx_active_tab");
+    if (saved && VALID_APP_TABS.includes(saved)) return saved;
+  }
+  return "dashboard";
+};
+
+const getPathnameForTab = (tab) => {
+  if (tab && VALID_APP_TABS.includes(tab)) {
+    return `/app/${tab}`;
+  }
+  return "/app/dashboard";
+};
 
 const App = () => {
   const { isAuthenticated, loading: authLoading, logout, user } = useAuth();
@@ -80,13 +113,17 @@ const App = () => {
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window === "undefined") return defaultWorkspaceTab;
     if (!isAppPath(window.location.pathname)) return "landing";
-    const savedTab = localStorage.getItem("aurelinx_active_tab");
-    return savedTab || defaultWorkspaceTab;
+    return getTabFromPathname(window.location.pathname) || defaultWorkspaceTab;
   });
 
   useEffect(() => {
-    if (typeof window !== "undefined" && activeTab && activeTab !== "landing") {
+    if (typeof window === "undefined" || !isAppPath(window.location.pathname)) return;
+    if (activeTab && VALID_APP_TABS.includes(activeTab)) {
       localStorage.setItem("aurelinx_active_tab", activeTab);
+      const targetPath = getPathnameForTab(activeTab);
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ tab: activeTab }, "", targetPath);
+      }
     }
   }, [activeTab]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
@@ -142,9 +179,15 @@ const App = () => {
 
   const navigate = (path, tab = null) => {
     if (typeof window === "undefined") return;
-    window.history.pushState({}, "", path);
-    setRoute(isAppPath(path) ? "app" : "landing");
-    if (tab) setActiveTab(tab);
+    const isApp = isAppPath(path);
+    let targetTab = tab;
+    if (isApp && !targetTab) {
+      targetTab = getTabFromPathname(path);
+    }
+    const finalPath = isApp && targetTab ? getPathnameForTab(targetTab) : path;
+    window.history.pushState({ tab: targetTab }, "", finalPath);
+    setRoute(isApp ? "app" : "landing");
+    if (targetTab) setActiveTab(targetTab);
   };
 
   const showToast = (message, type = "info") => {
@@ -350,13 +393,21 @@ const App = () => {
   }, [route, authLoading, isAuthenticated]);
 
   useEffect(() => {
-    const syncRoute = () => {
+    const syncRouteAndTab = () => {
       if (typeof window === "undefined") return;
-      setRoute(isAppPath(window.location.pathname) ? "app" : "landing");
+      const path = window.location.pathname;
+      const isApp = isAppPath(path);
+      setRoute(isApp ? "app" : "landing");
+      if (isApp) {
+        const tabFromUrl = getTabFromPathname(path);
+        if (tabFromUrl) {
+          setActiveTab(tabFromUrl);
+        }
+      }
     };
 
-    window.addEventListener("popstate", syncRoute);
-    return () => window.removeEventListener("popstate", syncRoute);
+    window.addEventListener("popstate", syncRouteAndTab);
+    return () => window.removeEventListener("popstate", syncRouteAndTab);
   }, []);
 
   useEffect(() => {

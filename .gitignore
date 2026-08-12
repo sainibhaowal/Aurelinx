@@ -77,7 +77,10 @@ ppt_render_*/
 uploads/
 server/uploads/
 deliverables/
-# Local documentation, datasets, and working notes
+# Local documentation, agent configs, datasets, and working notes
+.agents/
+.agents
+Docs/
 /Docs/
 # Generated datasets and large files
 DataSets/

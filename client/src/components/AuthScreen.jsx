@@ -39,7 +39,21 @@ const FEATURES = [
 
 const AuthScreen = () => {
   const { login, register, loading, savedCreds } = useAuth();
-  const [mode, setMode] = useState("register");
+  const [mode, setModeState] = useState(() => {
+    if (typeof window === "undefined") return "register";
+    return window.location.pathname.startsWith("/login") ? "login" : "register";
+  });
+
+  const setMode = (newMode) => {
+    setModeState(newMode);
+    if (typeof window !== "undefined") {
+      const targetPath = newMode === "login" ? "/login" : "/signup";
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({}, "", targetPath + window.location.search);
+      }
+    }
+  };
+
   const [registerForm, setRegisterForm] = useState(initialRegisterState);
   const [loginForm, setLoginForm] = useState(initialLoginState);
   const [registerError, setRegisterError] = useState("");
@@ -62,7 +76,7 @@ const AuthScreen = () => {
     });
   };
 
-  // Prefill saved credentials from Tauri parent shell if available (transition to login tab only, fields remain blank)
+  // Prefill saved credentials from Tauri parent shell if available
   useEffect(() => {
     if (savedCreds?.email && savedCreds?.password) {
       setMode("login");

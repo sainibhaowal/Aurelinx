@@ -636,6 +636,20 @@ export const candidatesAPI = {
 /** Organizational network analysis (shared with Intel Center). */
 export const intelligenceAPI = {
   ona: (limit = 45) => request(`${API_V1}/intelligence/ona?limit=${encodeURIComponent(limit)}`, { timeoutMs: LONG_REQUEST_TIMEOUT }),
+
+  explain: (subtab, context, provider = "lmstudio", apiKey = null, baseUrl = null, model = null) =>
+    request(`${API_V1}/intelligence/explain`, {
+      method: "POST",
+      body: JSON.stringify({
+        subtab,
+        context,
+        provider,
+        api_key: apiKey,
+        base_url: baseUrl,
+        model,
+      }),
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    }),
 };
 
 /**

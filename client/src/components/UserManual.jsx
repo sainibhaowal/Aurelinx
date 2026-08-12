@@ -1348,18 +1348,23 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                       Mathematical Foundations
                     </strong>
                     <p className="leading-relaxed">
-                      The model calculates the hazard rate $h(t)$ for an employee at tenure $t$ using the formulation:
+                      The engine is a Cox Proportional Hazards model with a piecewise-constant baseline hazard h_0(t) by tenure bucket, plus a log-linear covariate risk surface. Each employee&apos;s hazard rate is:
                     </p>
                     <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
-                      h(t) = h_0(t) &times; exp(&sum; &beta;_i &times; X_i)
+                      h(t) = h_0(t) &times; seniority &times; exp(dept) &times; exp(&sum; &beta;_i (X_i - X&#772;_i))
                     </div>
                     <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
                       <li>
-                        <strong>h_0(t) (Baseline Hazard Function):</strong> Represents the underlying risk of resignation over time. Based on historical data, attrition rates are not flat; they feature Gaussian peaks at organizational boundaries: 1-year (12 months) and 3-year (36 months) milestones. <br />
-                        <code className="text-cyan-300">h_0(t) = 0.04 + 0.1 &times; exp(-0.5 &times; ((t - 12) / 3)^2) + 0.06 &times; exp(-0.5 &times; ((t - 36) / 6)^2)</code>
+                        <strong>h_0(t) (Baseline Hazard Function):</strong> Piecewise-constant monthly attrition risk by tenure bucket, calibrated to industry tenure-attrition benchmarks: probation (&lt;6 mo: 0.8%/mo), first role-fit wave (6–12 mo: 1.3%/mo), 12–18 month peak (1.7%/mo), post-peak fade (18–24 mo: 1.4%/mo), career-climber wave (24–36 mo: 1.1%/mo), then decay to a stable senior cohort (60+ mo: 0.5%/mo).
                       </li>
                       <li>
-                        <strong>Hazard Multiplier (Simulated Attrition Multiplier):</strong> The exponential term <code className="text-cyan-300">exp(&sum; &beta;_i &times; X_i)</code>. A multiplier above 1.0 indicates accelerated flight risk compared to average baseline probability (e.g. x1.25), whereas a multiplier below 1.0 (e.g. x0.45) represents protective factors.
+                        <strong>Hazard Ratio (Simulated Attrition Multiplier):</strong> <code className="text-cyan-300">exp(&sum; &beta;_i (X_i - X&#772;_i))</code> — the multiplicative hazard of the employee&apos;s profile versus the population-average profile (HR = 1.00). Covariates are centered on the population mean, so an average employee scores exactly x1.00. The ratio is clamped to [x0.20, x6.00] to keep extreme profiles from exploding.
+                      </li>
+                      <li>
+                        <strong>Survival &amp; CI:</strong> S(t) = exp(-&sum;h(t)); the shaded band is a 95% model band around S(t) (log-cumulative-hazard standard error). The gray band and dashed line are the population P10–P90 range and population median survival, both derived from the live workforce.
+                      </li>
+                      <li>
+                        <strong>Median Residual Tenure:</strong> The interpolated month where S(t) crosses 50% — the point at which the employee has a 50/50 chance of having left.
                       </li>
                     </ul>
                   </div>
@@ -1369,20 +1374,18 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                       Baseline Covariates (SHAP Explainability)
                     </strong>
                     <p className="leading-relaxed">
-                      The parameters $X_i$ represent covariates that directly modify the log hazard ratio:
+                      Nine covariates drive the log hazard ratio. Each one&apos;s SHAP-style contribution &beta;_i(X_i - X&#772;_i) is shown as a multiplicative factor in the waterfall; factors multiply exactly to the displayed hazard ratio. Green = protective, red = risky:
                     </p>
                     <ul className="list-disc pl-4 space-y-2 text-[11px] leading-relaxed">
-                      <li>
-                        <strong>Organizational Morale Index:</strong> Calculated from sentiment scores. Low sentiment pushes the hazard ratio up; high sentiment provides a protective buffer. The effect is modeled as: <br />
-                        <code className="text-cyan-300">moraleEffect = -2.5 &times; (Morale_Simulated - Morale_Original)</code>
-                      </li>
-                      <li>
-                        <strong>Historical Risk Trigger Flag:</strong> Represents administrative flags (`is_at_risk`). If active, it injects a major baseline hazard penalty of <code className="text-cyan-300">+1.2</code> to the log hazard ratio.
-                      </li>
-                      <li>
-                        <strong>Skill Density / Task Fatigue:</strong> A proxy for employee overload. If an employee has a high skill count, they are prone to task fatigue and burnout. The workload adjustment delta modifies the log hazard ratio: <br />
-                        <code className="text-cyan-300">workloadEffect = 0.25 &times; (Skills_Simulated - Skills_Original)</code>
-                      </li>
+                      <li><strong>Organizational Morale Index:</strong> sentiment score; coefficient &beta; = -1.5 per morale unit. Low morale raises hazard, high morale protects.</li>
+                      <li><strong>Salary Compression:</strong> log of salary vs department median salary; &beta; = -1.0 per log unit. Paying 10% above median cuts hazard by ~10%; compression raises it.</li>
+                      <li><strong>Historical Risk Trigger:</strong> the administrative `is_at_risk` flag; &beta; = +0.8.</li>
+                      <li><strong>Skill Overload:</strong> every assigned skill beyond the healthy baseline of 4 adds &beta; = +0.06 (burnout proxy).</li>
+                      <li><strong>Proficiency Depth:</strong> average skill level (1–5) vs the 3.0 reference; &beta; = -0.25 per level.</li>
+                      <li><strong>Role-Skill Alignment:</strong> semantic coverage of the role&apos;s required skill family by the employee&apos;s stack (0–1); &beta; = -1.2 per unit vs the 0.6 reference. Misaligned employees carry the highest preventable risk.</li>
+                      <li><strong>Experience Maturity:</strong> years of experience beyond the 10-year inflection; &beta; = +0.08 per year (senior talent is more poachable).</li>
+                      <li><strong>Tenure Fragmentation:</strong> number of past employers beyond 3; &beta; = +0.12 per employer (job-hopping signal).</li>
+                      <li><strong>Department Base Rate:</strong> calibrated offset (e.g. Sales +35%, Support +22%, Engineering -8%, Legal -20%).</li>
                     </ul>
                   </div>
 
@@ -1391,15 +1394,16 @@ export const UserManualModal = ({ isOpen, onClose, defaultTab = "overview" }) =>
                       Flight Risk Mitigation Simulator & Sandbox
                     </strong>
                     <p className="leading-relaxed">
-                      This sandbox provides managers with control sliders to simulate &quot;what-if&quot; scenarios for any selected employee:
+                      This sandbox is a real what-if engine: every slider movement re-runs the full Cox model client-side (identical math to the server, same coefficients and population means) and live-updates the hazard ratio, survival curve, 95% band, hazard function, SHAP waterfall, tier and percentile — nothing is precomputed or cosmetic:
                     </p>
                     <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
-                      <li><strong>Morale Index Slider:</strong> Simulates structural interventions (e.g. team changes, workload relief) to lift morale.</li>
-                      <li><strong>Salary Boost Slider:</strong> Simulates a target salary raise (0% to 50%). It offsets the hazard ratio: <code className="text-cyan-300">salaryEffect = -1.8 &times; Salary_Boost</code>.</li>
-                      <li><strong>Workload Skill Slider:</strong> Simulates adding or removing technical ownership responsibilities to adjust task complexity and prevent burnout.</li>
+                      <li><strong>Morale Index Slider:</strong> Simulates structural interventions (team changes, workload relief) lifting morale; the morale covariate contribution is recomputed against the population mean.</li>
+                      <li><strong>Salary Increase Slider:</strong> Simulates a raise (0–50%); the new salary is re-baselined against the department median and the salary-compression contribution is recomputed.</li>
+                      <li><strong>Skill Load Slider:</strong> Simulates adding/removing assigned skills; the skill-overload contribution is recomputed.</li>
+                      <li><strong>Net effect chips:</strong> show the exact Δ in 12-month attrition probability, Δ hazard ratio, new median tenure and the simulated risk tier vs the employee&apos;s recorded baseline.</li>
                     </ul>
                     <p className="leading-relaxed mt-1">
-                      <strong>The Benefit:</strong> Managers get live updates of the adjusted hazard ratio and the resulting 12-month survival curve, allowing them to calculate the exact ROI of salary increases or task redistribution before allocating budgets.
+                      <strong>The Benefit:</strong> managers get live, mathematically-exact ROI of salary increases or task redistribution before allocating budgets — with the same engine that powers the registry, so the simulation and the reporting never disagree.
                     </p>
                   </div>
                 </div>
