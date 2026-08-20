@@ -92,10 +92,7 @@ jobs:
             cd "$DEPLOY_DIR"
 
             # Write a tiny env file that only contains the image coordinates
-            cat > .env.deploy <<ENVEOF
-GHCR_OWNER=$GHCR_OWNER
-VERSION=$VERSION
-ENVEOF
+            printf "GHCR_OWNER=%s\nVERSION=%s\n" "$GHCR_OWNER" "$VERSION" > .env.deploy
 
             # Pull the new images and recreate containers
             docker compose --env-file .env.production --env-file .env.deploy pull
