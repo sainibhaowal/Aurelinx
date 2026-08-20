@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.4](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.3...v1.1.4) (2026-08-20)
+
+
+### Bug Fixes
+
+* pass deploy variables correctly to SSH command ([b502d04](https://github.com/sainibhaowal/Aurelinx/commit/b502d04ef09e0846cb428891d7ce761e93216e54))
+
 ### [1.1.3](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.2...v1.1.3) (2026-08-20)
 
 
