@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.3](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.2...v1.1.3) (2026-08-20)
+
+
+### Bug Fixes
+
+* add contents:write permission for release creation ([b955a4d](https://github.com/sainibhaowal/Aurelinx/commit/b955a4df3b2ca1c3651baadbae84d112eb8720b2))
+
 ### [1.1.2](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.1...v1.1.2) (2026-08-20)
 
 
