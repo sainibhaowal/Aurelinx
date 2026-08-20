@@ -4,6 +4,8 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    env_file:
+      - ./.env.production
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-aurelinx_db}
       POSTGRES_USER: ${POSTGRES_USER:-aurelinx}
@@ -14,7 +16,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aurelinx} -d ${POSTGRES_DB:-aurelinx_db}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aurelinx} -d ${POSTGRES_DB:-aurelinx_db}" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -22,13 +24,15 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-AurelinxRedis_2026!ChangeMe}"]
+    env_file:
+      - ./.env.production
+    command: [ "redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-AurelinxRedis_2026!ChangeMe}" ]
     ports:
       - "${REDIS_PORT:-6380}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-AurelinxRedis_2026!ChangeMe} ping"]
+      test: [ "CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-AurelinxRedis_2026!ChangeMe} ping" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -42,15 +46,13 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333 && echo -e 'GET /healthz HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q 'healthz check passed'"]
+      test: [ "CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333 && echo -e 'GET /healthz HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q 'healthz check passed'" ]
       interval: 15s
       timeout: 5s
       retries: 10
 
   api:
-    build:
-      context: ../server
-      dockerfile: ../infra/backend.Dockerfile
+    image: ${GHCR_OWNER:-your-org}/aurelinx-backend:${VERSION:-latest}
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -74,15 +76,13 @@ services:
     volumes:
       - chat_uploads:/app/data/chat
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5000/health || exit 1"]
+      test: [ "CMD-SHELL", "curl -fsS http://127.0.0.1:5000/health || exit 1" ]
       interval: 15s
       timeout: 5s
       retries: 10
 
   worker:
-    build:
-      context: ../server
-      dockerfile: ../infra/backend.Dockerfile
+    image: ${GHCR_OWNER:-your-org}/aurelinx-backend:${VERSION:-latest}
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -97,12 +97,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: ["sh", "-lc", "PYTHONPATH=/app python scripts/retry_worker.py"]
+    command: [ "sh", "-lc", "PYTHONPATH=/app python scripts/retry_worker.py" ]
 
   scheduler:
-    build:
-      context: ../server
-      dockerfile: ../infra/backend.Dockerfile
+    image: ${GHCR_OWNER:-your-org}/aurelinx-backend:${VERSION:-latest}
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -118,15 +116,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: ["sh", "-lc", "PYTHONPATH=/app python scripts/retry_scheduler.py"]
+    command: [ "sh", "-lc", "PYTHONPATH=/app python scripts/retry_scheduler.py" ]
 
   web:
-    build:
-      context: ../client
-      dockerfile: ../infra/frontend.Dockerfile
-      network: host
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5100}
+    image: ${GHCR_OWNER:-your-org}/aurelinx-frontend:${VERSION:-latest}
     restart: unless-stopped
     env_file:
       - ./.env.production
@@ -138,7 +131,7 @@ services:
     ports:
       - "${WEB_PORT:-3100}:3000"
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: [ "CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"" ]
       interval: 15s
       timeout: 5s
       retries: 10
