@@ -8,13 +8,12 @@ with `next_retry_at <= now` and attempts re-delivery, updating `attempts`,
 
 import asyncio
 import json
-from datetime import datetime, timedelta
 import logging
+from datetime import datetime, timedelta
 
 import httpx
 
-from app.models.database import get_session
-from app.models.database import IntegrationWebhookEventTable
+from app.models.database import IntegrationWebhookEventTable, get_session
 
 logger = logging.getLogger("retry_worker")
 logging.basicConfig(level=logging.INFO)

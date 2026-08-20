@@ -338,8 +338,7 @@ const ProvidersView = () => {
   const fetchTokens = async () => {
     setLoadingTokens(true);
     try {
-      const apiBase =
-        API_BASE_URL;
+      const apiBase = API_BASE_URL;
       const response = await fetch(`${apiBase}/api/v1/integrations/tokens`, {
         headers: getAuthHeaders(),
       });
@@ -361,8 +360,7 @@ const ProvidersView = () => {
   const fetchIntegrationLogs = async () => {
     setLoadingLogs(true);
     try {
-      const apiBase =
-        API_BASE_URL;
+      const apiBase = API_BASE_URL;
       const response = await fetch(
         `${apiBase}/api/v1/integrations/logs?limit=20`,
         {
@@ -387,8 +385,7 @@ const ProvidersView = () => {
   const fetchWebhookEvents = async () => {
     setLoadingEvents(true);
     try {
-      const apiBase =
-        API_BASE_URL;
+      const apiBase = API_BASE_URL;
       const response = await fetch(
         `${apiBase}/api/v1/integrations/events?limit=20`,
         {
@@ -409,8 +406,7 @@ const ProvidersView = () => {
   const handleGenerateToken = async () => {
     if (!newTokenName.trim()) return;
     try {
-      const apiBase =
-        API_BASE_URL;
+      const apiBase = API_BASE_URL;
       const response = await fetch(
         `${apiBase}/api/v1/integrations/token?name=${encodeURIComponent(newTokenName)}`,
         {
@@ -434,8 +430,7 @@ const ProvidersView = () => {
 
   const handleRevokeToken = async (tokenId) => {
     try {
-      const apiBase =
-        API_BASE_URL;
+      const apiBase = API_BASE_URL;
       const response = await fetch(
         `${apiBase}/api/v1/integrations/token/${tokenId}`,
         {
@@ -458,7 +453,8 @@ const ProvidersView = () => {
     try {
       const apiBase = API_BASE_URL;
       const authHeaders = getAuthHeaders();
-      let tokenToUse = generatedKey || (tokens.length > 0 ? tokens[0].api_key : null);
+      let tokenToUse =
+        generatedKey || (tokens.length > 0 ? tokens[0].api_key : null);
 
       if (!tokenToUse && authHeaders.Authorization) {
         try {
@@ -467,7 +463,7 @@ const ProvidersView = () => {
             {
               method: "POST",
               headers: authHeaders,
-            }
+            },
           );
           if (genResp.ok) {
             const genData = await genResp.json();
@@ -483,7 +479,7 @@ const ProvidersView = () => {
       if (!tokenToUse) {
         showToast(
           "No integration token available. Click 'Generate Token' on the API Key Registry tab.",
-          "error"
+          "error",
         );
         setSimulatingWebhook(null);
         return;
@@ -567,8 +563,7 @@ const ProvidersView = () => {
       fetchWebhookEvents();
       const loadDefaultEmail = async () => {
         try {
-          const apiBase =
-        API_BASE_URL;
+          const apiBase = API_BASE_URL;
           const token = localStorage.getItem("auth_token") || "";
           const headers = token ? { Authorization: `Bearer ${token}` } : {};
           const response = await fetch(`${apiBase}/api/v1/employees?limit=5`, {
@@ -619,8 +614,7 @@ const ProvidersView = () => {
         api_key: currentToken || null,
         base_url: currentUrl,
       };
-      const apiBase =
-        API_BASE_URL;
+      const apiBase = API_BASE_URL;
       const response = await fetch(
         `${apiBase}/api/v1/chat/providers/discover`,
         {
@@ -707,8 +701,7 @@ const ProvidersView = () => {
     };
 
     try {
-      const apiBase =
-        API_BASE_URL;
+      const apiBase = API_BASE_URL;
       const response = await fetch(`${apiBase}/api/v1/chat/providers/ping`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -932,7 +925,14 @@ const ProvidersView = () => {
                     </div>
                   </div>
                 </div>
-                <UserManualButton defaultTab={activeCategory === "INTEGRATIONS" ? "integrations" : "overview"} className="ml-4 mt-8" />
+                <UserManualButton
+                  defaultTab={
+                    activeCategory === "INTEGRATIONS"
+                      ? "integrations"
+                      : "overview"
+                  }
+                  className="ml-4 mt-8"
+                />
               </div>
 
               {/* Category tabs */}
@@ -1293,7 +1293,8 @@ const ProvidersView = () => {
                             Enterprise API Ingestions &amp; SDK
                           </h2>
                           <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wide">
-                            Secure live synchronization for Jira, Slack, Workday APIs, and custom B2B SDK integrations.
+                            Secure live synchronization for Jira, Slack, Workday
+                            APIs, and custom B2B SDK integrations.
                           </p>
                         </div>
 
@@ -1306,9 +1307,26 @@ const ProvidersView = () => {
                       {/* SUB-TAB NAVIGATION BAR */}
                       <div className="flex items-center gap-2 p-2 rounded-2xl bg-[#06101e]/95 border border-cyan-500/30 shadow-[0_12px_40px_rgba(0,0,0,0.7)] backdrop-blur-2xl overflow-x-auto custom-scrollbar mb-4 shrink-0">
                         {[
-                          { id: "keys", label: "API Key Registry", icon: KeyRound, badge: tokens.length },
-                          { id: "webhooks", label: "Secure Webhooks", icon: Globe, badge: "3 Endpoints" },
-                          { id: "telemetry", label: "Delivery Dashboard", icon: Activity, badge: integrationLogs.length ? `${integrationLogs.length} Logs` : "Live" },
+                          {
+                            id: "keys",
+                            label: "API Key Registry",
+                            icon: KeyRound,
+                            badge: tokens.length,
+                          },
+                          {
+                            id: "webhooks",
+                            label: "Secure Webhooks",
+                            icon: Globe,
+                            badge: "3 Endpoints",
+                          },
+                          {
+                            id: "telemetry",
+                            label: "Delivery Dashboard",
+                            icon: Activity,
+                            badge: integrationLogs.length
+                              ? `${integrationLogs.length} Logs`
+                              : "Live",
+                          },
                           { id: "sdk", label: "REST API Specs", icon: Code },
                         ].map((st) => {
                           const Icon = st.icon;
@@ -1323,7 +1341,12 @@ const ProvidersView = () => {
                                   : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent"
                               }`}
                             >
-                              <Icon size={14} className={isActive ? "text-cyan-400" : "text-slate-500"} />
+                              <Icon
+                                size={14}
+                                className={
+                                  isActive ? "text-cyan-400" : "text-slate-500"
+                                }
+                              />
                               <span>{st.label}</span>
                               {st.badge !== undefined && (
                                 <span
@@ -1357,7 +1380,9 @@ const ProvidersView = () => {
                                     <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                                       Generate New Webhook API Key
                                     </h3>
-                                    <span className="text-[10px] text-slate-400 font-mono block">B2B Middleware Credentials</span>
+                                    <span className="text-[10px] text-slate-400 font-mono block">
+                                      B2B Middleware Credentials
+                                    </span>
                                   </div>
                                 </div>
                                 <div className="space-y-4">
@@ -1369,7 +1394,9 @@ const ProvidersView = () => {
                                       type="text"
                                       placeholder="e.g. Jira-Agile-Connector"
                                       value={newTokenName}
-                                      onChange={(e) => setNewTokenName(e.target.value)}
+                                      onChange={(e) =>
+                                        setNewTokenName(e.target.value)
+                                      }
                                       className="w-full h-10 rounded-xl bg-slate-950/80 border border-white/10 px-3 text-xs outline-none focus:border-cyan-500/40 text-slate-200"
                                     />
                                   </div>
@@ -1379,7 +1406,9 @@ const ProvidersView = () => {
                                     </label>
                                     <PremiumSelect
                                       value={employeeEmail}
-                                      onChange={(e) => setEmployeeEmail(e.target.value)}
+                                      onChange={(e) =>
+                                        setEmployeeEmail(e.target.value)
+                                      }
                                       className="w-full h-10 rounded-xl bg-slate-950/80 border border-white/10 px-3 text-xs outline-none focus:border-cyan-500/40 text-slate-200"
                                     >
                                       <option value={employeeEmail}>
@@ -1416,14 +1445,20 @@ const ProvidersView = () => {
                                         {generatedKey}
                                       </div>
                                       <span className="text-[8px] text-slate-400 mt-1 block">
-                                        Copy this token securely. It will not be shown again!
+                                        Copy this token securely. It will not be
+                                        shown again!
                                       </span>
                                     </div>
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        navigator.clipboard.writeText(generatedKey);
-                                        showToast("API Key copied to clipboard!", "success");
+                                        navigator.clipboard.writeText(
+                                          generatedKey,
+                                        );
+                                        showToast(
+                                          "API Key copied to clipboard!",
+                                          "success",
+                                        );
                                         setGeneratedKey("");
                                       }}
                                       className="w-9 h-9 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-500/20 transition-all cursor-pointer shrink-0"
@@ -1438,29 +1473,59 @@ const ProvidersView = () => {
                               {/* Security & Governance Guidelines Card */}
                               <div className="premium-card p-5 border border-white/5 bg-[#0a1222]/40 rounded-2xl space-y-3">
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-200 uppercase tracking-wider border-b border-white/5 pb-2.5">
-                                  <ShieldCheck size={15} className="text-cyan-400" />
-                                  <span>Token Security &amp; Ingestion Governance</span>
+                                  <ShieldCheck
+                                    size={15}
+                                    className="text-cyan-400"
+                                  />
+                                  <span>
+                                    Token Security &amp; Ingestion Governance
+                                  </span>
                                 </div>
                                 <div className="space-y-2.5 text-[10px] text-slate-400 leading-relaxed">
                                   <div className="flex items-start gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
-                                    <span className="text-cyan-400 font-mono font-bold shrink-0">01.</span>
+                                    <span className="text-cyan-400 font-mono font-bold shrink-0">
+                                      01.
+                                    </span>
                                     <div>
-                                      <strong className="text-slate-200 block mb-0.5">Header-Based Authentication</strong>
-                                      Every request requires standard <code className="text-cyan-300 font-mono">X-API-Key</code> header matching an active token registered in this database.
+                                      <strong className="text-slate-200 block mb-0.5">
+                                        Header-Based Authentication
+                                      </strong>
+                                      Every request requires standard{" "}
+                                      <code className="text-cyan-300 font-mono">
+                                        X-API-Key
+                                      </code>{" "}
+                                      header matching an active token registered
+                                      in this database.
                                     </div>
                                   </div>
                                   <div className="flex items-start gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
-                                    <span className="text-cyan-400 font-mono font-bold shrink-0">02.</span>
+                                    <span className="text-cyan-400 font-mono font-bold shrink-0">
+                                      02.
+                                    </span>
                                     <div>
-                                      <strong className="text-slate-200 block mb-0.5">Instant Key Revocation</strong>
-                                      Revoking a credential terminates ingestion access across Jira, Slack, and Workday middleware routers within 250 milliseconds.
+                                      <strong className="text-slate-200 block mb-0.5">
+                                        Instant Key Revocation
+                                      </strong>
+                                      Revoking a credential terminates ingestion
+                                      access across Jira, Slack, and Workday
+                                      middleware routers within 250
+                                      milliseconds.
                                     </div>
                                   </div>
                                   <div className="flex items-start gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
-                                    <span className="text-cyan-400 font-mono font-bold shrink-0">03.</span>
+                                    <span className="text-cyan-400 font-mono font-bold shrink-0">
+                                      03.
+                                    </span>
                                     <div>
-                                      <strong className="text-slate-200 block mb-0.5">Idempotency Protection</strong>
-                                      Optional <code className="text-cyan-300 font-mono">Idempotency-Key</code> header ensures replay protection during transient network retries.
+                                      <strong className="text-slate-200 block mb-0.5">
+                                        Idempotency Protection
+                                      </strong>
+                                      Optional{" "}
+                                      <code className="text-cyan-300 font-mono">
+                                        Idempotency-Key
+                                      </code>{" "}
+                                      header ensures replay protection during
+                                      transient network retries.
                                     </div>
                                   </div>
                                 </div>
@@ -1474,13 +1539,19 @@ const ProvidersView = () => {
                                 <div>
                                   <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-3">
                                     <div className="flex items-center gap-2">
-                                      <KeyRound size={16} className="text-cyan-400" />
+                                      <KeyRound
+                                        size={16}
+                                        className="text-cyan-400"
+                                      />
                                       <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                                         Integrations API Key Registry
                                       </h3>
                                     </div>
                                     <span className="text-xs text-slate-400 font-mono bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
-                                      Active Tokens: <strong className="text-cyan-300">{tokens.length}</strong>
+                                      Active Tokens:{" "}
+                                      <strong className="text-cyan-300">
+                                        {tokens.length}
+                                      </strong>
                                     </span>
                                   </div>
 
@@ -1500,37 +1571,70 @@ const ProvidersView = () => {
                                           <th className="p-3 text-[9px] uppercase tracking-widest font-bold font-mono">
                                             Status
                                           </th>
-                                          <th className="p-3 text-right">Action</th>
+                                          <th className="p-3 text-right">
+                                            Action
+                                          </th>
                                         </tr>
                                       </thead>
                                       <tbody>
                                         {loadingTokens ? (
                                           <tr>
-                                            <td colSpan={5} className="p-8 text-center text-slate-500">
-                                              <RefreshCw size={16} className="animate-spin inline mr-2 text-cyan-400" />
+                                            <td
+                                              colSpan={5}
+                                              className="p-8 text-center text-slate-500"
+                                            >
+                                              <RefreshCw
+                                                size={16}
+                                                className="animate-spin inline mr-2 text-cyan-400"
+                                              />
                                               Loading active credentials...
                                             </td>
                                           </tr>
                                         ) : tokens.length === 0 ? (
                                           <tr>
-                                            <td colSpan={5} className="p-10 text-center text-slate-500">
+                                            <td
+                                              colSpan={5}
+                                              className="p-10 text-center text-slate-500"
+                                            >
                                               <div className="max-w-xs mx-auto space-y-2">
-                                                <KeyRound size={28} className="mx-auto text-slate-600 mb-1" />
+                                                <KeyRound
+                                                  size={28}
+                                                  className="mx-auto text-slate-600 mb-1"
+                                                />
                                                 <div className="text-xs text-slate-300 font-bold uppercase tracking-wider">
                                                   No Active Credentials
                                                 </div>
                                                 <p className="text-[10px] text-slate-500 leading-normal">
-                                                  No B2B Ingestion Credentials registered yet. Use the form on the left to generate a token for your Jira, Slack, or Workday pipeline.
+                                                  No B2B Ingestion Credentials
+                                                  registered yet. Use the form
+                                                  on the left to generate a
+                                                  token for your Jira, Slack, or
+                                                  Workday pipeline.
                                                 </p>
                                               </div>
                                             </td>
                                           </tr>
                                         ) : (
                                           tokens.map((token) => (
-                                            <tr key={token.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                                              <td className="p-3 font-bold text-white">{token.name}</td>
-                                              <td className="p-3">{new Date(token.created_at).toLocaleDateString()}</td>
-                                              <td className="p-3">{token.expires_at ? new Date(token.expires_at).toLocaleDateString() : "Never"}</td>
+                                            <tr
+                                              key={token.id}
+                                              className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                                            >
+                                              <td className="p-3 font-bold text-white">
+                                                {token.name}
+                                              </td>
+                                              <td className="p-3">
+                                                {new Date(
+                                                  token.created_at,
+                                                ).toLocaleDateString()}
+                                              </td>
+                                              <td className="p-3">
+                                                {token.expires_at
+                                                  ? new Date(
+                                                      token.expires_at,
+                                                    ).toLocaleDateString()
+                                                  : "Never"}
+                                              </td>
                                               <td className="p-3">
                                                 <span
                                                   className={`px-2 py-0.5 rounded text-[8px] uppercase tracking-wider font-extrabold ${
@@ -1545,7 +1649,11 @@ const ProvidersView = () => {
                                               <td className="p-3 text-right">
                                                 {token.status === "active" && (
                                                   <button
-                                                    onClick={() => handleRevokeToken(token.id)}
+                                                    onClick={() =>
+                                                      handleRevokeToken(
+                                                        token.id,
+                                                      )
+                                                    }
                                                     className="text-slate-500 hover:text-rose-400 p-1.5 transition-colors cursor-pointer"
                                                     title="Revoke Key Access"
                                                   >
@@ -1565,18 +1673,31 @@ const ProvidersView = () => {
                               {/* Router Ingestion Status Telemetry Banner */}
                               <div className="premium-card p-4 border border-white/5 bg-[#0a1222]/40 rounded-2xl grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="bg-slate-950/40 p-3 rounded-xl border border-white/5 min-w-0">
-                                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Router Endpoint</span>
-                                  <span className="text-xs font-mono text-cyan-300 font-bold truncate block" title={`${API_BASE_URL}/api/v1/integrations`}>
+                                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mb-1">
+                                    Router Endpoint
+                                  </span>
+                                  <span
+                                    className="text-xs font-mono text-cyan-300 font-bold truncate block"
+                                    title={`${API_BASE_URL}/api/v1/integrations`}
+                                  >
                                     {`${API_BASE_URL}/api/v1/integrations`}
                                   </span>
                                 </div>
                                 <div className="bg-slate-950/40 p-3 rounded-xl border border-white/5 min-w-0">
-                                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Protection Protocol</span>
-                                  <span className="text-xs font-mono text-emerald-300 font-bold truncate block">X-API-Key + SHA256</span>
+                                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mb-1">
+                                    Protection Protocol
+                                  </span>
+                                  <span className="text-xs font-mono text-emerald-300 font-bold truncate block">
+                                    X-API-Key + SHA256
+                                  </span>
                                 </div>
                                 <div className="bg-slate-950/40 p-3 rounded-xl border border-white/5 min-w-0">
-                                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Ingestion Health</span>
-                                  <span className="text-xs font-mono text-teal-300 font-bold truncate block">100% Operational</span>
+                                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mb-1">
+                                    Ingestion Health
+                                  </span>
+                                  <span className="text-xs font-mono text-teal-300 font-bold truncate block">
+                                    100% Operational
+                                  </span>
                                 </div>
                               </div>
                             </div>
@@ -1593,10 +1714,20 @@ const ProvidersView = () => {
                               </h3>
                             </div>
                             <p className="text-[10px] text-slate-400 leading-relaxed mb-4">
-                              This ingestion pipeline uses header-based protection:{" "}
-                              <span className="font-mono text-slate-100">X-API-Key</span>,{" "}
-                              <span className="font-mono text-slate-100">X-Signature</span>, and optional{" "}
-                              <span className="font-mono text-slate-100">Idempotency-Key</span>. URLs shown below are endpoint targets only.
+                              This ingestion pipeline uses header-based
+                              protection:{" "}
+                              <span className="font-mono text-slate-100">
+                                X-API-Key
+                              </span>
+                              ,{" "}
+                              <span className="font-mono text-slate-100">
+                                X-Signature
+                              </span>
+                              , and optional{" "}
+                              <span className="font-mono text-slate-100">
+                                Idempotency-Key
+                              </span>
+                              . URLs shown below are endpoint targets only.
                             </p>
 
                             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -1607,11 +1738,18 @@ const ProvidersView = () => {
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/20">
                                       Jira Agile API
                                     </span>
-                                    <span className="text-[8px] text-slate-500 font-mono">ONA Network Graph</span>
+                                    <span className="text-[8px] text-slate-500 font-mono">
+                                      ONA Network Graph
+                                    </span>
                                   </div>
-                                  <h4 className="text-xs font-bold text-white mb-1.5 uppercase">Jira Ticket &amp; Assignee sync</h4>
+                                  <h4 className="text-xs font-bold text-white mb-1.5 uppercase">
+                                    Jira Ticket &amp; Assignee sync
+                                  </h4>
                                   <p className="text-[10px] text-slate-400 leading-relaxed">
-                                    Captures pull request reviews and task activities between developers, dynamically building ONA spring-physics link weights in real-time.
+                                    Captures pull request reviews and task
+                                    activities between developers, dynamically
+                                    building ONA spring-physics link weights in
+                                    real-time.
                                   </p>
                                 </div>
                                 <div className="space-y-2 mt-auto">
@@ -1621,20 +1759,30 @@ const ProvidersView = () => {
                                   <div className="flex gap-2">
                                     <button
                                       onClick={() => {
-                                        navigator.clipboard.writeText(`${API_BASE_URL}/api/v1/integrations/jira`);
-                                        showToast("Jira Ingestion Endpoint copied!", "success");
+                                        navigator.clipboard.writeText(
+                                          `${API_BASE_URL}/api/v1/integrations/jira`,
+                                        );
+                                        showToast(
+                                          "Jira Ingestion Endpoint copied!",
+                                          "success",
+                                        );
                                       }}
                                       className="flex-1 h-9 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-[10px] font-bold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer"
                                     >
                                       <Copy size={11} /> Copy URL
                                     </button>
                                     <button
-                                      onClick={() => handleSimulateIngest("jira")}
+                                      onClick={() =>
+                                        handleSimulateIngest("jira")
+                                      }
                                       disabled={simulatingWebhook === "jira"}
                                       className="flex-1 h-9 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
                                     >
                                       {simulatingWebhook === "jira" ? (
-                                        <RefreshCw size={11} className="animate-spin" />
+                                        <RefreshCw
+                                          size={11}
+                                          className="animate-spin"
+                                        />
                                       ) : (
                                         <Play size={11} />
                                       )}
@@ -1651,11 +1799,18 @@ const ProvidersView = () => {
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/20">
                                       Slack Morale API
                                     </span>
-                                    <span className="text-[8px] text-slate-500 font-mono">Cox Attrition Curve</span>
+                                    <span className="text-[8px] text-slate-500 font-mono">
+                                      Cox Attrition Curve
+                                    </span>
                                   </div>
-                                  <h4 className="text-xs font-bold text-white mb-1.5 uppercase">Slack channel Sentiment score</h4>
+                                  <h4 className="text-xs font-bold text-white mb-1.5 uppercase">
+                                    Slack channel Sentiment score
+                                  </h4>
                                   <p className="text-[10px] text-slate-400 leading-relaxed">
-                                    Ingests message sentiments, dynamically shifting employee hazard ratios, survival timelines, and risk indicators automatically in-memory.
+                                    Ingests message sentiments, dynamically
+                                    shifting employee hazard ratios, survival
+                                    timelines, and risk indicators automatically
+                                    in-memory.
                                   </p>
                                 </div>
                                 <div className="space-y-2 mt-auto">
@@ -1665,20 +1820,30 @@ const ProvidersView = () => {
                                   <div className="flex gap-2">
                                     <button
                                       onClick={() => {
-                                        navigator.clipboard.writeText(`${API_BASE_URL}/api/v1/integrations/slack`);
-                                        showToast("Slack Ingestion Endpoint copied!", "success");
+                                        navigator.clipboard.writeText(
+                                          `${API_BASE_URL}/api/v1/integrations/slack`,
+                                        );
+                                        showToast(
+                                          "Slack Ingestion Endpoint copied!",
+                                          "success",
+                                        );
                                       }}
                                       className="flex-1 h-9 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-[10px] font-bold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer"
                                     >
                                       <Copy size={11} /> Copy URL
                                     </button>
                                     <button
-                                      onClick={() => handleSimulateIngest("slack")}
+                                      onClick={() =>
+                                        handleSimulateIngest("slack")
+                                      }
                                       disabled={simulatingWebhook === "slack"}
                                       className="flex-1 h-9 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
                                     >
                                       {simulatingWebhook === "slack" ? (
-                                        <RefreshCw size={11} className="animate-spin" />
+                                        <RefreshCw
+                                          size={11}
+                                          className="animate-spin"
+                                        />
                                       ) : (
                                         <Play size={11} />
                                       )}
@@ -1695,11 +1860,18 @@ const ProvidersView = () => {
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/20">
                                       Workday HRIS
                                     </span>
-                                    <span className="text-[8px] text-slate-500 font-mono">Directory Sync</span>
+                                    <span className="text-[8px] text-slate-500 font-mono">
+                                      Directory Sync
+                                    </span>
                                   </div>
-                                  <h4 className="text-xs font-bold text-white mb-1.5 uppercase">Workday automated Directory Sync</h4>
+                                  <h4 className="text-xs font-bold text-white mb-1.5 uppercase">
+                                    Workday automated Directory Sync
+                                  </h4>
                                   <p className="text-[10px] text-slate-400 leading-relaxed">
-                                    Connects directly to employee directories. Promotes, hires, or updates developers and skill matrices transactionally with zero manual clicks.
+                                    Connects directly to employee directories.
+                                    Promotes, hires, or updates developers and
+                                    skill matrices transactionally with zero
+                                    manual clicks.
                                   </p>
                                 </div>
                                 <div className="space-y-2 mt-auto">
@@ -1709,20 +1881,30 @@ const ProvidersView = () => {
                                   <div className="flex gap-2">
                                     <button
                                       onClick={() => {
-                                        navigator.clipboard.writeText(`${API_BASE_URL}/api/v1/integrations/workday`);
-                                        showToast("Workday Ingestion Endpoint copied!", "success");
+                                        navigator.clipboard.writeText(
+                                          `${API_BASE_URL}/api/v1/integrations/workday`,
+                                        );
+                                        showToast(
+                                          "Workday Ingestion Endpoint copied!",
+                                          "success",
+                                        );
                                       }}
                                       className="flex-1 h-9 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-[10px] font-bold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer"
                                     >
                                       <Copy size={11} /> Copy URL
                                     </button>
                                     <button
-                                      onClick={() => handleSimulateIngest("workday")}
+                                      onClick={() =>
+                                        handleSimulateIngest("workday")
+                                      }
                                       disabled={simulatingWebhook === "workday"}
                                       className="flex-1 h-9 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
                                     >
                                       {simulatingWebhook === "workday" ? (
-                                        <RefreshCw size={11} className="animate-spin" />
+                                        <RefreshCw
+                                          size={11}
+                                          className="animate-spin"
+                                        />
                                       ) : (
                                         <Play size={11} />
                                       )}
@@ -1745,7 +1927,9 @@ const ProvidersView = () => {
                               </h3>
                             </div>
                             <p className="text-[10px] text-slate-400 leading-relaxed">
-                              View recent tenant-scoped ingestion logs and webhook events with retry and idempotency state. Requires admin access for full audit visibility.
+                              View recent tenant-scoped ingestion logs and
+                              webhook events with retry and idempotency state.
+                              Requires admin access for full audit visibility.
                             </p>
 
                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -1755,23 +1939,44 @@ const ProvidersView = () => {
                                     <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">
                                       Recent Ingestion Audit Logs
                                     </p>
-                                    <p className="text-[10px] text-slate-500">Last 20 audit entries</p>
+                                    <p className="text-[10px] text-slate-500">
+                                      Last 20 audit entries
+                                    </p>
                                   </div>
-                                  {loadingLogs && <RefreshCw size={14} className="text-cyan-400 animate-spin" />}
+                                  {loadingLogs && (
+                                    <RefreshCw
+                                      size={14}
+                                      className="text-cyan-400 animate-spin"
+                                    />
+                                  )}
                                 </div>
                                 <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
                                   {integrationLogs.length === 0 ? (
                                     <div className="text-[10px] text-slate-500 py-6 text-center">
-                                      No ingestion logs available for this tenant or session.
+                                      No ingestion logs available for this
+                                      tenant or session.
                                     </div>
                                   ) : (
                                     integrationLogs.slice(0, 8).map((entry) => (
-                                      <div key={entry.id} className="rounded-xl border border-white/10 bg-[#08111e]/90 p-3 text-[10px] text-slate-300">
-                                        <div className="font-bold text-slate-100 truncate">{entry.integration_name.toUpperCase()}</div>
-                                        <div className="text-slate-400 truncate">{entry.details}</div>
+                                      <div
+                                        key={entry.id}
+                                        className="rounded-xl border border-white/10 bg-[#08111e]/90 p-3 text-[10px] text-slate-300"
+                                      >
+                                        <div className="font-bold text-slate-100 truncate">
+                                          {entry.integration_name.toUpperCase()}
+                                        </div>
+                                        <div className="text-slate-400 truncate">
+                                          {entry.details}
+                                        </div>
                                         <div className="text-[9px] text-slate-500 mt-2 flex items-center justify-between">
-                                          <span>{new Date(entry.created_at).toLocaleString()}</span>
-                                          <span className={`px-2 py-0.5 rounded ${entry.status === "success" ? "bg-emerald-500/10 text-emerald-300" : "bg-rose-500/10 text-rose-300"}`}>
+                                          <span>
+                                            {new Date(
+                                              entry.created_at,
+                                            ).toLocaleString()}
+                                          </span>
+                                          <span
+                                            className={`px-2 py-0.5 rounded ${entry.status === "success" ? "bg-emerald-500/10 text-emerald-300" : "bg-rose-500/10 text-rose-300"}`}
+                                          >
                                             {entry.status}
                                           </span>
                                         </div>
@@ -1787,27 +1992,43 @@ const ProvidersView = () => {
                                     <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">
                                       Webhook Delivery Events
                                     </p>
-                                    <p className="text-[10px] text-slate-500">Delivery status &amp; retries</p>
+                                    <p className="text-[10px] text-slate-500">
+                                      Delivery status &amp; retries
+                                    </p>
                                   </div>
-                                  {loadingEvents && <RefreshCw size={14} className="text-cyan-400 animate-spin" />}
+                                  {loadingEvents && (
+                                    <RefreshCw
+                                      size={14}
+                                      className="text-cyan-400 animate-spin"
+                                    />
+                                  )}
                                 </div>
                                 <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
                                   {webhookEvents.length === 0 ? (
                                     <div className="text-[10px] text-slate-500 py-6 text-center">
-                                      No webhook delivery events found for this tenant.
+                                      No webhook delivery events found for this
+                                      tenant.
                                     </div>
                                   ) : (
                                     webhookEvents.slice(0, 8).map((event) => (
-                                      <div key={event.id} className="rounded-xl border border-white/10 bg-[#08111e]/90 p-3 text-[10px] text-slate-300">
+                                      <div
+                                        key={event.id}
+                                        className="rounded-xl border border-white/10 bg-[#08111e]/90 p-3 text-[10px] text-slate-300"
+                                      >
                                         <div className="font-bold text-slate-100 truncate">
-                                          {event.integration_name.toUpperCase()} • {event.endpoint}
+                                          {event.integration_name.toUpperCase()}{" "}
+                                          • {event.endpoint}
                                         </div>
                                         <div className="text-slate-400 truncate">
-                                          Idempotency: {event.idempotency_key || "none"}
+                                          Idempotency:{" "}
+                                          {event.idempotency_key || "none"}
                                         </div>
                                         <div className="text-[9px] text-slate-500 mt-2 flex items-center justify-between">
                                           <span>{event.status}</span>
-                                          <span>{event.attempts} attempt{event.attempts === 1 ? "" : "s"}</span>
+                                          <span>
+                                            {event.attempts} attempt
+                                            {event.attempts === 1 ? "" : "s"}
+                                          </span>
                                         </div>
                                       </div>
                                     ))
@@ -1829,7 +2050,10 @@ const ProvidersView = () => {
                             </div>
 
                             <p className="text-[10px] text-slate-400 leading-relaxed">
-                              Send HTTP POST payloads directly from your backend services, cURL scripts, or API gateways to feed telemetry directly into Aurelinx. Zero external npm packages required.
+                              Send HTTP POST payloads directly from your backend
+                              services, cURL scripts, or API gateways to feed
+                              telemetry directly into Aurelinx. Zero external
+                              npm packages required.
                             </p>
 
                             <div className="rounded-xl border border-white/10 bg-slate-950 overflow-hidden flex flex-col font-mono text-[10px] text-slate-300">
@@ -1841,7 +2065,10 @@ const ProvidersView = () => {
                                   onClick={() => {
                                     const curlCmd = `curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\\n  -H "Content-Type: application/json" \\\n  -H "X-API-Key: ${generatedKey || "aur_your_secure_ingestion_api_token"}" \\\n  -d '{\n    "action": "sync",\n    "employee_email": "${employeeEmail}",\n    "metrics": { "sentiment_score": 0.85, "message_count": 142 }\n  }'`;
                                     navigator.clipboard.writeText(curlCmd);
-                                    showToast("cURL command copied!", "success");
+                                    showToast(
+                                      "cURL command copied!",
+                                      "success",
+                                    );
                                   }}
                                   className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-[9px] cursor-pointer"
                                 >
@@ -1849,7 +2076,7 @@ const ProvidersView = () => {
                                 </button>
                               </div>
                               <div className="p-3.5 bg-black/60 text-emerald-400 select-all border-b border-white/5 whitespace-pre overflow-x-auto">
-{`$ curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\
+                                {`$ curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: ${generatedKey || "aur_your_secure_ingestion_api_token"}" \\
   -d '{"action": "sync", "employee_email": "${employeeEmail}"}'`}
@@ -1857,13 +2084,18 @@ const ProvidersView = () => {
 
                               {/* Native JS Fetch Example */}
                               <div className="bg-slate-900 px-4 py-2 text-[9px] uppercase tracking-wider text-slate-400 font-bold border-b border-white/5 flex items-center justify-between">
-                                <span>JavaScript / Node.js Native Fetch Snippet</span>
+                                <span>
+                                  JavaScript / Node.js Native Fetch Snippet
+                                </span>
                                 <button
                                   type="button"
                                   onClick={() => {
                                     const snippet = `// Direct REST Ingestion (Standard HTTP Fetch)\nconst response = await fetch("${API_BASE_URL}/api/v1/integrations/jira", {\n  method: "POST",\n  headers: {\n    "Content-Type": "application/json",\n    "X-API-Key": "${generatedKey || "aur_your_secure_ingestion_api_token"}",\n    "Idempotency-Key": "evt_" + Date.now()\n  },\n  body: JSON.stringify({\n    action: "sync",\n    employee_email: "${employeeEmail}",\n    metrics: { sentiment_score: 0.85, message_count: 142 }\n  })\n});\nconst result = await response.json();\nconsole.log("Ingestion Status:", result);`;
                                     navigator.clipboard.writeText(snippet);
-                                    showToast("Fetch snippet copied!", "success");
+                                    showToast(
+                                      "Fetch snippet copied!",
+                                      "success",
+                                    );
                                   }}
                                   className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-[9px] cursor-pointer"
                                 >
@@ -1871,7 +2103,7 @@ const ProvidersView = () => {
                                 </button>
                               </div>
                               <div className="p-4 bg-slate-950/80 overflow-x-auto whitespace-pre leading-relaxed select-all text-slate-300">
-{`// Native REST API Integration (Zero External SDK Dependencies)
+                                {`// Native REST API Integration (Zero External SDK Dependencies)
 const response = await fetch("${API_BASE_URL}/api/v1/integrations/jira", {
   method: "POST",
   headers: {

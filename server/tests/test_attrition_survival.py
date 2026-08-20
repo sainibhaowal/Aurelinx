@@ -20,24 +20,25 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["ALLOWED_HOSTS"] = "*"
 os.environ.setdefault("ENVIRONMENT", "development")
 
-from datetime import datetime, timedelta  # noqa: E402
+from datetime import datetime, timedelta
 
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import create_engine  # noqa: E402
-from sqlmodel import Session as SQLSession  # noqa: E402
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import (
+    create_engine,
+)
+from sqlmodel import Session as SQLSession
 
-from app.main import app  # noqa: E402
-from app.core.security import get_current_user, get_tenant_id, TokenData  # noqa: E402
-from app.models.database import (  # noqa: E402
-    SQLModel,
+from app.core.security import TokenData, get_current_user, get_tenant_id
+from app.main import app
+from app.models import database as db
+from app.models.database import (
     EmployeeTable,
-    SkillTable,
     ExperienceTable,
+    SkillTable,
+    SQLModel,
     get_session,
 )
-from sqlalchemy import select  # noqa: E402
-from app.models import database as db  # noqa: E402
 
 
 @pytest.fixture()
@@ -111,8 +112,11 @@ def _seed_workforce(engine):
                 SkillTable(employee_id=stable.id, name="Docker", level=4),
                 SkillTable(employee_id=stable.id, name="AWS", level=4),
                 ExperienceTable(
-                    employee_id=stable.id, company="Acme", position="Engineer",
-                    duration_years=12.0, description="",
+                    employee_id=stable.id,
+                    company="Acme",
+                    position="Engineer",
+                    duration_years=12.0,
+                    description="",
                 ),
                 # Mid: average everything
                 SkillTable(employee_id=mid.id, name="SQL", level=3),
@@ -121,12 +125,18 @@ def _seed_workforce(engine):
                 SkillTable(employee_id=mid.id, name="Tableau", level=3),
                 SkillTable(employee_id=mid.id, name="Power BI", level=2),
                 ExperienceTable(
-                    employee_id=mid.id, company="Beta", position="Analyst",
-                    duration_years=6.0, description="",
+                    employee_id=mid.id,
+                    company="Beta",
+                    position="Analyst",
+                    duration_years=6.0,
+                    description="",
                 ),
                 ExperienceTable(
-                    employee_id=mid.id, company="Gamma", position="Associate",
-                    duration_years=2.0, description="",
+                    employee_id=mid.id,
+                    company="Gamma",
+                    position="Associate",
+                    duration_years=2.0,
+                    description="",
                 ),
                 # Risky: overloaded, misaligned, compressed, fragmented history
                 SkillTable(employee_id=risky.id, name="React", level=2),
@@ -140,24 +150,39 @@ def _seed_workforce(engine):
                 SkillTable(employee_id=risky.id, name="Kubernetes", level=1),
                 SkillTable(employee_id=risky.id, name="AWS", level=2),
                 ExperienceTable(
-                    employee_id=risky.id, company="One", position="Dev",
-                    duration_years=1.0, description="",
+                    employee_id=risky.id,
+                    company="One",
+                    position="Dev",
+                    duration_years=1.0,
+                    description="",
                 ),
                 ExperienceTable(
-                    employee_id=risky.id, company="Two", position="Dev",
-                    duration_years=1.0, description="",
+                    employee_id=risky.id,
+                    company="Two",
+                    position="Dev",
+                    duration_years=1.0,
+                    description="",
                 ),
                 ExperienceTable(
-                    employee_id=risky.id, company="Three", position="Dev",
-                    duration_years=1.0, description="",
+                    employee_id=risky.id,
+                    company="Three",
+                    position="Dev",
+                    duration_years=1.0,
+                    description="",
                 ),
                 ExperienceTable(
-                    employee_id=risky.id, company="Four", position="Dev",
-                    duration_years=1.0, description="",
+                    employee_id=risky.id,
+                    company="Four",
+                    position="Dev",
+                    duration_years=1.0,
+                    description="",
                 ),
                 ExperienceTable(
-                    employee_id=risky.id, company="Five", position="Dev",
-                    duration_years=1.0, description="",
+                    employee_id=risky.id,
+                    company="Five",
+                    position="Dev",
+                    duration_years=1.0,
+                    description="",
                 ),
             ]
         )
@@ -188,16 +213,20 @@ def test_attrition_hazard_contract_and_differentiation(client_db):
     assert stable["risk_tier"] in ("Low", "Moderate")
     assert risky["risk_tier"] in ("High", "Critical")
     assert stable["attr_12"] < mid["attr_12"] < risky["attr_12"]
-    assert stable["median_residual_tenure"] is None or stable["median_residual_tenure"] > 12
+    assert (
+        stable["median_residual_tenure"] is None
+        or stable["median_residual_tenure"] > 12
+    )
     assert risky["median_residual_tenure"] is not None
-    assert risky["median_residual_tenure"] < (stable.get("median_residual_tenure") or 999)
+    assert risky["median_residual_tenure"] < (
+        stable.get("median_residual_tenure") or 999
+    )
 
     # 2. Survival timeline integrity
     for e in employees:
         timeline = e["survival_forecast"]
         assert len(timeline) == 12
         prev_s = 1.0
-        prev_h = 0.0
         prev_H = 0.0
         for point in timeline:
             assert 0.0 <= point["survival_probability"] <= 1.0
@@ -209,7 +238,6 @@ def test_attrition_hazard_contract_and_differentiation(client_db):
             # survival is non-increasing
             assert point["survival_probability"] <= prev_s + 1e-9
             prev_s = point["survival_probability"]
-            prev_h = point["hazard"]
             prev_H = point["cumulative_hazard"]
 
         # 3. SHAP waterfall: ratios multiply to the hazard ratio
@@ -224,21 +252,35 @@ def test_attrition_hazard_contract_and_differentiation(client_db):
 
         # 4. Covariate explain rows mirror waterfall
         assert len(e["covariates_explain"]) == len(waterfall)
-        assert all("factor" in c and "impact_percentage" in c for c in e["covariates_explain"])
+        assert all(
+            "factor" in c and "impact_percentage" in c for c in e["covariates_explain"]
+        )
 
         # 5. Levers block present for the client-side sandbox mirror
         levers = e["levers"]
-        for field in ("morale", "salary", "dept_median_salary", "skills_count",
-                      "skill_level_avg", "match_score", "experience_years",
-                      "companies_count", "tenure_months", "department", "role",
-                      "seniority_scale", "dept_offset", "risk_flag"):
+        for field in (
+            "morale",
+            "salary",
+            "dept_median_salary",
+            "skills_count",
+            "skill_level_avg",
+            "match_score",
+            "experience_years",
+            "companies_count",
+            "tenure_months",
+            "department",
+            "role",
+            "seniority_scale",
+            "dept_offset",
+            "risk_flag",
+        ):
             assert field in levers, f"levers missing {field}"
 
     # 6. Population band integrity
     pop = data["population"]
     assert pop["count"] == 3
     assert len(pop["p10"]) == len(pop["p50"]) == len(pop["p90"]) == 12
-    for lo, mid_v, hi in zip(pop["p10"], pop["p50"], pop["p90"]):
+    for lo, mid_v, hi in zip(pop["p10"], pop["p50"], pop["p90"], strict=True):
         assert 0.0 <= lo <= mid_v <= hi <= 1.0
 
     # 7. Hazard ratio vs population average reference

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Cpu,
@@ -19,9 +19,12 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
+  Share2,
+  Activity,
 } from "lucide-react";
 import { UserManualButton } from "./UserManual";
 import PremiumSelect from "./PremiumSelect";
+import OnaGraph3DCanvas from "./ui/OnaGraph3DCanvas";
 import { API_BASE_URL } from "../services/apiBase";
 import {
   buildCovariates,
@@ -70,7 +73,9 @@ const MobileSplitPane = ({
         >
           {leftIcon}
           <span className="truncate">{leftTitle}</span>
-          {activePane === "left" && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />}
+          {activePane === "left" && (
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+          )}
         </button>
         <button
           type="button"
@@ -83,7 +88,9 @@ const MobileSplitPane = ({
         >
           {rightIcon}
           <span className="truncate">{rightTitle}</span>
-          {activePane === "right" && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />}
+          {activePane === "right" && (
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
+          )}
         </button>
       </div>
 
@@ -98,7 +105,9 @@ const MobileSplitPane = ({
               : "max-lg:w-11 sm:max-lg:w-12 max-lg:shrink-0 max-lg:overflow-hidden max-lg:cursor-pointer max-lg:select-none max-lg:opacity-85 max-lg:hover:opacity-100 max-lg:transition-all max-lg:duration-300"
           }`}
         >
-          <div className={`h-full w-full flex flex-col min-h-0 ${activePane === "left" ? "flex" : "hidden lg:flex"}`}>
+          <div
+            className={`h-full w-full flex flex-col min-h-0 ${activePane === "left" ? "flex" : "hidden lg:flex"}`}
+          >
             {leftContent}
           </div>
 
@@ -106,11 +115,17 @@ const MobileSplitPane = ({
             <div className="lg:hidden h-full min-h-[380px] rounded-2xl border border-white/10 bg-slate-950/80 p-2 flex flex-col items-center justify-between hover:border-indigo-400/40 transition-all shadow-lg group">
               <div className="flex flex-col items-center gap-2 pt-2 text-indigo-400 group-hover:scale-110 transition-transform">
                 {leftIcon}
-                <ChevronRight size={14} className="text-indigo-300 animate-pulse" />
+                <ChevronRight
+                  size={14}
+                  className="text-indigo-300 animate-pulse"
+                />
               </div>
               <div
                 className="uppercase tracking-widest text-[10px] font-bold text-slate-300 text-center py-4 select-none whitespace-nowrap"
-                style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                style={{
+                  writingMode: "vertical-rl",
+                  transform: "rotate(180deg)",
+                }}
               >
                 {leftTitle}
               </div>
@@ -130,7 +145,9 @@ const MobileSplitPane = ({
               : "max-lg:w-11 sm:max-lg:w-12 max-lg:shrink-0 max-lg:overflow-hidden max-lg:cursor-pointer max-lg:select-none max-lg:opacity-85 max-lg:hover:opacity-100 max-lg:transition-all max-lg:duration-300"
           }`}
         >
-          <div className={`h-full w-full flex flex-col min-h-0 ${activePane === "right" ? "flex" : "hidden lg:flex"}`}>
+          <div
+            className={`h-full w-full flex flex-col min-h-0 ${activePane === "right" ? "flex" : "hidden lg:flex"}`}
+          >
             {rightContent}
           </div>
 
@@ -138,11 +155,17 @@ const MobileSplitPane = ({
             <div className="lg:hidden h-full min-h-[380px] rounded-2xl border border-white/10 bg-slate-950/80 p-2 flex flex-col items-center justify-between hover:border-cyan-400/40 transition-all shadow-lg group">
               <div className="flex flex-col items-center gap-2 pt-2 text-cyan-400 group-hover:scale-110 transition-transform">
                 {rightIcon}
-                <ChevronLeft size={14} className="text-cyan-300 animate-pulse" />
+                <ChevronLeft
+                  size={14}
+                  className="text-cyan-300 animate-pulse"
+                />
               </div>
               <div
                 className="uppercase tracking-widest text-[10px] font-bold text-slate-300 text-center py-4 select-none whitespace-nowrap"
-                style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                style={{
+                  writingMode: "vertical-rl",
+                  transform: "rotate(180deg)",
+                }}
               >
                 {rightTitle}
               </div>
@@ -373,7 +396,13 @@ const IntelligenceCenterView = () => {
       skillsCount: workloadSlider,
     });
     return computeSurvival(covs, populationStats.means);
-  }, [selectedAttritionEmp, moraleSlider, salarySlider, workloadSlider, populationStats]);
+  }, [
+    selectedAttritionEmp,
+    moraleSlider,
+    salarySlider,
+    workloadSlider,
+    populationStats,
+  ]);
 
   // Sandbox covariate vector (for value display in SHAP rows)
   const attritionCovs = useMemo(() => {
@@ -385,9 +414,7 @@ const IntelligenceCenterView = () => {
     });
   }, [selectedAttritionEmp, moraleSlider, salarySlider, workloadSlider]);
 
-  const riskTierSim = attritionSim
-    ? riskTier(attritionSim.attr12)
-    : "Low";
+  const riskTierSim = attritionSim ? riskTier(attritionSim.attr12) : "Low";
 
   // Sandbox lever deltas vs the employee's recorded baseline
   const leverDeltas = useMemo(() => {
@@ -395,11 +422,19 @@ const IntelligenceCenterView = () => {
     return {
       morale: moraleSlider - (selectedAttritionEmp?.levers?.morale ?? 0.5),
       salaryIncrease: salarySlider,
-      skills: workloadSlider - (selectedAttritionEmp?.levers?.skills_count ?? 0),
+      skills:
+        workloadSlider - (selectedAttritionEmp?.levers?.skills_count ?? 0),
       attrDelta: (attritionBaseline.attr12 - attritionSim.attr12) * 100,
       hrDelta: attritionSim.hazardRatio - attritionBaseline.hazardRatio,
     };
-  }, [attritionBaseline, attritionSim, moraleSlider, salarySlider, workloadSlider, selectedAttritionEmp]);
+  }, [
+    attritionBaseline,
+    attritionSim,
+    moraleSlider,
+    salarySlider,
+    workloadSlider,
+    selectedAttritionEmp,
+  ]);
 
   // Registry view: search + sort (never mutates server data)
   const visibleAttrition = useMemo(() => {
@@ -429,20 +464,69 @@ const IntelligenceCenterView = () => {
       }
     });
     return sorted;
-  }, [attritionData, attritionSearch, attritionSort, attritionSortDesc]);
-
-  // 4. ONA State
-  const [onaData, setOnaData] = useState({ nodes: [], links: [] });
+  }, [attritionData, attritionSearch, attritionSort, attritionSortDesc]); // 4. ONA State
+  const [onaData, setOnaData] = useState({ nodes: [], links: [], metrics: {} });
   const [onaLoading, setOnaLoading] = useState(false);
   const [selectedOnaNode, setSelectedOnaNode] = useState(null);
+  const [onaColorMode, setOnaColorMode] = useState("department"); // "department" | "pagerank" | "betweenness" | "silo"
+  const [onaDeptFilter, setOnaDeptFilter] = useState("all");
+  const [onaSearchQuery, setOnaSearchQuery] = useState("");
+  const [onaCamera, setOnaCamera] = useState({
+    yaw: 0.1,
+    pitch: -0.32,
+    scale: 1.0,
+    panX: 0,
+    panY: 0,
+  });
 
-  // ONA Physics Simulation State
-  const [nodesState, setNodesState] = useState([]);
-  const dragNodeRef = useRef(null);
-  const canvasRef = useRef(null);
-  const onaCameraRef = useRef({ yaw: 0, pitch: -0.38, scale: 1 });
-  const [onaCamera, setOnaCamera] = useState({ yaw: 0, pitch: -0.38, scale: 1 });
-  const onaRotateRef = useRef(null);
+  const topInfluencers = useMemo(() => {
+    if (!onaData?.nodes?.length) return [];
+    return [...onaData.nodes]
+      .sort((a, b) => (b.influence_pagerank || 0) - (a.influence_pagerank || 0))
+      .slice(0, 4);
+  }, [onaData]);
+
+  const topBridgeBrokers = useMemo(() => {
+    if (!onaData?.nodes?.length) return [];
+    return [...onaData.nodes]
+      .sort((a, b) => (b.bridge_betweenness || 0) - (a.bridge_betweenness || 0))
+      .slice(0, 4);
+  }, [onaData]);
+
+  // Selected Node's direct 1st-degree neighbors
+  const selectedNodeNeighbors = useMemo(() => {
+    if (!selectedOnaNode || !onaData?.links?.length) return [];
+    const neighbors = [];
+    onaData.links.forEach((l) => {
+      if (l.source === selectedOnaNode.id) {
+        const targetNode = onaData.nodes.find((n) => n.id === l.target);
+        if (targetNode)
+          neighbors.push({
+            node: targetNode,
+            weight: l.weight,
+            channel: l.channel,
+            isCross: l.is_cross_dept,
+          });
+      } else if (l.target === selectedOnaNode.id) {
+        const sourceNode = onaData.nodes.find((n) => n.id === l.source);
+        if (sourceNode)
+          neighbors.push({
+            node: sourceNode,
+            weight: l.weight,
+            channel: l.channel,
+            isCross: l.is_cross_dept,
+          });
+      }
+    });
+    return neighbors.sort((a, b) => b.weight - a.weight);
+  }, [selectedOnaNode, onaData]);
+
+  const availableDepts = useMemo(() => {
+    if (!onaData?.nodes?.length) return [];
+    return Array.from(
+      new Set(onaData.nodes.map((n) => n.department || "General")),
+    );
+  }, [onaData]);
 
   // 5. Career Path State
   const [careerEmployees, setCareerEmployees] = useState([]);
@@ -487,28 +571,9 @@ const IntelligenceCenterView = () => {
   async function fetchOna() {
     try {
       setOnaLoading(true);
-      const data = await apiCall("/ona");
+      const data = await apiCall("/ona?limit=120");
       setOnaData(data);
-
-      // Initialize physics layout positions
       if (data.nodes && data.nodes.length > 0) {
-        const initialNodes = data.nodes.map((node, idx) => {
-          // Distribute the real network nodes through a spherical volume rather
-          // than a 2D ring. The force solver then settles this 3D seed without
-          // changing the underlying ONA records or links.
-          const phi = Math.acos(1 - (2 * (idx + 0.5)) / data.nodes.length);
-          const theta = Math.PI * (1 + Math.sqrt(5)) * idx;
-          const radius = 170;
-          return {
-            ...node,
-            x: 250 + radius * Math.sin(phi) * Math.cos(theta) + (Math.random() - 0.5) * 12,
-            y: 250 + radius * Math.sin(phi) * Math.sin(theta) + (Math.random() - 0.5) * 12,
-            z: radius * Math.cos(phi) + (Math.random() - 0.5) * 12,
-            vx: 0,
-            vy: 0,
-          };
-        });
-        setNodesState(initialNodes);
         setSelectedOnaNode(data.nodes[0]);
       }
       setOnaLoading(false);
@@ -518,230 +583,33 @@ const IntelligenceCenterView = () => {
     }
   }
 
-  // Physics animation tick for draggable ONA Graph
-  useEffect(() => {
-    if (nodesState.length === 0 || activeSubTab !== "ona") return;
-
-    let animId;
-    const tick = () => {
-      setNodesState((prev) => {
-        // Create lookup Map for easy reference
-        const nodeMap = {};
-        prev.forEach((n, i) => {
-          nodeMap[n.id] = i;
-        });
-
-        // Clone nodes to update physics positions
-        const nextNodes = prev.map((n) => ({
-          ...n,
-          vx: n.vx * 0.85,
-          vy: n.vy * 0.85,
-          vz: (n.vz || 0) * 0.85,
-        }));
-
-        // 1. Repulsion force between all nodes
-        for (let i = 0; i < nextNodes.length; i++) {
-          const n1 = nextNodes[i];
-          for (let j = i + 1; j < nextNodes.length; j++) {
-            const n2 = nextNodes[j];
-            const dx = n2.x - n1.x;
-            const dy = n2.y - n1.y;
-            const dz = (n2.z || 0) - (n1.z || 0);
-            const distSq = dx * dx + dy * dy + dz * dz + 1.0;
-            const dist = Math.sqrt(distSq);
-            if (dist < 180) {
-              const force = 10.0 / distSq;
-              const fx = (dx / dist) * force;
-              const fy = (dy / dist) * force;
-
-              if (n1.id !== dragNodeRef.current) {
-                nextNodes[i].vx -= fx;
-                nextNodes[i].vy -= fy;
-                nextNodes[i].vz -= (dz / dist) * force;
-              }
-              if (n2.id !== dragNodeRef.current) {
-                nextNodes[j].vx += fx;
-                nextNodes[j].vy += fy;
-                nextNodes[j].vz += (dz / dist) * force;
-              }
-            }
-          }
-        }
-
-        // 2. Attraction force along connections
-        onaData.links.forEach((link) => {
-          const idxSrc = nodeMap[link.source];
-          const idxTgt = nodeMap[link.target];
-          if (idxSrc === undefined || idxTgt === undefined) return;
-
-          const nSrc = nextNodes[idxSrc];
-          const nTgt = nextNodes[idxTgt];
-          const dx = nTgt.x - nSrc.x;
-          const dy = nTgt.y - nSrc.y;
-          const dz = (nTgt.z || 0) - (nSrc.z || 0);
-          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.1;
-          const desiredDist = 120;
-          const force = (dist - desiredDist) * 0.015 * link.weight;
-
-          const fx = (dx / dist) * force;
-          const fy = (dy / dist) * force;
-
-          if (nSrc.id !== dragNodeRef.current) {
-            nextNodes[idxSrc].vx += fx;
-            nextNodes[idxSrc].vy += fy;
-            nextNodes[idxSrc].vz += (dz / dist) * force;
-          }
-          if (nTgt.id !== dragNodeRef.current) {
-            nextNodes[idxTgt].vx -= fx;
-            nextNodes[idxTgt].vy -= fy;
-            nextNodes[idxTgt].vz -= (dz / dist) * force;
-          }
-        });
-
-        // 3. Center gravity force
-        nextNodes.forEach((n, i) => {
-          if (n.id === dragNodeRef.current) return;
-          const dx = 250 - n.x;
-          const dy = 250 - n.y;
-          const dz = -(n.z || 0);
-          nextNodes[i].vx += dx * 0.003;
-          nextNodes[i].vy += dy * 0.003;
-          nextNodes[i].vz += dz * 0.0008;
-        });
-
-        // 4. Update coordinates with velocities
-        nextNodes.forEach((n, i) => {
-          if (n.id === dragNodeRef.current) return;
-          let nextX = n.x + n.vx;
-          let nextY = n.y + n.vy;
-          let nextZ = (n.z || 0) + (n.vz || 0);
-          // Boundary collision
-          nextX = Math.max(25, Math.min(475, nextX));
-          nextY = Math.max(25, Math.min(475, nextY));
-          nextZ = Math.max(-210, Math.min(210, nextZ));
-          nextNodes[i].x = nextX;
-          nextNodes[i].y = nextY;
-          nextNodes[i].z = nextZ;
-        });
-
-        return nextNodes;
-      });
-      animId = requestAnimationFrame(tick);
-    };
-
-    animId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animId);
-  }, [nodesState, onaData, activeSubTab]);
-
-  const handleNodeMouseDown = (nodeId) => {
-    dragNodeRef.current = nodeId;
-    const rect = canvasRef.current ? canvasRef.current.getBoundingClientRect() : null;
-    const updateCoords = (moveEvent) => {
-      if (!rect) return;
-      const clientX = moveEvent.clientX ?? moveEvent.touches?.[0]?.clientX;
-      const clientY = moveEvent.clientY ?? moveEvent.touches?.[0]?.clientY;
-
-      const x = ((clientX - rect.left) / rect.width) * 500;
-      const y = ((clientY - rect.top) / rect.height) * 500;
-
-      setNodesState((prev) =>
-        prev.map((n) =>
-          n.id === nodeId
-            ? {
-                ...n,
-                x: Math.max(20, Math.min(480, x)),
-                y: Math.max(20, Math.min(480, y)),
-                vx: 0,
-                vy: 0,
-              }
-            : n,
-        ),
-      );
-    };
-
-    const handleMouseUp = () => {
-      dragNodeRef.current = null;
-      window.removeEventListener("mousemove", updateCoords);
-      window.removeEventListener("mouseup", handleMouseUp);
-      window.removeEventListener("touchmove", updateCoords);
-      window.removeEventListener("touchend", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", updateCoords);
-    window.addEventListener("mouseup", handleMouseUp);
-    window.addEventListener("touchmove", updateCoords);
-    window.addEventListener("touchend", handleMouseUp);
-  };
-
-  const projectOnaNode = (node) => {
-    const camera = onaCamera;
-    const x = node.x - 250;
-    const y = node.y - 250;
-    const z = node.z || 0;
-    const cosYaw = Math.cos(camera.yaw);
-    const sinYaw = Math.sin(camera.yaw);
-    const yawX = x * cosYaw - z * sinYaw;
-    const yawZ = x * sinYaw + z * cosYaw;
-    const cosPitch = Math.cos(camera.pitch);
-    const sinPitch = Math.sin(camera.pitch);
-    const pitchY = y * cosPitch - yawZ * sinPitch;
-    const depth = y * sinPitch + yawZ * cosPitch;
-    const perspective = 360 / Math.max(210, 360 - depth);
-    return {
-      x: 250 + yawX * perspective * camera.scale,
-      y: 250 + pitchY * perspective * camera.scale,
-      depth,
-      perspective,
-    };
-  };
-
-  const project3D = (x, y, z) => projectOnaNode({ x, y, z });
-
-  const handleOnaNodePointerDown = (event, node) => {
-    event.stopPropagation();
-    handleNodeMouseDown(node.id);
-  };
-
-  const handleOnaCanvasPointerDown = (event) => {
-    if (event.target !== event.currentTarget) return;
-    onaRotateRef.current = { x: event.clientX, y: event.clientY };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-  };
-
-  const handleOnaCanvasPointerMove = (event) => {
-    if (!onaRotateRef.current) return;
-    const previous = onaRotateRef.current;
-    const next = {
-      ...onaCameraRef.current,
-      yaw: onaCameraRef.current.yaw + (event.clientX - previous.x) * 0.008,
-      pitch: Math.max(-1.1, Math.min(1.1, onaCameraRef.current.pitch + (event.clientY - previous.y) * 0.008)),
-    };
-    onaRotateRef.current = { x: event.clientX, y: event.clientY };
-    onaCameraRef.current = next;
-    setOnaCamera(next);
-  };
-
-  const handleOnaCanvasPointerUp = () => {
-    onaRotateRef.current = null;
-  };
-
-  const handleOnaCanvasWheel = (event) => {
-    event.preventDefault();
-    const next = { ...onaCameraRef.current, scale: Math.max(0.65, Math.min(1.8, onaCameraRef.current.scale - event.deltaY * 0.001)) };
-    onaCameraRef.current = next;
-    setOnaCamera(next);
-  };
-
-  const resetOnaCamera = () => {
-    const next = { yaw: 0, pitch: -0.38, scale: 1 };
-    onaCameraRef.current = next;
-    setOnaCamera(next);
+  const getNodeColor = (node) => {
+    if (onaColorMode === "pagerank") {
+      const pr = node.influence_pagerank || 0;
+      if (pr > 0.75) return "#fbbf24";
+      if (pr > 0.45) return "#f59e0b";
+      if (pr > 0.25) return "#818cf8";
+      return "#6366f1";
+    }
+    if (onaColorMode === "betweenness") {
+      const bc = node.bridge_betweenness || 0;
+      if (bc > 0.6) return "#2dd4bf";
+      if (bc > 0.3) return "#06b6d4";
+      if (bc > 0.15) return "#0284c7";
+      return "#475569";
+    }
+    if (onaColorMode === "silo") {
+      const ei = node.ei_silo_index || 0;
+      if (ei > 0.3) return "#10b981"; // Strong cross-dept boundary spanner
+      if (ei >= -0.2) return "#38bdf8"; // Balanced
+      return "#f43f5e"; // Siloed in own dept
+    }
+    return node.department_color || "#10b981";
   };
 
   async function fetchCareerEmployees() {
     try {
-      const API_BASE =
-        API_BASE_URL;
+      const API_BASE = API_BASE_URL;
       const token = localStorage.getItem("auth_token") || "";
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await fetch(`${API_BASE}/api/v1/employees`, {
@@ -893,11 +761,12 @@ const IntelligenceCenterView = () => {
               transition matrices.
             </p>
           </div>
-          <UserManualButton defaultTab="intelligence" className="ml-3 shrink-0" />
+          <UserManualButton
+            defaultTab="intelligence"
+            className="ml-3 shrink-0"
+          />
         </div>
       </header>
-
-
 
       {/* Main Tabs Navigation */}
       <div className="flex overflow-x-auto custom-scrollbar no-scrollbar sm:flex-wrap gap-1.5 sm:gap-2 border-b border-white/5 pb-2.5 mb-1 shrink-0 max-w-full">
@@ -971,11 +840,13 @@ const IntelligenceCenterView = () => {
                             Define target requirements
                           </h3>
                           <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                            Add the skills and minimum levels the graph solver must evaluate.
+                            Add the skills and minimum levels the graph solver
+                            must evaluate.
                           </p>
                         </div>
                         <span className="shrink-0 rounded-full border border-indigo-300/20 bg-indigo-300/10 px-2 py-1 text-[9px] font-semibold text-indigo-200">
-                          {matchSkillsInput.length} requirement{matchSkillsInput.length === 1 ? "" : "s"}
+                          {matchSkillsInput.length} requirement
+                          {matchSkillsInput.length === 1 ? "" : "s"}
                         </span>
                       </div>
 
@@ -1057,7 +928,9 @@ const IntelligenceCenterView = () => {
                             setMobileActivePane("right");
                             triggerSkillMatch();
                           }}
-                          disabled={matchingLoading || matchSkillsInput.length === 0}
+                          disabled={
+                            matchingLoading || matchSkillsInput.length === 0
+                          }
                           className="inline-flex h-11 md:h-12 lg:h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-cyan-300/50 bg-cyan-300/[0.07] text-xs md:text-sm font-semibold uppercase tracking-[0.12em] text-cyan-200 transition hover:bg-cyan-300/[0.14] disabled:cursor-not-allowed disabled:opacity-40 min-h-[48px]"
                         >
                           <Search size={14} />{" "}
@@ -1066,29 +939,60 @@ const IntelligenceCenterView = () => {
                             : "Solve Adjacencies"}
                         </button>
 
-                        {(skillMatchStatus === "running" || skillMatchStatus === "complete" || skillMatchStatus === "error") && (
-                          <div className="pt-2 border-t border-white/10" aria-live="polite">
-                          <div className="mb-3 flex items-center justify-between gap-3">
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                              Solver request status
-                            </span>
-                            <span className={`text-[10px] font-medium ${skillMatchStatus === "error" ? "text-rose-300" : skillMatchStatus === "complete" ? "text-emerald-300" : "text-cyan-300"}`}>
-                              {skillMatchStatus === "error" ? "Request failed" : skillMatchStatus === "complete" ? `${matchResults.length} matches returned` : "Processing on server"}
-                            </span>
+                        {(skillMatchStatus === "running" ||
+                          skillMatchStatus === "complete" ||
+                          skillMatchStatus === "error") && (
+                          <div
+                            className="pt-2 border-t border-white/10"
+                            aria-live="polite"
+                          >
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                                Solver request status
+                              </span>
+                              <span
+                                className={`text-[10px] font-medium ${skillMatchStatus === "error" ? "text-rose-300" : skillMatchStatus === "complete" ? "text-emerald-300" : "text-cyan-300"}`}
+                              >
+                                {skillMatchStatus === "error"
+                                  ? "Request failed"
+                                  : skillMatchStatus === "complete"
+                                    ? `${matchResults.length} matches returned`
+                                    : "Processing on server"}
+                              </span>
+                            </div>
+                            <div className="mb-3 h-1 overflow-hidden rounded-full bg-white/10">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${skillMatchStatus === "error" ? "w-full bg-rose-400" : skillMatchStatus === "complete" ? "w-full bg-emerald-400" : "w-2/3 animate-pulse bg-cyan-300"}`}
+                              />
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-[9px]">
+                              {[
+                                "Requirements validated",
+                                "Adjacency solver",
+                                "Matches rendered",
+                              ].map((label, index) => {
+                                const reached =
+                                  skillMatchStatus === "complete" ||
+                                  (skillMatchStatus === "running" &&
+                                    index < 2) ||
+                                  (skillMatchStatus === "error" && index < 2);
+                                return (
+                                  <div
+                                    key={label}
+                                    className={`flex items-center gap-1.5 ${reached ? "text-slate-200" : "text-slate-600"}`}
+                                  >
+                                    <span
+                                      className={`h-1.5 w-1.5 rounded-full ${reached ? (skillMatchStatus === "error" && index === 1 ? "bg-rose-300" : "bg-cyan-300") : "bg-white/15"}`}
+                                    />
+                                    {label}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                          <div className="mb-3 h-1 overflow-hidden rounded-full bg-white/10">
-                            <div className={`h-full rounded-full transition-all duration-500 ${skillMatchStatus === "error" ? "w-full bg-rose-400" : skillMatchStatus === "complete" ? "w-full bg-emerald-400" : "w-2/3 animate-pulse bg-cyan-300"}`} />
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 text-[9px]">
-                            {["Requirements validated", "Adjacency solver", "Matches rendered"].map((label, index) => {
-                              const reached = skillMatchStatus === "complete" || (skillMatchStatus === "running" && index < 2) || (skillMatchStatus === "error" && index < 2);
-                              return <div key={label} className={`flex items-center gap-1.5 ${reached ? "text-slate-200" : "text-slate-600"}`}><span className={`h-1.5 w-1.5 rounded-full ${reached ? (skillMatchStatus === "error" && index === 1 ? "bg-rose-300" : "bg-cyan-300") : "bg-white/15"}`} />{label}</div>;
-                            })}
-                          </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
                   </div>
                 }
                 rightContent={
@@ -1126,7 +1030,8 @@ const IntelligenceCenterView = () => {
                                 </span>
                                 <span className="text-xs md:text-sm font-black text-primary">
                                   {(
-                                    result.match_details.overall_compatibility * 100
+                                    result.match_details.overall_compatibility *
+                                    100
                                   ).toFixed(0)}
                                   %
                                 </span>
@@ -1165,7 +1070,8 @@ const IntelligenceCenterView = () => {
                                         >
                                           <div className="flex items-center justify-between mb-2 md:mb-3 border-b border-white/5 pb-2">
                                             <div className="text-xs md:text-sm font-bold text-white">
-                                              Target Skill: {detail.target_skill} (L
+                                              Target Skill:{" "}
+                                              {detail.target_skill} (L
                                               {detail.target_level})
                                             </div>
                                             <span
@@ -1192,12 +1098,15 @@ const IntelligenceCenterView = () => {
                                                 <div className="bg-white/5 px-2 md:px-3 py-1 md:py-1.5 rounded border border-white/10 text-slate-200">
                                                   {detail.matched_by_skill}
                                                 </div>
-                                                {detail.semantic_distance > 0 && (
+                                                {detail.semantic_distance >
+                                                  0 && (
                                                   <>
                                                     <div className="text-slate-500 flex flex-col items-center">
                                                       <span className="text-[8px] md:text-[9px] text-indigo-400 font-mono">
                                                         Weight:{" "}
-                                                        {detail.semantic_distance}
+                                                        {
+                                                          detail.semantic_distance
+                                                        }
                                                       </span>
                                                       <span className="text-indigo-400">
                                                         ➔
@@ -1223,7 +1132,10 @@ const IntelligenceCenterView = () => {
                                 </div>
 
                                 {/* visual DAG map */}
-                                <div className={`${graphExpanded ? "fixed inset-3 z-[90] flex flex-col rounded-2xl border border-cyan-300/25 bg-[#020617]/[0.98] p-4 shadow-[0_24px_90px_rgba(0,0,0,.65)] backdrop-blur-2xl md:inset-8 md:p-6" : "relative rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between flex-1 h-full min-h-[300px]"}`} onClick={(event) => event.stopPropagation()}>
+                                <div
+                                  className={`${graphExpanded ? "fixed inset-3 z-[90] flex flex-col rounded-2xl border border-cyan-300/25 bg-[#020617]/[0.98] p-4 shadow-[0_24px_90px_rgba(0,0,0,.65)] backdrop-blur-2xl md:inset-8 md:p-6" : "relative rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between flex-1 h-full min-h-[300px]"}`}
+                                  onClick={(event) => event.stopPropagation()}
+                                >
                                   <div>
                                     <div className="mb-2 flex items-start justify-between gap-3">
                                       <div>
@@ -1231,16 +1143,40 @@ const IntelligenceCenterView = () => {
                                           Shortest path graph view
                                         </div>
                                         <div className="mt-1 text-[10px] text-slate-500 leading-relaxed">
-                                          Green nodes are present in the candidate profile. Cyan paths show the evaluated transitions.
+                                          Green nodes are present in the
+                                          candidate profile. Cyan paths show the
+                                          evaluated transitions.
                                         </div>
                                       </div>
-                                      <button type="button" aria-label={graphExpanded ? "Collapse graph" : "Expand graph"} title={graphExpanded ? "Collapse graph" : "Expand graph"} onClick={() => setGraphExpanded((open) => !open)} className="shrink-0 rounded-lg border border-white/10 bg-white/[0.05] p-2 text-slate-300 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-cyan-200">
-                                        {graphExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                                      <button
+                                        type="button"
+                                        aria-label={
+                                          graphExpanded
+                                            ? "Collapse graph"
+                                            : "Expand graph"
+                                        }
+                                        title={
+                                          graphExpanded
+                                            ? "Collapse graph"
+                                            : "Expand graph"
+                                        }
+                                        onClick={() =>
+                                          setGraphExpanded((open) => !open)
+                                        }
+                                        className="shrink-0 rounded-lg border border-white/10 bg-white/[0.05] p-2 text-slate-300 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-cyan-200"
+                                      >
+                                        {graphExpanded ? (
+                                          <Minimize2 size={14} />
+                                        ) : (
+                                          <Maximize2 size={14} />
+                                        )}
                                       </button>
                                     </div>
                                   </div>
 
-                                  <div className={`${graphExpanded ? "min-h-0 flex-1" : "h-[380px] min-h-[380px]"} relative border border-white/5 rounded-lg overflow-hidden bg-slate-950/80`}>
+                                  <div
+                                    className={`${graphExpanded ? "min-h-0 flex-1" : "h-[380px] min-h-[380px]"} relative border border-white/5 rounded-lg overflow-hidden bg-slate-950/80`}
+                                  >
                                     <svg
                                       className="absolute inset-0 h-full w-full pointer-events-none"
                                       viewBox="80 70 840 400"
@@ -1248,8 +1184,10 @@ const IntelligenceCenterView = () => {
                                     >
                                       {/* Links */}
                                       {SKILL_GRAPH_LINKS.map((link, idx) => {
-                                        const src = SKILL_GRAPH_COORDS[link.source];
-                                        const tgt = SKILL_GRAPH_COORDS[link.target];
+                                        const src =
+                                          SKILL_GRAPH_COORDS[link.source];
+                                        const tgt =
+                                          SKILL_GRAPH_COORDS[link.target];
                                         if (!src || !tgt) return null;
 
                                         const isActivePath =
@@ -1264,12 +1202,16 @@ const IntelligenceCenterView = () => {
                                               x2={tgt.x}
                                               y2={tgt.y}
                                               stroke={
-                                                isActivePath ? "#2dd4bf" : "#ffffff"
+                                                isActivePath
+                                                  ? "#2dd4bf"
+                                                  : "#ffffff"
                                               }
                                               strokeOpacity={
                                                 isActivePath ? 0.9 : 0.05
                                               }
-                                              strokeWidth={isActivePath ? 3.5 : 1}
+                                              strokeWidth={
+                                                isActivePath ? 3.5 : 1
+                                              }
                                             />
                                             {isActivePath && (
                                               <circle r="4" fill="#2dd4bf">
@@ -1309,19 +1251,28 @@ const IntelligenceCenterView = () => {
                                                 strokeWidth={
                                                   isHighlighted ? 2.5 : 1
                                                 }
-                                                style={{ transition: "all 0.5s" }}
+                                                style={{
+                                                  transition: "all 0.5s",
+                                                }}
                                               />
                                               <text
                                                 x={node.x}
-                                                y={node.y - (isHighlighted ? 14 : 10)}
+                                                y={
+                                                  node.y -
+                                                  (isHighlighted ? 14 : 10)
+                                                }
                                                 fill={
                                                   isHighlighted
                                                     ? "#ffffff"
                                                     : "#475569"
                                                 }
-                                                fontSize={isHighlighted ? "12" : "10"}
+                                                fontSize={
+                                                  isHighlighted ? "12" : "10"
+                                                }
                                                 fontWeight={
-                                                  isHighlighted ? "black" : "normal"
+                                                  isHighlighted
+                                                    ? "black"
+                                                    : "normal"
                                                 }
                                                 textAnchor="middle"
                                                 paintOrder="stroke"
@@ -1349,26 +1300,34 @@ const IntelligenceCenterView = () => {
                         <div className="h-12 w-12 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 flex items-center justify-center text-indigo-300 mb-4 shadow-[0_0_20px_rgba(163,230,53,0.15)]">
                           <Brain size={24} />
                         </div>
-                        <h4 className="text-sm font-extrabold text-white tracking-wide uppercase mb-2">Graph Solver Standing By</h4>
+                        <h4 className="text-sm font-extrabold text-white tracking-wide uppercase mb-2">
+                          Graph Solver Standing By
+                        </h4>
                         <p className="text-xs text-slate-400 leading-relaxed max-w-md">
-                          Enter target skill requirements on the left panel and click <span className="font-semibold text-cyan-300">Solve Adjacencies</span> to calculate graph shortest-path Dijkstra matching across the workforce.
+                          Enter target skill requirements on the left panel and
+                          click{" "}
+                          <span className="font-semibold text-cyan-300">
+                            Solve Adjacencies
+                          </span>{" "}
+                          to calculate graph shortest-path Dijkstra matching
+                          across the workforce.
                         </p>
                       </div>
                     )}
                   </div>
                 }
               />
-            <AIExplanationPanel
-              subtab="skill-match"
-              context={{
-                targetSkills: matchSkillsInput,
-                matchResults: matchResults,
-                activeMatchEmployeeId: activeMatchEmployeeId,
-              }}
-              buttonText="Explain with AI"
-              autoRefresh={true}
-              disabled={matchResults.length === 0}
-            />
+              <AIExplanationPanel
+                subtab="skill-match"
+                context={{
+                  targetSkills: matchSkillsInput,
+                  matchResults: matchResults,
+                  activeMatchEmployeeId: activeMatchEmployeeId,
+                }}
+                buttonText="Explain with AI"
+                autoRefresh={true}
+                disabled={matchResults.length === 0}
+              />
             </motion.div>
           )}
 
@@ -1400,7 +1359,8 @@ const IntelligenceCenterView = () => {
                           Combinatorial constraints
                         </h3>
                         <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                          Set the operating limits used by the optimization solver.
+                          Set the operating limits used by the optimization
+                          solver.
                         </p>
                       </div>
 
@@ -1431,7 +1391,9 @@ const IntelligenceCenterView = () => {
                             min="2"
                             max="6"
                             value={teamSize}
-                            onChange={(e) => setTeamSize(Number(e.target.value))}
+                            onChange={(e) =>
+                              setTeamSize(Number(e.target.value))
+                            }
                             className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
                           />
                         </div>
@@ -1522,7 +1484,9 @@ const IntelligenceCenterView = () => {
                             setMobileActivePane("right");
                             triggerTeamOptimize();
                           }}
-                          disabled={optimizingLoading || teamSkillsInput.length === 0}
+                          disabled={
+                            optimizingLoading || teamSkillsInput.length === 0
+                          }
                           className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-indigo-600 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_28px_rgba(79,70,229,.22)] transition hover:from-primary/90 hover:to-indigo-500/90 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Play size={14} />{" "}
@@ -1546,7 +1510,6 @@ const IntelligenceCenterView = () => {
                     </div>
 
                     <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar space-y-4">
-
                       {/* ANNEALING STATUS ACTIVE PANEL */}
                       {annealingStatus === "running" && (
                         <div className="py-12 flex flex-col items-center justify-center space-y-6">
@@ -1563,7 +1526,9 @@ const IntelligenceCenterView = () => {
                           <div className="w-64 h-4 bg-white/5 rounded-full overflow-hidden border border-white/10 relative p-0.5">
                             <div
                               className="h-full rounded-full transition-all duration-75 bg-gradient-to-r from-rose-500 via-amber-500 to-indigo-500"
-                              style={{ width: `${(annealingTemp / 10.0) * 100}%` }}
+                              style={{
+                                width: `${(annealingTemp / 10.0) * 100}%`,
+                              }}
                             />
                           </div>
                         </div>
@@ -1573,7 +1538,9 @@ const IntelligenceCenterView = () => {
                         <div>
                           {(() => {
                             const history =
-                              annealingHistory.length > 0 ? annealingHistory : [];
+                              annealingHistory.length > 0
+                                ? annealingHistory
+                                : [];
 
                             if (history.length === 0) {
                               return (
@@ -1585,7 +1552,9 @@ const IntelligenceCenterView = () => {
                             }
 
                             const n = history.length;
-                            const steps = history.map((h) => Number(h.step) || 0);
+                            const steps = history.map(
+                              (h) => Number(h.step) || 0,
+                            );
                             const energies = history.map(
                               (h) => Number(h.energy) || 0,
                             );
@@ -1601,7 +1570,9 @@ const IntelligenceCenterView = () => {
                             const temps = history.map(
                               (h) => Number(h.temperature) || 0,
                             );
-                            const costs = history.map((h) => Number(h.cost) || 0);
+                            const costs = history.map(
+                              (h) => Number(h.cost) || 0,
+                            );
 
                             const metrics = optimizedTeam.metrics || {};
                             const lastCost = costs[costs.length - 1] || 0;
@@ -1627,8 +1598,13 @@ const IntelligenceCenterView = () => {
                               );
                               const ratio = stepRaw / mag;
                               const step =
-                                (ratio < 1.5 ? 1 : ratio < 3 ? 2 : ratio < 7 ? 5 : 10) *
-                                mag;
+                                (ratio < 1.5
+                                  ? 1
+                                  : ratio < 3
+                                    ? 2
+                                    : ratio < 7
+                                      ? 5
+                                      : 10) * mag;
                               const ticks = [];
                               for (
                                 let v = Math.ceil(lo / step) * step;
@@ -1640,20 +1616,22 @@ const IntelligenceCenterView = () => {
                               return ticks.length >= 2 ? ticks : [lo, hi];
                             };
 
-                            const eTicks = niceTicks(minE - ePad, maxE + ePad, 5);
+                            const eTicks = niceTicks(
+                              minE - ePad,
+                              maxE + ePad,
+                              5,
+                            );
                             const maxCost =
                               Math.max(...costs, budgetCap) * 1.05 || 1;
                             const costTicks = niceTicks(0, maxCost, 4);
                             const covTicks = [0, 25, 50, 75, 100];
                             const tmpTicks = [10, 5, 0];
 
-                            const xPos = (i) =>
-                              (i / Math.max(n - 1, 1)) * 100;
+                            const xPos = (i) => (i / Math.max(n - 1, 1)) * 100;
                             const yScaler = (lo, hi) => (v) => {
                               const r = hi - lo || 1;
                               return (
-                                84 -
-                                Math.max(0, Math.min(1, (v - lo) / r)) * 66
+                                84 - Math.max(0, Math.min(1, (v - lo) / r)) * 66
                               );
                             };
                             const yE = yScaler(
@@ -1689,17 +1667,20 @@ const IntelligenceCenterView = () => {
 
                             const fmtMoney = (v) => {
                               const num = Number(v) || 0;
-                              if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
-                              if (num >= 1e3) return `$${(num / 1e3).toFixed(0)}k`;
+                              if (num >= 1e6)
+                                return `$${(num / 1e6).toFixed(2)}M`;
+                              if (num >= 1e3)
+                                return `$${(num / 1e3).toFixed(0)}k`;
                               return `$${num.toFixed(0)}`;
                             };
 
                             const stepAt = (frac) =>
-                              steps[Math.round((n - 1) * frac)] ??
-                              steps[n - 1];
+                              steps[Math.round((n - 1) * frac)] ?? steps[n - 1];
                             const smoothPath = (pts) => {
                               if (pts.length < 2) {
-                                return pts.length ? `M ${pts[0].x},${pts[0].y}` : "";
+                                return pts.length
+                                  ? `M ${pts[0].x},${pts[0].y}`
+                                  : "";
                               }
                               let d = `M ${pts[0].x},${pts[0].y}`;
                               for (let i = 0; i < pts.length - 1; i++) {
@@ -1810,13 +1791,39 @@ const IntelligenceCenterView = () => {
                                               stopOpacity="0.0"
                                             />
                                           </linearGradient>
-                                          <filter id="glowEmerald" x="-30%" y="-30%" width="160%" height="160%">
-                                            <feGaussianBlur stdDeviation="1.5" result="blur" />
-                                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                                          <filter
+                                            id="glowEmerald"
+                                            x="-30%"
+                                            y="-30%"
+                                            width="160%"
+                                            height="160%"
+                                          >
+                                            <feGaussianBlur
+                                              stdDeviation="1.5"
+                                              result="blur"
+                                            />
+                                            <feComposite
+                                              in="SourceGraphic"
+                                              in2="blur"
+                                              operator="over"
+                                            />
                                           </filter>
-                                          <filter id="glowTeal" x="-30%" y="-30%" width="160%" height="160%">
-                                            <feGaussianBlur stdDeviation="1.5" result="blur" />
-                                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                                          <filter
+                                            id="glowTeal"
+                                            x="-30%"
+                                            y="-30%"
+                                            width="160%"
+                                            height="160%"
+                                          >
+                                            <feGaussianBlur
+                                              stdDeviation="1.5"
+                                              result="blur"
+                                            />
+                                            <feComposite
+                                              in="SourceGraphic"
+                                              in2="blur"
+                                              operator="over"
+                                            />
                                           </filter>
                                         </defs>
 
@@ -1948,7 +1955,14 @@ const IntelligenceCenterView = () => {
                                         {ePts.map((p, idx) => {
                                           const isBest = idx === bestIndex;
                                           const isHov = idx === hovered;
-                                          if (!isBest && !isHov && idx % Math.max(1, Math.floor(n / 8)) !== 0) return null;
+                                          if (
+                                            !isBest &&
+                                            !isHov &&
+                                            idx %
+                                              Math.max(1, Math.floor(n / 8)) !==
+                                              0
+                                          )
+                                            return null;
 
                                           return (
                                             <div
@@ -1957,10 +1971,13 @@ const IntelligenceCenterView = () => {
                                                 isBest
                                                   ? "w-3.5 h-3.5 bg-emerald-400 border-2 border-white shadow-[0_0_10px_#34d399] z-20"
                                                   : isHov
-                                                  ? "w-3 h-3 bg-white border-2 border-teal-400 shadow-[0_0_8px_#2dd4bf] z-20"
-                                                  : "w-2 h-2 bg-teal-400/90 border border-slate-900 shadow-[0_0_4px_#2dd4bf] z-10"
+                                                    ? "w-3 h-3 bg-white border-2 border-teal-400 shadow-[0_0_8px_#2dd4bf] z-20"
+                                                    : "w-2 h-2 bg-teal-400/90 border border-slate-900 shadow-[0_0_4px_#2dd4bf] z-10"
                                               }`}
-                                              style={{ left: `${p.x}%`, top: `${p.y}%` }}
+                                              style={{
+                                                left: `${p.x}%`,
+                                                top: `${p.y}%`,
+                                              }}
                                             />
                                           );
                                         })}
@@ -2016,10 +2033,29 @@ const IntelligenceCenterView = () => {
                                               stopOpacity="0.9"
                                             />
                                           </linearGradient>
-                                          <filter id="glowAmber" x="-30%" y="-30%" width="160%" height="160%">
-                                            <feGaussianBlur in="SourceAlpha" stdDeviation="0.35" result="blur" />
-                                            <feFlood floodColor="#fbbf24" floodOpacity="0.9" result="c" />
-                                            <feComposite in="c" in2="blur" operator="in" result="glow" />
+                                          <filter
+                                            id="glowAmber"
+                                            x="-30%"
+                                            y="-30%"
+                                            width="160%"
+                                            height="160%"
+                                          >
+                                            <feGaussianBlur
+                                              in="SourceAlpha"
+                                              stdDeviation="0.35"
+                                              result="blur"
+                                            />
+                                            <feFlood
+                                              floodColor="#fbbf24"
+                                              floodOpacity="0.9"
+                                              result="c"
+                                            />
+                                            <feComposite
+                                              in="c"
+                                              in2="blur"
+                                              operator="in"
+                                              result="glow"
+                                            />
                                             <feMerge>
                                               <feMergeNode in="glow" />
                                               <feMergeNode in="SourceGraphic" />
@@ -2075,9 +2111,7 @@ const IntelligenceCenterView = () => {
                                             fill="url(#annealBarGrad)"
                                             opacity={hovered === i ? 1 : 0.55}
                                             stroke={
-                                              hovered === i
-                                                ? "#ffffff"
-                                                : "none"
+                                              hovered === i ? "#ffffff" : "none"
                                             }
                                             strokeWidth="0.6"
                                             vectorEffect="non-scaling-stroke"
@@ -2122,23 +2156,25 @@ const IntelligenceCenterView = () => {
                                     </div>
                                   </div>
                                   {/* Hover overlay spanning both charts */}
-                                    <div className="absolute inset-0 ml-14 mr-11 flex justify-between items-stretch pointer-events-auto">
-                                      {history.map((h, i) => (
-                                        <div
-                                          key={i}
-                                          onMouseEnter={() =>
-                                            setHoveredAnnealIndex(i)
-                                          }
-                                          onMouseLeave={() =>
-                                              setHoveredAnnealIndex(null)
-                                          }
-                                          className="flex-1 h-full cursor-pointer relative group"
-                                        />
-                                      ))}
-                                    </div>
+                                  <div className="absolute inset-0 ml-14 mr-11 flex justify-between items-stretch pointer-events-auto">
+                                    {history.map((h, i) => (
+                                      <div
+                                        key={i}
+                                        onMouseEnter={() =>
+                                          setHoveredAnnealIndex(i)
+                                        }
+                                        onMouseLeave={() =>
+                                          setHoveredAnnealIndex(null)
+                                        }
+                                        className="flex-1 h-full cursor-pointer relative group"
+                                      />
+                                    ))}
+                                  </div>
 
-                                    {/* Smart Opposite-Corner Hover Tooltip Box (Zero Obscuration & Zero Extra Gap) */}
-                                    {hovered !== null && history[hovered] && (() => {
+                                  {/* Smart Opposite-Corner Hover Tooltip Box (Zero Obscuration & Zero Extra Gap) */}
+                                  {hovered !== null &&
+                                    history[hovered] &&
+                                    (() => {
                                       const hx = xPos(hovered);
                                       const isRightHalf = hx > 50;
                                       return (
@@ -2150,8 +2186,7 @@ const IntelligenceCenterView = () => {
                                           <div className="font-bold text-teal-300 flex items-center justify-between gap-1 border-b border-white/10 pb-1">
                                             <span className="flex items-center gap-1">
                                               Step #
-                                              {history[hovered].step ??
-                                                hovered}
+                                              {history[hovered].step ?? hovered}
                                             </span>
                                             {hovered === bestIndex && (
                                               <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30 font-semibold">
@@ -2204,7 +2239,7 @@ const IntelligenceCenterView = () => {
                                         </div>
                                       );
                                     })()}
-                                  </div>
+                                </div>
 
                                 {/* X-Axis Step Ticks (real step numbers) */}
                                 <div className="ml-14 mr-11 mt-2 flex justify-between items-center text-[10px] font-mono text-slate-400 border-t border-white/10 pt-2">
@@ -2240,63 +2275,128 @@ const IntelligenceCenterView = () => {
                             );
                           })()}
 
-                        {/* Skill Coverage details */}
-                        <div className="rounded-xl border border-white/5 bg-slate-950 p-4 flex-1 flex flex-col justify-between">
-                          <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500 mb-2">
-                            Total Skill coverage
-                          </div>
-                          <div className="text-3xl font-extrabold text-indigo-400 mb-2">
-                            {optimizedTeam.metrics.coverage_percentage}%
-                          </div>
-                          <div className="space-y-1">
-                            {optimizedTeam.metrics.skills_coverage.map(
-                              (detail, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex justify-between text-[9px] border-b border-white/5 pb-1"
-                                >
-                                  <span className="text-slate-400">
-                                    {detail.skill}
-                                  </span>
-                                  <span className="text-slate-200">
-                                    Bridge Match:{" "}
-                                    <strong className="text-cyan-400">
-                                      {detail.contributed_by_skill || "None"}
-                                    </strong>
-                                  </span>
+                          {/* Assembled Team Roster & Skill Coverage Grid */}
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                            {/* Assembled Team Roster */}
+                            <div className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between">
+                              <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
+                                <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                                  Assembled Team Roster (
+                                  {(optimizedTeam.optimized_team || []).length}{" "}
+                                  members)
                                 </div>
-                              ),
-                            )}
+                                <div className="text-[10px] font-mono text-cyan-300 font-bold">
+                                  Total: $
+                                  {(
+                                    (optimizedTeam.metrics?.total_cost || 0) /
+                                    1000
+                                  ).toFixed(0)}
+                                  k
+                                </div>
+                              </div>
+                              <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                                {(optimizedTeam.optimized_team || []).map(
+                                  (emp, idx) => (
+                                    <div
+                                      key={emp.id || idx}
+                                      className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-2.5 hover:border-indigo-400/30 transition-colors"
+                                    >
+                                      <div className="min-w-0 flex-1 mr-2">
+                                        <div className="text-xs font-bold text-white truncate">
+                                          {emp.full_name}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 truncate">
+                                          {emp.role} · {emp.department}
+                                        </div>
+                                      </div>
+                                      <div className="text-right shrink-0">
+                                        <div className="text-xs font-mono font-bold text-emerald-400">
+                                          $
+                                          {(
+                                            (emp.estimated_cost || 0) / 1000
+                                          ).toFixed(0)}
+                                          k
+                                        </div>
+                                        <div className="text-[8px] uppercase tracking-wider text-slate-500">
+                                          {emp.salary_source ===
+                                          "employee_record"
+                                            ? "Recorded"
+                                            : "Estimated"}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Skill Coverage details */}
+                            <div className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between">
+                              <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
+                                <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                                  Total Skill Coverage
+                                </div>
+                                <div className="text-xl font-extrabold text-indigo-400">
+                                  {optimizedTeam.metrics.coverage_percentage}%
+                                </div>
+                              </div>
+                              <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+                                {(
+                                  optimizedTeam.metrics.skills_coverage || []
+                                ).map((detail, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="flex justify-between items-center text-[10px] border-b border-white/5 py-1.5"
+                                  >
+                                    <span className="text-slate-300 font-medium">
+                                      {detail.skill}{" "}
+                                      <span className="text-[9px] text-slate-500 font-mono">
+                                        (L{detail.target_level})
+                                      </span>
+                                    </span>
+                                    <span className="text-slate-200">
+                                      Bridge:{" "}
+                                      <strong className="text-cyan-400 font-semibold">
+                                        {detail.contributed_by_skill || "None"}
+                                      </strong>
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                  {annealingStatus === "idle" && (
-                    <div className="py-12 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-4 text-xs text-slate-400 leading-relaxed">
-                      Configure target skills, budget constraint, and click <span className="font-semibold text-cyan-300">Find Mathematically Perfect Team</span> to execute Simulated Annealing optimization.
+                      {annealingStatus === "idle" && (
+                        <div className="py-12 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-4 text-xs text-slate-400 leading-relaxed">
+                          Configure target skills, budget constraint, and click{" "}
+                          <span className="font-semibold text-cyan-300">
+                            Find Mathematically Perfect Team
+                          </span>{" "}
+                          to execute Simulated Annealing optimization.
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-}
-          />
-          <AIExplanationPanel
-            subtab="team-builder"
-            context={{
-              targetSkills: teamSkillsInput,
-              budget: teamBudget,
-              teamSize: teamSize,
-              optimizedTeam: optimizedTeam,
-            }}
-            buttonText="Explain with AI"
-            autoRefresh={true}
-            disabled={!optimizedTeam}
-          />
-          </motion.div>
-        )}
+                  </div>
+                }
+              />
+              <AIExplanationPanel
+                subtab="team-builder"
+                context={{
+                  targetSkills: teamSkillsInput,
+                  budget: teamBudget,
+                  teamSize: teamSize,
+                  optimizedTeam: optimizedTeam,
+                }}
+                buttonText="Explain with AI"
+                autoRefresh={true}
+                disabled={!optimizedTeam}
+              />
+            </motion.div>
+          )}
 
-        {/* TAB 3: ATTRITION SURVIVAL PREDICTOR */}
+          {/* TAB 3: ATTRITION SURVIVAL PREDICTOR */}
           {activeSubTab === "attrition" && (
             <motion.div
               key="attrition"
@@ -2327,7 +2427,10 @@ const IntelligenceCenterView = () => {
                     {/* Search + sort controls */}
                     <div className="shrink-0 space-y-2 mb-3">
                       <div className="relative">
-                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        <Search
+                          size={12}
+                          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
+                        />
                         <input
                           type="text"
                           value={attritionSearch}
@@ -2361,7 +2464,8 @@ const IntelligenceCenterView = () => {
                             }`}
                           >
                             {opt.label}
-                            {attritionSort === opt.key && (attritionSortDesc ? " ↓" : " ↑")}
+                            {attritionSort === opt.key &&
+                              (attritionSortDesc ? " ↓" : " ↑")}
                           </button>
                         ))}
                       </div>
@@ -2378,7 +2482,9 @@ const IntelligenceCenterView = () => {
                         </div>
                       ) : (
                         visibleAttrition.map((emp) => {
-                          const isSel = emp.employee_id === selectedAttritionEmp?.employee_id;
+                          const isSel =
+                            emp.employee_id ===
+                            selectedAttritionEmp?.employee_id;
                           return (
                             <button
                               key={emp.employee_id}
@@ -2397,7 +2503,8 @@ const IntelligenceCenterView = () => {
                                     {emp.role} · {emp.department}
                                   </div>
                                   <div className="text-[9px] text-slate-500 mt-1 font-mono">
-                                    {emp.tenure_months} mo tenure · {emp.skills_count ?? 0} skills
+                                    {emp.tenure_months} mo tenure ·{" "}
+                                    {emp.skills_count ?? 0} skills
                                   </div>
                                 </div>
                                 <div className="text-right shrink-0 flex flex-col items-end gap-1">
@@ -2436,21 +2543,30 @@ const IntelligenceCenterView = () => {
                               Survival Hazard Breakdown & Simulation Sandbox
                             </div>
                             <div className="mt-1 text-[9px] uppercase tracking-wider text-amber-300 truncate">
-                              Cox Proportional Hazards · {selectedAttritionEmp.model_version || "cox-ph-industry-v2"} · calibrated to industry tenure-attrition benchmarks
+                              Cox Proportional Hazards ·{" "}
+                              {selectedAttritionEmp.model_version ||
+                                "cox-ph-industry-v2"}{" "}
+                              · calibrated to industry tenure-attrition
+                              benchmarks
                             </div>
                             <h3 className="text-xl font-extrabold text-white mt-1 truncate">
                               {selectedAttritionEmp.full_name}
                             </h3>
                             <div className="text-[10px] text-slate-400 mt-0.5 truncate">
-                              {selectedAttritionEmp.role} · {selectedAttritionEmp.department}
+                              {selectedAttritionEmp.role} ·{" "}
+                              {selectedAttritionEmp.department}
                             </div>
                           </div>
                           <div className="shrink-0 flex flex-col items-end gap-1.5">
                             <span
                               className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider"
                               style={{
-                                color: tierColor(selectedAttritionEmp.risk_tier),
-                                background: tierBg(selectedAttritionEmp.risk_tier),
+                                color: tierColor(
+                                  selectedAttritionEmp.risk_tier,
+                                ),
+                                background: tierBg(
+                                  selectedAttritionEmp.risk_tier,
+                                ),
                                 border: `1px solid ${tierColor(selectedAttritionEmp.risk_tier)}44`,
                               }}
                             >
@@ -2471,14 +2587,20 @@ const IntelligenceCenterView = () => {
                               sub: `of ${populationStats?.count ?? 0} profiles`,
                               color: tierColor(selectedAttritionEmp.risk_tier),
                               bar: selectedAttritionEmp.risk_percentile / 100,
-                              barColor: tierColor(selectedAttritionEmp.risk_tier),
+                              barColor: tierColor(
+                                selectedAttritionEmp.risk_tier,
+                              ),
                             },
                             {
                               label: "Hazard Ratio",
                               value: `x${attritionSim?.hazardRatio.toFixed(2) ?? selectedAttritionEmp.hazard_ratio}`,
                               sub: "vs population avg 1.00",
                               color: "#fb7185",
-                              bar: Math.min(1, (attritionSim?.hazardRatio ?? selectedAttritionEmp.hazard_ratio) / 6),
+                              bar: Math.min(
+                                1,
+                                (attritionSim?.hazardRatio ??
+                                  selectedAttritionEmp.hazard_ratio) / 6,
+                              ),
                               barColor: "#f43f5e",
                             },
                             {
@@ -2486,19 +2608,23 @@ const IntelligenceCenterView = () => {
                               value: `${((attritionSim?.attr12 ?? selectedAttritionEmp.attr_12) * 100).toFixed(1)}%`,
                               sub: "P(T quit ≤ 12 mo)",
                               color: "#fbbf24",
-                              bar: attritionSim?.attr12 ?? selectedAttritionEmp.attr_12,
+                              bar:
+                                attritionSim?.attr12 ??
+                                selectedAttritionEmp.attr_12,
                               barColor: "#fbbf24",
                             },
                             {
                               label: "Median Residual Tenure",
-                              value: attritionSim?.medianResidualTenure != null
-                                ? `${attritionSim.medianResidualTenure.toFixed(1)} mo`
-                                : "> 12 mo",
+                              value:
+                                attritionSim?.medianResidualTenure != null
+                                  ? `${attritionSim.medianResidualTenure.toFixed(1)} mo`
+                                  : "> 12 mo",
                               sub: "S(t) crosses 50%",
                               color: "#34d399",
-                              bar: attritionSim?.medianResidualTenure != null
-                                ? 1 - attritionSim.medianResidualTenure / 18
-                                : 0.08,
+                              bar:
+                                attritionSim?.medianResidualTenure != null
+                                  ? 1 - attritionSim.medianResidualTenure / 18
+                                  : 0.08,
                               barColor: "#34d399",
                             },
                             {
@@ -2506,22 +2632,38 @@ const IntelligenceCenterView = () => {
                               value: `${((attritionSim?.currentHazard ?? selectedAttritionEmp.monthly_attrition_hazard) * 100).toFixed(2)}%`,
                               sub: "h(t) this month",
                               color: "#2dd4bf",
-                              bar: Math.min(1, (attritionSim?.currentHazard ?? selectedAttritionEmp.monthly_attrition_hazard) / 0.05),
+                              bar: Math.min(
+                                1,
+                                (attritionSim?.currentHazard ??
+                                  selectedAttritionEmp.monthly_attrition_hazard) /
+                                  0.05,
+                              ),
                               barColor: "#2dd4bf",
                             },
                           ].map((card) => (
-                            <div key={card.label} className="rounded-xl border border-white/5 bg-slate-950/70 p-3">
+                            <div
+                              key={card.label}
+                              className="rounded-xl border border-white/5 bg-slate-950/70 p-3"
+                            >
                               <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">
                                 {card.label}
                               </div>
-                              <div className="text-lg font-black font-mono mt-0.5" style={{ color: card.color }}>
+                              <div
+                                className="text-lg font-black font-mono mt-0.5"
+                                style={{ color: card.color }}
+                              >
                                 {card.value}
                               </div>
-                              <div className="text-[8px] text-slate-500 mt-1">{card.sub}</div>
+                              <div className="text-[8px] text-slate-500 mt-1">
+                                {card.sub}
+                              </div>
                               <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden mt-1.5">
                                 <div
                                   className="h-full rounded-full transition-all duration-300"
-                                  style={{ width: `${Math.max(2, Math.min(100, card.bar * 100))}%`, background: card.barColor }}
+                                  style={{
+                                    width: `${Math.max(2, Math.min(100, card.bar * 100))}%`,
+                                    background: card.barColor,
+                                  }}
                                 />
                               </div>
                             </div>
@@ -2538,18 +2680,32 @@ const IntelligenceCenterView = () => {
                                 </div>
                                 <span className="text-xs font-bold text-indigo-400">
                                   End Projection Survival:{" "}
-                                  {attritionSim ? (attritionSim.forecast[11].survival_probability * 100).toFixed(1) : "—"}%
+                                  {attritionSim
+                                    ? (
+                                        attritionSim.forecast[11]
+                                          .survival_probability * 100
+                                      ).toFixed(1)
+                                    : "—"}
+                                  %
                                 </span>
                               </div>
 
                               {/* Chart legend */}
                               <div className="flex flex-wrap items-center gap-3 mb-2 text-[8px] uppercase tracking-wider text-slate-400">
                                 <span className="flex items-center gap-1.5">
-                                  <span className="w-4 h-[3px] rounded-full" style={{ background: "#818cf8" }} />
+                                  <span
+                                    className="w-4 h-[3px] rounded-full"
+                                    style={{ background: "#818cf8" }}
+                                  />
                                   Employee S(t)
                                 </span>
                                 <span className="flex items-center gap-1.5">
-                                  <span className="w-4 h-[3px] rounded-full" style={{ background: "rgba(129,140,248,0.25)" }} />
+                                  <span
+                                    className="w-4 h-[3px] rounded-full"
+                                    style={{
+                                      background: "rgba(129,140,248,0.25)",
+                                    }}
+                                  />
                                   95% Model Band
                                 </span>
                                 <span className="flex items-center gap-1.5">
@@ -2557,7 +2713,10 @@ const IntelligenceCenterView = () => {
                                   Population Median
                                 </span>
                                 <span className="flex items-center gap-1.5">
-                                  <span className="w-4 h-[3px] rounded-full" style={{ background: "rgba(51,65,85,0.8)" }} />
+                                  <span
+                                    className="w-4 h-[3px] rounded-full"
+                                    style={{ background: "rgba(51,65,85,0.8)" }}
+                                  />
                                   Population P10–P90
                                 </span>
                               </div>
@@ -2566,8 +2725,13 @@ const IntelligenceCenterView = () => {
                               <div className="relative h-64 w-full rounded-xl border border-white/10 bg-slate-950/80 p-3 shadow-inner flex flex-col justify-between overflow-hidden">
                                 {/* Left Y-Axis Percentage Labels */}
                                 <div className="absolute left-2 top-3 bottom-8 flex flex-col justify-between text-[9px] font-mono text-slate-400 z-10 pointer-events-none">
-                                  {[100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0].map((v) => (
-                                    <span key={v} className="bg-slate-900/80 px-1 rounded border border-white/5">
+                                  {[
+                                    100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0,
+                                  ].map((v) => (
+                                    <span
+                                      key={v}
+                                      className="bg-slate-900/80 px-1 rounded border border-white/5"
+                                    >
                                       {v}%
                                     </span>
                                   ))}
@@ -2581,22 +2745,45 @@ const IntelligenceCenterView = () => {
                                     preserveAspectRatio="none"
                                   >
                                     <defs>
-                                      <linearGradient id="survGradHigh" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#818cf8" stopOpacity="0.45" />
-                                        <stop offset="100%" stopColor="#818cf8" stopOpacity="0.0" />
+                                      <linearGradient
+                                        id="survGradHigh"
+                                        x1="0"
+                                        y1="0"
+                                        x2="0"
+                                        y2="1"
+                                      >
+                                        <stop
+                                          offset="0%"
+                                          stopColor="#818cf8"
+                                          stopOpacity="0.45"
+                                        />
+                                        <stop
+                                          offset="100%"
+                                          stopColor="#818cf8"
+                                          stopOpacity="0.0"
+                                        />
                                       </linearGradient>
                                     </defs>
 
                                     {/* Y-Axis Grid lines every 10% */}
-                                    {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((v) => (
+                                    {[
+                                      0, 10, 20, 30, 40, 50, 60, 70, 80, 90,
+                                      100,
+                                    ].map((v) => (
                                       <line
                                         key={v}
                                         x1="0"
                                         y1={v}
                                         x2="100"
                                         y2={v}
-                                        stroke={v === 50 ? "rgba(244,63,94,0.35)" : "rgba(255,255,255,0.07)"}
-                                        strokeDasharray={v === 50 ? "4 4" : "3 3"}
+                                        stroke={
+                                          v === 50
+                                            ? "rgba(244,63,94,0.35)"
+                                            : "rgba(255,255,255,0.07)"
+                                        }
+                                        strokeDasharray={
+                                          v === 50 ? "4 4" : "3 3"
+                                        }
                                         vectorEffect="non-scaling-stroke"
                                       />
                                     ))}
@@ -2610,7 +2797,12 @@ const IntelligenceCenterView = () => {
                                             stroke="none"
                                             d={
                                               `M 0,${100 - populationStats.p90[0] * 100} ` +
-                                              populationStats.p90.map((v, i) => `L ${(i / 11) * 100},${100 - v * 100}`).join(" ") +
+                                              populationStats.p90
+                                                .map(
+                                                  (v, i) =>
+                                                    `L ${(i / 11) * 100},${100 - v * 100}`,
+                                                )
+                                                .join(" ") +
                                               " " +
                                               populationStats.p10
                                                 .slice()
@@ -2635,7 +2827,10 @@ const IntelligenceCenterView = () => {
                                             strokeLinecap="round"
                                             vectorEffect="non-scaling-stroke"
                                             points={populationStats.p50
-                                              .map((v, i) => `${(i / 11) * 100},${100 - v * 100}`)
+                                              .map(
+                                                (v, i) =>
+                                                  `${(i / 11) * 100},${100 - v * 100}`,
+                                              )
                                               .join(" ")}
                                           />
                                         )}
@@ -2647,7 +2842,10 @@ const IntelligenceCenterView = () => {
                                           d={
                                             `M 0,${100 - attritionSim.forecast[0].ci_high * 100} ` +
                                             attritionSim.forecast
-                                              .map((f, i) => `L ${(i / 11) * 100},${100 - f.ci_high * 100}`)
+                                              .map(
+                                                (f, i) =>
+                                                  `L ${(i / 11) * 100},${100 - f.ci_high * 100}`,
+                                              )
                                               .join(" ") +
                                             " " +
                                             attritionSim.forecast
@@ -2671,7 +2869,9 @@ const IntelligenceCenterView = () => {
                                             attritionSim.forecast
                                               .map((f, i) => {
                                                 const x = (i / 11) * 100;
-                                                const y = 100 - f.survival_probability * 100;
+                                                const y =
+                                                  100 -
+                                                  f.survival_probability * 100;
                                                 return `L ${x},${y}`;
                                               })
                                               .join(" ") +
@@ -2686,12 +2886,17 @@ const IntelligenceCenterView = () => {
                                           strokeWidth="2.5"
                                           strokeLinecap="round"
                                           strokeLinejoin="round"
-                                          style={{ filter: "drop-shadow(0 0 5px rgba(129,140,248,0.5))" }}
+                                          style={{
+                                            filter:
+                                              "drop-shadow(0 0 5px rgba(129,140,248,0.5))",
+                                          }}
                                           vectorEffect="non-scaling-stroke"
                                           points={attritionSim.forecast
                                             .map((f, i) => {
                                               const x = (i / 11) * 100;
-                                              const y = 100 - f.survival_probability * 100;
+                                              const y =
+                                                100 -
+                                                f.survival_probability * 100;
                                               return `${x},${y}`;
                                             })
                                             .join(" ")}
@@ -2700,22 +2905,61 @@ const IntelligenceCenterView = () => {
                                         {/* Median residual tenure marker (S(t) = 50%) */}
                                         {(() => {
                                           let cross = null;
-                                          for (let i = 0; i < attritionSim.forecast.length; i++) {
+                                          for (
+                                            let i = 0;
+                                            i < attritionSim.forecast.length;
+                                            i++
+                                          ) {
                                             const f = attritionSim.forecast[i];
                                             if (f.survival_probability <= 0.5) {
-                                              const prevS = i === 0 ? 1 : attritionSim.forecast[i - 1].survival_probability;
+                                              const prevS =
+                                                i === 0
+                                                  ? 1
+                                                  : attritionSim.forecast[i - 1]
+                                                      .survival_probability;
                                               if (prevS > 0.5) {
-                                                const frac = (prevS - 0.5) / (prevS - f.survival_probability);
-                                                cross = { x: ((i + frac) / 11) * 100, month: i + 1 };
+                                                const frac =
+                                                  (prevS - 0.5) /
+                                                  (prevS -
+                                                    f.survival_probability);
+                                                cross = {
+                                                  x: ((i + frac) / 11) * 100,
+                                                  month: i + 1,
+                                                };
                                               }
                                               break;
                                             }
                                           }
                                           return cross ? (
                                             <>
-                                              <line x1={cross.x} y1="0" x2={cross.x} y2="100" stroke="rgba(52,211,153,0.6)" strokeWidth="1.5" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-                                              <circle cx={cross.x} cy="50" r="1.6" fill="#34d399" style={{ filter: "drop-shadow(0 0 4px #34d399)" }} />
-                                              <circle cx={cross.x} cy="50" r="3.5" fill="none" stroke="#34d399" strokeOpacity="0.4" />
+                                              <line
+                                                x1={cross.x}
+                                                y1="0"
+                                                x2={cross.x}
+                                                y2="100"
+                                                stroke="rgba(52,211,153,0.6)"
+                                                strokeWidth="1.5"
+                                                strokeDasharray="3 3"
+                                                vectorEffect="non-scaling-stroke"
+                                              />
+                                              <circle
+                                                cx={cross.x}
+                                                cy="50"
+                                                r="1.6"
+                                                fill="#34d399"
+                                                style={{
+                                                  filter:
+                                                    "drop-shadow(0 0 4px #34d399)",
+                                                }}
+                                              />
+                                              <circle
+                                                cx={cross.x}
+                                                cy="50"
+                                                r="3.5"
+                                                fill="none"
+                                                stroke="#34d399"
+                                                strokeOpacity="0.4"
+                                              />
                                             </>
                                           ) : null;
                                         })()}
@@ -2745,11 +2989,17 @@ const IntelligenceCenterView = () => {
                                         return (
                                           <div
                                             key={i}
-                                            onMouseEnter={() => setHoveredSurvMonth(i)}
-                                            onMouseLeave={() => setHoveredSurvMonth(null)}
+                                            onMouseEnter={() =>
+                                              setHoveredSurvMonth(i)
+                                            }
+                                            onMouseLeave={() =>
+                                              setHoveredSurvMonth(null)
+                                            }
                                             className="h-full flex-1 cursor-pointer relative group flex justify-center items-center"
                                           >
-                                            <div className={`w-2 h-2 rounded-full transition-all ${hoveredSurvMonth === i ? "bg-white scale-150 shadow-[0_0_10px_#2dd4bf]" : S_t < 0.5 ? "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.6)]" : "bg-indigo-400/80 group-hover:scale-125"}`} />
+                                            <div
+                                              className={`w-2 h-2 rounded-full transition-all ${hoveredSurvMonth === i ? "bg-white scale-150 shadow-[0_0_10px_#2dd4bf]" : S_t < 0.5 ? "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.6)]" : "bg-indigo-400/80 group-hover:scale-125"}`}
+                                            />
                                           </div>
                                         );
                                       })}
@@ -2760,87 +3010,167 @@ const IntelligenceCenterView = () => {
                                 <div className="pl-20 pr-4 flex justify-between items-center text-[9px] font-mono text-slate-400 border-t border-white/5 pt-1">
                                   {attritionSim &&
                                     attritionSim.forecast.map((f, i) => (
-                                      <span key={i} className={`px-0.5 transition-all ${hoveredSurvMonth === i ? "text-cyan-300 font-bold scale-110" : ""}`}>
+                                      <span
+                                        key={i}
+                                        className={`px-0.5 transition-all ${hoveredSurvMonth === i ? "text-cyan-300 font-bold scale-110" : ""}`}
+                                      >
                                         M{i + 1}
                                       </span>
                                     ))}
                                 </div>
 
                                 {/* Hover Data Tooltip Glass Card */}
-                                {hoveredSurvMonth !== null && attritionSim && attritionSim.forecast[hoveredSurvMonth] && (
-                                  <div className="absolute top-3 right-3 z-20 rounded-xl border border-indigo-400/30 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-md text-[10px] space-y-1 w-56">
-                                    <div className="font-bold text-indigo-300 flex items-center justify-between gap-3">
-                                      <span>Projection Month {attritionSim.forecast[hoveredSurvMonth].month}</span>
-                                      <span
-                                        className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
-                                          attritionSim.forecast[hoveredSurvMonth].survival_probability > 0.75
-                                            ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
-                                            : attritionSim.forecast[hoveredSurvMonth].survival_probability > 0.5
-                                              ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
-                                              : "bg-rose-500/10 text-rose-300 border border-rose-500/20"
-                                        }`}
-                                      >
-                                        {attritionSim.forecast[hoveredSurvMonth].survival_probability > 0.75
-                                          ? "Low Hazard"
-                                          : attritionSim.forecast[hoveredSurvMonth].survival_probability > 0.5
-                                            ? "Elevated Risk"
-                                            : "Critical Flight Danger"}
-                                      </span>
+                                {hoveredSurvMonth !== null &&
+                                  attritionSim &&
+                                  attritionSim.forecast[hoveredSurvMonth] && (
+                                    <div className="absolute top-3 right-3 z-20 rounded-xl border border-indigo-400/30 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-md text-[10px] space-y-1 w-56">
+                                      <div className="font-bold text-indigo-300 flex items-center justify-between gap-3">
+                                        <span>
+                                          Projection Month{" "}
+                                          {
+                                            attritionSim.forecast[
+                                              hoveredSurvMonth
+                                            ].month
+                                          }
+                                        </span>
+                                        <span
+                                          className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                                            attritionSim.forecast[
+                                              hoveredSurvMonth
+                                            ].survival_probability > 0.75
+                                              ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
+                                              : attritionSim.forecast[
+                                                    hoveredSurvMonth
+                                                  ].survival_probability > 0.5
+                                                ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
+                                                : "bg-rose-500/10 text-rose-300 border border-rose-500/20"
+                                          }`}
+                                        >
+                                          {attritionSim.forecast[
+                                            hoveredSurvMonth
+                                          ].survival_probability > 0.75
+                                            ? "Low Hazard"
+                                            : attritionSim.forecast[
+                                                  hoveredSurvMonth
+                                                ].survival_probability > 0.5
+                                              ? "Elevated Risk"
+                                              : "Critical Flight Danger"}
+                                        </span>
+                                      </div>
+                                      <div className="text-slate-300 flex justify-between">
+                                        <span>Survival S(t)</span>
+                                        <strong className="text-white font-mono">
+                                          {(
+                                            attritionSim.forecast[
+                                              hoveredSurvMonth
+                                            ].survival_probability * 100
+                                          ).toFixed(1)}
+                                          %
+                                        </strong>
+                                      </div>
+                                      <div className="text-slate-400 flex justify-between">
+                                        <span>95% CI</span>
+                                        <strong className="text-indigo-300 font-mono">
+                                          {(
+                                            attritionSim.forecast[
+                                              hoveredSurvMonth
+                                            ].ci_low * 100
+                                          ).toFixed(1)}
+                                          –
+                                          {(
+                                            attritionSim.forecast[
+                                              hoveredSurvMonth
+                                            ].ci_high * 100
+                                          ).toFixed(1)}
+                                          %
+                                        </strong>
+                                      </div>
+                                      <div className="text-slate-300 flex justify-between">
+                                        <span>Attrition Probability</span>
+                                        <strong className="text-rose-300 font-mono">
+                                          {(
+                                            attritionSim.forecast[
+                                              hoveredSurvMonth
+                                            ].attrition_probability * 100
+                                          ).toFixed(1)}
+                                          %
+                                        </strong>
+                                      </div>
+                                      <div className="text-slate-300 flex justify-between">
+                                        <span>Monthly Hazard h(t)</span>
+                                        <strong className="text-cyan-300 font-mono">
+                                          {(
+                                            attritionSim.forecast[
+                                              hoveredSurvMonth
+                                            ].hazard * 100
+                                          ).toFixed(2)}
+                                          %
+                                        </strong>
+                                      </div>
+                                      <div className="text-slate-300 flex justify-between">
+                                        <span>Cumulative Hazard H(t)</span>
+                                        <strong className="text-amber-300 font-mono">
+                                          {attritionSim.forecast[
+                                            hoveredSurvMonth
+                                          ].cumulative_hazard.toFixed(3)}
+                                        </strong>
+                                      </div>
+                                      <div className="text-slate-300 flex justify-between">
+                                        <span>Cumulative Tenure</span>
+                                        <strong className="text-indigo-300 font-mono">
+                                          {
+                                            attritionSim.forecast[
+                                              hoveredSurvMonth
+                                            ].projected_tenure
+                                          }{" "}
+                                          Mo
+                                        </strong>
+                                      </div>
+                                      <div className="text-slate-300 flex justify-between">
+                                        <span>Hazard Ratio</span>
+                                        <strong className="text-rose-300 font-mono">
+                                          x{attritionSim.hazardRatio.toFixed(2)}
+                                        </strong>
+                                      </div>
                                     </div>
-                                    <div className="text-slate-300 flex justify-between">
-                                      <span>Survival S(t)</span>
-                                      <strong className="text-white font-mono">{(attritionSim.forecast[hoveredSurvMonth].survival_probability * 100).toFixed(1)}%</strong>
-                                    </div>
-                                    <div className="text-slate-400 flex justify-between">
-                                      <span>95% CI</span>
-                                      <strong className="text-indigo-300 font-mono">
-                                        {(attritionSim.forecast[hoveredSurvMonth].ci_low * 100).toFixed(1)}–{(attritionSim.forecast[hoveredSurvMonth].ci_high * 100).toFixed(1)}%
-                                      </strong>
-                                    </div>
-                                    <div className="text-slate-300 flex justify-between">
-                                      <span>Attrition Probability</span>
-                                      <strong className="text-rose-300 font-mono">{(attritionSim.forecast[hoveredSurvMonth].attrition_probability * 100).toFixed(1)}%</strong>
-                                    </div>
-                                    <div className="text-slate-300 flex justify-between">
-                                      <span>Monthly Hazard h(t)</span>
-                                      <strong className="text-cyan-300 font-mono">{(attritionSim.forecast[hoveredSurvMonth].hazard * 100).toFixed(2)}%</strong>
-                                    </div>
-                                    <div className="text-slate-300 flex justify-between">
-                                      <span>Cumulative Hazard H(t)</span>
-                                      <strong className="text-amber-300 font-mono">{attritionSim.forecast[hoveredSurvMonth].cumulative_hazard.toFixed(3)}</strong>
-                                    </div>
-                                    <div className="text-slate-300 flex justify-between">
-                                      <span>Cumulative Tenure</span>
-                                      <strong className="text-indigo-300 font-mono">{attritionSim.forecast[hoveredSurvMonth].projected_tenure} Mo</strong>
-                                    </div>
-                                    <div className="text-slate-300 flex justify-between">
-                                      <span>Hazard Ratio</span>
-                                      <strong className="text-rose-300 font-mono">x{attritionSim.hazardRatio.toFixed(2)}</strong>
-                                    </div>
-                                  </div>
-                                )}
+                                  )}
                               </div>
 
                               {/* Permanent Month Milestone Summary Grid (Visible without hovering!) */}
                               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
                                 {attritionSim &&
-                                  attritionSim.forecast.filter((_, idx) => idx % 2 === 1 || idx === 0 || idx === 11).map((f) => {
-                                    const mIdx = f.month - 1;
-                                    const S_t = f.survival_probability;
-                                    return (
-                                      <div
-                                        key={f.month}
-                                        onMouseEnter={() => setHoveredSurvMonth(mIdx)}
-                                        onMouseLeave={() => setHoveredSurvMonth(null)}
-                                        className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${hoveredSurvMonth === mIdx ? "border-cyan-400 bg-cyan-500/10 shadow-[0_0_12px_rgba(56,189,248,0.25)]" : "border-white/5 bg-slate-950/60 hover:border-white/10"}`}
-                                      >
-                                        <div className="text-[9px] uppercase font-bold text-slate-400">Month {f.month}</div>
-                                        <div className={`text-xs font-black mt-0.5 ${S_t > 0.75 ? "text-emerald-400" : S_t > 0.5 ? "text-amber-400" : "text-rose-400"}`}>
-                                          {(S_t * 100).toFixed(1)}%
+                                  attritionSim.forecast
+                                    .filter(
+                                      (_, idx) =>
+                                        idx % 2 === 1 ||
+                                        idx === 0 ||
+                                        idx === 11,
+                                    )
+                                    .map((f) => {
+                                      const mIdx = f.month - 1;
+                                      const S_t = f.survival_probability;
+                                      return (
+                                        <div
+                                          key={f.month}
+                                          onMouseEnter={() =>
+                                            setHoveredSurvMonth(mIdx)
+                                          }
+                                          onMouseLeave={() =>
+                                            setHoveredSurvMonth(null)
+                                          }
+                                          className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${hoveredSurvMonth === mIdx ? "border-cyan-400 bg-cyan-500/10 shadow-[0_0_12px_rgba(56,189,248,0.25)]" : "border-white/5 bg-slate-950/60 hover:border-white/10"}`}
+                                        >
+                                          <div className="text-[9px] uppercase font-bold text-slate-400">
+                                            Month {f.month}
+                                          </div>
+                                          <div
+                                            className={`text-xs font-black mt-0.5 ${S_t > 0.75 ? "text-emerald-400" : S_t > 0.5 ? "text-amber-400" : "text-rose-400"}`}
+                                          >
+                                            {(S_t * 100).toFixed(1)}%
+                                          </div>
                                         </div>
-                                      </div>
-                                    );
-                                  })}
+                                      );
+                                    })}
                               </div>
                             </div>
 
@@ -2851,7 +3181,16 @@ const IntelligenceCenterView = () => {
                                   Monthly Hazard Function h(t)
                                 </div>
                                 <span className="text-[9px] font-mono text-cyan-300">
-                                  h(t) = h₀(t) · sen. · dept. · HR &nbsp;·&nbsp; peak {(attritionSim ? Math.max(...attritionSim.forecast.map((f) => f.hazard)) : 0).toFixed(3)}
+                                  h(t) = h₀(t) · sen. · dept. · HR &nbsp;·&nbsp;
+                                  peak{" "}
+                                  {(attritionSim
+                                    ? Math.max(
+                                        ...attritionSim.forecast.map(
+                                          (f) => f.hazard,
+                                        ),
+                                      )
+                                    : 0
+                                  ).toFixed(3)}
                                 </span>
                               </div>
 
@@ -2865,37 +3204,73 @@ const IntelligenceCenterView = () => {
                                 </div>
 
                                 <div className="relative flex-1 w-full pl-20 pr-4 pt-2 pb-2">
-                                  <svg className="h-full w-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                  <svg
+                                    className="h-full w-full overflow-visible"
+                                    viewBox="0 0 100 100"
+                                    preserveAspectRatio="none"
+                                  >
                                     {[0, 25, 50, 75, 100].map((v) => (
-                                      <line key={v} x1="0" y1={v} x2="100" y2={v} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                      <line
+                                        key={v}
+                                        x1="0"
+                                        y1={v}
+                                        x2="100"
+                                        y2={v}
+                                        stroke="rgba(255,255,255,0.06)"
+                                        strokeDasharray="3 3"
+                                        vectorEffect="non-scaling-stroke"
+                                      />
                                     ))}
                                     {attritionSim && (
                                       <>
                                         {(() => {
-                                          const maxH = Math.max(...attritionSim.forecast.map((f) => f.hazard)) || 0.01;
-                                          const barW = 100 / attritionSim.forecast.length;
-                                          const pts = attritionSim.forecast.map((f, i) => {
-                                            const x = (i / 11) * 100;
-                                            const y = 100 - (f.hazard / maxH) * 100;
-                                            return { x, y };
-                                          });
+                                          const maxH =
+                                            Math.max(
+                                              ...attritionSim.forecast.map(
+                                                (f) => f.hazard,
+                                              ),
+                                            ) || 0.01;
+                                          const barW =
+                                            100 / attritionSim.forecast.length;
+                                          const pts = attritionSim.forecast.map(
+                                            (f, i) => {
+                                              const x = (i / 11) * 100;
+                                              const y =
+                                                100 - (f.hazard / maxH) * 100;
+                                              return { x, y };
+                                            },
+                                          );
                                           return (
                                             <>
-                                              {attritionSim.forecast.map((f, i) => {
-                                                const y = 100 - (f.hazard / maxH) * 100;
-                                                const cx = (i / 11) * 100;
-                                                return (
-                                                  <rect
-                                                    key={i}
-                                                    x={cx - barW / 2 + 1}
-                                                    y={y}
-                                                    width={barW - 2}
-                                                    height={100 - y}
-                                                    rx="1"
-                                                    fill={hoveredHazMonth === i ? "rgba(45,212,191,0.85)" : f.hazard / maxH > 0.7 ? "rgba(244,63,94,0.65)" : f.hazard / maxH > 0.4 ? "rgba(251,191,36,0.55)" : "rgba(129,140,248,0.45)"}
-                                                  />
-                                                );
-                                              })}
+                                              {attritionSim.forecast.map(
+                                                (f, i) => {
+                                                  const y =
+                                                    100 -
+                                                    (f.hazard / maxH) * 100;
+                                                  const cx = (i / 11) * 100;
+                                                  return (
+                                                    <rect
+                                                      key={i}
+                                                      x={cx - barW / 2 + 1}
+                                                      y={y}
+                                                      width={barW - 2}
+                                                      height={100 - y}
+                                                      rx="1"
+                                                      fill={
+                                                        hoveredHazMonth === i
+                                                          ? "rgba(45,212,191,0.85)"
+                                                          : f.hazard / maxH >
+                                                              0.7
+                                                            ? "rgba(244,63,94,0.65)"
+                                                            : f.hazard / maxH >
+                                                                0.4
+                                                              ? "rgba(251,191,36,0.55)"
+                                                              : "rgba(129,140,248,0.45)"
+                                                      }
+                                                    />
+                                                  );
+                                                },
+                                              )}
                                               <polyline
                                                 fill="none"
                                                 stroke="#2dd4bf"
@@ -2903,10 +3278,24 @@ const IntelligenceCenterView = () => {
                                                 strokeLinecap="round"
                                                 strokeLinejoin="round"
                                                 vectorEffect="non-scaling-stroke"
-                                                points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
+                                                points={pts
+                                                  .map((p) => `${p.x},${p.y}`)
+                                                  .join(" ")}
                                               />
                                               {hoveredHazMonth !== null && (
-                                                <line x1={(hoveredHazMonth / 11) * 100} y1="0" x2={(hoveredHazMonth / 11) * 100} y2="100" stroke="rgba(45,212,191,0.5)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                                                <line
+                                                  x1={
+                                                    (hoveredHazMonth / 11) * 100
+                                                  }
+                                                  y1="0"
+                                                  x2={
+                                                    (hoveredHazMonth / 11) * 100
+                                                  }
+                                                  y2="100"
+                                                  stroke="rgba(45,212,191,0.5)"
+                                                  strokeDasharray="3 3"
+                                                  vectorEffect="non-scaling-stroke"
+                                                />
                                               )}
                                             </>
                                           );
@@ -2921,8 +3310,12 @@ const IntelligenceCenterView = () => {
                                       attritionSim.forecast.map((f, i) => (
                                         <div
                                           key={i}
-                                          onMouseEnter={() => setHoveredHazMonth(i)}
-                                          onMouseLeave={() => setHoveredHazMonth(null)}
+                                          onMouseEnter={() =>
+                                            setHoveredHazMonth(i)
+                                          }
+                                          onMouseLeave={() =>
+                                            setHoveredHazMonth(null)
+                                          }
                                           className="h-full flex-1 cursor-pointer"
                                         />
                                       ))}
@@ -2932,7 +3325,10 @@ const IntelligenceCenterView = () => {
                                 <div className="pl-20 pr-4 flex justify-between items-center text-[9px] font-mono text-slate-400 border-t border-white/5 pt-1">
                                   {attritionSim &&
                                     attritionSim.forecast.map((f, i) => (
-                                      <span key={i} className={`px-0.5 ${hoveredHazMonth === i ? "text-cyan-300 font-bold" : ""}`}>
+                                      <span
+                                        key={i}
+                                        className={`px-0.5 ${hoveredHazMonth === i ? "text-cyan-300 font-bold" : ""}`}
+                                      >
                                         M{i + 1}
                                       </span>
                                     ))}
@@ -2941,19 +3337,45 @@ const IntelligenceCenterView = () => {
                                 {hoveredHazMonth !== null && attritionSim && (
                                   <div className="absolute top-3 right-3 z-20 rounded-xl border border-cyan-400/30 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-md text-[10px] space-y-1 w-52">
                                     <div className="font-bold text-cyan-300">
-                                      Month {attritionSim.forecast[hoveredHazMonth].month} · Tenure {attritionSim.forecast[hoveredHazMonth].projected_tenure} Mo
+                                      Month{" "}
+                                      {
+                                        attritionSim.forecast[hoveredHazMonth]
+                                          .month
+                                      }{" "}
+                                      · Tenure{" "}
+                                      {
+                                        attritionSim.forecast[hoveredHazMonth]
+                                          .projected_tenure
+                                      }{" "}
+                                      Mo
                                     </div>
                                     <div className="text-slate-300 flex justify-between">
                                       <span>Monthly hazard</span>
-                                      <strong className="text-white font-mono">{(attritionSim.forecast[hoveredHazMonth].hazard * 100).toFixed(3)}%</strong>
+                                      <strong className="text-white font-mono">
+                                        {(
+                                          attritionSim.forecast[hoveredHazMonth]
+                                            .hazard * 100
+                                        ).toFixed(3)}
+                                        %
+                                      </strong>
                                     </div>
                                     <div className="text-slate-300 flex justify-between">
                                       <span>Cumulative H(t)</span>
-                                      <strong className="text-amber-300 font-mono">{attritionSim.forecast[hoveredHazMonth].cumulative_hazard.toFixed(3)}</strong>
+                                      <strong className="text-amber-300 font-mono">
+                                        {attritionSim.forecast[
+                                          hoveredHazMonth
+                                        ].cumulative_hazard.toFixed(3)}
+                                      </strong>
                                     </div>
                                     <div className="text-slate-300 flex justify-between">
                                       <span>Expected attrition</span>
-                                      <strong className="text-rose-300 font-mono">{(attritionSim.forecast[hoveredHazMonth].attrition_probability * 100).toFixed(1)}%</strong>
+                                      <strong className="text-rose-300 font-mono">
+                                        {(
+                                          attritionSim.forecast[hoveredHazMonth]
+                                            .attrition_probability * 100
+                                        ).toFixed(1)}
+                                        %
+                                      </strong>
                                     </div>
                                   </div>
                                 )}
@@ -2973,9 +3395,15 @@ const IntelligenceCenterView = () => {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setMoraleSlider(selectedAttritionEmp.levers.morale ?? 0.5);
+                                      setMoraleSlider(
+                                        selectedAttritionEmp.levers.morale ??
+                                          0.5,
+                                      );
                                       setSalarySlider(0.0);
-                                      setWorkloadSlider(selectedAttritionEmp.levers.skills_count ?? 0);
+                                      setWorkloadSlider(
+                                        selectedAttritionEmp.levers
+                                          .skills_count ?? 0,
+                                      );
                                     }}
                                     className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-slate-400 transition hover:border-cyan-300/40 hover:text-cyan-200 cursor-pointer"
                                   >
@@ -3004,9 +3432,22 @@ const IntelligenceCenterView = () => {
                                     className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                                   />
                                   <div className="mt-1 text-[8px] font-mono text-slate-500">
-                                    recorded: {(selectedAttritionEmp.levers.morale ?? 0.5) * 100}%
-                                    <span className={leverDeltas && leverDeltas.morale > 0.01 ? " text-emerald-400" : leverDeltas && leverDeltas.morale < -0.01 ? " text-rose-400" : ""}>
-                                      {leverDeltas && Math.abs(leverDeltas.morale) >= 0.01
+                                    recorded:{" "}
+                                    {(selectedAttritionEmp.levers.morale ??
+                                      0.5) * 100}
+                                    %
+                                    <span
+                                      className={
+                                        leverDeltas && leverDeltas.morale > 0.01
+                                          ? " text-emerald-400"
+                                          : leverDeltas &&
+                                              leverDeltas.morale < -0.01
+                                            ? " text-rose-400"
+                                            : ""
+                                      }
+                                    >
+                                      {leverDeltas &&
+                                      Math.abs(leverDeltas.morale) >= 0.01
                                         ? `  ${leverDeltas.morale > 0 ? "+" : ""}${(leverDeltas.morale * 100).toFixed(0)}pt`
                                         : " (unchanged)"}
                                     </span>
@@ -3032,8 +3473,9 @@ const IntelligenceCenterView = () => {
                                     className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                                   />
                                   <div className="mt-1 text-[8px] font-mono text-slate-500">
-                                    new base: {selectedAttritionEmp.levers.salary
-                                      ? `$${Math.round((selectedAttritionEmp.levers.salary * (1 + salarySlider))).toLocaleString()}`
+                                    new base:{" "}
+                                    {selectedAttritionEmp.levers.salary
+                                      ? `$${Math.round(selectedAttritionEmp.levers.salary * (1 + salarySlider)).toLocaleString()}`
                                       : "no salary record"}
                                   </div>
                                 </div>
@@ -3057,8 +3499,19 @@ const IntelligenceCenterView = () => {
                                     className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                                   />
                                   <div className="mt-1 text-[8px] font-mono text-slate-500">
-                                    recorded: {selectedAttritionEmp.levers.skills_count ?? 0}
-                                    <span className={leverDeltas && leverDeltas.skills > 0 ? " text-rose-400" : leverDeltas && leverDeltas.skills < 0 ? " text-emerald-400" : ""}>
+                                    recorded:{" "}
+                                    {selectedAttritionEmp.levers.skills_count ??
+                                      0}
+                                    <span
+                                      className={
+                                        leverDeltas && leverDeltas.skills > 0
+                                          ? " text-rose-400"
+                                          : leverDeltas &&
+                                              leverDeltas.skills < 0
+                                            ? " text-emerald-400"
+                                            : ""
+                                      }
+                                    >
                                       {leverDeltas && leverDeltas.skills !== 0
                                         ? `  ${leverDeltas.skills > 0 ? "+" : ""}${leverDeltas.skills}`
                                         : ""}
@@ -3071,25 +3524,41 @@ const IntelligenceCenterView = () => {
                               {leverDeltas && (
                                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 border-t border-white/5 pt-3">
                                   <div className="rounded-lg border border-white/10 bg-slate-950/70 px-2.5 py-2">
-                                    <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">12-Mo Attrition</div>
-                                    <div className={`text-sm font-black font-mono ${leverDeltas.attrDelta > 0.5 ? "text-rose-400" : leverDeltas.attrDelta < -0.5 ? "text-emerald-400" : "text-slate-300"}`}>
+                                    <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">
+                                      12-Mo Attrition
+                                    </div>
+                                    <div
+                                      className={`text-sm font-black font-mono ${leverDeltas.attrDelta > 0.5 ? "text-rose-400" : leverDeltas.attrDelta < -0.5 ? "text-emerald-400" : "text-slate-300"}`}
+                                    >
                                       {(attritionSim.attr12 * 100).toFixed(1)}%
                                       <span className="text-[9px] ml-1">
-                                        {leverDeltas.attrDelta > 0.5 ? `▲${leverDeltas.attrDelta.toFixed(1)}` : leverDeltas.attrDelta < -0.5 ? `▼${Math.abs(leverDeltas.attrDelta).toFixed(1)}` : ""}
+                                        {leverDeltas.attrDelta > 0.5
+                                          ? `▲${leverDeltas.attrDelta.toFixed(1)}`
+                                          : leverDeltas.attrDelta < -0.5
+                                            ? `▼${Math.abs(leverDeltas.attrDelta).toFixed(1)}`
+                                            : ""}
                                       </span>
                                     </div>
                                   </div>
                                   <div className="rounded-lg border border-white/10 bg-slate-950/70 px-2.5 py-2">
-                                    <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">Hazard Ratio Δ</div>
-                                    <div className={`text-sm font-black font-mono ${leverDeltas.hrDelta > 0.05 ? "text-rose-400" : leverDeltas.hrDelta < -0.05 ? "text-emerald-400" : "text-slate-300"}`}>
+                                    <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">
+                                      Hazard Ratio Δ
+                                    </div>
+                                    <div
+                                      className={`text-sm font-black font-mono ${leverDeltas.hrDelta > 0.05 ? "text-rose-400" : leverDeltas.hrDelta < -0.05 ? "text-emerald-400" : "text-slate-300"}`}
+                                    >
                                       x{attritionSim.hazardRatio.toFixed(2)}
                                       <span className="text-[9px] ml-1">
-                                        {Math.abs(leverDeltas.hrDelta) > 0.02 ? `${leverDeltas.hrDelta > 0 ? "+" : ""}${leverDeltas.hrDelta.toFixed(2)}` : ""}
+                                        {Math.abs(leverDeltas.hrDelta) > 0.02
+                                          ? `${leverDeltas.hrDelta > 0 ? "+" : ""}${leverDeltas.hrDelta.toFixed(2)}`
+                                          : ""}
                                       </span>
                                     </div>
                                   </div>
                                   <div className="rounded-lg border border-white/10 bg-slate-950/70 px-2.5 py-2">
-                                    <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">Median Tenure</div>
+                                    <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">
+                                      Median Tenure
+                                    </div>
                                     <div className="text-sm font-black font-mono text-indigo-300">
                                       {attritionSim.medianResidualTenure != null
                                         ? `${attritionSim.medianResidualTenure.toFixed(1)} mo`
@@ -3097,10 +3566,16 @@ const IntelligenceCenterView = () => {
                                     </div>
                                   </div>
                                   <div className="rounded-lg border border-white/10 bg-slate-950/70 px-2.5 py-2">
-                                    <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">Simulated Tier</div>
+                                    <div className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">
+                                      Simulated Tier
+                                    </div>
                                     <span
                                       className="inline-block mt-0.5 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider"
-                                      style={{ color: tierColor(riskTierSim), background: tierBg(riskTierSim), border: `1px solid ${tierColor(riskTierSim)}44` }}
+                                      style={{
+                                        color: tierColor(riskTierSim),
+                                        background: tierBg(riskTierSim),
+                                        border: `1px solid ${tierColor(riskTierSim)}44`,
+                                      }}
                                     >
                                       {riskTierSim}
                                     </span>
@@ -3118,41 +3593,63 @@ const IntelligenceCenterView = () => {
                               </div>
                               <div className="flex items-baseline gap-2">
                                 <div className="text-4xl font-black text-rose-400 font-mono">
-                                  x{attritionSim ? attritionSim.hazardRatio.toFixed(2) : "—"}
+                                  x
+                                  {attritionSim
+                                    ? attritionSim.hazardRatio.toFixed(2)
+                                    : "—"}
                                 </div>
                                 {attritionSim && (
                                   <span
                                     className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider"
-                                    style={{ color: tierColor(riskTierSim), background: tierBg(riskTierSim) }}
+                                    style={{
+                                      color: tierColor(riskTierSim),
+                                      background: tierBg(riskTierSim),
+                                    }}
                                   >
                                     {riskTierSim}
                                   </span>
                                 )}
                               </div>
                               <p className="text-[9px] text-slate-400 mt-2 leading-relaxed">
-                                Multiplicative hazard against the population-average
-                                profile (HR = 1.00). Each covariate contributes an
-                                exp(β·Δx) factor; the product is this ratio.
+                                Multiplicative hazard against the
+                                population-average profile (HR = 1.00). Each
+                                covariate contributes an exp(β·Δx) factor; the
+                                product is this ratio.
                               </p>
 
                               {/* Decomposition chips */}
                               {attritionSim && (
                                 <div className="mt-3 space-y-1 border-t border-white/5 pt-3">
                                   <div className="flex items-center justify-between text-[9px] font-mono">
-                                    <span className="text-slate-500">population average profile</span>
-                                    <span className="text-slate-300 font-bold">×1.00</span>
+                                    <span className="text-slate-500">
+                                      population average profile
+                                    </span>
+                                    <span className="text-slate-300 font-bold">
+                                      ×1.00
+                                    </span>
                                   </div>
                                   {attritionSim.waterfall.map((w) => (
-                                    <div key={w.factor} className="flex items-center justify-between text-[9px] font-mono">
-                                      <span className="text-slate-500 truncate mr-2">{w.label}</span>
-                                      <span className={`font-bold ${w.direction === "risky" ? "text-rose-400" : "text-emerald-400"}`}>
+                                    <div
+                                      key={w.factor}
+                                      className="flex items-center justify-between text-[9px] font-mono"
+                                    >
+                                      <span className="text-slate-500 truncate mr-2">
+                                        {w.label}
+                                      </span>
+                                      <span
+                                        className={`font-bold ${w.direction === "risky" ? "text-rose-400" : "text-emerald-400"}`}
+                                      >
                                         ×{w.impact_ratio.toFixed(2)}
                                       </span>
                                     </div>
                                   ))}
                                   <div className="flex items-center justify-between text-[9px] font-mono border-t border-white/10 pt-1.5">
-                                    <span className="text-slate-400 font-bold uppercase tracking-wider">Net hazard ratio</span>
-                                    <span className="text-rose-300 font-black">×{attritionSim.hazardRatio.toFixed(2)}</span>
+                                    <span className="text-slate-400 font-bold uppercase tracking-wider">
+                                      Net hazard ratio
+                                    </span>
+                                    <span className="text-rose-300 font-black">
+                                      ×{attritionSim.hazardRatio.toFixed(2)}
+                                    </span>
                                   </div>
                                 </div>
                               )}
@@ -3172,7 +3669,8 @@ const IntelligenceCenterView = () => {
                               {attritionSim && (
                                 <div className="rounded-xl border border-white/5 bg-slate-950 p-3">
                                   <div className="text-[8px] font-mono text-slate-500 text-center mb-1.5">
-                                    log-hazard scale · center = population average profile
+                                    log-hazard scale · center = population
+                                    average profile
                                   </div>
                                   <div className="relative">
                                     {/* center reference line */}
@@ -3184,23 +3682,36 @@ const IntelligenceCenterView = () => {
                                       {attritionSim.waterfall.map((w) => {
                                         const lo = Math.log(0.2);
                                         const hi = Math.log(6.0);
-                                        const pct = ((Math.log(w.impact_ratio) - lo) / (hi - lo)) * 100;
+                                        const pct =
+                                          ((Math.log(w.impact_ratio) - lo) /
+                                            (hi - lo)) *
+                                          100;
                                         const width = Math.abs(pct - 50);
                                         const risky = w.direction === "risky";
                                         return (
-                                          <div key={w.factor} className="relative h-5 flex items-center">
+                                          <div
+                                            key={w.factor}
+                                            className="relative h-5 flex items-center"
+                                          >
                                             <div
                                               className={`h-full rounded-r-md ${risky ? "bg-rose-500/70" : "bg-emerald-500/70"}`}
                                               style={{
                                                 width: `${width}%`,
-                                                marginLeft: risky ? "50%" : `${50 - width}%`,
+                                                marginLeft: risky
+                                                  ? "50%"
+                                                  : `${50 - width}%`,
                                               }}
                                             />
                                             <div className="absolute left-2 text-[8px] font-bold text-slate-300 truncate max-w-[45%]">
                                               {w.label}
                                             </div>
-                                            <div className={`absolute right-2 text-[8px] font-black font-mono ${risky ? "text-rose-300" : "text-emerald-300"}`}>
-                                              {w.impact_percentage > 0 ? "+" : ""}{w.impact_percentage.toFixed(0)}%
+                                            <div
+                                              className={`absolute right-2 text-[8px] font-black font-mono ${risky ? "text-rose-300" : "text-emerald-300"}`}
+                                            >
+                                              {w.impact_percentage > 0
+                                                ? "+"
+                                                : ""}
+                                              {w.impact_percentage.toFixed(0)}%
                                             </div>
                                           </div>
                                         );
@@ -3232,7 +3743,9 @@ const IntelligenceCenterView = () => {
                                       : w.factor === "salary"
                                         ? `×${Math.exp(attritionCovs.salary_log_ratio).toFixed(2)} dept median`
                                         : w.factor === "risk_flag"
-                                          ? attritionCovs.risk_flag ? "triggered" : "clean"
+                                          ? attritionCovs.risk_flag
+                                            ? "triggered"
+                                            : "clean"
                                           : w.factor === "skills"
                                             ? `${workloadSlider} skills`
                                             : w.factor === "skill_level"
@@ -3253,13 +3766,17 @@ const IntelligenceCenterView = () => {
                                         <span className="text-[10px] font-semibold text-slate-300 truncate mr-2">
                                           {w.label}
                                         </span>
-                                        <span className={`text-[9px] font-bold shrink-0 ${w.direction === "risky" ? "text-rose-400" : "text-emerald-400"}`}>
+                                        <span
+                                          className={`text-[9px] font-bold shrink-0 ${w.direction === "risky" ? "text-rose-400" : "text-emerald-400"}`}
+                                        >
                                           {w.direction === "risky" ? "+" : ""}
                                           {w.impact_percentage.toFixed(0)}% risk
                                         </span>
                                       </div>
                                       <div className="flex items-center justify-between mb-1.5">
-                                        <span className="text-[8px] font-mono text-slate-500">{valText}</span>
+                                        <span className="text-[8px] font-mono text-slate-500">
+                                          {valText}
+                                        </span>
                                         <span className="text-[8px] font-mono text-slate-500">
                                           factor ×{w.impact_ratio.toFixed(2)}
                                         </span>
@@ -3269,7 +3786,10 @@ const IntelligenceCenterView = () => {
                                           className={`h-full rounded-full ${w.direction === "risky" ? "bg-rose-500" : "bg-emerald-500"}`}
                                           style={{
                                             width: `${Math.min(100, Math.abs(w.impact_percentage))}%`,
-                                            marginLeft: w.direction === "risky" ? "0" : `${Math.max(0, 50 - Math.min(50, Math.abs(w.impact_percentage) / 2))}%`,
+                                            marginLeft:
+                                              w.direction === "risky"
+                                                ? "0"
+                                                : `${Math.max(0, 50 - Math.min(50, Math.abs(w.impact_percentage) / 2))}%`,
                                           }}
                                         />
                                       </div>
@@ -3282,12 +3802,12 @@ const IntelligenceCenterView = () => {
                       </div>
                     ) : (
                       <div className="text-slate-400 text-sm py-20 text-center">
-                        Select an employee from the left panel to review attrition
-                        survival analytics.
+                        Select an employee from the left panel to review
+                        attrition survival analytics.
                       </div>
                     )}
                   </div>
-}
+                }
               />
               <AIExplanationPanel
                 subtab="attrition"
@@ -3305,10 +3825,10 @@ const IntelligenceCenterView = () => {
                 autoRefresh={true}
                 disabled={!selectedAttritionEmp}
               />
-              </motion.div>
-            )}
+            </motion.div>
+          )}
 
-            {/* TAB 4: ORGANIZATIONAL NETWORK ANALYSIS (ONA) */}
+          {/* TAB 4: ORGANIZATIONAL NETWORK ANALYSIS (ONA) */}
           {activeSubTab === "ona" && (
             <motion.div
               key="ona"
@@ -3320,254 +3840,358 @@ const IntelligenceCenterView = () => {
               <MobileSplitPane
                 activePane={mobileActivePane}
                 setActivePane={setMobileActivePane}
-                leftTitle="Collaboration Graph"
-                rightTitle="Node Centrality"
+                leftTitle="3D Collaboration Space"
+                rightTitle="Network Intelligence"
                 leftIcon={<Share2 size={14} />}
                 rightIcon={<Activity size={14} />}
-                leftWidthClass="lg:flex-1"
+                leftWidthClass="lg:w-[60%] xl:w-[63%]"
                 leftContent={
-                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 flex flex-col justify-between relative overflow-hidden h-auto lg:h-full">
-                    <div>
-                      <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 gap-3">
+                  <div className="premium-card p-4 md:p-5 border border-white/5 bg-slate-950/30 backdrop-blur-xl flex flex-col justify-between relative overflow-hidden h-auto lg:h-full">
+                    <div className="flex-1 flex flex-col min-h-0">
+                      {/* Top Canvas Bar with Filter & Search Controls */}
+                      <div className="flex flex-wrap items-center justify-between border-b border-white/5 pb-3 mb-3 gap-2 shrink-0">
                         <div>
-                          <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
-                            Corporate collaboration graph
-                          </h3>
-                          <p className="mt-1 text-[10px] text-slate-500">3D force layout · drag a node · drag the canvas to rotate · wheel to zoom</p>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">
+                              3D Enterprise Network Space
+                            </h3>
+                            <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-[8.5px] font-mono font-bold text-cyan-300">
+                              {onaData?.nodes?.length || 0} Nodes ·{" "}
+                              {onaData?.links?.length || 0} Links
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-[9.5px] text-slate-400">
+                            Multi-cluster 3D orbital physics · PageRank
+                            influence · Brandes betweenness bridges
+                          </p>
                         </div>
-                        <button type="button" onClick={resetOnaCamera} className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400 transition hover:border-cyan-300/40 hover:text-cyan-200">Reset view</button>
+
+                        {/* Search in 3D Canvas */}
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative">
+                            <Search
+                              size={11}
+                              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
+                            />
+                            <input
+                              type="text"
+                              value={onaSearchQuery}
+                              onChange={(e) =>
+                                setOnaSearchQuery(e.target.value)
+                              }
+                              placeholder="Find member in 3D space..."
+                              className="rounded-lg border border-white/10 bg-slate-950/80 pl-7 pr-2 py-1 text-[9.5px] text-white placeholder:text-slate-600 outline-none focus:border-cyan-400/50 w-36 sm:w-44"
+                            />
+                          </div>
+
+                          {/* Department Filter */}
+                          <select
+                            value={onaDeptFilter}
+                            onChange={(e) => setOnaDeptFilter(e.target.value)}
+                            className="rounded-lg border border-white/10 bg-slate-950/80 px-2 py-1 text-[9.5px] font-bold text-slate-300 outline-none focus:border-cyan-400/50 cursor-pointer"
+                          >
+                            <option value="all">All Departments</option>
+                            {availableDepts.map((d) => (
+                              <option key={d} value={d}>
+                                {d}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
 
-                      {/* Physics SVG Canvas */}
-                      <div
-                        ref={canvasRef}
-                        onPointerDown={handleOnaCanvasPointerDown}
-                        onPointerMove={handleOnaCanvasPointerMove}
-                        onPointerUp={handleOnaCanvasPointerUp}
-                        onPointerCancel={handleOnaCanvasPointerUp}
-                        onWheel={handleOnaCanvasWheel}
-                        className="relative h-[clamp(360px,62vh,620px)] min-h-0 cursor-grab touch-none border border-cyan-300/10 bg-[radial-gradient(circle_at_50%_45%,rgba(30,64,175,.16),transparent_52%),#020617] rounded-2xl overflow-hidden flex items-center justify-center select-none active:cursor-grabbing"
-                      >
+                      {/* 3D Force Canvas Container */}
+                      <div className="relative flex-1 min-h-[420px] lg:min-h-0 w-full touch-none border border-white/10 bg-[#020408] backdrop-blur-2xl rounded-2xl overflow-hidden flex items-center justify-center select-none shadow-inner">
                         {onaLoading ? (
                           <div className="text-slate-400 text-xs flex items-center gap-2">
-                            <RefreshCw size={14} className="animate-spin" />{" "}
-                            Resolving Brandes centrality paths...
+                            <RefreshCw
+                              size={14}
+                              className="animate-spin text-cyan-400"
+                            />
+                            Resolving 3D enterprise topology & Brandes paths...
+                          </div>
+                        ) : !onaData?.nodes?.length ? (
+                          <div className="text-slate-400 text-xs flex flex-col items-center gap-2 px-6 text-center">
+                            <Users size={16} className="text-cyan-400/60" />
+                            No collaboration network available yet.
                           </div>
                         ) : (
-                          <>
-                            {/* Links */}
-                            <svg className="absolute inset-0 h-full w-full pointer-events-none opacity-40">
-                              {onaData.links.map((link, idx) => {
-                                const srcNode = nodesState.find(
-                                  (n) => n.id === link.source,
-                                );
-                                const tgtNode = nodesState.find(
-                                  (n) => n.id === link.target,
-                                );
-                                if (!srcNode || !tgtNode) return null;
-
-                                const srcProj = project3D(
-                                  srcNode.x,
-                                  srcNode.y,
-                                  srcNode.z,
-                                );
-                                const tgtProj = project3D(
-                                  tgtNode.x,
-                                  tgtNode.y,
-                                  tgtNode.z,
-                                );
-
-                                return (
-                                  <line
-                                    key={idx}
-                                    x1={srcProj.x}
-                                    y1={srcProj.y}
-                                    x2={tgtProj.x}
-                                    y2={tgtProj.y}
-                                    stroke="#2dd4bf"
-                                    strokeWidth={link.weight}
-                                    strokeOpacity={0.4}
-                                  />
-                                );
-                              })}
-                            </svg>
-
-                            {/* HTML Orbiting Node Bubbles */}
-                            {nodesState.map((node) => {
-                              const projected = project3D(node.x, node.y, node.z);
-                              const isSelected = selectedOnaNode?.id === node.id;
-                              const size = isSelected ? 32 : 24;
-
-                              const depthScale = Math.max(
-                                0.4,
-                                1 - projected.depth / 800,
-                              );
-                              const depthOpacity = Math.max(
-                                0.3,
-                                1 - projected.depth / 600,
-                              );
-
-                              return (
-                                <div
-                                  key={node.id}
-                                  onPointerDown={(e) =>
-                                    handleOnaNodePointerDown(e, node)
-                                  }
-                                  onClick={() => {
-                                    setSelectedOnaNode(node);
-                                    setMobileActivePane("right");
-                                  }}
-                                  style={{
-                                    left: `${projected.x}px`,
-                                    top: `${projected.y}px`,
-                                    width: `${size * depthScale}px`,
-                                    height: `${size * depthScale}px`,
-                                    marginLeft: `-${(size * depthScale) / 2}px`,
-                                    marginTop: `-${(size * depthScale) / 2}px`,
-                                    opacity: depthOpacity,
-                                    zIndex: Math.round(1000 - projected.depth),
-                                  }}
-                                  className={`absolute rounded-full border transition-shadow duration-300 flex items-center justify-center group pointer-events-auto cursor-pointer select-none ${
-                                    isSelected
-                                      ? "bg-primary border-white shadow-[0_0_15px_rgba(45,212,191,0.8)] z-20 scale-105"
-                                      : "bg-slate-900 border-indigo-500/40 hover:border-cyan-300 z-10"
-                                  }`}
-                                >
-                                  <div className="absolute hidden group-hover:block bg-black/90 text-white text-[8px] uppercase tracking-wider px-2 py-1 rounded border border-white/10 whitespace-nowrap -top-8 z-30 pointer-events-none">
-                                    {node.name}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </>
+                          <OnaGraph3DCanvas
+                            nodes={onaData.nodes}
+                            links={onaData.links}
+                            colorMode={onaColorMode}
+                            deptFilter={onaDeptFilter}
+                            searchQuery={onaSearchQuery}
+                            selectedId={selectedOnaNode?.id ?? null}
+                            onSelect={(node) => {
+                              setSelectedOnaNode(node);
+                              setMobileActivePane("right");
+                            }}
+                            onCameraChange={setOnaCamera}
+                            onColorModeChange={setOnaColorMode}
+                          />
                         )}
                       </div>
                     </div>
                   </div>
                 }
                 rightContent={
-                  <div className="premium-card p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md space-y-6 lg:w-[320px] xl:w-[340px]">
+                  <div className="premium-card p-4 md:p-5 border border-white/5 bg-slate-950/40 backdrop-blur-xl flex flex-col justify-between h-auto lg:h-full w-full overflow-y-auto custom-scrollbar space-y-4">
                     {selectedOnaNode ? (
                       <>
+                        {/* Employee Node Header */}
                         <div className="border-b border-white/5 pb-3">
-                          <div className="text-[10px] uppercase font-bold tracking-widest text-slate-500">
-                            Corporate Node Centrality
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                              Selected Node Centrality
+                            </span>
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider"
+                              style={{
+                                color: getNodeColor(selectedOnaNode),
+                                background: `${getNodeColor(selectedOnaNode)}18`,
+                                border: `1px solid ${getNodeColor(selectedOnaNode)}44`,
+                              }}
+                            >
+                              {selectedOnaNode.department}
+                            </span>
                           </div>
                           <h3 className="text-lg font-extrabold text-white mt-1">
                             {selectedOnaNode.name}
                           </h3>
-                          <div className="text-[9px] text-slate-400 uppercase mt-0.5 tracking-wider">
-                            {selectedOnaNode.role}
+                          <div className="text-[9.5px] text-slate-400 uppercase mt-0.5 tracking-wider">
+                            {selectedOnaNode.role} ·{" "}
+                            {selectedOnaNode.degree || 0} Direct Ties
                           </div>
                         </div>
 
-                        <div className="space-y-4">
-                          {/* PageRank Card */}
-                          <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
-                            <div className="text-[9px] uppercase tracking-[0.16em] text-slate-500 mb-1">
-                              PageRank Centrality (Influence)
+                        {/* 4-Vector Centrality Metrics */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {/* PageRank Centrality */}
+                          <div className="rounded-xl border border-white/5 bg-slate-950/80 p-3">
+                            <div className="text-[8.5px] uppercase tracking-widest text-slate-500 font-bold">
+                              PageRank (Influence)
                             </div>
-                            <div className="flex justify-between items-center">
-                              <div className="text-3xl font-extrabold text-indigo-400">
-                                {(selectedOnaNode.influence_pagerank * 100).toFixed(
-                                  0,
-                                )}
-                                %
-                              </div>
-                              {/* Radial indicator */}
-                              <svg className="w-10 h-10 transform -rotate-90">
-                                <circle
-                                  cx="20"
-                                  cy="20"
-                                  r="16"
-                                  stroke="rgba(255,255,255,0.05)"
-                                  strokeWidth="3"
-                                  fill="transparent"
-                                />
-                                <circle
-                                  cx="20"
-                                  cy="20"
-                                  r="16"
-                                  stroke="#fbbf24"
-                                  strokeWidth="3"
-                                  fill="transparent"
-                                  strokeDasharray={100}
-                                  strokeDashoffset={
-                                    100 - selectedOnaNode.influence_pagerank * 100
-                                  }
-                                />
-                              </svg>
+                            <div className="text-2xl font-black font-mono text-amber-300 mt-0.5">
+                              {(
+                                (selectedOnaNode.influence_pagerank || 0) * 100
+                              ).toFixed(0)}
+                              %
                             </div>
-                            <p className="text-[9px] text-slate-400 mt-2 leading-relaxed">
-                              Calculates global endorsement weight across edge
-                              connections using Google PageRank power iteration.
-                            </p>
+                            <div className="w-full h-1 rounded-full bg-white/5 mt-2 overflow-hidden">
+                              <div
+                                className="h-full bg-amber-400 rounded-full"
+                                style={{
+                                  width: `${(selectedOnaNode.influence_pagerank || 0) * 100}%`,
+                                }}
+                              />
+                            </div>
                           </div>
 
-                          {/* Betweenness Bottleneck Card */}
-                          <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
-                            <div className="text-[9px] uppercase tracking-[0.16em] text-slate-500 mb-1">
-                              Betweenness Centrality (Bridge Power)
+                          {/* Betweenness Centrality */}
+                          <div className="rounded-xl border border-white/5 bg-slate-950/80 p-3">
+                            <div className="text-[8.5px] uppercase tracking-widest text-slate-500 font-bold">
+                              Betweenness (Bridges)
                             </div>
-                            <div className="flex justify-between items-center">
-                              <div className="text-3xl font-extrabold text-cyan-400">
-                                {(selectedOnaNode.bridge_betweenness * 100).toFixed(
-                                  0,
-                                )}
-                                %
-                              </div>
-                              <svg className="w-10 h-10 transform -rotate-90">
-                                <circle
-                                  cx="20"
-                                  cy="20"
-                                  r="16"
-                                  stroke="rgba(255,255,255,0.05)"
-                                  strokeWidth="3"
-                                  fill="transparent"
-                                />
-                                <circle
-                                  cx="20"
-                                  cy="20"
-                                  r="16"
-                                  stroke="#2dd4bf"
-                                  strokeWidth="3"
-                                  fill="transparent"
-                                  strokeDasharray={100}
-                                  strokeDashoffset={
-                                    100 - selectedOnaNode.bridge_betweenness * 100
-                                  }
-                                />
-                              </svg>
+                            <div className="text-2xl font-black font-mono text-cyan-300 mt-0.5">
+                              {(
+                                (selectedOnaNode.bridge_betweenness || 0) * 100
+                              ).toFixed(0)}
+                              %
                             </div>
-                            <p className="text-[9px] text-slate-400 mt-2 leading-relaxed">
-                              Measures structural bridge strength across siloed
-                              departments. High betweenness employees prevent
-                              organization communication bottlenecks.
-                            </p>
+                            <div className="w-full h-1 rounded-full bg-white/5 mt-2 overflow-hidden">
+                              <div
+                                className="h-full bg-cyan-400 rounded-full"
+                                style={{
+                                  width: `${(selectedOnaNode.bridge_betweenness || 0) * 100}%`,
+                                }}
+                              />
+                            </div>
                           </div>
+
+                          {/* Closeness Centrality */}
+                          <div className="rounded-xl border border-white/5 bg-slate-950/80 p-3">
+                            <div className="text-[8.5px] uppercase tracking-widest text-slate-500 font-bold">
+                              Closeness (Diffusion)
+                            </div>
+                            <div className="text-2xl font-black font-mono text-indigo-300 mt-0.5">
+                              {(
+                                (selectedOnaNode.closeness_centrality || 0) *
+                                100
+                              ).toFixed(0)}
+                              %
+                            </div>
+                            <div className="w-full h-1 rounded-full bg-white/5 mt-2 overflow-hidden">
+                              <div
+                                className="h-full bg-indigo-400 rounded-full"
+                                style={{
+                                  width: `${(selectedOnaNode.closeness_centrality || 0) * 100}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Krackhardt E-I Silo Index */}
+                          <div className="rounded-xl border border-white/5 bg-slate-950/80 p-3">
+                            <div className="text-[8.5px] uppercase tracking-widest text-slate-500 font-bold">
+                              E-I Silo Index
+                            </div>
+                            <div
+                              className={`text-2xl font-black font-mono mt-0.5 ${
+                                (selectedOnaNode.ei_silo_index || 0) > 0
+                                  ? "text-emerald-300"
+                                  : "text-rose-400"
+                              }`}
+                            >
+                              {(selectedOnaNode.ei_silo_index || 0) > 0
+                                ? `+${selectedOnaNode.ei_silo_index}`
+                                : selectedOnaNode.ei_silo_index}
+                            </div>
+                            <div className="text-[8px] text-slate-500 mt-1 uppercase truncate">
+                              {(selectedOnaNode.ei_silo_index || 0) > 0
+                                ? "Cross-Dept Spanner"
+                                : "Dept Siloed"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Direct 1st-Degree Collaborators (Ego Network) */}
+                        <div className="rounded-xl border border-white/5 bg-slate-950/70 p-3.5 space-y-2">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                            <span className="text-[9px] uppercase tracking-widest font-bold text-cyan-300">
+                              Active Collaborators (
+                              {selectedNodeNeighbors.length})
+                            </span>
+                            <span className="text-[8px] text-slate-500 font-mono">
+                              Weight / Tie
+                            </span>
+                          </div>
+                          {selectedNodeNeighbors.length === 0 ? (
+                            <div className="text-[10px] text-slate-500 py-2 text-center">
+                              No direct links detected
+                            </div>
+                          ) : (
+                            <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                              {selectedNodeNeighbors
+                                .slice(0, 6)
+                                .map(({ node, weight, isCross }) => (
+                                  <button
+                                    key={node.id}
+                                    onClick={() => setSelectedOnaNode(node)}
+                                    className="w-full flex items-center justify-between p-1.5 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.06] text-left transition-colors cursor-pointer"
+                                  >
+                                    <div className="min-w-0 pr-2">
+                                      <div className="text-[10px] font-bold text-white truncate">
+                                        {node.name}
+                                      </div>
+                                      <div className="text-[8px] text-slate-400 truncate">
+                                        {node.role} · {node.department}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      {isCross && (
+                                        <span className="px-1 py-0.5 rounded bg-purple-500/20 text-[7.5px] font-bold text-purple-300 uppercase">
+                                          Cross-Dept
+                                        </span>
+                                      )}
+                                      <span className="text-[9.5px] font-mono font-bold text-cyan-300">
+                                        {(weight * 100).toFixed(0)}%
+                                      </span>
+                                    </div>
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Top Key Influencers & Cross-Silo Brokers */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {/* Influencers */}
+                          <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3 space-y-1.5">
+                            <span className="text-[8.5px] uppercase tracking-widest font-bold text-amber-300 block border-b border-white/5 pb-1">
+                              Top Influencers
+                            </span>
+                            {topInfluencers.slice(0, 3).map((node) => (
+                              <button
+                                key={node.id}
+                                onClick={() => setSelectedOnaNode(node)}
+                                className="w-full flex items-center justify-between text-left text-slate-300 hover:text-white py-0.5 cursor-pointer"
+                              >
+                                <span className="text-[9.5px] truncate font-medium">
+                                  {node.name}
+                                </span>
+                                <span className="text-[9px] font-mono text-amber-300 font-bold shrink-0">
+                                  {(
+                                    (node.influence_pagerank || 0) * 100
+                                  ).toFixed(0)}
+                                  %
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Bridge Brokers */}
+                          <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3 space-y-1.5">
+                            <span className="text-[8.5px] uppercase tracking-widest font-bold text-cyan-300 block border-b border-white/5 pb-1">
+                              Key Bridge Brokers
+                            </span>
+                            {topBridgeBrokers.slice(0, 3).map((node) => (
+                              <button
+                                key={node.id}
+                                onClick={() => setSelectedOnaNode(node)}
+                                className="w-full flex items-center justify-between text-left text-slate-300 hover:text-white py-0.5 cursor-pointer"
+                              >
+                                <span className="text-[9.5px] truncate font-medium">
+                                  {node.name}
+                                </span>
+                                <span className="text-[9px] font-mono text-cyan-300 font-bold shrink-0">
+                                  {(
+                                    (node.bridge_betweenness || 0) * 100
+                                  ).toFixed(0)}
+                                  %
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Network Topology Summary Footer */}
+                        <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] text-slate-500 font-mono">
+                          <span>
+                            Density: {onaData?.metrics?.graph_density || "0.08"}{" "}
+                            · Cross-Dept:{" "}
+                            {(
+                              (onaData?.metrics?.cross_dept_ratio || 0.42) * 100
+                            ).toFixed(0)}
+                            %
+                          </span>
+                          <span>Brandes + PageRank</span>
                         </div>
                       </>
                     ) : (
-                  <div className="text-slate-400 text-xs py-16 text-center">
-                    Select a collaboration node on the graph to analyze
+                      <div className="text-slate-400 text-xs py-16 text-center">
+                        Select a collaboration node on the graph to analyze
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-}
-            />
-            <AIExplanationPanel
-              subtab="ona"
-              context={{
-                nodes: onaData?.nodes || [],
-                links: onaData?.links || [],
-                selectedNode: selectedOnaNode,
-                camera: onaCamera,
-                departments: onaData?.departments || [],
-              }}
-              buttonText="Explain with AI"
-              autoRefresh={false}
-              disabled={!onaData || !onaData.nodes || onaData.nodes.length === 0}
-            />
+                }
+              />
+              <AIExplanationPanel
+                subtab="ona"
+                context={{
+                  nodes: onaData?.nodes || [],
+                  links: onaData?.links || [],
+                  selectedNode: selectedOnaNode,
+                  camera: onaCamera,
+                  departments: availableDepts,
+                  metrics: onaData?.metrics || {},
+                }}
+                buttonText="Explain with AI"
+                autoRefresh={false}
+                disabled={
+                  !onaData || !onaData.nodes || onaData.nodes.length === 0
+                }
+              />
             </motion.div>
           )}
 
@@ -3641,7 +4265,8 @@ const IntelligenceCenterView = () => {
                         Markov Career Transition Horizon
                       </h3>
                       <span className="text-[10px] text-slate-500">
-                        {careerPathData?.model_version || "markov-career-v1"} · modeled probabilities
+                        {careerPathData?.model_version || "markov-career-v1"} ·
+                        modeled probabilities
                       </span>
                     </div>
 
@@ -3681,9 +4306,9 @@ const IntelligenceCenterView = () => {
                                         </div>
                                       </div>
                                       <span className="text-[10px] font-black text-cyan-300 bg-cyan-400/5 border border-cyan-400/10 px-2 py-0.5 rounded">
-                                        {(pos.transition_probability * 100).toFixed(
-                                          0,
-                                        )}
+                                        {(
+                                          pos.transition_probability * 100
+                                        ).toFixed(0)}
                                         % Prob.
                                       </span>
                                     </div>
@@ -3712,7 +4337,8 @@ const IntelligenceCenterView = () => {
                                       </div>
                                     ) : (
                                       <div className="border-t border-white/5 pt-2.5 text-[9px] text-emerald-400">
-                                        ✓ Zero skill nodes missing for transition.
+                                        ✓ Zero skill nodes missing for
+                                        transition.
                                       </div>
                                     )}
                                   </div>
@@ -3729,7 +4355,7 @@ const IntelligenceCenterView = () => {
                       </div>
                     )}
                   </div>
-}
+                }
               />
               <AIExplanationPanel
                 subtab="career-path"
@@ -3742,9 +4368,9 @@ const IntelligenceCenterView = () => {
                 autoRefresh={false}
                 disabled={!careerPathData}
               />
-              </motion.div>
-            )}
-          </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

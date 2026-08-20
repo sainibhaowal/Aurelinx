@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.models.database import (
     WorkflowEventTable,
@@ -20,7 +21,7 @@ from app.models.database import (
 )
 
 
-def _safe_json(value: Any, max_chars: int = 4000) -> Optional[str]:
+def _safe_json(value: Any, max_chars: int = 4000) -> str | None:
     if value is None:
         return None
     try:
@@ -35,10 +36,13 @@ def safe_summary(value: Any, max_chars: int = 500) -> Any:
     if value is None:
         return None
     if isinstance(value, dict):
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         for key, item in value.items():
             lowered = str(key).lower()
-            if any(secret in lowered for secret in ("password", "token", "api_key", "secret")):
+            if any(
+                secret in lowered
+                for secret in ("password", "token", "api_key", "secret")
+            ):
                 result[str(key)] = "[redacted]"
             elif isinstance(item, (dict, list, tuple)):
                 result[str(key)] = safe_summary(item, max_chars)
@@ -51,7 +55,9 @@ def safe_summary(value: Any, max_chars: int = 500) -> Any:
     return text[:max_chars]
 
 
-def create_workflow_run(session_id: str, user_id: str, tenant_id: str = "default") -> WorkflowRunTable:
+def create_workflow_run(
+    session_id: str, user_id: str, tenant_id: str = "default"
+) -> WorkflowRunTable:
     with Session(engine) as db:
         run = WorkflowRunTable(
             session_id=str(session_id),
@@ -66,7 +72,12 @@ def create_workflow_run(session_id: str, user_id: str, tenant_id: str = "default
         return run
 
 
-def update_workflow_run(run_id: str, status: str, phase: Optional[str] = None, failure_reason: Optional[str] = None) -> None:
+def update_workflow_run(
+    run_id: str,
+    status: str,
+    phase: str | None = None,
+    failure_reason: str | None = None,
+) -> None:
     with Session(engine) as db:
         run = db.get(WorkflowRunTable, str(run_id))
         if not run:
@@ -88,19 +99,19 @@ def emit_workflow_event(
     display_message: str,
     *,
     status: str = "running",
-    tool_name: Optional[str] = None,
+    tool_name: str | None = None,
     safe_input: Any = None,
     result_summary: Any = None,
-    error_code: Optional[str] = None,
-    duration_ms: Optional[int] = None,
-    parent_event_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    error_code: str | None = None,
+    duration_ms: int | None = None,
+    parent_event_id: str | None = None,
+) -> dict[str, Any]:
     """Persist and return one event. This is safe to call from a worker thread."""
     with Session(engine) as db:
         last = db.exec(
             select(WorkflowEventTable)
             .where(WorkflowEventTable.run_id == str(run_id))
-            .order_by(WorkflowEventTable.sequence.desc())
+            .order_by(col(WorkflowEventTable.sequence).desc())
         ).first()
         sequence = (last.sequence + 1) if last else 1
         event = WorkflowEventTable(
@@ -126,12 +137,12 @@ def emit_workflow_event(
 def update_workflow_event(
     event_id: str,
     *,
-    status: Optional[str] = None,
-    display_message: Optional[str] = None,
+    status: str | None = None,
+    display_message: str | None = None,
     result_summary: Any = None,
-    error_code: Optional[str] = None,
-    duration_ms: Optional[int] = None,
-) -> Optional[Dict[str, Any]]:
+    error_code: str | None = None,
+    duration_ms: int | None = None,
+) -> dict[str, Any] | None:
     """Update one workflow event in place and return its dict.
 
     Used to finish a reasoning card on the same row instead of persisting a
@@ -158,8 +169,8 @@ def update_workflow_event(
         return workflow_event_dict(event)
 
 
-def workflow_event_dict(event: WorkflowEventTable) -> Dict[str, Any]:
-    def parse(value: Optional[str]) -> Any:
+def workflow_event_dict(event: WorkflowEventTable) -> dict[str, Any]:
+    def parse(value: str | None) -> Any:
         if not value:
             return None
         try:
@@ -188,7 +199,14 @@ def workflow_event_dict(event: WorkflowEventTable) -> Dict[str, Any]:
 class ToolEventScope:
     """Emit a start/completion pair around one real internal tool operation."""
 
-    def __init__(self, run_id: str, tool_name: str, phase: str, message: str, sink: Optional[Callable[[Dict[str, Any]], None]] = None):
+    def __init__(
+        self,
+        run_id: str,
+        tool_name: str,
+        phase: str,
+        message: str,
+        sink: Callable[[dict[str, Any]], None] | None = None,
+    ):
         self.run_id = run_id
         self.tool_name = tool_name
         self.phase = phase
@@ -196,7 +214,7 @@ class ToolEventScope:
         self.sink = sink
         self.started = time.perf_counter()
 
-    def start(self, safe_input: Any = None) -> Dict[str, Any]:
+    def start(self, safe_input: Any = None) -> dict[str, Any]:
         event = emit_workflow_event(
             self.run_id,
             "tool_call",
@@ -210,7 +228,12 @@ class ToolEventScope:
             self.sink(event)
         return event
 
-    def complete(self, result_summary: Any = None, status: str = "completed", error_code: Optional[str] = None) -> Dict[str, Any]:
+    def complete(
+        self,
+        result_summary: Any = None,
+        status: str = "completed",
+        error_code: str | None = None,
+    ) -> dict[str, Any]:
         event = emit_workflow_event(
             self.run_id,
             "tool_result",
@@ -225,4 +248,3 @@ class ToolEventScope:
         if self.sink:
             self.sink(event)
         return event
-

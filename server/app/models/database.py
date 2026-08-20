@@ -1,15 +1,14 @@
-from sqlmodel import SQLModel, Field, create_engine, Session
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy import Column, inspect, text, String, UniqueConstraint
-from sqlalchemy.pool import QueuePool
-from typing import Optional
-from uuid import UUID, uuid4
-from datetime import datetime
-import os
 import logging
+import os
+from datetime import datetime
+from uuid import UUID, uuid4
 
 # Load environment variables FIRST
 from dotenv import load_dotenv
+from sqlalchemy import Column, String, UniqueConstraint, inspect, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.pool import QueuePool
+from sqlmodel import Field, Session, SQLModel, create_engine
 
 load_dotenv()
 
@@ -73,8 +72,8 @@ class RegistrationCodeTable(SQLModel, table=True):
     code_hash: str = Field(index=True)
     is_used: bool = Field(default=False, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    used_at: Optional[datetime] = Field(default=None)
-    used_by: Optional[str] = Field(default=None)  # Email of the registered user
+    used_at: datetime | None = Field(default=None)
+    used_by: str | None = Field(default=None)  # Email of the registered user
 
 
 # ============ SKILLS ============
@@ -88,10 +87,10 @@ class SkillTable(SQLModel, table=True):
     )
     name: str = Field(index=True)
     level: int = Field(ge=1, le=5)  # 1-5 proficiency scale
-    employee_id: Optional[UUID] = Field(
+    employee_id: UUID | None = Field(
         default=None, foreign_key="employeetable.id", index=True
     )
-    candidate_id: Optional[UUID] = Field(
+    candidate_id: UUID | None = Field(
         default=None, foreign_key="candidatetable.id", index=True
     )
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -110,10 +109,10 @@ class ExperienceTable(SQLModel, table=True):
     position: str
     duration_years: float
     description: str
-    employee_id: Optional[UUID] = Field(
+    employee_id: UUID | None = Field(
         default=None, foreign_key="employeetable.id", index=True
     )
-    candidate_id: Optional[UUID] = Field(
+    candidate_id: UUID | None = Field(
         default=None, foreign_key="candidatetable.id", index=True
     )
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -134,8 +133,8 @@ class EmployeeTable(SQLModel, table=True):
     role: str = Field(index=True)
     sentiment_score: float = Field(default=0.5, ge=0.0, le=1.0)
     is_at_risk: bool = Field(default=False, index=True)
-    retention_prob: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    salary: Optional[int] = Field(default=None)
+    retention_prob: float | None = Field(default=None, ge=0.0, le=1.0)
+    salary: int | None = Field(default=None)
     join_date: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -156,8 +155,8 @@ class CandidateTable(SQLModel, table=True):
     role: str = Field(index=True)
     sentiment_score: float = Field(default=0.5, ge=0.0, le=1.0)
     application_date: datetime = Field(default_factory=datetime.utcnow)
-    match_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    salary: Optional[int] = Field(default=None)
+    match_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    salary: int | None = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -188,10 +187,10 @@ class AuditLogTable(SQLModel, table=True):
     id: UUID = Field(
         default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
     )
-    user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
+    user_id: UUID | None = Field(default=None, foreign_key="users.id", index=True)
     action: str = Field(index=True)  # 'VIEW_EMPLOYEE', 'EXPORT_REPORT', etc
     resource_type: str  # 'employee', 'candidate', 'report'
-    resource_id: Optional[UUID] = Field(default=None)
+    resource_id: UUID | None = Field(default=None)
     details: str  # JSON string with additional details
     ip_address: str
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
@@ -203,9 +202,7 @@ class ChatSessionTable(SQLModel, table=True):
 
     __tablename__ = "chat_sessions"
 
-    id: Optional[str] = Field(
-        default=None, sa_column=Column(String(36), primary_key=True)
-    )
+    id: str | None = Field(default=None, sa_column=Column(String(36), primary_key=True))
     user_id: str = Field(index=True)
     title: str = Field(default="New Session")
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
@@ -222,13 +219,11 @@ class ChatMessageTable(SQLModel, table=True):
 
     __tablename__ = "chat_messages"
 
-    id: Optional[str] = Field(
-        default=None, sa_column=Column(String(36), primary_key=True)
-    )
+    id: str | None = Field(default=None, sa_column=Column(String(36), primary_key=True))
     session_id: str = Field(foreign_key="chat_sessions.id", index=True)
     role: str = Field(index=True)  # user | assistant | system
     content: str
-    tool_trace: Optional[str] = Field(
+    tool_trace: str | None = Field(
         default=None
     )  # JSON string with executed tool actions
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
@@ -247,16 +242,14 @@ class ChatFeedbackTable(SQLModel, table=True):
 
     __tablename__ = "chat_feedback"
 
-    id: Optional[str] = Field(
-        default=None, sa_column=Column(String(36), primary_key=True)
-    )
+    id: str | None = Field(default=None, sa_column=Column(String(36), primary_key=True))
     session_id: str = Field(foreign_key="chat_sessions.id", index=True)
     user_id: str = Field(index=True)
-    message_id: Optional[str] = Field(
+    message_id: str | None = Field(
         default=None, foreign_key="chat_messages.id", index=True
     )
     rating: str = Field(default="down", index=True)  # up | down
-    assistant_preview: Optional[str] = Field(default=None, max_length=2000)
+    assistant_preview: str | None = Field(default=None, max_length=2000)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
     def __init__(self, **data):
@@ -272,21 +265,19 @@ class ChatAttachmentTable(SQLModel, table=True):
 
     __tablename__ = "chat_attachments"
 
-    id: Optional[str] = Field(
-        default=None, sa_column=Column(String(36), primary_key=True)
-    )
+    id: str | None = Field(default=None, sa_column=Column(String(36), primary_key=True))
     session_id: str = Field(foreign_key="chat_sessions.id", index=True)
-    message_id: Optional[str] = Field(
+    message_id: str | None = Field(
         default=None, foreign_key="chat_messages.id", index=True
     )
     original_name: str
-    content_type: Optional[str] = None
+    content_type: str | None = None
     file_path: str
     file_size: int = 0
     parsing_status: str = Field(
         default="pending", index=True
     )  # pending|parsed|failed|unsupported
-    parsing_error: Optional[str] = None
+    parsing_error: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
     def __init__(self, **data):
@@ -310,13 +301,13 @@ class WorkflowRunTable(SQLModel, table=True):
     user_id: str = Field(index=True)
     tenant_id: str = Field(default="default", index=True)
     status: str = Field(default="received", index=True)
-    intent: Optional[str] = Field(default=None)
-    current_phase: Optional[str] = Field(default=None)
-    idempotency_key: Optional[str] = Field(default=None, unique=True, index=True)
-    failure_reason: Optional[str] = Field(default=None)
+    intent: str | None = Field(default=None)
+    current_phase: str | None = Field(default=None)
+    idempotency_key: str | None = Field(default=None, unique=True, index=True)
+    failure_reason: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    completed_at: Optional[datetime] = Field(default=None)
+    completed_at: datetime | None = Field(default=None)
 
 
 class WorkflowEventTable(SQLModel, table=True):
@@ -327,16 +318,16 @@ class WorkflowEventTable(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     run_id: str = Field(index=True)
     sequence: int = Field(index=True)
-    parent_event_id: Optional[str] = Field(default=None)
+    parent_event_id: str | None = Field(default=None)
     event_type: str = Field(index=True)
     phase: str = Field(index=True)
-    tool_name: Optional[str] = Field(default=None, index=True)
+    tool_name: str | None = Field(default=None, index=True)
     status: str = Field(default="running", index=True)
     display_message: str
-    safe_input: Optional[str] = Field(default=None)
-    result_summary: Optional[str] = Field(default=None)
-    error_code: Optional[str] = Field(default=None)
-    duration_ms: Optional[int] = Field(default=None)
+    safe_input: str | None = Field(default=None)
+    result_summary: str | None = Field(default=None)
+    error_code: str | None = Field(default=None)
+    duration_ms: int | None = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
@@ -349,15 +340,15 @@ class WorkflowApprovalTable(SQLModel, table=True):
     run_id: str = Field(index=True)
     tenant_id: str = Field(default="default", index=True)
     requested_by: str = Field(index=True)
-    approved_by: Optional[str] = Field(default=None, index=True)
+    approved_by: str | None = Field(default=None, index=True)
     action_type: str = Field(index=True)
     action_payload_hash: str
     action_payload: str
     status: str = Field(default="pending", index=True)
-    reason: Optional[str] = Field(default=None)
+    reason: str | None = Field(default=None)
     expires_at: datetime
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    resolved_at: Optional[datetime] = Field(default=None)
+    resolved_at: datetime | None = Field(default=None)
 
 
 # ============ ENTERPRISE INTEGRATIONS ============
@@ -378,15 +369,15 @@ class IntegrationConnectionTable(SQLModel, table=True):
         index=True
     )  # workday | successfactors | oracle_hcm | greenhouse ...
     status: str = Field(default="draft", index=True)  # draft | active | paused | error
-    base_url: Optional[str] = None
+    base_url: str | None = None
     auth_type: str = Field(default="api_key")  # api_key | oauth2 | basic
-    encrypted_secret_ref: Optional[str] = None  # reference only, no raw secrets in DB
+    encrypted_secret_ref: str | None = None  # reference only, no raw secrets in DB
     sync_interval_minutes: int = Field(default=60, ge=5, le=10080)
-    next_sync_at: Optional[datetime] = Field(default=None, index=True)
+    next_sync_at: datetime | None = Field(default=None, index=True)
     sync_retry_count: int = Field(default=0, ge=0)
-    last_sync_at: Optional[datetime] = None
-    last_sync_status: Optional[str] = None  # success | failed | partial
-    last_sync_summary: Optional[str] = None
+    last_sync_at: datetime | None = None
+    last_sync_status: str | None = None  # success | failed | partial
+    last_sync_summary: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
@@ -403,7 +394,7 @@ class ConnectorFieldMappingTable(SQLModel, table=True):
     connection_id: UUID = Field(foreign_key="integration_connections.id", index=True)
     source_field: str = Field(index=True)
     canonical_field: str = Field(index=True)
-    transform_rule: Optional[str] = None
+    transform_rule: str | None = None
     required: bool = Field(default=True, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
@@ -427,9 +418,9 @@ class ConnectorSyncJobTable(SQLModel, table=True):
     bronze_events: int = Field(default=0)
     silver_upserts: int = Field(default=0)
     quarantined: int = Field(default=0)
-    error_message: Optional[str] = None
+    error_message: str | None = None
     started_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    finished_at: Optional[datetime] = None
+    finished_at: datetime | None = None
 
 
 # ============ INTERVENTION WORKFLOW ============
@@ -443,25 +434,25 @@ class InterventionTable(SQLModel, table=True):
     )
     tenant_id: str = Field(default="default", index=True)
     title: str = Field(index=True)
-    description: Optional[str] = None
+    description: str | None = None
     target_scope: str = Field(index=True)  # employee | team | department | org
-    target_employee_id: Optional[UUID] = Field(
+    target_employee_id: UUID | None = Field(
         default=None, foreign_key="employeetable.id", index=True
     )
-    target_department: Optional[str] = Field(default=None, index=True)
+    target_department: str | None = Field(default=None, index=True)
     priority: str = Field(
         default="medium", index=True
     )  # low | medium | high | critical
     status: str = Field(
         default="planned", index=True
     )  # planned | approved | in_progress | completed | cancelled
-    owner_name: Optional[str] = Field(default=None, index=True)
-    due_date: Optional[datetime] = Field(default=None, index=True)
-    expected_impact: Optional[str] = None
-    estimated_cost: Optional[float] = Field(default=None, ge=0.0)
-    outcome_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    closed_at: Optional[datetime] = None
-    created_by: Optional[str] = Field(default=None, index=True)
+    owner_name: str | None = Field(default=None, index=True)
+    due_date: datetime | None = Field(default=None, index=True)
+    expected_impact: str | None = None
+    estimated_cost: float | None = Field(default=None, ge=0.0)
+    outcome_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    closed_at: datetime | None = None
+    created_by: str | None = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
@@ -481,9 +472,9 @@ class InterventionOutcomeTable(SQLModel, table=True):
     status: str = Field(
         default="tracking", index=True
     )  # tracking | improved | neutral | worsened
-    risk_delta: Optional[float] = None  # negative is better
-    retention_delta: Optional[float] = None  # positive is better
-    notes: Optional[str] = None
+    risk_delta: float | None = None  # negative is better
+    retention_delta: float | None = None  # positive is better
+    notes: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
@@ -517,7 +508,7 @@ class RawEventTable(SQLModel, table=True):
     tenant_id: str = Field(default="default", index=True)
     source_type: str = Field(index=True)
     provider: str = Field(index=True)
-    external_id: Optional[str] = Field(default=None, index=True)
+    external_id: str | None = Field(default=None, index=True)
     payload: str  # JSON payload
     ingested_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
@@ -533,7 +524,7 @@ class QuarantineEventTable(SQLModel, table=True):
     tenant_id: str = Field(default="default", index=True)
     source_type: str = Field(index=True)
     provider: str = Field(index=True)
-    external_id: Optional[str] = Field(default=None, index=True)
+    external_id: str | None = Field(default=None, index=True)
     payload: str
     reason: str
     quarantined_at: datetime = Field(default_factory=datetime.utcnow, index=True)
@@ -555,9 +546,9 @@ class CanonicalEmployeeTable(SQLModel, table=True):
     department: str = Field(index=True)
     role: str = Field(index=True)
     sentiment_score: float = Field(default=0.5, ge=0.0, le=1.0)
-    retention_prob: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    retention_prob: float | None = Field(default=None, ge=0.0, le=1.0)
     is_at_risk: bool = Field(default=False, index=True)
-    salary: Optional[int] = Field(default=None)
+    salary: int | None = Field(default=None)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
@@ -577,8 +568,8 @@ class CanonicalCandidateTable(SQLModel, table=True):
     email: str = Field(index=True)
     department: str = Field(index=True)
     role: str = Field(index=True)
-    match_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    salary: Optional[int] = Field(default=None)
+    match_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    salary: int | None = Field(default=None)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
@@ -648,7 +639,7 @@ class ForecastScenarioTable(SQLModel, table=True):
     scenario_name: str = Field(index=True)
     input_payload: str  # JSON
     output_payload: str  # JSON
-    created_by: Optional[str] = Field(default=None, index=True)
+    created_by: str | None = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
@@ -666,7 +657,7 @@ class MLDriftSnapshotTable(SQLModel, table=True):
     model_version: str = Field(index=True)
     drift_score: float = Field(default=0.0, ge=0.0, le=1.0)
     needs_retraining: bool = Field(default=False, index=True)
-    notes: Optional[str] = None
+    notes: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
@@ -688,9 +679,9 @@ class MLModelCardTable(SQLModel, table=True):
     pr_auc: float = Field(default=0.0, ge=0.0, le=1.0)
     calibration_error: float = Field(default=0.0, ge=0.0, le=1.0)
     fairness_gap: float = Field(default=0.0, ge=0.0, le=1.0)
-    notes: Optional[str] = None
-    approved_by: Optional[str] = Field(default=None, index=True)
-    approved_at: Optional[datetime] = None
+    notes: str | None = None
+    approved_by: str | None = Field(default=None, index=True)
+    approved_at: datetime | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
@@ -710,9 +701,9 @@ class ReleaseGateTable(SQLModel, table=True):
         default="pending", index=True
     )  # pending|approved|rejected|promoted
     required_checks: str = Field(default="[]")  # JSON array string
-    approved_by: Optional[str] = Field(default=None, index=True)
-    approved_at: Optional[datetime] = None
-    notes: Optional[str] = None
+    approved_by: str | None = Field(default=None, index=True)
+    approved_at: datetime | None = None
+    notes: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
@@ -732,9 +723,9 @@ class DRRunbookTable(SQLModel, table=True):
     status: str = Field(
         default="draft", index=True
     )  # draft|ready|validated|needs_review
-    last_drill_at: Optional[datetime] = None
-    last_drill_result: Optional[str] = None
-    notes: Optional[str] = None
+    last_drill_at: datetime | None = None
+    last_drill_result: str | None = None
+    notes: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
@@ -752,7 +743,7 @@ class ProcurementArtifactTable(SQLModel, table=True):
     title: str = Field(index=True)
     version: str = Field(default="v1", index=True)
     status: str = Field(default="draft", index=True)  # draft|ready|approved
-    notes: Optional[str] = None
+    notes: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
@@ -770,7 +761,7 @@ class IntegrationApiKeyTable(SQLModel, table=True):
     api_key_hash: str = Field(index=True)  # Hashed key for secure lookup
     status: str = Field(default="active", index=True)  # active | revoked
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
 
 
 class IntegrationLogTable(SQLModel, table=True):
@@ -805,18 +796,18 @@ class IntegrationWebhookEventTable(SQLModel, table=True):
         default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
     )
     tenant_id: str = Field(default="default", index=True)
-    api_key_id: Optional[UUID] = Field(
+    api_key_id: UUID | None = Field(
         default=None, foreign_key="integration_api_keys.id", index=True
     )
     integration_name: str = Field(index=True)
     endpoint: str = Field(index=True)
-    idempotency_key: Optional[str] = Field(default=None, index=True)
+    idempotency_key: str | None = Field(default=None, index=True)
     status: str = Field(default="pending", index=True)  # pending | success | failed
     attempts: int = Field(default=0)
-    last_error: Optional[str] = None
+    last_error: str | None = None
     payload: str
-    headers: Optional[str] = None
-    next_retry_at: Optional[datetime] = None
+    headers: str | None = None
+    next_retry_at: datetime | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 

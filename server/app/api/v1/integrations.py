@@ -3,26 +3,27 @@ Aurelinx B2B/B2C Enterprise API Integration Middleware
 Secure endpoint ingestions for Slack, Jira, and Workday systems.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Header, Request, status
-from sqlmodel import Session, select
-from uuid import UUID
-from datetime import datetime, timedelta
 import hashlib
 import hmac
 import json
 import secrets
-from typing import Dict, Any, Optional
+from datetime import datetime, timedelta
+from typing import Any
+from uuid import UUID
 
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from sqlmodel import Session, select
+
+from app.core.logging_config import get_logger
+from app.core.security import get_current_admin_user_strict, get_tenant_id
 from app.models.database import (
-    get_session,
     EmployeeTable,
-    SkillTable,
     IntegrationApiKeyTable,
     IntegrationLogTable,
     IntegrationWebhookEventTable,
+    SkillTable,
+    get_session,
 )
-from app.core.logging_config import get_logger
-from app.core.security import get_current_admin_user_strict, get_tenant_id
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 logger = get_logger(__name__)
@@ -42,7 +43,7 @@ def hash_api_key(key: str) -> str:
 
 # API Key security validator dependency
 def verify_api_key(
-    api_key_header: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key_header: str | None = Header(None, alias="X-API-Key"),
     tenant_id: str = Depends(get_tenant_id),
     session: Session = Depends(get_session),
 ):
@@ -84,8 +85,8 @@ def verify_api_key(
 
 async def verify_payload_signature(
     request: Request,
-    x_signature: Optional[str] = Header(None, alias="X-Signature"),
-    api_key_header: Optional[str] = Header(None, alias="X-API-Key"),
+    x_signature: str | None = Header(None, alias="X-Signature"),
+    api_key_header: str | None = Header(None, alias="X-API-Key"),
 ):
     raw_key = api_key_header
     if not raw_key:
@@ -116,8 +117,8 @@ async def verify_payload_signature(
 
 
 def get_idempotency_key(
-    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")
-) -> Optional[str]:
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key")
+) -> str | None:
     return idempotency_key
 
 
@@ -126,9 +127,9 @@ def create_webhook_event_record(
     api_key: IntegrationApiKeyTable,
     integration_name: str,
     endpoint: str,
-    payload: Dict[str, Any],
-    headers: Dict[str, Any],
-    idempotency_key: Optional[str] = None,
+    payload: dict[str, Any],
+    headers: dict[str, Any],
+    idempotency_key: str | None = None,
 ):
     existing = None
     if idempotency_key:
@@ -166,7 +167,7 @@ def update_webhook_event_status(
     session: Session,
     event: IntegrationWebhookEventTable,
     success: bool,
-    error_message: Optional[str] = None,
+    error_message: str | None = None,
 ):
     event.attempts += 1
     event.updated_at = datetime.utcnow()
@@ -332,11 +333,11 @@ def rotate_token(
 
 @router.post("/workday")
 def ingest_workday_hris(
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     request: Request,
     api_key: IntegrationApiKeyTable = Depends(verify_api_key),
     signature_valid: bool = Depends(verify_payload_signature),
-    idempotency_key: Optional[str] = Depends(get_idempotency_key),
+    idempotency_key: str | None = Depends(get_idempotency_key),
     session: Session = Depends(get_session),
 ):
     """
@@ -471,11 +472,11 @@ def ingest_workday_hris(
 
 @router.post("/slack")
 def ingest_slack_sentiment(
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     request: Request,
     api_key: IntegrationApiKeyTable = Depends(verify_api_key),
     signature_valid: bool = Depends(verify_payload_signature),
-    idempotency_key: Optional[str] = Depends(get_idempotency_key),
+    idempotency_key: str | None = Depends(get_idempotency_key),
     session: Session = Depends(get_session),
 ):
     """
@@ -568,11 +569,11 @@ def ingest_slack_sentiment(
 
 @router.post("/jira")
 def ingest_jira_collaboration(
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     request: Request,
     api_key: IntegrationApiKeyTable = Depends(verify_api_key),
     signature_valid: bool = Depends(verify_payload_signature),
-    idempotency_key: Optional[str] = Depends(get_idempotency_key),
+    idempotency_key: str | None = Depends(get_idempotency_key),
     session: Session = Depends(get_session),
 ):
     """

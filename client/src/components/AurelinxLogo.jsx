@@ -34,4 +34,3 @@ const AurelinxLogo = ({ size = 24, collapsed = false }) => {
 };
 
 export default AurelinxLogo;
-

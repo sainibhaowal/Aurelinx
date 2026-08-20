@@ -5,10 +5,9 @@ Enterprise HR intelligence endpoints:
 - Integration connector registry
 """
 
-from datetime import datetime
 import asyncio
 import json
-from typing import List
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,23 +20,23 @@ from app.models.database import (
     AuditLogTable,
     EmployeeTable,
     IntegrationConnectionTable,
-    InterventionTable,
     InterventionOutcomeTable,
+    InterventionTable,
     get_session,
 )
 from app.schemas.schemas import (
     AttritionDriverOut,
     AttritionExplainOut,
     AttritionExplainResponse,
+    ConnectionSyncStatusOut,
     IntegrationConnectionCreate,
     IntegrationConnectionOut,
     IntegrationConnectionUpdate,
-    ConnectionSyncStatusOut,
     InterventionCreate,
     InterventionOut,
-    InterventionUpdate,
     InterventionOutcomeCreate,
     InterventionOutcomeOut,
+    InterventionUpdate,
     RiskDriverDrilldownItem,
     RiskDriverDrilldownResponse,
 )
@@ -72,8 +71,8 @@ def _audit(
     )
 
 
-def _risk_components(employee: EmployeeTable) -> List[AttritionDriverOut]:
-    drivers: List[AttritionDriverOut] = []
+def _risk_components(employee: EmployeeTable) -> list[AttritionDriverOut]:
+    drivers: list[AttritionDriverOut] = []
     sentiment = float(employee.sentiment_score or 0.5)
     retention = float(
         employee.retention_prob if employee.retention_prob is not None else 0.5
@@ -116,7 +115,7 @@ def _risk_components(employee: EmployeeTable) -> List[AttritionDriverOut]:
 
 
 def _risk_probability(
-    employee: EmployeeTable, drivers: List[AttritionDriverOut]
+    employee: EmployeeTable, drivers: list[AttritionDriverOut]
 ) -> float:
     sentiment = float(employee.sentiment_score or 0.5)
     retention = float(
@@ -131,7 +130,7 @@ def _risk_probability(
     return round(max(0.01, min(0.99, base)), 3)
 
 
-def _recommended_actions(employee: EmployeeTable, risk_probability: float) -> List[str]:
+def _recommended_actions(employee: EmployeeTable, risk_probability: float) -> list[str]:
     actions = []
     if risk_probability >= 0.6:
         actions.append("Schedule manager + HRBP retention conversation within 7 days.")
@@ -270,7 +269,7 @@ def _to_intervention_out(item: InterventionTable) -> InterventionOut:
     )
 
 
-@router.get("/interventions", response_model=List[InterventionOut])
+@router.get("/interventions", response_model=list[InterventionOut])
 async def list_interventions(
     status_filter: str | None = Query(default=None),
     current_user: TokenData = Depends(get_current_user),
@@ -408,7 +407,7 @@ def _to_outcome_out(item: InterventionOutcomeTable) -> InterventionOutcomeOut:
 
 @router.get(
     "/interventions/{intervention_id}/outcomes",
-    response_model=List[InterventionOutcomeOut],
+    response_model=list[InterventionOutcomeOut],
 )
 async def list_intervention_outcomes(
     intervention_id: UUID,
@@ -537,7 +536,7 @@ def _to_connection_out(item: IntegrationConnectionTable) -> IntegrationConnectio
     )
 
 
-@router.get("/connections", response_model=List[IntegrationConnectionOut])
+@router.get("/connections", response_model=list[IntegrationConnectionOut])
 async def list_connections(
     current_user: TokenData = Depends(get_current_user),
     tenant_id: str = Depends(get_tenant_id),

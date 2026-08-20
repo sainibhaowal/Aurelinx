@@ -1,14 +1,14 @@
-from typing import Dict, List
 from sqlmodel import Session, select
-from app.services.connectors.base import BaseConnector
+
 from app.models.database import EmployeeTable
+from app.services.connectors.base import BaseConnector
 
 
 class WorkdayConnector(BaseConnector):
     provider = "workday"
     source_type = "hris"
 
-    def fetch_records(self, connection: Dict) -> List[Dict]:
+    def fetch_records(self, connection: dict) -> list[dict]:
         # Lean v1 adapter: map from local employee store as source simulation.
         # Replace with real Workday API calls when credentials are configured.
         session: Session = connection["session"]

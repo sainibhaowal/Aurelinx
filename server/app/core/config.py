@@ -1,6 +1,6 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
 import os
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -44,19 +44,19 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # LLM Providers
-    OPENAI_API_KEY: Optional[str] = None
-    CLAUDE_API_KEY: Optional[str] = None
-    GROQ_API_KEY: Optional[str] = None
-    OPENCODE_ZEN: Optional[str] = None
+    OPENAI_API_KEY: str | None = None
+    CLAUDE_API_KEY: str | None = None
+    GROQ_API_KEY: str | None = None
+    OPENCODE_ZEN: str | None = None
 
     # Vector Search
     EMBEDDING_MODEL: str = "text-embedding-3-small"
 
     # OAuth Settings
-    GOOGLE_CLIENT_ID: Optional[str] = None
-    GOOGLE_CLIENT_SECRET: Optional[str] = None
-    GITHUB_CLIENT_ID: Optional[str] = None
-    GITHUB_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_CLIENT_SECRET: str | None = None
+    GITHUB_CLIENT_ID: str | None = None
+    GITHUB_CLIENT_SECRET: str | None = None
 
     # Configuration
     model_config = SettingsConfigDict(
@@ -103,9 +103,7 @@ class Settings(BaseSettings):
         return normalized in {"1", "true", "yes", "on", "debug", "dev", "development"}
 
     @staticmethod
-    def _parse_allowed_origins(
-        raw: Optional[str], current: list[str] | str
-    ) -> list[str]:
+    def _parse_allowed_origins(raw: str | None, current: list[str] | str) -> list[str]:
         """Accept ALLOWED_ORIGINS as comma-separated env value and merge safely."""
         if isinstance(current, str):
             defaults = {item.strip() for item in current.split(",") if item.strip()}

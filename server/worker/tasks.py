@@ -1,10 +1,12 @@
 """Background tasks for processing webhook events using RQ."""
+
 import json
-from datetime import datetime, timedelta
 import logging
+from datetime import datetime, timedelta
+
 import httpx
 
-from app.models.database import get_session, IntegrationWebhookEventTable
+from app.models.database import IntegrationWebhookEventTable, get_session
 
 logger = logging.getLogger("worker.tasks")
 
@@ -25,9 +27,14 @@ def deliver_event_by_id(event_id: str):
             headers = {}
 
         try:
-            resp = httpx.post(event.endpoint, content=event.payload.encode('utf-8'), headers=headers, timeout=10.0)
+            resp = httpx.post(
+                event.endpoint,
+                content=event.payload.encode("utf-8"),
+                headers=headers,
+                timeout=10.0,
+            )
             if 200 <= resp.status_code < 300:
-                event.status = 'success'
+                event.status = "success"
                 event.attempts = event.attempts + 1
                 event.last_error = None
                 event.next_retry_at = None
@@ -41,9 +48,11 @@ def deliver_event_by_id(event_id: str):
             event.attempts = event.attempts + 1
             event.last_error = str(exc)
             backoff = 60 * (2 ** (event.attempts - 1))
-            event.next_retry_at = datetime.utcnow() + timedelta(seconds=min(backoff, 3600))
+            event.next_retry_at = datetime.utcnow() + timedelta(
+                seconds=min(backoff, 3600)
+            )
             if event.attempts >= 5:
-                event.status = 'failed'
+                event.status = "failed"
             session.add(event)
             session.commit()
             logger.warning(f"Delivery failed for event {event.id}: {exc}")

@@ -1,14 +1,13 @@
+import configparser
 import os
 import sys
-import configparser
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.core.config import settings
 from app.models.database import SQLModel
@@ -25,13 +24,13 @@ if config.config_file_name is not None:
 
 # Set the SQLAlchemy URL from application settings/environment.
 # Alembic uses ConfigParser interpolation, so literal percent signs must be escaped.
-config.set_main_option('sqlalchemy.url', settings.DATABASE_URL.replace('%', '%%'))
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
 
 target_metadata = SQLModel.metadata
 
 
 def run_migrations_offline():
-    url = config.get_main_option('sqlalchemy.url')
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -46,7 +45,7 @@ def run_migrations_offline():
 def run_migrations_online():
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),
-        prefix='sqlalchemy.',
+        prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 

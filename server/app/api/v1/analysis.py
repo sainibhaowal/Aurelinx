@@ -2,12 +2,11 @@
 AI Analysis and Agent endpoints
 """
 
-from datetime import datetime
 import asyncio
 import json
 import re
 import time
-from typing import Dict, List, Tuple
+from datetime import datetime
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,19 +14,18 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from app.api.v1.employees import get_employee_out
-from app.api.v1.candidates import get_candidate_out
-from app.core.logging_config import get_logger
-from app.core.security import TokenData, get_current_user
-from app.core.provider_utils import normalize_local_provider_base
 from app.core.data_policy import filter_real_records
+from app.core.logging_config import get_logger
+from app.core.provider_utils import normalize_local_provider_base
+from app.core.security import TokenData, get_current_user
 from app.models.database import (
     CandidateTable,
     CompliancePolicyTable,
     EmployeeTable,
     ForecastScenarioTable,
+    GoldMetricSnapshotTable,
     InterventionTable,
     MLModelCardTable,
-    GoldMetricSnapshotTable,
     SkillTable,
     engine,
     get_session,
@@ -45,11 +43,15 @@ router = APIRouter(prefix="/ai", tags=["analysis"])
 logger = get_logger(__name__)
 _SENTIMENT_PREV_SNAPSHOT = {}
 
+
 def _tenant_key(current_user: TokenData) -> str:
     """Resolve the authenticated workspace scope without trusting client input."""
     return str(getattr(current_user, "tenant_id", None) or "default")
 
-def _save_analytics_snapshot(session: Session, snapshot: dict, tenant_id: str = "default") -> None:
+
+def _save_analytics_snapshot(
+    session: Session, snapshot: dict, tenant_id: str = "default"
+) -> None:
     """Persist a compact, tenant-scoped analytics point for durable trend history."""
     row = GoldMetricSnapshotTable(
         tenant_id=tenant_id,
@@ -152,7 +154,7 @@ def _analytics_snapshot(session: Session) -> dict:
     }
 
 
-def _workspace_context(session: Session) -> Dict:
+def _workspace_context(session: Session) -> dict:
     employees = filter_real_records(session.exec(select(EmployeeTable)).all())
     top_risky = sorted(
         employees,
@@ -237,8 +239,8 @@ def _workspace_context(session: Session) -> Dict:
 
 
 def _build_sentiment_metrics(
-    employees: List[EmployeeTable], prev_snapshot: dict = None
-) -> Tuple[List[SentimentMetric], dict]:
+    employees: list[EmployeeTable], prev_snapshot: dict = None
+) -> tuple[list[SentimentMetric], dict]:
     total = len(employees)
     if total == 0:
         return [], {}
@@ -266,7 +268,7 @@ def _build_sentiment_metrics(
         "Retention-Sentiment Index": round(leadership_trust, 4),
     }
 
-    metrics: List[SentimentMetric] = []
+    metrics: list[SentimentMetric] = []
     sample_confidence = min(0.99, 0.72 + (total / 200))
     for idx, (name, score) in enumerate(current.items()):
         prev_score = (prev_snapshot or {}).get(name, score)
@@ -284,12 +286,12 @@ def _build_sentiment_metrics(
     return metrics, current
 
 
-def _tokenize(text: str) -> List[str]:
+def _tokenize(text: str) -> list[str]:
     return re.findall(r"[a-z0-9\+\#\.]{2,}", text.lower())
 
 
 def _score_employee(
-    prompt: str, employee: EmployeeTable, skill_names: List[str]
+    prompt: str, employee: EmployeeTable, skill_names: list[str]
 ) -> float:
     prompt_tokens = set(_tokenize(prompt))
     role_tokens = set(_tokenize(employee.role))
@@ -308,7 +310,7 @@ def _score_employee(
 
 
 def _score_candidate(
-    prompt: str, candidate: CandidateTable, skill_names: List[str]
+    prompt: str, candidate: CandidateTable, skill_names: list[str]
 ) -> float:
     prompt_tokens = set(_tokenize(prompt))
     role_tokens = set(_tokenize(candidate.role))
@@ -329,13 +331,17 @@ def _score_candidate(
 async def _call_openai_compatible_model(
     provider: str,
     prompt: str,
-    ranked_profiles: List[dict],
+    ranked_profiles: list[dict],
     api_key: str = None,
     base_url: str = None,
     model: str = None,
 ) -> str:
     provider = (provider or "openai").lower()
-    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
+    provider = {
+        "anthropic": "claude",
+        "google": "gemini",
+        "google-gemini": "gemini",
+    }.get(provider, provider)
 
     if provider == "lmstudio":
         endpoint = (
@@ -411,13 +417,17 @@ async def _call_openai_compatible_model(
 async def _call_copilot_model(
     provider: str,
     prompt: str,
-    context: Dict,
+    context: dict,
     api_key: str = None,
     base_url: str = None,
     model: str = None,
 ) -> str:
     provider = (provider or "lmstudio").lower()
-    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
+    provider = {
+        "anthropic": "claude",
+        "google": "gemini",
+        "google-gemini": "gemini",
+    }.get(provider, provider)
     if provider == "lmstudio":
         endpoint = (
             f"{normalize_local_provider_base(base_url).rstrip('/')}/chat/completions"
@@ -435,7 +445,10 @@ async def _call_copilot_model(
     elif provider == "claude":
         endpoint = "https://api.anthropic.com/v1/messages"
         selected_model = model or "claude-3-5-sonnet-20241022"
-        auth_header = {"Content-Type": "application/json", "anthropic-version": "2023-06-01"}
+        auth_header = {
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01",
+        }
         if api_key:
             auth_header["x-api-key"] = api_key
     elif provider == "gemini":
@@ -544,7 +557,9 @@ async def analyze_talent(
         if candidates:
             candidate_skill_rows = session.exec(
                 select(SkillTable).where(
-                    SkillTable.candidate_id.in_([candidate.id for candidate in candidates])
+                    SkillTable.candidate_id.in_(
+                        [candidate.id for candidate in candidates]
+                    )
                 )
             ).all()
             for skill in candidate_skill_rows:
@@ -560,7 +575,7 @@ async def analyze_talent(
                 employee_skill_map.setdefault(skill.employee_id, []).append(skill)
 
         use_candidates = bool(candidates)
-        scored: List[Tuple[float, object, List[str]]] = []
+        scored: list[tuple[float, object, list[str]]] = []
         if use_candidates:
             for cand in candidates:
                 skills = candidate_skill_map.get(cand.id, [])
@@ -607,7 +622,12 @@ async def analyze_talent(
                     "is_at_risk": bool((cand.match_score or 0.0) < 0.55),
                     "retention_prob": float(cand.match_score or 0.0),
                     "skills": [
-                        {"id": skill.id, "name": skill.name, "level": skill.level, "created_at": skill.created_at}
+                        {
+                            "id": skill.id,
+                            "name": skill.name,
+                            "level": skill.level,
+                            "created_at": skill.created_at,
+                        }
                         for skill in skills[:12]
                     ],
                     "experiences": [],
@@ -637,25 +657,32 @@ async def analyze_talent(
                         "ranking_score": round(score, 3),
                     }
                 )
-                top_candidates.append({
-                    "id": emp.id,
-                    "full_name": emp.full_name,
-                    "email": emp.email,
-                    "department": emp.department,
-                    "role": emp.role,
-                    "sentiment_score": emp.sentiment_score,
-                    "is_at_risk": emp.is_at_risk,
-                    "retention_prob": emp.retention_prob,
-                    "salary": emp.salary,
-                    "join_date": emp.join_date,
-                    "created_at": emp.created_at,
-                    "updated_at": emp.updated_at,
-                    "skills": [
-                        {"id": skill.id, "name": skill.name, "level": skill.level, "created_at": skill.created_at}
-                        for skill in skills[:12]
-                    ],
-                    "experiences": [],
-                })
+                top_candidates.append(
+                    {
+                        "id": emp.id,
+                        "full_name": emp.full_name,
+                        "email": emp.email,
+                        "department": emp.department,
+                        "role": emp.role,
+                        "sentiment_score": emp.sentiment_score,
+                        "is_at_risk": emp.is_at_risk,
+                        "retention_prob": emp.retention_prob,
+                        "salary": emp.salary,
+                        "join_date": emp.join_date,
+                        "created_at": emp.created_at,
+                        "updated_at": emp.updated_at,
+                        "skills": [
+                            {
+                                "id": skill.id,
+                                "name": skill.name,
+                                "level": skill.level,
+                                "created_at": skill.created_at,
+                            }
+                            for skill in skills[:12]
+                        ],
+                        "experiences": [],
+                    }
+                )
 
         analysis_text = await _call_openai_compatible_model(
             provider=request.provider,
@@ -686,7 +713,7 @@ async def analyze_talent(
             detail="AI provider request failed. Check provider endpoint/key/model.",
         )
     except Exception as e:
-        logger.error(f"Analysis failed: {str(e)}", exc_info=True)
+        logger.error(f"Analysis failed: {e!s}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Analysis failed",
@@ -750,7 +777,7 @@ async def get_sentiment_report(
         )
 
     except Exception as e:
-        logger.error(f"Sentiment report failed: {str(e)}", exc_info=True)
+        logger.error(f"Sentiment report failed: {e!s}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate sentiment report",
@@ -857,7 +884,9 @@ async def analytics_stream(
             try:
                 with Session(engine) as session:
                     snapshot = _analytics_snapshot(session)
-                    _save_analytics_snapshot(session, snapshot, _tenant_key(current_user))
+                    _save_analytics_snapshot(
+                        session, snapshot, _tenant_key(current_user)
+                    )
                 yield f"event: analytics\ndata: {json.dumps(snapshot)}\n\n"
             except Exception as e:
                 logger.error(f"Analytics stream error: {e}", exc_info=True)
@@ -905,11 +934,17 @@ async def analytics_history(
         for row in reversed(rows):
             try:
                 point = json.loads(row.payload)
-                point["timestamp"] = point.get("timestamp") or row.created_at.isoformat()
+                point["timestamp"] = (
+                    point.get("timestamp") or row.created_at.isoformat()
+                )
                 points.append(point)
             except (TypeError, ValueError, json.JSONDecodeError):
                 continue
-        return {"points": points, "source": "durable_analytics_snapshots", "limit": limit}
+        return {
+            "points": points,
+            "source": "durable_analytics_snapshots",
+            "limit": limit,
+        }
 
 
 @router.get("/analytics/overview")
@@ -933,31 +968,64 @@ async def analytics_overview(
         at_risk = sum(1 for row in employees if row.is_at_risk)
         departments = {}
         for row in employees:
-            bucket = departments.setdefault(row.department, {"department": row.department, "total": 0, "risk": 0, "sentiment": 0.0, "retention": 0.0})
+            bucket = departments.setdefault(
+                row.department,
+                {
+                    "department": row.department,
+                    "total": 0,
+                    "risk": 0,
+                    "sentiment": 0.0,
+                    "retention": 0.0,
+                },
+            )
             bucket["total"] += 1
             bucket["risk"] += int(row.is_at_risk)
             bucket["sentiment"] += float(row.sentiment_score or 0.0)
-            bucket["retention"] += float(row.retention_prob if row.retention_prob is not None else 0.5)
+            bucket["retention"] += float(
+                row.retention_prob if row.retention_prob is not None else 0.5
+            )
         department_rows = []
         for bucket in departments.values():
-            bucket["sentiment"] = round(bucket["sentiment"] / bucket["total"], 3) if bucket["total"] else 0.0
-            bucket["retention"] = round(bucket["retention"] / bucket["total"], 3) if bucket["total"] else 0.0
+            bucket["sentiment"] = (
+                round(bucket["sentiment"] / bucket["total"], 3)
+                if bucket["total"]
+                else 0.0
+            )
+            bucket["retention"] = (
+                round(bucket["retention"] / bucket["total"], 3)
+                if bucket["total"]
+                else 0.0
+            )
             department_rows.append(bucket)
         department_rows.sort(key=lambda item: item["department"] or "")
-        evidence = sorted([row for row in employees if row.is_at_risk], key=lambda row: float(row.retention_prob if row.retention_prob is not None else 0.5))
+        evidence = sorted(
+            [row for row in employees if row.is_at_risk],
+            key=lambda row: float(
+                row.retention_prob if row.retention_prob is not None else 0.5
+            ),
+        )
         candidates = filter_real_records(session.exec(select(CandidateTable)).all())
-        match_scores = [float(row.match_score) for row in candidates if row.match_score is not None]
+        match_scores = [
+            float(row.match_score) for row in candidates if row.match_score is not None
+        ]
         return {
             "total": total,
             "atRisk": at_risk,
             "atRiskPct": round(at_risk / total * 100, 1) if total else 0.0,
             "departments": department_rows,
-            "riskEmployees": [get_employee_out(row, session, current_user) for row in evidence[offset:offset + limit]],
+            "riskEmployees": [
+                get_employee_out(row, session, current_user)
+                for row in evidence[offset : offset + limit]
+            ],
             "riskTotal": len(evidence),
             "offset": offset,
             "limit": limit,
             "candidateCount": len(candidates),
-            "candidateAverageMatch": round(sum(match_scores) / len(match_scores), 3) if match_scores else None,
+            "candidateAverageMatch": (
+                round(sum(match_scores) / len(match_scores), 3)
+                if match_scores
+                else None
+            ),
             "candidateHighMatch": sum(1 for score in match_scores if score >= 0.7),
         }
 

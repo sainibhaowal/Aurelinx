@@ -190,29 +190,45 @@ const PLATFORM_MODULES = [
     accent: "#f43f5e",
     title: "Multi-Step Agentic Workflow Chat",
     body: "Features a live ReAct orchestration loop with interactive status transitions (Think ➔ Plan ➔ Explore ➔ Modify ➔ Verify ➔ Complete). Directly translates natural language queries into secure database read/write actions.",
-    tags: ["Interactive State Tracker", "Dynamic SQL Mutations", "Context Trace Inspector"],
+    tags: [
+      "Interactive State Tracker",
+      "Dynamic SQL Mutations",
+      "Context Trace Inspector",
+    ],
   },
   {
     icon: Search,
     accent: "#2dd4bf",
     title: "Semantic Talent Scout Matchmaker",
     body: "Enables conceptual candidate matchmaking using description prompts. Employs a hybrid scoring algorithm indexing roles, departments, skill hierarchies, and matched coordinates.",
-    tags: ["Conceptual Skill Search", "Typewriter Token Streaming", "Talent Profile Modal"],
+    tags: [
+      "Conceptual Skill Search",
+      "Typewriter Token Streaming",
+      "Talent Profile Modal",
+    ],
   },
   {
     icon: BarChart3,
     accent: "#10b981",
     title: "Sentiment Intelligence & Morale Analytics",
     body: "Monitors organizational health and burnout risk indices in real-time. Computes leadership trust, morale velocities, and burnout levels using streaming Server-Sent Events (SSE).",
-    tags: ["burnout risk vector", "morale velocity trends", "live SSE analytics"],
+    tags: [
+      "burnout risk vector",
+      "morale velocity trends",
+      "live SSE analytics",
+    ],
   },
   {
     icon: Network,
     accent: "#ec4899",
     title: "Organizational Network Analysis (ONA)",
     body: "Maps employee pull request reviews and collaborations onto an interactive ONA graph. Computes influence scores using PageRank, Brandes Betweenness centrality, and Dijkstra skill pathways.",
-    tags: ["PageRank Centrality", "Spring-Physics Physics", "Dijkstra skill distances"],
-  }
+    tags: [
+      "PageRank Centrality",
+      "Spring-Physics Physics",
+      "Dijkstra skill distances",
+    ],
+  },
 ];
 
 const MATH_PILLARS = [
@@ -285,7 +301,11 @@ const GradientWord = ({ children }) => (
   <span className="gradient-headline">{children}</span>
 );
 
-const CountUp = ({ value, format = (v) => v.toLocaleString(), duration = 950 }) => {
+const CountUp = ({
+  value,
+  format = (v) => v.toLocaleString(),
+  duration = 950,
+}) => {
   const [display, setDisplay] = React.useState(0);
   const ref = React.useRef(null);
   const started = React.useRef(false);
@@ -307,7 +327,7 @@ const CountUp = ({ value, format = (v) => v.toLocaleString(), duration = 950 }) 
         };
         requestAnimationFrame(tick);
       },
-      { threshold: 0.4 }
+      { threshold: 0.4 },
     );
     observer.observe(node);
     return () => observer.disconnect();
@@ -325,7 +345,10 @@ const GlassCard = ({ children, className = "", style = {}, delay = 0 }) => (
     whileInView={{ opacity: 1, y: 0 }}
     viewport={{ once: true, amount: 0.12 }}
     transition={{ duration: 0.6, delay, ease: [0.16, 1, 0.3, 1] }}
-    whileHover={{ y: -4, transition: { type: "spring", stiffness: 350, damping: 25 } }}
+    whileHover={{
+      y: -4,
+      transition: { type: "spring", stiffness: 350, damping: 25 },
+    }}
     className={`group relative rounded-[22px] luxe-card ${className}`}
     style={{
       background:
@@ -356,7 +379,10 @@ const SectionLabel = ({ children }) => (
   >
     <span
       className="h-1.5 w-1.5 rounded-full"
-      style={{ background: "#6ee7b7", boxShadow: "0 0 8px rgba(110,231,183,0.9)" }}
+      style={{
+        background: "#6ee7b7",
+        boxShadow: "0 0 8px rgba(110,231,183,0.9)",
+      }}
     />
     {children}
   </p>
@@ -384,7 +410,14 @@ const Tag = ({ children, accent = null }) => (
 /* ─────────────────────────────────────────
    CAPABILITY TICKER (endless marquee)
 ───────────────────────────────────────── */
-const TICKER_PALETTE = ["#34d399", "#fbbf24", "#2dd4bf", "#a3e635", "#fb7185", "#a78bfa"];
+const TICKER_PALETTE = [
+  "#34d399",
+  "#fbbf24",
+  "#2dd4bf",
+  "#a3e635",
+  "#fb7185",
+  "#a78bfa",
+];
 
 const Ticker = ({ items, className = "" }) => (
   <div className={`ticker-mask ${className}`} aria-hidden="true">
@@ -426,7 +459,7 @@ const Waveform = ({ count = 9, color = "#6ee7b7", height = 40 }) => (
           height: `${12 + ((i * 37) % 26)}px`,
           background: color,
           animationDelay: `${(i % 5) * 0.12}s`,
-          opacity: 0.35 + ((i % 3) * 0.2),
+          opacity: 0.35 + (i % 3) * 0.2,
         }}
       />
     ))}
@@ -445,13 +478,19 @@ const HeroOrb = ({ sreStatus, pingLatency, onEnterWorkspace }) => {
       <div className="orb-vignette absolute inset-0" aria-hidden="true" />
 
       {/* Rotating rings */}
-      <div className="orb-ring absolute h-[380px] w-[380px] rounded-full border border-cyan-400/10" aria-hidden="true" />
+      <div
+        className="orb-ring absolute h-[380px] w-[380px] rounded-full border border-cyan-400/10"
+        aria-hidden="true"
+      />
       <div
         className="orb-ring absolute h-[300px] w-[300px] rounded-full border border-dashed border-indigo-400/15"
         style={{ animationDuration: "58s" }}
         aria-hidden="true"
       />
-      <div className="orb-ring reverse absolute h-[236px] w-[236px] rounded-full border border-cyan-300/10" aria-hidden="true" />
+      <div
+        className="orb-ring reverse absolute h-[236px] w-[236px] rounded-full border border-cyan-300/10"
+        aria-hidden="true"
+      />
 
       {/* Orbit satellites */}
       {[
@@ -523,7 +562,10 @@ const HeroOrb = ({ sreStatus, pingLatency, onEnterWorkspace }) => {
       >
         <span
           className={`h-1.5 w-1.5 rounded-full ${ok ? "animate-pulse" : ""}`}
-          style={{ background: ok ? "#6ee7b7" : "#f87171", boxShadow: ok ? "0 0 8px rgba(110,231,183,0.8)" : "none" }}
+          style={{
+            background: ok ? "#6ee7b7" : "#f87171",
+            boxShadow: ok ? "0 0 8px rgba(110,231,183,0.8)" : "none",
+          }}
         />
         <span
           className="text-[9px] font-bold uppercase tracking-wider"
@@ -536,7 +578,12 @@ const HeroOrb = ({ sreStatus, pingLatency, onEnterWorkspace }) => {
 
       <motion.div
         animate={{ y: [0, 5, 0] }}
-        transition={{ duration: 5.2, repeat: Infinity, ease: "easeInOut", delay: 0.7 }}
+        transition={{
+          duration: 5.2,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: 0.7,
+        }}
         className="absolute right-[3%] top-[14%] flex items-center gap-2 rounded-[14px] px-3.5 py-2.5"
         style={{
           background: "rgba(4,16,11,0.88)",
@@ -555,7 +602,12 @@ const HeroOrb = ({ sreStatus, pingLatency, onEnterWorkspace }) => {
 
       <motion.div
         animate={{ y: [0, -5, 0] }}
-        transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut", delay: 1.4 }}
+        transition={{
+          duration: 4.8,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: 1.4,
+        }}
         className="absolute bottom-[22%] left-[2%] flex items-center gap-2 rounded-[14px] px-3.5 py-2.5"
         style={{
           background: "rgba(4,16,11,0.88)",
@@ -574,7 +626,12 @@ const HeroOrb = ({ sreStatus, pingLatency, onEnterWorkspace }) => {
 
       <motion.div
         animate={{ y: [0, 6, 0] }}
-        transition={{ duration: 5.6, repeat: Infinity, ease: "easeInOut", delay: 2.1 }}
+        transition={{
+          duration: 5.6,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: 2.1,
+        }}
         className="absolute bottom-[16%] right-[5%] flex items-center gap-2 rounded-[14px] px-3.5 py-2.5"
         style={{
           background: "rgba(4,16,11,0.88)",
@@ -627,7 +684,14 @@ const FormulaTypewriter = ({ formula, active }) => {
 ───────────────────────────────────────── */
 /* Per-tile accent cycle — every connector exposes its own color instead
    of sharing one monochrome chrome */
-const CONNECTOR_PALETTE = ["#34d399", "#fbbf24", "#2dd4bf", "#a3e635", "#fb7185", "#a78bfa"];
+const CONNECTOR_PALETTE = [
+  "#34d399",
+  "#fbbf24",
+  "#2dd4bf",
+  "#a3e635",
+  "#fb7185",
+  "#a78bfa",
+];
 
 const ConnectorTile = ({ name, type, status, index = 0 }) => {
   const statusStyle = {
@@ -660,8 +724,16 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
       initial={{ opacity: 0, y: 25 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.15 }}
-      transition={{ duration: 0.5, delay: (index % 3) * 0.08, ease: [0.16, 1, 0.3, 1] }}
-      whileHover={{ scale: 1.02, y: -4, transition: { type: "spring", stiffness: 400, damping: 25 } }}
+      transition={{
+        duration: 0.5,
+        delay: (index % 3) * 0.08,
+        ease: [0.16, 1, 0.3, 1],
+      }}
+      whileHover={{
+        scale: 1.02,
+        y: -4,
+        transition: { type: "spring", stiffness: 400, damping: 25 },
+      }}
       onMouseMove={spotlightMove}
       className="group spotlight-card luxe-card relative overflow-hidden rounded-[18px] px-5 py-5 border border-white/10 bg-white/[0.02] hover:border-white/15 transition-colors duration-300 shadow-xl"
       style={{ willChange: "transform, opacity", "--card-accent": accent }}
@@ -716,7 +788,13 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
 /* ─────────────────────────────────────────
    SLIDER FILL (gradient progress thumb track)
 ───────────────────────────────────────── */
-const sliderFill = (min, max, value, color1 = "rgba(52,211,153,0.6)", color2 = "rgba(163,230,53,0.6)") => {
+const sliderFill = (
+  min,
+  max,
+  value,
+  color1 = "rgba(52,211,153,0.6)",
+  color2 = "rgba(163,230,53,0.6)",
+) => {
   const pct = ((value - min) / (max - min)) * 100;
   return {
     background: `linear-gradient(90deg, ${color1}, ${color2} ${pct}%, rgba(255,255,255,0.08) ${pct}%)`,
@@ -731,7 +809,10 @@ const FooterLink = ({ onClick, href = null, children }) => {
     <>
       <span
         className="h-px w-0 rounded-full transition-all duration-200 group-hover:w-3"
-        style={{ background: "#34d399", boxShadow: "0 0 6px rgba(52,211,153,0.7)" }}
+        style={{
+          background: "#34d399",
+          boxShadow: "0 0 6px rgba(52,211,153,0.7)",
+        }}
       />
       <span>{children}</span>
     </>
@@ -813,7 +894,10 @@ const getThumbGeometry = (el) => {
   const thumbHeight =
     max <= 0
       ? 0
-      : Math.max(56, Math.min(trackHeight, trackHeight * (viewport / el.scrollHeight)));
+      : Math.max(
+          56,
+          Math.min(trackHeight, trackHeight * (viewport / el.scrollHeight)),
+        );
   return {
     viewport,
     trackHeight,
@@ -841,7 +925,8 @@ const LuxeScrollbar = () => {
     const update = () => {
       rafId = 0;
       const { trackHeight, max, thumbHeight } = getThumbGeometry(el);
-      const thumbTop = max <= 0 ? 0 : (el.scrollTop / max) * (trackHeight - thumbHeight);
+      const thumbTop =
+        max <= 0 ? 0 : (el.scrollTop / max) * (trackHeight - thumbHeight);
       const pct = max <= 0 ? 0 : Math.round((el.scrollTop / max) * 100);
 
       const thumb = thumbRef.current;
@@ -969,7 +1054,8 @@ const LuxeScrollbar = () => {
             const el = document.getElementById("landing-scroll-root");
             if (!el) return;
             const { max, travel } = getThumbGeometry(el);
-            const currentThumbTop = max <= 0 ? 0 : (el.scrollTop / max) * travel;
+            const currentThumbTop =
+              max <= 0 ? 0 : (el.scrollTop / max) * travel;
             // Preserve the grab point: thumb follows the cursor 1:1 from here
             dragStart.current = { offset: currentThumbTop - e.clientY };
             setDragging(true);
@@ -985,7 +1071,8 @@ const LuxeScrollbar = () => {
             background: "rgba(4,16,11,0.94)",
             borderColor: "rgba(110,231,183,0.25)",
             color: "#6ee7b7",
-            boxShadow: "0 6px 18px rgba(2,10,6,0.55), 0 0 12px rgba(52,211,153,0.18)",
+            boxShadow:
+              "0 6px 18px rgba(2,10,6,0.55), 0 0 12px rgba(52,211,153,0.18)",
             opacity: hovering || dragging ? 1 : 0,
             transform: `translateY(-50%) ${hovering || dragging ? "translateX(0)" : "translateX(8px)"}`,
             transition: "opacity 0.2s ease, transform 0.2s ease",
@@ -1097,7 +1184,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           obs.disconnect();
         }
       },
-      { threshold: 0.3 }
+      { threshold: 0.3 },
     );
     obs.observe(node);
     return () => obs.disconnect();
@@ -1111,28 +1198,28 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
       type: "Core Employee DB",
       status: "ACTIVE",
     },
-        {
-          name: "Greenhouse ATS",
-          type: "Candidate Pipeline",
-          status: "SUPPORTED",
-        },
-        {
-          name: "SAP SuccessFactors",
-          type: "Performance Analytics",
-          status: "SUPPORTED",
-        },
-        {
-          name: "Oracle HCM Cloud",
-          type: "Workforce Planning",
-          status: "SUPPORTED",
-        },
-        { name: "BambooHR", type: "Directory Sync", status: "SUPPORTED" },
-        {
-          name: "ADP Workforce",
-          type: "Compensation Mapping",
-          status: "SUPPORTED",
-        },
-      ];
+    {
+      name: "Greenhouse ATS",
+      type: "Candidate Pipeline",
+      status: "SUPPORTED",
+    },
+    {
+      name: "SAP SuccessFactors",
+      type: "Performance Analytics",
+      status: "SUPPORTED",
+    },
+    {
+      name: "Oracle HCM Cloud",
+      type: "Workforce Planning",
+      status: "SUPPORTED",
+    },
+    { name: "BambooHR", type: "Directory Sync", status: "SUPPORTED" },
+    {
+      name: "ADP Workforce",
+      type: "Compensation Mapping",
+      status: "SUPPORTED",
+    },
+  ];
 
   /* ── Fallback compliance data ── */
   const fallbackRunbooks = [
@@ -1191,7 +1278,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
   const retainedCount = Math.round(departures * (calcReduction / 100));
   const savings = retainedCount * calcSalary * 1.5;
   const afterCost = costToday - savings;
-  const afterPct = costToday > 0 ? Math.max(0, (afterCost / costToday) * 100) : 0;
+  const afterPct =
+    costToday > 0 ? Math.max(0, (afterCost / costToday) * 100) : 0;
 
   /* Capability ticker items */
   const tickerItems = [
@@ -1211,7 +1299,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
   ];
 
   /* Illustrative risk pattern (decorative narrative visual) */
-  const RISK_SIGNAL = [3.1, 2.2, 3.6, 2.8, 4.2, 3.4, 5.1, 4.0, 6.3, 5.2, 7.4, 6.8];
+  const RISK_SIGNAL = [
+    3.1, 2.2, 3.6, 2.8, 4.2, 3.4, 5.1, 4.0, 6.3, 5.2, 7.4, 6.8,
+  ];
   const RISK_MAX = Math.max(...RISK_SIGNAL);
 
   /* ─────────────────────────────────────────
@@ -1250,7 +1340,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         className="absolute top-0 left-0 right-0 h-[85vh] min-h-[600px] max-h-[1000px] overflow-hidden pointer-events-none z-0"
         style={{
           maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)",
-          WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)"
+          WebkitMaskImage:
+            "linear-gradient(to bottom, black 65%, transparent 100%)",
         }}
       >
         <NeonParticlesWave />
@@ -1276,13 +1367,15 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="flex items-center gap-3 select-none cursor-pointer hover:opacity-80 transition-opacity"
               title="Scroll to Top"
             >
-              <div
-                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl"
-              >
+              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl">
                 <img
                   src="/aurelinx-logo-4k.svg"
                   alt="Aurelinx Logo"
-                  style={{ width: "120%", height: "120%", objectFit: "contain" }}
+                  style={{
+                    width: "120%",
+                    height: "120%",
+                    objectFit: "contain",
+                  }}
                 />
               </div>
               <div>
@@ -1347,7 +1440,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 onClick={onEnterWorkspace}
                 className="btn-shine inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95"
                 style={{
-                  background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                  background:
+                    "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
                   color: "#020a07",
                   boxShadow: "0 8px 24px -8px rgba(52,211,153,0.5)",
                 }}
@@ -1365,12 +1459,32 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         </header>
 
         {/* ══════════ HERO ══════════ */}
-        <section id="section-0" className="relative pb-8 pt-16 lg:pt-20 overflow-hidden">
+        <section
+          id="section-0"
+          className="relative pb-8 pt-16 lg:pt-20 overflow-hidden"
+        >
           {/* Aurora glows + center beam behind the hero copy (particles stay on top) */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[640px] overflow-hidden" aria-hidden="true">
-            <AuroraBlob color="rgba(52,211,153,0.5)" className="left-[8%] -top-40" size={520} />
-            <AuroraBlob color="rgba(251,191,36,0.4)" className="right-[6%] -top-24" size={560} delay="4s" />
-            <AuroraBlob color="rgba(163,230,53,0.3)" className="left-[42%] top-10" size={420} delay="8s" />
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-[640px] overflow-hidden"
+            aria-hidden="true"
+          >
+            <AuroraBlob
+              color="rgba(52,211,153,0.5)"
+              className="left-[8%] -top-40"
+              size={520}
+            />
+            <AuroraBlob
+              color="rgba(251,191,36,0.4)"
+              className="right-[6%] -top-24"
+              size={560}
+              delay="4s"
+            />
+            <AuroraBlob
+              color="rgba(163,230,53,0.3)"
+              className="left-[42%] top-10"
+              size={420}
+              delay="8s"
+            />
             <div className="hero-beam" />
           </div>
 
@@ -1404,8 +1518,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-6 max-w-[580px] text-base leading-relaxed"
               style={{ color: "rgba(148,163,184,0.7)" }}
             >
-              Aurelinx unifies live workforce analytics, AI agent governance, and
-              automated risk parameters into a high-precision executive control panel.
+              Aurelinx unifies live workforce analytics, AI agent governance,
+              and automated risk parameters into a high-precision executive
+              control panel.
             </motion.p>
 
             <motion.div
@@ -1419,15 +1534,18 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 onClick={onEnterWorkspace}
                 className="btn-shine inline-flex h-11 items-center gap-2 rounded-xl px-6 text-sm font-bold transition-all active:scale-[0.98]"
                 style={{
-                  background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                  background:
+                    "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
                   color: "#020a07",
                   boxShadow: "0 12px 34px -8px rgba(52,211,153,0.5)",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "linear-gradient(100deg, #34d399 0%, #fbbf24 100%)";
+                  e.currentTarget.style.background =
+                    "linear-gradient(100deg, #34d399 0%, #fbbf24 100%)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "linear-gradient(100deg, #34d399 0%, #a3e635 100%)";
+                  e.currentTarget.style.background =
+                    "linear-gradient(100deg, #34d399 0%, #a3e635 100%)";
                 }}
               >
                 Enter Workspace <ArrowRight className="h-4 w-4" />
@@ -1466,7 +1584,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 ["Policy Release Gates", "#6ee7b7"],
                 ["Explainable ML Model Cards", "#a78bfa"],
               ].map(([label, accent]) => (
-                <Tag key={label} accent={accent}>{label}</Tag>
+                <Tag key={label} accent={accent}>
+                  {label}
+                </Tag>
               ))}
             </motion.div>
 
@@ -1482,14 +1602,18 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${sreStatus === "operational" ? "animate-pulse" : ""}`}
                   style={{
-                    background: sreStatus === "operational" ? "#6ee7b7" : "#f87171",
+                    background:
+                      sreStatus === "operational" ? "#6ee7b7" : "#f87171",
                   }}
                 />
                 Gateway {sreStatus}
                 {pingLatency ? ` · ${pingLatency}ms` : ""}
               </span>
               <span className="opacity-40">·</span>
-              <span>Workforce telemetry lives inside your workspace, never on this page</span>
+              <span>
+                Workforce telemetry lives inside your workspace, never on this
+                page
+              </span>
             </motion.div>
 
             {/* TELEMETRY ORB — purely decorative on this public page */}
@@ -1584,12 +1708,15 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       border: "1px solid rgba(255,255,255,0.06)",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.035)";
+                      e.currentTarget.style.background =
+                        "rgba(255,255,255,0.035)";
                       e.currentTarget.style.borderColor = accent + "35";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
+                      e.currentTarget.style.background =
+                        "rgba(255,255,255,0.02)";
+                      e.currentTarget.style.borderColor =
+                        "rgba(255,255,255,0.06)";
                     }}
                   >
                     <div
@@ -1602,7 +1729,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       <Icon className="h-4.5 w-4.5" style={{ color: accent }} />
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-white">{title}</div>
+                      <div className="text-sm font-bold text-white">
+                        {title}
+                      </div>
                       <p
                         className="mt-1 text-xs leading-relaxed"
                         style={{ color: "rgba(148,163,184,0.6)" }}
@@ -1616,7 +1745,13 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             </div>
 
             {/* Right: the pattern you miss */}
-            <div className="rounded-[24px] p-6 sm:p-8" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div
+              className="rounded-[24px] p-6 sm:p-8"
+              style={{
+                background: "rgba(255,255,255,0.02)",
+                border: "1px solid rgba(255,255,255,0.07)",
+              }}
+            >
               <div className="flex items-center justify-between">
                 <div
                   className="text-[10px] font-black uppercase tracking-[0.24em]"
@@ -1665,10 +1800,16 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   );
                 })}
               </div>
-              <div className="mt-3 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: "rgba(148,163,184,0.35)" }}>
+              <div
+                className="mt-3 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.2em]"
+                style={{ color: "rgba(148,163,184,0.35)" }}
+              >
                 <span>Months before exit</span>
                 <span className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#f43f5e" }} />
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: "#f43f5e" }}
+                  />
                   signal spike
                 </span>
               </div>
@@ -1680,11 +1821,17 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   border: "1px solid rgba(244,63,94,0.18)",
                 }}
               >
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider" style={{ color: "#f43f5e" }}>
+                <div
+                  className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider"
+                  style={{ color: "#f43f5e" }}
+                >
                   <AlertTriangle className="h-3.5 w-3.5" />
                   The detection gap
                 </div>
-                <p className="mt-2 text-xs leading-relaxed" style={{ color: "rgba(226,232,240,0.75)" }}>
+                <p
+                  className="mt-2 text-xs leading-relaxed"
+                  style={{ color: "rgba(226,232,240,0.75)" }}
+                >
                   Sentiment and morale drift are measurable weeks before exit.
                   Aurelinx scores them continuously and surfaces the signal —
                   before it becomes a goodbye.
@@ -1707,7 +1854,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               <Activity className="h-3.5 w-3.5" /> Continuous Ingest Sync
             </SectionLabel>
             <SectionHeading>
-              Interactive <GradientWord>Ingestion Pipeline</GradientWord> Simulator
+              Interactive <GradientWord>Ingestion Pipeline</GradientWord>{" "}
+              Simulator
             </SectionHeading>
             <p
               className="mt-5 text-sm leading-relaxed"
@@ -2061,7 +2209,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   onClick={onEnterWorkspace}
                   className="btn-shine inline-flex h-11 items-center gap-2 rounded-xl px-6 text-sm font-bold transition-all active:scale-[0.98]"
                   style={{
-                    background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                    background:
+                      "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
                     color: "#020a07",
                     boxShadow: "0 12px 34px -8px rgba(52,211,153,0.5)",
                   }}
@@ -2090,7 +2239,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
-              Mathematically-grounded solvers and simulation parameters powering advanced workforce optimizations, career projection pathways, and retention sandbox analytics. Select a pillar to explore it.
+              Mathematically-grounded solvers and simulation parameters powering
+              advanced workforce optimizations, career projection pathways, and
+              retention sandbox analytics. Select a pillar to explore it.
             </p>
           </div>
 
@@ -2196,10 +2347,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                             textShadow: `0 0 20px ${pillar.accent}30`,
                           }}
                         >
-                          <FormulaTypewriter
-                            formula={pillar.formula}
-                            active
-                          />
+                          <FormulaTypewriter formula={pillar.formula} active />
                         </div>
 
                         <div className="mt-6 flex items-center justify-between">
@@ -2207,7 +2355,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                             className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em]"
                             style={{ color: "rgba(148,163,184,0.4)" }}
                           >
-                            <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: "#6ee7b7" }} />
+                            <span
+                              className="h-1.5 w-1.5 rounded-full animate-pulse"
+                              style={{ background: "#6ee7b7" }}
+                            />
                             Live in the executive workspace
                           </span>
                           <button
@@ -2220,7 +2371,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                               color: pillar.accent,
                             }}
                           >
-                            Open workspace <ChevronRight className="h-3.5 w-3.5" />
+                            Open workspace{" "}
+                            <ChevronRight className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </>
@@ -2283,7 +2435,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                           transform: isActive ? "scale(1.08)" : "scale(1)",
                         }}
                       >
-                        <Icon className="h-4 w-4" style={{ color: mod.accent }} />
+                        <Icon
+                          className="h-4 w-4"
+                          style={{ color: mod.accent }}
+                        />
                       </span>
                       <span className="min-w-0">
                         <span
@@ -2331,14 +2486,18 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                               boxShadow: `0 0 24px ${mod.accent}20`,
                             }}
                           >
-                            <Icon className="h-6 w-6" style={{ color: mod.accent }} />
+                            <Icon
+                              className="h-6 w-6"
+                              style={{ color: mod.accent }}
+                            />
                           </div>
                           <div>
                             <div
                               className="text-[9px] font-black uppercase tracking-[0.24em]"
                               style={{ color: mod.accent }}
                             >
-                              Module {String(activeModule + 1).padStart(2, "0")} · {PLATFORM_MODULES.length} modules
+                              Module {String(activeModule + 1).padStart(2, "0")}{" "}
+                              · {PLATFORM_MODULES.length} modules
                             </div>
                             <h3 className="mt-1.5 text-2xl font-extrabold tracking-tight text-white">
                               {mod.title}
@@ -2355,7 +2514,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
                         <div className="mt-7 flex flex-wrap gap-2">
                           {mod.tags.map((t) => (
-                            <Tag key={t} accent={mod.accent}>{t}</Tag>
+                            <Tag key={t} accent={mod.accent}>
+                              {t}
+                            </Tag>
                           ))}
                         </div>
 
@@ -2383,7 +2544,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                                 color: mod.accent,
                               }}
                             >
-                              Explore module <ChevronRight className="h-3.5 w-3.5" />
+                              Explore module{" "}
+                              <ChevronRight className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         </div>
@@ -2414,7 +2576,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             >
               Benchmark model based on industry research: employee replacement
               costs (recruiting, onboarding, productivity lag) average{" "}
-              <span className="text-cyan-300 font-semibold">1.5x base salary</span>{" "}
+              <span className="text-cyan-300 font-semibold">
+                1.5x base salary
+              </span>{" "}
               (SHRM / Gallup). Adjust the variables and watch the forecast
               update live.
             </p>
@@ -2427,7 +2591,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <div>
                   <div className="flex justify-between text-sm font-semibold mb-2">
                     <span className="text-slate-300">Total Workforce Size</span>
-                    <span className="text-cyan-400 font-mono font-bold">{calcWorkforce.toLocaleString()} employees</span>
+                    <span className="text-cyan-400 font-mono font-bold">
+                      {calcWorkforce.toLocaleString()} employees
+                    </span>
                   </div>
                   <input
                     type="range"
@@ -2447,8 +2613,12 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
                 <div>
                   <div className="flex justify-between text-sm font-semibold mb-2">
-                    <span className="text-slate-300">Average Employee Salary</span>
-                    <span className="text-cyan-400 font-mono font-bold">${calcSalary.toLocaleString()} / year</span>
+                    <span className="text-slate-300">
+                      Average Employee Salary
+                    </span>
+                    <span className="text-cyan-400 font-mono font-bold">
+                      ${calcSalary.toLocaleString()} / year
+                    </span>
                   </div>
                   <input
                     type="range"
@@ -2468,8 +2638,12 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
                 <div>
                   <div className="flex justify-between text-sm font-semibold mb-2">
-                    <span className="text-slate-300">Annual Employee Turnover Rate</span>
-                    <span className="text-cyan-400 font-mono font-bold">{calcTurnover}%</span>
+                    <span className="text-slate-300">
+                      Annual Employee Turnover Rate
+                    </span>
+                    <span className="text-cyan-400 font-mono font-bold">
+                      {calcTurnover}%
+                    </span>
                   </div>
                   <input
                     type="range"
@@ -2489,8 +2663,12 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
                 <div>
                   <div className="flex justify-between text-sm font-semibold mb-2">
-                    <span className="text-slate-300">Target Retention Improvement</span>
-                    <span className="text-emerald-400 font-mono font-bold">{calcReduction}% reduction</span>
+                    <span className="text-slate-300">
+                      Target Retention Improvement
+                    </span>
+                    <span className="text-emerald-400 font-mono font-bold">
+                      {calcReduction}% reduction
+                    </span>
                   </div>
                   <input
                     type="range"
@@ -2500,7 +2678,13 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     value={calcReduction}
                     onChange={(e) => setCalcReduction(Number(e.target.value))}
                     className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-emerald-400 focus:outline-none"
-                    style={sliderFill(10, 50, calcReduction, "rgba(52,211,153,0.6)", "rgba(16,185,129,0.6)")}
+                    style={sliderFill(
+                      10,
+                      50,
+                      calcReduction,
+                      "rgba(52,211,153,0.6)",
+                      "rgba(16,185,129,0.6)",
+                    )}
                   />
                   <div className="flex justify-between text-[10px] text-slate-500 mt-1">
                     <span>10% (Conservative)</span>
@@ -2515,11 +2699,20 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     border: "1px solid rgba(255,255,255,0.06)",
                   }}
                 >
-                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider" style={{ color: "rgba(148,163,184,0.4)" }}>
-                    <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#6ee7b7" }} />
+                  <div
+                    className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider"
+                    style={{ color: "rgba(148,163,184,0.4)" }}
+                  >
+                    <CheckCircle2
+                      className="h-3.5 w-3.5"
+                      style={{ color: "#6ee7b7" }}
+                    />
                     How the model works
                   </div>
-                  <p className="mt-2 text-[11px] leading-relaxed" style={{ color: "rgba(148,163,184,0.6)" }}>
+                  <p
+                    className="mt-2 text-[11px] leading-relaxed"
+                    style={{ color: "rgba(148,163,184,0.6)" }}
+                  >
                     Annual departures × 1.5× salary = total attrition cost.
                     Aurelinx retention loops (30/60/90-day interventions) are
                     modeled to recover a share of those departures, which is
@@ -2549,15 +2742,25 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
                   <div className="grid grid-cols-2 gap-4 mb-6">
                     <div>
-                      <div className="text-xs text-slate-400 mb-1">Annual Departures</div>
+                      <div className="text-xs text-slate-400 mb-1">
+                        Annual Departures
+                      </div>
                       <div className="text-xl font-bold text-white font-mono">
-                        {departures} <span className="text-xs font-normal text-slate-400">exits/yr</span>
+                        {departures}{" "}
+                        <span className="text-xs font-normal text-slate-400">
+                          exits/yr
+                        </span>
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-400 mb-1">Retained via Aurelinx</div>
+                      <div className="text-xs text-slate-400 mb-1">
+                        Retained via Aurelinx
+                      </div>
                       <div className="text-xl font-bold text-emerald-400 font-mono">
-                        +{retainedCount} <span className="text-xs font-normal text-slate-400">/ yr</span>
+                        +{retainedCount}{" "}
+                        <span className="text-xs font-normal text-slate-400">
+                          / yr
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -2566,30 +2769,40 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   <div className="space-y-5">
                     <div>
                       <div className="flex justify-between items-center text-xs mb-1.5">
-                        <span className="text-slate-400">Current annual attrition cost</span>
-                        <span className="font-mono text-rose-400 font-bold">${costToday.toLocaleString()}</span>
+                        <span className="text-slate-400">
+                          Current annual attrition cost
+                        </span>
+                        <span className="font-mono text-rose-400 font-bold">
+                          ${costToday.toLocaleString()}
+                        </span>
                       </div>
                       <div className="h-3 rounded-full bg-white/5 overflow-hidden">
                         <div
                           className="bar-fill h-full rounded-full"
                           style={{
                             width: "100%",
-                            background: "linear-gradient(90deg, rgba(244,63,94,0.75), rgba(244,63,94,0.3))",
+                            background:
+                              "linear-gradient(90deg, rgba(244,63,94,0.75), rgba(244,63,94,0.3))",
                           }}
                         />
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between items-center text-xs mb-1.5">
-                        <span className="text-slate-400">With Aurelinx retention loops</span>
-                        <span className="font-mono text-emerald-400 font-bold">${afterCost.toLocaleString()}</span>
+                        <span className="text-slate-400">
+                          With Aurelinx retention loops
+                        </span>
+                        <span className="font-mono text-emerald-400 font-bold">
+                          ${afterCost.toLocaleString()}
+                        </span>
                       </div>
                       <div className="h-3 rounded-full bg-white/5 overflow-hidden">
                         <div
                           className="bar-fill h-full rounded-full"
                           style={{
                             width: `${afterPct}%`,
-                            background: "linear-gradient(90deg, rgba(52,211,153,0.75), rgba(52,211,153,0.3))",
+                            background:
+                              "linear-gradient(90deg, rgba(52,211,153,0.75), rgba(52,211,153,0.3))",
                           }}
                         />
                       </div>
@@ -2598,13 +2811,17 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
                   <div className="border-t border-white/5 pt-5 mt-6 space-y-4">
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-400">Cost Per Exit (1.5x Multiplier)</span>
+                      <span className="text-slate-400">
+                        Cost Per Exit (1.5x Multiplier)
+                      </span>
                       <span className="font-bold text-slate-300 font-mono">
                         ${(calcSalary * 1.5).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-400">Avg Retention Loop Cost</span>
+                      <span className="text-slate-400">
+                        Avg Retention Loop Cost
+                      </span>
                       <span className="font-bold text-slate-300 font-mono">
                         $4,500 / intervention
                       </span>
@@ -2628,7 +2845,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     />
                   </div>
                   <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
-                    *Savings projection based on standard organizational replacement cost indexes (SHRM, Gallup). Net returns vary by department role specificity.
+                    *Savings projection based on standard organizational
+                    replacement cost indexes (SHRM, Gallup). Net returns vary by
+                    department role specificity.
                   </p>
                 </div>
               </div>
@@ -2674,10 +2893,12 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         >
           <div className="mx-auto max-w-[700px] text-center">
             <SectionLabel>
-              <ShieldCheck className="h-3.5 w-3.5" /> SRE &amp; Security Compliance
+              <ShieldCheck className="h-3.5 w-3.5" /> SRE &amp; Security
+              Compliance
             </SectionLabel>
             <SectionHeading>
-              System Specifications &amp; <GradientWord>Audit Readiness</GradientWord>
+              System Specifications &amp;{" "}
+              <GradientWord>Audit Readiness</GradientWord>
             </SectionHeading>
             <p
               className="mt-5 text-sm leading-relaxed"
@@ -2860,10 +3081,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                           status: "healthy",
                           sub: "Model Name: attrition_v1",
                           rows: [
-                            [
-                              "Drift score baseline",
-                              "0.0815",
-                            ],
+                            ["Drift score baseline", "0.0815"],
                             ["Calibration error", "0.024"],
                             ["Retraining Status", "Not Needed"],
                           ],
@@ -2873,14 +3091,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                           status: "approved",
                           sub: "Champion Version: attrition_v1_champion",
                           rows: [
-                            [
-                              "PR-AUC accuracy",
-                              "0.94",
-                            ],
-                            [
-                              "Fairness discrepancy gap",
-                              "0.04",
-                            ],
+                            ["PR-AUC accuracy", "0.94"],
+                            ["Fairness discrepancy gap", "0.04"],
                             ["Calibration Score", "99.8% Compliant"],
                           ],
                         },
@@ -2955,7 +3167,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               boxShadow: "0 30px 90px -25px rgba(52,211,153,0.3)",
             }}
           >
-            <div className="pointer-events-none absolute inset-x-0 -top-40 flex justify-center" aria-hidden="true">
+            <div
+              className="pointer-events-none absolute inset-x-0 -top-40 flex justify-center"
+              aria-hidden="true"
+            >
               <AuroraBlob color="rgba(52,211,153,0.4)" size={460} />
             </div>
             <div className="relative">
@@ -2963,7 +3178,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <CheckCircle2 className="h-3.5 w-3.5" /> Ready when you are
               </SectionLabel>
               <h2 className="mt-6 text-[clamp(1.9rem,4vw,3rem)] font-extrabold leading-[1.08] tracking-tight text-white">
-                See your workforce <GradientWord>clearly</GradientWord> — no blind spots.
+                See your workforce <GradientWord>clearly</GradientWord> — no
+                blind spots.
               </h2>
               <p
                 className="mx-auto mt-5 max-w-[560px] text-sm leading-relaxed"
@@ -2978,7 +3194,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   onClick={onEnterWorkspace}
                   className="btn-shine inline-flex h-12 items-center gap-2 rounded-xl px-7 text-sm font-bold transition-all active:scale-[0.98]"
                   style={{
-                    background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                    background:
+                      "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
                     color: "#020a07",
                     boxShadow: "0 12px 34px -8px rgba(52,211,153,0.5)",
                   }}
@@ -3007,23 +3224,31 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         {/* ══════════ PRODUCTION ENTERPRISE FOOTER ══════════ */}
         <footer
           className="mt-20 pt-16 pb-12 relative overflow-hidden"
-          style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "rgba(5, 12, 24, 0.6)" }}
+          style={{
+            borderTop: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(5, 12, 24, 0.6)",
+          }}
         >
           {/* Gradient hairline top edge */}
           <div
             className="pointer-events-none absolute top-0 inset-x-0 h-px"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(110,231,183,0.45), rgba(163,230,53,0.35), transparent)" }}
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, rgba(110,231,183,0.45), rgba(163,230,53,0.35), transparent)",
+            }}
             aria-hidden="true"
           />
 
           {/* Ambient Glow */}
           <div
             className="pointer-events-none absolute -bottom-24 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full blur-[140px] opacity-20"
-            style={{ background: "radial-gradient(circle, #6ee7b7 0%, #2dd4bf 50%, transparent 80%)" }}
+            style={{
+              background:
+                "radial-gradient(circle, #6ee7b7 0%, #2dd4bf 50%, transparent 80%)",
+            }}
           />
 
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-
             {/* CTA strip */}
             <div
               className="flex flex-col gap-6 rounded-2xl p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between"
@@ -3046,14 +3271,20 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <div
                   className="inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider"
                   style={{
-                    background: sreStatus === "operational" ? "rgba(110,231,183,0.08)" : "rgba(248,113,113,0.08)",
+                    background:
+                      sreStatus === "operational"
+                        ? "rgba(110,231,183,0.08)"
+                        : "rgba(248,113,113,0.08)",
                     border: `1px solid ${sreStatus === "operational" ? "rgba(110,231,183,0.25)" : "rgba(248,113,113,0.25)"}`,
                     color: sreStatus === "operational" ? "#6ee7b7" : "#f87171",
                   }}
                 >
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${sreStatus === "operational" ? "animate-pulse" : ""}`}
-                    style={{ background: sreStatus === "operational" ? "#6ee7b7" : "#f87171" }}
+                    style={{
+                      background:
+                        sreStatus === "operational" ? "#6ee7b7" : "#f87171",
+                    }}
                   />
                   All systems operational
                   {pingLatency ? ` · ${pingLatency}ms` : ""}
@@ -3063,7 +3294,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   onClick={onEnterWorkspace}
                   className="btn-shine px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all duration-200 active:scale-95"
                   style={{
-                    background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                    background:
+                      "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
                     color: "#020a07",
                     boxShadow: "0 8px 24px -8px rgba(52,211,153,0.5)",
                   }}
@@ -3083,7 +3315,6 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
             {/* Main grid */}
             <div className="mt-14 grid gap-12 lg:grid-cols-12">
-
               {/* Brand column */}
               <div className="lg:col-span-4 space-y-5 text-left">
                 <div className="flex items-center gap-3">
@@ -3091,7 +3322,11 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     <img
                       src="/aurelinx-logo-4k.svg"
                       alt="Aurelinx Logo"
-                      style={{ width: "120%", height: "120%", objectFit: "contain" }}
+                      style={{
+                        width: "120%",
+                        height: "120%",
+                        objectFit: "contain",
+                      }}
                     />
                   </div>
                   <div>
@@ -3113,7 +3348,11 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 {/* Socials */}
                 <div className="flex items-center gap-2.5">
                   {[
-                    { name: "github", label: "GitHub", href: "https://github.com/sainibhaowal/Aurelinx" },
+                    {
+                      name: "github",
+                      label: "GitHub",
+                      href: "https://github.com/sainibhaowal/Aurelinx",
+                    },
                     { name: "x", label: "X (Twitter)", href: null },
                     { name: "linkedin", label: "LinkedIn", href: null },
                     { name: "youtube", label: "YouTube", href: null },
@@ -3139,7 +3378,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       >
                         <BrandIcon name={name} />
                       </button>
-                    )
+                    ),
                   )}
                 </div>
 
@@ -3171,7 +3410,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                         type="submit"
                         className="btn-shine h-9 flex-none rounded-lg px-4 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
                         style={{
-                          background: "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
+                          background:
+                            "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
                           color: "#020a07",
                         }}
                       >
@@ -3186,80 +3426,162 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               <div className="grid grid-cols-2 gap-10 sm:grid-cols-4 lg:col-span-8">
                 <FooterColumn title="Product">
                   <li>
-                    <FooterLink onClick={() => {
-                      const el = document.getElementById("section-0");
-                      if (el) el.scrollIntoView({ behavior: "smooth" });
-                    }}>Platform Overview</FooterLink>
+                    <FooterLink
+                      onClick={() => {
+                        const el = document.getElementById("section-0");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }}
+                    >
+                      Platform Overview
+                    </FooterLink>
                   </li>
                   <li>
-                    <FooterLink onClick={() => {
-                      const el = document.getElementById("section-1");
-                      if (el) el.scrollIntoView({ behavior: "smooth" });
-                    }}>Ingest Pipeline</FooterLink>
+                    <FooterLink
+                      onClick={() => {
+                        const el = document.getElementById("section-1");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }}
+                    >
+                      Ingest Pipeline
+                    </FooterLink>
                   </li>
                   <li>
-                    <FooterLink onClick={() => {
-                      const el = document.getElementById("section-2");
-                      if (el) el.scrollIntoView({ behavior: "smooth" });
-                    }}>Math Engine</FooterLink>
+                    <FooterLink
+                      onClick={() => {
+                        const el = document.getElementById("section-2");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }}
+                    >
+                      Math Engine
+                    </FooterLink>
                   </li>
                   <li>
-                    <FooterLink onClick={() => {
-                      const el = document.getElementById("section-3");
-                      if (el) el.scrollIntoView({ behavior: "smooth" });
-                    }}>Platform Modules</FooterLink>
+                    <FooterLink
+                      onClick={() => {
+                        const el = document.getElementById("section-3");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }}
+                    >
+                      Platform Modules
+                    </FooterLink>
                   </li>
                   <li>
-                    <FooterLink onClick={() => {
-                      const el = document.getElementById("section-4");
-                      if (el) el.scrollIntoView({ behavior: "smooth" });
-                    }}>Connectors</FooterLink>
+                    <FooterLink
+                      onClick={() => {
+                        const el = document.getElementById("section-4");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }}
+                    >
+                      Connectors
+                    </FooterLink>
                   </li>
                   <li>
-                    <FooterLink onClick={() => {
-                      const el = document.getElementById("section-5");
-                      if (el) el.scrollIntoView({ behavior: "smooth" });
-                    }}>Compliance &amp; Audit</FooterLink>
+                    <FooterLink
+                      onClick={() => {
+                        const el = document.getElementById("section-5");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }}
+                    >
+                      Compliance &amp; Audit
+                    </FooterLink>
                   </li>
                 </FooterColumn>
 
                 <FooterColumn title="Solutions">
-                  <li><FooterLink onClick={onEnterWorkspace}>Enterprise Suite</FooterLink></li>
-                  <li><FooterLink onClick={onEnterWorkspace}>Attrition Analytics</FooterLink></li>
-                  <li><FooterLink onClick={onEnterWorkspace}>Talent Intelligence</FooterLink></li>
-                  <li><FooterLink onClick={onOpenEnterprise}>Data Governance</FooterLink></li>
                   <li>
-                    <FooterLink onClick={() => {
-                      const el = document.getElementById("section-5");
-                      if (el) el.scrollIntoView({ behavior: "smooth" });
-                    }}>Security &amp; Policy</FooterLink>
+                    <FooterLink onClick={onEnterWorkspace}>
+                      Enterprise Suite
+                    </FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink onClick={onEnterWorkspace}>
+                      Attrition Analytics
+                    </FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink onClick={onEnterWorkspace}>
+                      Talent Intelligence
+                    </FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink onClick={onOpenEnterprise}>
+                      Data Governance
+                    </FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink
+                      onClick={() => {
+                        const el = document.getElementById("section-5");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }}
+                    >
+                      Security &amp; Policy
+                    </FooterLink>
                   </li>
                 </FooterColumn>
 
                 <FooterColumn title="Resources">
-                  <li><FooterLink onClick={() => setManualOpen(true)}>Documentation</FooterLink></li>
-                  <li><FooterLink onClick={onOpenEnterprise}>API Reference</FooterLink></li>
                   <li>
-                    <FooterLink onClick={() => {
-                      const el = document.getElementById("section-0");
-                      if (el) el.scrollIntoView({ behavior: "smooth" });
-                    }}>System Status</FooterLink>
+                    <FooterLink onClick={() => setManualOpen(true)}>
+                      Documentation
+                    </FooterLink>
                   </li>
-                  <li><FooterLink onClick={onEnterWorkspace}>Changelog</FooterLink></li>
-                  <li><FooterLink href="mailto:support@aurelinx.com">Support</FooterLink></li>
+                  <li>
+                    <FooterLink onClick={onOpenEnterprise}>
+                      API Reference
+                    </FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink
+                      onClick={() => {
+                        const el = document.getElementById("section-0");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }}
+                    >
+                      System Status
+                    </FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink onClick={onEnterWorkspace}>
+                      Changelog
+                    </FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink href="mailto:support@aurelinx.com">
+                      Support
+                    </FooterLink>
+                  </li>
                 </FooterColumn>
 
                 <FooterColumn title="Company">
                   <li>
-                    <FooterLink onClick={() => {
-                      const el = document.getElementById("landing-scroll-root");
-                      if (el) el.scrollTo({ top: 0, behavior: "smooth" });
-                    }}>About</FooterLink>
+                    <FooterLink
+                      onClick={() => {
+                        const el = document.getElementById(
+                          "landing-scroll-root",
+                        );
+                        if (el) el.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    >
+                      About
+                    </FooterLink>
                   </li>
-                  <li><FooterLink onClick={onOpenEnterprise}>Careers</FooterLink></li>
-                  <li><FooterLink onClick={onEnterWorkspace}>Blog</FooterLink></li>
-                  <li><FooterLink href="mailto:sales@aurelinx.com">Contact Sales</FooterLink></li>
-                  <li><FooterLink onClick={onOpenEnterprise}>Press Kit</FooterLink></li>
+                  <li>
+                    <FooterLink onClick={onOpenEnterprise}>Careers</FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink onClick={onEnterWorkspace}>Blog</FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink href="mailto:sales@aurelinx.com">
+                      Contact Sales
+                    </FooterLink>
+                  </li>
+                  <li>
+                    <FooterLink onClick={onOpenEnterprise}>
+                      Press Kit
+                    </FooterLink>
+                  </li>
                 </FooterColumn>
               </div>
             </div>
@@ -3282,7 +3604,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em]"
                     style={{ color: "rgba(148,163,184,0.6)" }}
                   >
-                    <ShieldCheck size={12} style={{ color: accent || "#6ee7b7" }} />
+                    <ShieldCheck
+                      size={12}
+                      style={{ color: accent || "#6ee7b7" }}
+                    />
                     {label}
                   </span>
                 ))}
@@ -3296,22 +3621,34 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 }}
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
-                System Status: Operational ({pingLatency ? `${pingLatency}ms` : "checking…"})
+                System Status: Operational (
+                {pingLatency ? `${pingLatency}ms` : "checking…"})
               </div>
             </div>
 
             {/* Legal row */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between pt-6 text-[11px] text-slate-500">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span>&copy; {new Date().getFullYear()} Aurelinx Inc. All rights reserved.</span>
+                <span>
+                  &copy; {new Date().getFullYear()} Aurelinx Inc. All rights
+                  reserved.
+                </span>
                 <span className="opacity-40">•</span>
-                <span className="cursor-default hover:text-slate-300">Privacy Policy</span>
+                <span className="cursor-default hover:text-slate-300">
+                  Privacy Policy
+                </span>
                 <span className="opacity-40">•</span>
-                <span className="cursor-default hover:text-slate-300">Terms of Service</span>
+                <span className="cursor-default hover:text-slate-300">
+                  Terms of Service
+                </span>
                 <span className="opacity-40">•</span>
-                <span className="cursor-default hover:text-slate-300">Security</span>
+                <span className="cursor-default hover:text-slate-300">
+                  Security
+                </span>
                 <span className="opacity-40">•</span>
-                <span className="cursor-default hover:text-slate-300">Cookies</span>
+                <span className="cursor-default hover:text-slate-300">
+                  Cookies
+                </span>
               </div>
               <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider">
                 <span className="px-2.5 py-1 rounded-md bg-slate-900 border border-white/10 text-cyan-400">
@@ -3319,7 +3656,6 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 </span>
               </div>
             </div>
-
           </div>
         </footer>
 

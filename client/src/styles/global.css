@@ -116,7 +116,9 @@
 
 /* Thinking dots animation */
 @keyframes pulse-dots {
-  0%, 80%, 100% {
+  0%,
+  80%,
+  100% {
     opacity: 0.25;
     transform: scale(0.7) translateY(1px);
   }

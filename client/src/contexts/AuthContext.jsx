@@ -27,9 +27,9 @@ const postToParent = (message) => {
   const allowedOrigins = [
     "tauri://localhost",
     "https://tauri.localhost",
-    "http://localhost:3100"
+    "http://localhost:3100",
   ];
-  allowedOrigins.forEach(origin => {
+  allowedOrigins.forEach((origin) => {
     window.parent.postMessage(message, origin);
   });
 };
@@ -46,7 +46,8 @@ export const AuthProvider = ({ children }) => {
     return localStorage.getItem("auth_token");
   });
 
-  const isEmbeddedIframe = typeof window !== "undefined" && window !== window.parent;
+  const isEmbeddedIframe =
+    typeof window !== "undefined" && window !== window.parent;
 
   const resolveWithTimeout = useCallback((promise, timeoutMs = 4000) => {
     return Promise.race([
@@ -111,7 +112,10 @@ export const AuthProvider = ({ children }) => {
           hasToken = true;
         }
         if (data.user) {
-          const userStr = typeof data.user === "string" ? data.user : JSON.stringify(data.user);
+          const userStr =
+            typeof data.user === "string"
+              ? data.user
+              : JSON.stringify(data.user);
           localStorage.setItem(AUTH_USER_CACHE_KEY, userStr);
           setUser(JSON.parse(userStr));
         }
@@ -178,7 +182,7 @@ export const AuthProvider = ({ children }) => {
             type: "AURELINX_SAVE_CREDS",
             token: response.access_token,
             user: userData,
-            savedCreds: { email, password }
+            savedCreds: { email, password },
           });
         }
 
@@ -229,7 +233,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     if (isEmbeddedIframe) {
       postToParent({
-        type: "AURELINX_CLEAR_CREDS"
+        type: "AURELINX_CLEAR_CREDS",
       });
     }
   }, []);

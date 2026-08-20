@@ -1,12 +1,14 @@
-import pytest
 import os
-from sqlmodel import SQLModel, Session, create_engine
+
+import pytest
 from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session, SQLModel, create_engine
+
 from app.models.database import IntegrationWebhookEventTable
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:5432/aurelinx_db?options=-csearch_path%3Dtest,public",
+    "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:55433/aurelinx_db?options=-csearch_path%3Dtest,public",
 )
 
 

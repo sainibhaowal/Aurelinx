@@ -14,44 +14,44 @@ from uuid import uuid4
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:5432/aurelinx_db"
+    "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:55433/aurelinx_db"
     "?options=-csearch_path%3Dtest,public",
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["ALLOWED_HOSTS"] = "*"
 os.environ.setdefault("ENVIRONMENT", "development")
 
-from datetime import datetime, timedelta  # noqa: E402
+from datetime import datetime, timedelta
 
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import create_engine, select  # noqa: E402
-from sqlmodel import Session as SQLSession  # noqa: E402
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, select
+from sqlmodel import Session as SQLSession
 
-from app.main import app  # noqa: E402
-from app.core.security import get_current_user, get_tenant_id, TokenData  # noqa: E402
-from app.models.database import (  # noqa: E402
-    SQLModel,
-    EmployeeTable,
-    CandidateTable,
-    SkillTable,
-    IntegrationConnectionTable,
+from app.api.v1.chat import (
+    _execute_agent_tool,
+    _perform_approved_delete,
+    _prepare_delete_spec,
+)
+from app.core.security import TokenData, get_current_user, get_tenant_id
+from app.main import app
+from app.models import database as db
+from app.models.database import (
     ChatAttachmentTable,
-    ChatMessageTable,
     ChatSessionTable,
+    EmployeeTable,
+    IntegrationConnectionTable,
+    SkillTable,
+    SQLModel,
     WorkflowApprovalTable,
     get_session,
 )
-from app.models import database as db  # noqa: E402
-from app.workflows.events import create_workflow_run  # noqa: E402
-from app.api.v1.chat import (  # noqa: E402
-    _execute_agent_tool,
-    _prepare_delete_spec,
-    _perform_approved_delete,
-)
+from app.workflows.events import create_workflow_run
 
 ADMIN = TokenData(user_id=str(uuid4()), email="admin-tools@aurelinx.com", is_admin=True)
-MEMBER = TokenData(user_id=str(uuid4()), email="member-tools@aurelinx.com", is_admin=False)
+MEMBER = TokenData(
+    user_id=str(uuid4()), email="member-tools@aurelinx.com", is_admin=False
+)
 
 
 @pytest.fixture()
@@ -150,7 +150,10 @@ def test_search_groups_records_and_redacts_secrets(client_db):
         if group["entity"] == "integration"
     ]
     assert integration_rows
-    assert all("api_key" not in row or row["api_key"] == "[redacted]" for row in integration_rows)
+    assert all(
+        "api_key" not in row or row["api_key"] == "[redacted]"
+        for row in integration_rows
+    )
 
 
 def test_read_by_email_and_redacts_file_path(client_db):
@@ -200,7 +203,11 @@ def test_modify_admin_commits_and_member_blocked(client_db):
 
     member_result = _execute_agent_tool(
         "modify",
-        {"entity": "employee", "identifier": "carol.modify@aurelinx.io", "fields": {"sentiment_score": 0.99}},
+        {
+            "entity": "employee",
+            "identifier": "carol.modify@aurelinx.io",
+            "fields": {"sentiment_score": 0.99},
+        },
         "update carol",
         MEMBER,
         str(uuid4()),
@@ -228,9 +235,15 @@ def test_modify_admin_commits_and_member_blocked(client_db):
     assert result["result"]["record"]["sentiment_score"] == 0.99
 
     with SQLSession(engine) as s:
-        row = s.exec(
-            select(EmployeeTable).where(EmployeeTable.email == "carol.modify@aurelinx.io")
-        ).scalars().first()
+        row = (
+            s.exec(
+                select(EmployeeTable).where(
+                    EmployeeTable.email == "carol.modify@aurelinx.io"
+                )
+            )
+            .scalars()
+            .first()
+        )
         assert row.sentiment_score == 0.99
         assert row.department == "Data Science"
 
@@ -241,7 +254,11 @@ def test_modify_blocks_secret_and_id_columns(client_db):
 
     result = _execute_agent_tool(
         "modify",
-        {"entity": "employee", "identifier": "dave.secret@aurelinx.io", "fields": {"id": "new-id"}},
+        {
+            "entity": "employee",
+            "identifier": "dave.secret@aurelinx.io",
+            "fields": {"id": "new-id"},
+        },
         "update dave",
         ADMIN,
         str(uuid4()),
@@ -251,7 +268,6 @@ def test_modify_blocks_secret_and_id_columns(client_db):
 
 
 def test_write_creates_and_duplicates_blocked(client_db):
-    engine = client_db["engine"]
     session_id = str(uuid4())
 
     result = _execute_agent_tool(
@@ -289,7 +305,10 @@ def test_write_creates_and_duplicates_blocked(client_db):
 
     member_result = _execute_agent_tool(
         "write",
-        {"entity": "candidate", "data": {"full_name": "Nope", "email": "nope@aurelinx.io"}},
+        {
+            "entity": "candidate",
+            "data": {"full_name": "Nope", "email": "nope@aurelinx.io"},
+        },
         "member write",
         MEMBER,
         session_id,
@@ -319,7 +338,9 @@ def test_delete_prepares_spec_then_approval_executes(client_db):
     # executes it with the stored payload (admin only).
     run = create_workflow_run(str(uuid4()), str(ADMIN.user_id), "test-tenant")
     approval_id = str(uuid4())
-    payload = json.dumps(_prepare_delete_spec("employee", "frank.delete@aurelinx.io", "delete frank"))
+    payload = json.dumps(
+        _prepare_delete_spec("employee", "frank.delete@aurelinx.io", "delete frank")
+    )
     with SQLSession(engine) as s:
         s.add(
             WorkflowApprovalTable(
@@ -328,7 +349,9 @@ def test_delete_prepares_spec_then_approval_executes(client_db):
                 tenant_id="test-tenant",
                 requested_by=str(MEMBER.user_id),
                 action_type="delete",
-                action_payload_hash=__import__("hashlib").sha256(payload.encode("utf-8")).hexdigest(),
+                action_payload_hash=__import__("hashlib")
+                .sha256(payload.encode("utf-8"))
+                .hexdigest(),
                 action_payload=payload,
                 status="pending",
                 reason="Deletion requested through workflow chat",
@@ -348,9 +371,15 @@ def test_delete_prepares_spec_then_approval_executes(client_db):
     assert data["result"]["name"] == "Frank Deletable"
 
     with SQLSession(engine) as s:
-        row = s.exec(
-            select(EmployeeTable).where(EmployeeTable.email == "frank.delete@aurelinx.io")
-        ).scalars().first()
+        row = (
+            s.exec(
+                select(EmployeeTable).where(
+                    EmployeeTable.email == "frank.delete@aurelinx.io"
+                )
+            )
+            .scalars()
+            .first()
+        )
         assert row is None
         skills = s.exec(
             select(SkillTable).where(SkillTable.employee_id == emp_id)
@@ -369,7 +398,9 @@ def test_approval_reject_marks_rejected(client_db):
     _seed_employee(engine, "grace.reject@aurelinx.io", "Grace Rejectable")
     run = create_workflow_run(str(uuid4()), str(ADMIN.user_id), "test-tenant")
     approval_id = str(uuid4())
-    payload = json.dumps(_prepare_delete_spec("employee", "grace.reject@aurelinx.io", "delete grace"))
+    payload = json.dumps(
+        _prepare_delete_spec("employee", "grace.reject@aurelinx.io", "delete grace")
+    )
     with SQLSession(engine) as s:
         s.add(
             WorkflowApprovalTable(
@@ -378,7 +409,9 @@ def test_approval_reject_marks_rejected(client_db):
                 tenant_id="test-tenant",
                 requested_by=str(ADMIN.user_id),
                 action_type="delete",
-                action_payload_hash=__import__("hashlib").sha256(payload.encode("utf-8")).hexdigest(),
+                action_payload_hash=__import__("hashlib")
+                .sha256(payload.encode("utf-8"))
+                .hexdigest(),
                 action_payload=payload,
                 status="pending",
                 reason="Deletion requested through workflow chat",
@@ -394,14 +427,25 @@ def test_approval_reject_marks_rejected(client_db):
     with SQLSession(engine) as s:
         approval = s.get(WorkflowApprovalTable, approval_id)
         assert approval.status == "rejected"
-        assert s.exec(select(EmployeeTable).where(EmployeeTable.email == "grace.reject@aurelinx.io")).scalars().first() is not None
+        assert (
+            s.exec(
+                select(EmployeeTable).where(
+                    EmployeeTable.email == "grace.reject@aurelinx.io"
+                )
+            )
+            .scalars()
+            .first()
+            is not None
+        )
 
 
 def test_legacy_email_delete_payload_still_supported(client_db):
     engine = client_db["engine"]
     _seed_employee(engine, "heidi.legacy@aurelinx.io", "Heidi Legacy")
     with SQLSession(engine) as s:
-        result = _perform_approved_delete(s, "delete the employee heidi.legacy@aurelinx.io please")
+        result = _perform_approved_delete(
+            s, "delete the employee heidi.legacy@aurelinx.io please"
+        )
     assert result["deleted"] is True
     assert result["resource_type"] == "employee"
     assert result["email"] == "heidi.legacy@aurelinx.io"
@@ -410,7 +454,11 @@ def test_legacy_email_delete_payload_still_supported(client_db):
 def test_analyse_returns_record_counts_and_workforce(client_db):
     engine = client_db["engine"]
     _seed_employee(engine, "ivan.analyse@aurelinx.io", "Ivan Analyst")
-    _seed_employee(engine, "julia.analyse@aurelinx.io", "Julia Analyst", )
+    _seed_employee(
+        engine,
+        "julia.analyse@aurelinx.io",
+        "Julia Analyst",
+    )
 
     result = _execute_agent_tool(
         "analyse",
@@ -432,7 +480,15 @@ def test_observe_reports_patterns_symptoms_and_delta(client_db):
     session_id = str(uuid4())
     _seed_employee(engine, "kate.observe@aurelinx.io", "Kate Observed")
     with SQLSession(engine) as s:
-        row = s.exec(select(EmployeeTable).where(EmployeeTable.email == "kate.observe@aurelinx.io")).scalars().first()
+        row = (
+            s.exec(
+                select(EmployeeTable).where(
+                    EmployeeTable.email == "kate.observe@aurelinx.io"
+                )
+            )
+            .scalars()
+            .first()
+        )
         row.is_at_risk = True
         s.add(row)
         s.commit()
@@ -448,7 +504,12 @@ def test_observe_reports_patterns_symptoms_and_delta(client_db):
 
     mutation_state = {"observations": [observation]}
     second = _execute_agent_tool(
-        "observe", {"scope": "attrition"}, "observe risk again", MEMBER, session_id, mutation_state
+        "observe",
+        {"scope": "attrition"},
+        "observe risk again",
+        MEMBER,
+        session_id,
+        mutation_state,
     )
     second_observation = second["observation"]
     assert second_observation["prior_observations_seen"] == 1

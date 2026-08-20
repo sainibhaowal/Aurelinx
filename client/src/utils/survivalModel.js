@@ -120,10 +120,7 @@ export function logHazardContributions(covs, means) {
       centered(Number(covs.risk_flag), means.risk_flag),
     skills:
       COX_COEFFICIENTS.skills *
-      centered(
-        overloaded(covs.skills_count),
-        overloaded(means.skills_count),
-      ),
+      centered(overloaded(covs.skills_count), overloaded(means.skills_count)),
     skill_level:
       COX_COEFFICIENTS.skill_level *
       centered(
@@ -132,7 +129,10 @@ export function logHazardContributions(covs, means) {
       ),
     match:
       COX_COEFFICIENTS.match *
-      centered(covs.match_score - MATCH_REFERENCE, means.match_score - MATCH_REFERENCE),
+      centered(
+        covs.match_score - MATCH_REFERENCE,
+        means.match_score - MATCH_REFERENCE,
+      ),
     experience:
       COX_COEFFICIENTS.experience *
       centered(
@@ -151,7 +151,10 @@ export function logHazardContributions(covs, means) {
   let total = Object.values(contribs).reduce((a, b) => a + b, 0);
   if (total > MAX_LOG_HAZARD_RATIO || total < MIN_LOG_HAZARD_RATIO) {
     // Absorb saturation remainder into the dominant driver (backend parity)
-    const clamped = Math.max(MIN_LOG_HAZARD_RATIO, Math.min(MAX_LOG_HAZARD_RATIO, total));
+    const clamped = Math.max(
+      MIN_LOG_HAZARD_RATIO,
+      Math.min(MAX_LOG_HAZARD_RATIO, total),
+    );
     let dominant = null;
     let maxAbs = -Infinity;
     for (const key of Object.keys(contribs)) {
@@ -171,7 +174,11 @@ export function logHazardContributions(covs, means) {
  * Returns { hazardRatio, currentHazard, forecast[], medianResidualTenure,
  *           attr12, waterfall[] }.
  */
-export function computeSurvival(covs, means, horizon = FORECAST_HORIZON_MONTHS) {
+export function computeSurvival(
+  covs,
+  means,
+  horizon = FORECAST_HORIZON_MONTHS,
+) {
   const { contribs, total } = logHazardContributions(covs, means);
   const hazardRatio = Math.exp(total);
   const deptHr = Math.exp(covs.dept_offset);
@@ -191,7 +198,7 @@ export function computeSurvival(covs, means, horizon = FORECAST_HORIZON_MONTHS) 
 
     forecast.push({
       month: m,
-      projected_tenure: Number((projectedT).toFixed(1)),
+      projected_tenure: Number(projectedT.toFixed(1)),
       survival_probability: survival,
       attrition_probability: 1 - survival,
       hazard: h_t,
@@ -206,7 +213,8 @@ export function computeSurvival(covs, means, horizon = FORECAST_HORIZON_MONTHS) 
     const cur = forecast[m - 1];
     if (cur.survival_probability <= 0.5) {
       const prevS = m === 1 ? 1.0 : forecast[m - 2].survival_probability;
-      const prevT = m === 1 ? covs.tenure_months : forecast[m - 2].projected_tenure;
+      const prevT =
+        m === 1 ? covs.tenure_months : forecast[m - 2].projected_tenure;
       if (prevS > 0.5) {
         const frac = (prevS - 0.5) / (prevS - cur.survival_probability);
         medianResidualTenure = prevT + frac * (cur.projected_tenure - prevT);
@@ -226,11 +234,17 @@ export function computeSurvival(covs, means, horizon = FORECAST_HORIZON_MONTHS) 
       direction: contribs[key] > 0 ? "risky" : "protective",
     };
   });
-  waterfall.sort((a, b) => Math.abs(b.impact_percentage) - Math.abs(a.impact_percentage));
+  waterfall.sort(
+    (a, b) => Math.abs(b.impact_percentage) - Math.abs(a.impact_percentage),
+  );
 
   return {
     hazardRatio,
-    currentHazard: baselineHazard(covs.tenure_months) * covs.seniority_scale * deptHr * hazardRatio,
+    currentHazard:
+      baselineHazard(covs.tenure_months) *
+      covs.seniority_scale *
+      deptHr *
+      hazardRatio,
     forecast,
     medianResidualTenure,
     attr12: forecast[horizon - 1].attrition_probability,
@@ -253,22 +267,34 @@ export function riskTier(attr12) {
 
 export function tierColor(tier) {
   switch (tier) {
-    case "Low": return "#34d399";
-    case "Moderate": return "#fbbf24";
-    case "Elevated": return "#fb923c";
-    case "High": return "#f43f5e";
-    case "Critical": return "#e11d48";
-    default: return "#94a3b8";
+    case "Low":
+      return "#34d399";
+    case "Moderate":
+      return "#fbbf24";
+    case "Elevated":
+      return "#fb923c";
+    case "High":
+      return "#f43f5e";
+    case "Critical":
+      return "#e11d48";
+    default:
+      return "#94a3b8";
   }
 }
 
 export function tierBg(tier) {
   switch (tier) {
-    case "Low": return "rgba(52,211,153,0.12)";
-    case "Moderate": return "rgba(251,191,36,0.12)";
-    case "Elevated": return "rgba(251,146,60,0.12)";
-    case "High": return "rgba(244,63,94,0.14)";
-    case "Critical": return "rgba(225,29,72,0.18)";
-    default: return "rgba(148,163,184,0.1)";
+    case "Low":
+      return "rgba(52,211,153,0.12)";
+    case "Moderate":
+      return "rgba(251,191,36,0.12)";
+    case "Elevated":
+      return "rgba(251,146,60,0.12)";
+    case "High":
+      return "rgba(244,63,94,0.14)";
+    case "Critical":
+      return "rgba(225,29,72,0.18)";
+    default:
+      return "rgba(148,163,184,0.1)";
   }
 }
