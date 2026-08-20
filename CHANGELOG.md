@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.6](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.5...v1.1.6) (2026-08-20)
+
+
+### Bug Fixes
+
+* add GHCR login note and improve SSH command ([1c8a761](https://github.com/sainibhaowal/Aurelinx/commit/1c8a7616437ae8fca8ecfc0ab1f1a3f2233368ba))
+
 ### [1.1.5](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.4...v1.1.5) (2026-08-20)
 
 
