@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.14](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.13...v1.1.14) (2026-08-20)
+
+
+### Bug Fixes
+
+* exempt health check from HTTPS middleware, use dynamic version ([cc2a609](https://github.com/sainibhaowal/Aurelinx/commit/cc2a6092f432fbc8ac27e84228b7f7ee95fe91ce))
+
 ### [1.1.13](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.12...v1.1.13) (2026-08-20)
 
 ### [1.1.12](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.11...v1.1.12) (2026-08-20)
