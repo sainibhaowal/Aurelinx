@@ -75,7 +75,7 @@ jobs:
     #   VPS_USER        - SSH user with docker rights (e.g. deploy)
     #   VPS_SSH_KEY     - Private SSH key (no passphrase) for VPS_USER
     #   VPS_DEPLOY_DIR  - Absolute path on VPS where docker-compose.yml lives (e.g. /opt/aurelinx)
-steps:
+    steps:
       - name: Install SSH key
         uses: webfactory/ssh-agent@v0.9.0
         with:
