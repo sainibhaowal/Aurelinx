@@ -64,6 +64,7 @@ services:
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       PYTHONPATH: /app
       CHAT_UPLOAD_ROOT: ${CHAT_UPLOAD_ROOT:-/app/data/chat}
+      VERSION: ${VERSION:-1.0.0}
     depends_on:
       postgres:
         condition: service_healthy

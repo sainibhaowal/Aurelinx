@@ -90,6 +90,8 @@ if settings.ENVIRONMENT == "production" and settings.REQUIRE_HTTPS:
 
     @app.middleware("http")
     async def enforce_https(request: Request, call_next):
+        if request.url.path == "/health":
+            return await call_next(request)
         forwarded_proto = request.headers.get("x-forwarded-proto", "")
         scheme = request.url.scheme or "http"
         if forwarded_proto and forwarded_proto.lower() != "https":
@@ -215,7 +217,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "aurelinx",
-        "version": "1.0.0",
+        "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
         "timestamp": datetime.utcnow().isoformat(),
     }
@@ -226,7 +228,7 @@ async def root():
     """Root endpoint"""
     return {
         "name": "Aurelinx Intelligence API",
-        "version": "1.0.0",
+        "version": settings.VERSION,
         "docs": "/api/v1/docs",
         "status": "operational",
     }
