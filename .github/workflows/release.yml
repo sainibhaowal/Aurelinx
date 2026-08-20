@@ -87,18 +87,12 @@ jobs:
           GHCR_OWNER: ${{ github.repository_owner }}
           DEPLOY_DIR: ${{ secrets.VPS_DEPLOY_DIR }}
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} <<'EOF'
+          ssh -o StrictHostKeyChecking=no "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
             set -euo pipefail
             cd "$DEPLOY_DIR"
-
-            # Write a tiny env file that only contains the image coordinates
             printf "GHCR_OWNER=%s\nVERSION=%s\n" "$GHCR_OWNER" "$VERSION" > .env.deploy
-
-            # Pull the new images and recreate containers
             docker compose --env-file .env.production --env-file .env.deploy pull
             docker compose --env-file .env.production --env-file .env.deploy up -d --remove-orphans
-
-            # Quick health-check (adjust port/host if needed)
             sleep 5
-            curl -fsS http://localhost:5100/health | jq -e '.version=="'$VERSION'"' && echo "Deployed $VERSION"
-EOF
+            curl -fsS http://localhost:5100/health | jq -e ".version==\"$VERSION\"" && echo "Deployed $VERSION"
+          '
