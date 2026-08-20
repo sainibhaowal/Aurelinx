@@ -44,7 +44,9 @@ jobs:
           context: ./server
           file: ./infra/backend.Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:${{ steps.vars.outputs.VERSION }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:${{ steps.vars.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -54,16 +56,41 @@ jobs:
           context: ./client
           file: ./infra/frontend.Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:${{ steps.vars.outputs.VERSION }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:${{ steps.vars.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:latest
           build-args: |
             NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Generate professional release notes
+        id: release_notes
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          PREV_TAG=$(git tag --sort=-version:refname | sed -n 2p)
+          echo "### What's Changed" > NOTES.md
+          if [ -n "$PREV_TAG" ]; then
+            git log "$PREV_TAG"..HEAD --pretty=format:"- %s (%h)" --grep="^feat" >> NOTES.md || true
+          fi
+          echo "" >> NOTES.md
+          echo "### Bug Fixes & Improvements" >> NOTES.md
+          if [ -n "$PREV_TAG" ]; then
+            git log "$PREV_TAG"..HEAD --pretty=format:"- %s (%h)" --grep="^fix\|^chore\|^refactor\|^ci\|^docs" >> NOTES.md || true
+          fi
+          echo "" >> NOTES.md
+          echo "---" >> NOTES.md
+          echo "**Images:**" >> NOTES.md
+          echo "- \`ghcr.io/sainibhaowal/aurelinx-backend:$VERSION\`" >> NOTES.md
+          echo "- \`ghcr.io/sainibhaowal/aurelinx-frontend:$VERSION\`" >> NOTES.md
+          echo "**Deployment:** Automatically deployed to production (aurelinx.averqel.com)." >> NOTES.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          name: Aurelinx v${{ steps.vars.outputs.VERSION }}
+          body_path: NOTES.md
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
