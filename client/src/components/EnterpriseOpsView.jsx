@@ -44,7 +44,7 @@ const EnterpriseOpsView = () => {
   const [quarantine, setQuarantine] = useState([]);
   const [modelTop, setModelTop] = useState([]);
   const [scenarioResult, setScenarioResult] = useState(null);
-  const [scenarios, setScenarios] = useState([]);
+  const [, setScenarios] = useState([]);
   const [policies, setPolicies] = useState([]);
   const [modelCards, setModelCards] = useState([]);
   const [fairness, setFairness] = useState(null);
@@ -60,15 +60,16 @@ const EnterpriseOpsView = () => {
   const [selectedConnectionId, setSelectedConnectionId] = useState(null);
   const [fieldMappings, setFieldMappings] = useState([]);
   const [syncJobs, setSyncJobs] = useState([]);
-  const [expandedInterventionId, setExpandedInterventionId] = useState(null);
-  const [evidenceModalIntervention, setEvidenceModalIntervention] = useState(null);
+  const [evidenceModalIntervention, setEvidenceModalIntervention] =
+    useState(null);
   const [interventionOutcomes, setInterventionOutcomes] = useState({});
   const [outcomeLoading, setOutcomeLoading] = useState({});
   const [outcomeFeedback, setOutcomeFeedback] = useState({});
 
   // Helper to calculate 100% dynamic risk metrics per employee card
   const getEmployeeMetrics = (item) => {
-    if (!item) return { flightRisk: "75.0", payGap: "-20.0", moraleScore: "0.40" };
+    if (!item)
+      return { flightRisk: "75.0", payGap: "-20.0", moraleScore: "0.40" };
     let hash = 0;
     const str = String(item.id || item.title || "employee_seed");
     for (let idx = 0; idx < str.length; idx++) {
@@ -97,11 +98,17 @@ const EnterpriseOpsView = () => {
   const [modalBudget, setModalBudget] = useState("15000");
   const [modalOwner, setModalOwner] = useState("HRBP Senior Lead");
   const [modalPriority, setModalPriority] = useState("high");
-  const [modalNotes, setModalNotes] = useState("Execute 12% salary adjustment & clear promotion path.");
+  const [modalNotes, setModalNotes] = useState(
+    "Execute 12% salary adjustment & clear promotion path.",
+  );
 
   const [modalDate, setModalDate] = useState("");
-  const [modalAgenda, setModalAgenda] = useState("Discuss workload balance, equity options, and market pay alignment.");
-  const [modalReason, setModalReason] = useState("False positive risk signal / Employee satisfied");
+  const [modalAgenda, setModalAgenda] = useState(
+    "Discuss workload balance, equity options, and market pay alignment.",
+  );
+  const [modalReason, setModalReason] = useState(
+    "False positive risk signal / Employee satisfied",
+  );
 
   const openEscalateModal = (reviewItem) => {
     setSelectedReview(reviewItem);
@@ -141,7 +148,8 @@ const EnterpriseOpsView = () => {
     } catch (error) {
       alert(`Escalation failed: ${error?.message || "API Error"}`);
     } finally {
-      if (selectedReview) setOutcomeLoading((prev) => ({ ...prev, [selectedReview.id]: false }));
+      if (selectedReview)
+        setOutcomeLoading((prev) => ({ ...prev, [selectedReview.id]: false }));
     }
   };
 
@@ -152,12 +160,14 @@ const EnterpriseOpsView = () => {
       await enterpriseAPI.updateIntervention(selectedReview.id, {
         status: "in_progress",
         owner_name: modalOwner,
-        due_date: modalDate ? new Date(modalDate).toISOString() : new Date().toISOString(),
-        expected_impact: `[SCHEDULED RETENTION MEETING] Date: ${modalDate || 'Upcoming'} | Agenda: ${modalAgenda}`,
+        due_date: modalDate
+          ? new Date(modalDate).toISOString()
+          : new Date().toISOString(),
+        expected_impact: `[SCHEDULED RETENTION MEETING] Date: ${modalDate || "Upcoming"} | Agenda: ${modalAgenda}`,
       });
       setOutcomeFeedback((prev) => ({
         ...prev,
-        [selectedReview.id]: `Retention meeting scheduled for ${modalDate || 'upcoming date'}.`,
+        [selectedReview.id]: `Retention meeting scheduled for ${modalDate || "upcoming date"}.`,
       }));
       setActiveModal(null);
       setSelectedReview(null);
@@ -165,7 +175,8 @@ const EnterpriseOpsView = () => {
     } catch (error) {
       alert(`Scheduling failed: ${error?.message || "API Error"}`);
     } finally {
-      if (selectedReview) setOutcomeLoading((prev) => ({ ...prev, [selectedReview.id]: false }));
+      if (selectedReview)
+        setOutcomeLoading((prev) => ({ ...prev, [selectedReview.id]: false }));
     }
   };
 
@@ -187,7 +198,8 @@ const EnterpriseOpsView = () => {
     } catch (error) {
       alert(`Dismissal failed: ${error?.message || "API Error"}`);
     } finally {
-      if (selectedReview) setOutcomeLoading((prev) => ({ ...prev, [selectedReview.id]: false }));
+      if (selectedReview)
+        setOutcomeLoading((prev) => ({ ...prev, [selectedReview.id]: false }));
     }
   };
 
@@ -488,36 +500,24 @@ const EnterpriseOpsView = () => {
         status,
         notes: `Checkpoint ${checkpointDay} status updated to ${status}`,
       });
-      const outcomes = await enterpriseAPI.listInterventionOutcomes(interventionId);
-      setInterventionOutcomes((prev) => ({ ...prev, [interventionId]: outcomes || [] }));
-      setExpandedInterventionId(interventionId);
+      const outcomes =
+        await enterpriseAPI.listInterventionOutcomes(interventionId);
+      setInterventionOutcomes((prev) => ({
+        ...prev,
+        [interventionId]: outcomes || [],
+      }));
       setOutcomeFeedback((prev) => ({
         ...prev,
         [interventionId]: `${checkpointDay}-day checkpoint saved: ${status}.`,
       }));
       await loadAll();
     } catch (error) {
-      setExpandedInterventionId(interventionId);
       setOutcomeFeedback((prev) => ({
         ...prev,
         [interventionId]: `Checkpoint was not saved: ${error?.message || "review the lifecycle and existing history"}.`,
       }));
     } finally {
       setOutcomeLoading((prev) => ({ ...prev, [interventionId]: false }));
-    }
-  };
-
-  const toggleInterventionHistory = async (interventionId) => {
-    const nextOpen = expandedInterventionId === interventionId ? null : interventionId;
-    setExpandedInterventionId(nextOpen);
-    if (nextOpen && !interventionOutcomes[interventionId]) {
-      setOutcomeLoading((prev) => ({ ...prev, [interventionId]: true }));
-      try {
-        const outcomes = await enterpriseAPI.listInterventionOutcomes(interventionId);
-        setInterventionOutcomes((prev) => ({ ...prev, [interventionId]: outcomes || [] }));
-      } finally {
-        setOutcomeLoading((prev) => ({ ...prev, [interventionId]: false }));
-      }
     }
   };
 
@@ -850,8 +850,14 @@ const EnterpriseOpsView = () => {
     );
   };
 
-  const openInterventionStatuses = new Set(["planned", "approved", "in_progress"]);
-  const openInterventions = interventions.filter((item) => openInterventionStatuses.has(item.status));
+  const openInterventionStatuses = new Set([
+    "planned",
+    "approved",
+    "in_progress",
+  ]);
+  const openInterventions = interventions.filter((item) =>
+    openInterventionStatuses.has(item.status),
+  );
   const latestDrill = drRunbooks
     .filter((runbook) => runbook.last_drill_at)
     .sort((a, b) => new Date(b.last_drill_at) - new Date(a.last_drill_at))[0];
@@ -865,8 +871,8 @@ const EnterpriseOpsView = () => {
           <div className="flex-1 flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold uppercase tracking-[0.2em] mb-1">
-                <Database size={12} className="animate-pulse" /> Core Infrastructure
-                &amp; ML Ops
+                <Database size={12} className="animate-pulse" /> Core
+                Infrastructure &amp; ML Ops
               </div>
               <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
                 Enterprise Operations
@@ -907,7 +913,8 @@ const EnterpriseOpsView = () => {
               <div className="text-base font-black text-white flex items-baseline gap-1.5 mt-0.5">
                 {connections.length}{" "}
                 <span className="text-[10px] font-normal text-cyan-400">
-                  {connections.filter((c) => c.status === "active").length} active
+                  {connections.filter((c) => c.status === "active").length}{" "}
+                  active
                 </span>
               </div>
             </div>
@@ -1011,10 +1018,11 @@ const EnterpriseOpsView = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2.5 px-6 py-3 border-b-2 font-semibold text-xs uppercase tracking-wider transition-all whitespace-nowrap relative ${active
-                  ? "border-cyan-400 text-cyan-400 bg-cyan-500/[0.02]"
-                  : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/[0.01]"
-                  }`}
+                className={`flex items-center gap-2.5 px-6 py-3 border-b-2 font-semibold text-xs uppercase tracking-wider transition-all whitespace-nowrap relative ${
+                  active
+                    ? "border-cyan-400 text-cyan-400 bg-cyan-500/[0.02]"
+                    : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/[0.01]"
+                }`}
               >
                 {tab.icon}
                 <div className="text-left">
@@ -1037,10 +1045,32 @@ const EnterpriseOpsView = () => {
             {/* Sub-Tab Navigation Bar */}
             <div className="flex items-center gap-2 p-2 rounded-2xl bg-[#06101e]/95 border border-cyan-500/30 shadow-[0_12px_40px_rgba(0,0,0,0.7)] backdrop-blur-2xl overflow-x-auto custom-scrollbar">
               {[
-                { id: "connectors", label: "System Integrations", icon: Link2, badge: connections.length },
-                { id: "mappings", label: "Schema & Mappings", icon: Layers, badge: fieldMappings.length },
-                { id: "local_hub", label: "Local Dataset Hub", icon: FileSpreadsheet, badge: "CSV / ZIP" },
-                { id: "logs_quarantine", label: "Pipeline Logs & Quarantine", icon: Clock, badge: quarantine.length ? `${quarantine.length} Alert` : "Healthy" },
+                {
+                  id: "connectors",
+                  label: "System Integrations",
+                  icon: Link2,
+                  badge: connections.length,
+                },
+                {
+                  id: "mappings",
+                  label: "Schema & Mappings",
+                  icon: Layers,
+                  badge: fieldMappings.length,
+                },
+                {
+                  id: "local_hub",
+                  label: "Local Dataset Hub",
+                  icon: FileSpreadsheet,
+                  badge: "CSV / ZIP",
+                },
+                {
+                  id: "logs_quarantine",
+                  label: "Pipeline Logs & Quarantine",
+                  icon: Clock,
+                  badge: quarantine.length
+                    ? `${quarantine.length} Alert`
+                    : "Healthy",
+                },
               ].map((st) => {
                 const Icon = st.icon;
                 const isActive = pipelineSubTab === st.id;
@@ -1054,7 +1084,10 @@ const EnterpriseOpsView = () => {
                         : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent"
                     }`}
                   >
-                    <Icon size={14} className={isActive ? "text-cyan-400" : "text-slate-500"} />
+                    <Icon
+                      size={14}
+                      className={isActive ? "text-cyan-400" : "text-slate-500"}
+                    />
                     <span>{st.label}</span>
                     {st.badge !== undefined && (
                       <span
@@ -1086,7 +1119,9 @@ const EnterpriseOpsView = () => {
                         <h2 className="font-extrabold text-sm uppercase tracking-wider text-white">
                           Register Connection
                         </h2>
-                        <span className="text-[10px] text-slate-400 font-mono block">Ingestion Endpoint &amp; Credentials</span>
+                        <span className="text-[10px] text-slate-400 font-mono block">
+                          Ingestion Endpoint &amp; Credentials
+                        </span>
                       </div>
                     </div>
                     <div className="space-y-4">
@@ -1114,7 +1149,10 @@ const EnterpriseOpsView = () => {
                           placeholder="workday / greenhouse / etc."
                           value={connForm.provider}
                           onChange={(e) =>
-                            setConnForm((p) => ({ ...p, provider: e.target.value }))
+                            setConnForm((p) => ({
+                              ...p,
+                              provider: e.target.value,
+                            }))
                           }
                         />
                       </div>
@@ -1148,7 +1186,10 @@ const EnterpriseOpsView = () => {
                             className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all outline-none cursor-pointer"
                             value={connForm.status}
                             onChange={(e) =>
-                              setConnForm((p) => ({ ...p, status: e.target.value }))
+                              setConnForm((p) => ({
+                                ...p,
+                                status: e.target.value,
+                              }))
                             }
                           >
                             <option value="draft">Draft</option>
@@ -1288,7 +1329,8 @@ const EnterpriseOpsView = () => {
                             No connections registered
                           </div>
                           <p className="text-[10px] text-slate-500 mt-1">
-                            Use the form on the left to register your first HRIS/ATS data pipe.
+                            Use the form on the left to register your first
+                            HRIS/ATS data pipe.
                           </p>
                         </div>
                       )}
@@ -1314,7 +1356,9 @@ const EnterpriseOpsView = () => {
                           <h2 className="font-extrabold text-sm uppercase tracking-wider text-white">
                             Field Mapping
                           </h2>
-                          <span className="text-[10px] text-slate-400 font-mono block">Transform &amp; Schema Rules</span>
+                          <span className="text-[10px] text-slate-400 font-mono block">
+                            Transform &amp; Schema Rules
+                          </span>
                         </div>
                       </div>
                       {selectedConnectionId && (
@@ -1418,7 +1462,9 @@ const EnterpriseOpsView = () => {
                           <h2 className="font-extrabold text-sm uppercase tracking-wider text-white">
                             Lean Data Contracts
                           </h2>
-                          <span className="text-[10px] text-slate-400 font-mono block">Enforce Schema Rules</span>
+                          <span className="text-[10px] text-slate-400 font-mono block">
+                            Enforce Schema Rules
+                          </span>
                         </div>
                       </div>
                       <button
@@ -1516,7 +1562,10 @@ const EnterpriseOpsView = () => {
                           </div>
                           {m.transform_rule && (
                             <div className="text-[10px] text-slate-400 mt-1 font-mono">
-                              Transform: <span className="text-purple-300">{m.transform_rule}</span>
+                              Transform:{" "}
+                              <span className="text-purple-300">
+                                {m.transform_rule}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -1533,7 +1582,8 @@ const EnterpriseOpsView = () => {
                     ))}
                     {!fieldMappings.length && (
                       <div className="text-center py-10 rounded-xl border border-white/5 border-dashed bg-white/[0.01] text-slate-500 text-xs">
-                        No active mappings defined. Use the form above to add field translations.
+                        No active mappings defined. Use the form above to add
+                        field translations.
                       </div>
                     )}
                   </div>
@@ -1559,24 +1609,39 @@ const EnterpriseOpsView = () => {
                     <div className="flex flex-col lg:flex-row lg:items-center gap-3 justify-between relative z-10">
                       <div>
                         <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <Upload size={13} className="text-cyan-400" /> Bulk Dataset Ingestion
+                          <Upload size={13} className="text-cyan-400" /> Bulk
+                          Dataset Ingestion
                         </div>
                         <p className="text-[10px] text-slate-400 leading-normal mt-0.5 max-w-xl">
-                          Upload individual CSVs directly into Postgres, or use a single ZIP bundle (`aurelinx-dataset-bundle.zip`) to load the full dataset in one pass.
+                          Upload individual CSVs directly into Postgres, or use
+                          a single ZIP bundle (`aurelinx-dataset-bundle.zip`) to
+                          load the full dataset in one pass.
                         </p>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-300">
                         <div className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2">
-                          Employees: <strong className="text-slate-100">{dataSummary?.employees ?? 0}</strong>
+                          Employees:{" "}
+                          <strong className="text-slate-100">
+                            {dataSummary?.employees ?? 0}
+                          </strong>
                         </div>
                         <div className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2">
-                          Candidates: <strong className="text-slate-100">{dataSummary?.candidates ?? 0}</strong>
+                          Candidates:{" "}
+                          <strong className="text-slate-100">
+                            {dataSummary?.candidates ?? 0}
+                          </strong>
                         </div>
                         <div className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2">
-                          Skills: <strong className="text-slate-100">{dataSummary?.skills ?? 0}</strong>
+                          Skills:{" "}
+                          <strong className="text-slate-100">
+                            {dataSummary?.skills ?? 0}
+                          </strong>
                         </div>
                         <div className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2">
-                          Experience: <strong className="text-slate-100">{dataSummary?.experience ?? 0}</strong>
+                          Experience:{" "}
+                          <strong className="text-slate-100">
+                            {dataSummary?.experience ?? 0}
+                          </strong>
                         </div>
                       </div>
                     </div>
@@ -1587,10 +1652,13 @@ const EnterpriseOpsView = () => {
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div>
                         <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <Upload size={13} className="text-cyan-400" /> ZIP Bundle Import
+                          <Upload size={13} className="text-cyan-400" /> ZIP
+                          Bundle Import
                         </div>
                         <p className="text-[10px] text-slate-400 leading-normal mt-0.5 max-w-xl">
-                          Upload a single `aurelinx-dataset-bundle.zip` to load employees, candidates, skills, and experience in one pass.
+                          Upload a single `aurelinx-dataset-bundle.zip` to load
+                          employees, candidates, skills, and experience in one
+                          pass.
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1611,9 +1679,14 @@ const EnterpriseOpsView = () => {
                           className="h-9 px-4 rounded-xl border border-dashed border-cyan-400/30 bg-slate-950/40 text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all hover:border-cyan-400/60"
                         >
                           <span className="truncate max-w-[180px]">
-                            {importFiles.bundle ? importFiles.bundle.name : "Select ZIP Bundle"}
+                            {importFiles.bundle
+                              ? importFiles.bundle.name
+                              : "Select ZIP Bundle"}
                           </span>
-                          <FileSpreadsheet size={12} className="text-cyan-400" />
+                          <FileSpreadsheet
+                            size={12}
+                            className="text-cyan-400"
+                          />
                         </label>
                         <button
                           onClick={uploadBundleImport}
@@ -1627,13 +1700,17 @@ const EnterpriseOpsView = () => {
                     {uploadProgress.bundle?.message && (
                       <div className="mt-3 rounded-lg bg-cyan-950/20 border border-cyan-400/20 p-2.5 font-mono text-[9px]">
                         <div className="flex items-center justify-between text-cyan-300 font-bold mb-1">
-                          <span>{uploadProgress.bundle.phase.toUpperCase()}</span>
+                          <span>
+                            {uploadProgress.bundle.phase.toUpperCase()}
+                          </span>
                           <span>{uploadProgress.bundle.percent}%</span>
                         </div>
                         <div className="h-1 rounded-full bg-cyan-950 overflow-hidden">
                           <div
                             className="h-full bg-cyan-400 transition-all duration-300"
-                            style={{ width: `${uploadProgress.bundle.percent}%` }}
+                            style={{
+                              width: `${uploadProgress.bundle.percent}%`,
+                            }}
                           />
                         </div>
                         <div className="text-[9px] text-cyan-400/70 mt-1">
@@ -1652,11 +1729,31 @@ const EnterpriseOpsView = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {[
                         ["employees", "Employees CSV", "employees_public.csv"],
-                        ["candidates", "Candidates CSV", "candidates_public.csv"],
-                        ["employee_skills", "Employee Skills CSV", "employee_skills_public.csv"],
-                        ["candidate_skills", "Candidate Skills CSV", "candidate_skills_public.csv"],
-                        ["employee_experience", "Employee Experience CSV", "employee_experience_public.csv"],
-                        ["candidate_experience", "Candidate Experience CSV", "candidate_experience_public.csv"],
+                        [
+                          "candidates",
+                          "Candidates CSV",
+                          "candidates_public.csv",
+                        ],
+                        [
+                          "employee_skills",
+                          "Employee Skills CSV",
+                          "employee_skills_public.csv",
+                        ],
+                        [
+                          "candidate_skills",
+                          "Candidate Skills CSV",
+                          "candidate_skills_public.csv",
+                        ],
+                        [
+                          "employee_experience",
+                          "Employee Experience CSV",
+                          "employee_experience_public.csv",
+                        ],
+                        [
+                          "candidate_experience",
+                          "Candidate Experience CSV",
+                          "candidate_experience_public.csv",
+                        ],
                       ].map(([key, label, filename]) => (
                         <div
                           key={key}
@@ -1664,8 +1761,12 @@ const EnterpriseOpsView = () => {
                         >
                           <div>
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-white text-xs">{label}</span>
-                              <span className="font-mono text-[9px] text-slate-500">{filename}</span>
+                              <span className="font-bold text-white text-xs">
+                                {label}
+                              </span>
+                              <span className="font-mono text-[9px] text-slate-500">
+                                {filename}
+                              </span>
                             </div>
 
                             <input
@@ -1685,9 +1786,14 @@ const EnterpriseOpsView = () => {
                               className="w-full mt-3 h-8 px-3 rounded-lg border border-dashed border-white/10 hover:border-cyan-400/30 bg-slate-950/40 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between cursor-pointer transition-all"
                             >
                               <span className="truncate max-w-[150px]">
-                                {importFiles[key] ? importFiles[key].name : "Select Schema CSV"}
+                                {importFiles[key]
+                                  ? importFiles[key].name
+                                  : "Select Schema CSV"}
                               </span>
-                              <FileSpreadsheet size={10} className="text-slate-500" />
+                              <FileSpreadsheet
+                                size={10}
+                                className="text-slate-500"
+                              />
                             </label>
                           </div>
 
@@ -1695,12 +1801,30 @@ const EnterpriseOpsView = () => {
                             <div className="mt-3 rounded-lg border border-white/5 bg-black/35 p-2 font-mono text-[10px] text-slate-300">
                               <div className="flex items-center justify-between text-cyan-400 font-extrabold uppercase text-[9px] mb-1">
                                 <span>Quality Score</span>
-                                <span>{Math.round((validationResults[key].metrics?.quality_score || 0) * 100)}%</span>
+                                <span>
+                                  {Math.round(
+                                    (validationResults[key].metrics
+                                      ?.quality_score || 0) * 100,
+                                  )}
+                                  %
+                                </span>
                               </div>
                               <div className="grid grid-cols-3 gap-1 text-slate-500 text-[9px]">
-                                <div>Rows: {validationResults[key].metrics?.total_rows ?? 0}</div>
-                                <div>Miss: {validationResults[key].metrics?.missing_required_rows ?? 0}</div>
-                                <div>Dupes: {validationResults[key].metrics?.duplicate_rows ?? 0}</div>
+                                <div>
+                                  Rows:{" "}
+                                  {validationResults[key].metrics?.total_rows ??
+                                    0}
+                                </div>
+                                <div>
+                                  Miss:{" "}
+                                  {validationResults[key].metrics
+                                    ?.missing_required_rows ?? 0}
+                                </div>
+                                <div>
+                                  Dupes:{" "}
+                                  {validationResults[key].metrics
+                                    ?.duplicate_rows ?? 0}
+                                </div>
                               </div>
                             </div>
                           )}
@@ -1744,7 +1868,8 @@ const EnterpriseOpsView = () => {
                     <button
                       onClick={async () => {
                         if (!selectedConnectionId) return;
-                        const jobs = await leanAPI.listSyncJobs(selectedConnectionId);
+                        const jobs =
+                          await leanAPI.listSyncJobs(selectedConnectionId);
                         setSyncJobs(jobs || []);
                       }}
                       disabled={!selectedConnectionId}
@@ -1768,20 +1893,30 @@ const EnterpriseOpsView = () => {
                         </div>
                         <div className="grid grid-cols-3 gap-1.5 text-[9px] text-slate-400 font-mono">
                           <div>
-                            Bronze: <span className="text-amber-400 font-bold">{j.bronze_events}</span>
+                            Bronze:{" "}
+                            <span className="text-amber-400 font-bold">
+                              {j.bronze_events}
+                            </span>
                           </div>
                           <div>
-                            Silver: <span className="text-emerald-400 font-bold">{j.silver_upserts}</span>
+                            Silver:{" "}
+                            <span className="text-emerald-400 font-bold">
+                              {j.silver_upserts}
+                            </span>
                           </div>
                           <div>
-                            Quarantine: <span className="text-rose-400 font-bold">{j.quarantined}</span>
+                            Quarantine:{" "}
+                            <span className="text-rose-400 font-bold">
+                              {j.quarantined}
+                            </span>
                           </div>
                         </div>
                       </div>
                     ))}
                     {!syncJobs.length && (
                       <div className="text-center py-10 rounded-xl border border-white/5 border-dashed bg-white/[0.01] text-slate-500 text-xs">
-                        No historical sync logs. Select an active connection to view jobs.
+                        No historical sync logs. Select an active connection to
+                        view jobs.
                       </div>
                     )}
                   </div>
@@ -1819,7 +1954,10 @@ const EnterpriseOpsView = () => {
                     ))}
                     {!quarantine.length && (
                       <div className="text-center py-10 rounded-xl border border-white/5 border-dashed bg-white/[0.01] text-slate-500 text-xs">
-                        <CheckCircle2 size={24} className="mx-auto text-emerald-500 mb-2" />
+                        <CheckCircle2
+                          size={24}
+                          className="mx-auto text-emerald-500 mb-2"
+                        />
                         Quarantine queue is empty. No data errors detected.
                       </div>
                     )}
@@ -1836,9 +1974,24 @@ const EnterpriseOpsView = () => {
             {/* Sub-Tab Navigation Bar */}
             <div className="flex items-center gap-2 p-2 rounded-2xl bg-[#06101e]/95 border border-cyan-500/30 shadow-[0_12px_40px_rgba(0,0,0,0.7)] backdrop-blur-2xl overflow-x-auto custom-scrollbar">
               {[
-                { id: "registry", label: "Model Registry & Drift", icon: Cpu, badge: modelCards.length },
-                { id: "fairness", label: "Fairness & Bias Audit", icon: Globe, badge: fairness?.compliant ? "Compliant" : "Review" },
-                { id: "deployment", label: "MLOps Deployment Center", icon: Activity, badge: models.length },
+                {
+                  id: "registry",
+                  label: "Model Registry & Drift",
+                  icon: Cpu,
+                  badge: modelCards.length,
+                },
+                {
+                  id: "fairness",
+                  label: "Fairness & Bias Audit",
+                  icon: Globe,
+                  badge: fairness?.compliant ? "Compliant" : "Review",
+                },
+                {
+                  id: "deployment",
+                  label: "MLOps Deployment Center",
+                  icon: Activity,
+                  badge: models.length,
+                },
               ].map((st) => {
                 const Icon = st.icon;
                 const isActive = govSubTab === st.id;
@@ -1852,7 +2005,10 @@ const EnterpriseOpsView = () => {
                         : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent"
                     }`}
                   >
-                    <Icon size={14} className={isActive ? "text-cyan-400" : "text-slate-500"} />
+                    <Icon
+                      size={14}
+                      className={isActive ? "text-cyan-400" : "text-slate-500"}
+                    />
                     <span>{st.label}</span>
                     {st.badge !== undefined && (
                       <span
@@ -1899,7 +2055,10 @@ const EnterpriseOpsView = () => {
                         <div>
                           <div className="flex justify-between items-center mb-2">
                             <span className="font-bold text-slate-100 text-sm">
-                              {m.model_name} <span className="text-cyan-400 text-xs font-mono">{m.version}</span>
+                              {m.model_name}{" "}
+                              <span className="text-cyan-400 text-xs font-mono">
+                                {m.version}
+                              </span>
                             </span>
                             {getStatusBadge(m.status)}
                           </div>
@@ -1975,7 +2134,9 @@ const EnterpriseOpsView = () => {
                       >
                         <div className="font-bold text-slate-200 mb-1 flex items-center justify-between">
                           <span>{d.model_name}</span>
-                          <span className="font-mono text-cyan-400 text-[10px]">{d.model_version}</span>
+                          <span className="font-mono text-cyan-400 text-[10px]">
+                            {d.model_version}
+                          </span>
                         </div>
                         <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-2">
                           <span>Drift Factor Score:</span>
@@ -2006,7 +2167,8 @@ const EnterpriseOpsView = () => {
                     ))}
                     {!drifts.length && (
                       <div className="col-span-full text-center py-10 rounded-xl border border-white/5 border-dashed bg-white/[0.01] text-slate-500 text-xs">
-                        No active drift signals detected. Model predictions remain calibrated.
+                        No active drift signals detected. Model predictions
+                        remain calibrated.
                       </div>
                     )}
                   </div>
@@ -2027,11 +2189,15 @@ const EnterpriseOpsView = () => {
                         <h2 className="font-extrabold text-sm uppercase tracking-wider text-white">
                           Fairness &amp; Demographics Gap Audit
                         </h2>
-                        <span className="text-[10px] text-slate-400 font-mono block">Subgroup Parity &amp; Compliance Release Gates</span>
+                        <span className="text-[10px] text-slate-400 font-mono block">
+                          Subgroup Parity &amp; Compliance Release Gates
+                        </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400 font-mono">Compliance Status:</span>
+                      <span className="text-xs text-slate-400 font-mono">
+                        Compliance Status:
+                      </span>
                       <span
                         className={`px-3 py-1 rounded-xl text-xs font-extrabold uppercase tracking-wider border ${
                           fairness?.compliant
@@ -2039,7 +2205,11 @@ const EnterpriseOpsView = () => {
                             : "bg-amber-500/10 text-amber-400 border-amber-500/20"
                         }`}
                       >
-                        {fairness ? (fairness.compliant ? "Compliant" : "Attention Required") : "N/A"}
+                        {fairness
+                          ? fairness.compliant
+                            ? "Compliant"
+                            : "Attention Required"
+                          : "N/A"}
                       </span>
                     </div>
                   </div>
@@ -2048,8 +2218,12 @@ const EnterpriseOpsView = () => {
                     {/* Statistical Subgroups Analysis */}
                     <div className="space-y-3">
                       <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2 flex items-center justify-between">
-                        <span>Statistical Subgroups Analysis (10 Departments)</span>
-                        <span className="font-mono text-cyan-400">Total: {fairness?.groups?.length || 0}</span>
+                        <span>
+                          Statistical Subgroups Analysis (10 Departments)
+                        </span>
+                        <span className="font-mono text-cyan-400">
+                          Total: {fairness?.groups?.length || 0}
+                        </span>
                       </div>
                       <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
                         {(fairness?.groups || []).map((g) => (
@@ -2094,7 +2268,9 @@ const EnterpriseOpsView = () => {
                     <div className="space-y-3">
                       <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2 flex items-center justify-between">
                         <span>Compliance Release Gates</span>
-                        <span className="font-mono text-cyan-400">Active Gates: {releaseGates.length}</span>
+                        <span className="font-mono text-cyan-400">
+                          Active Gates: {releaseGates.length}
+                        </span>
                       </div>
                       <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
                         {releaseGates.map((g) => (
@@ -2114,7 +2290,10 @@ const EnterpriseOpsView = () => {
                               {getStatusBadge(g.status)}
                             </div>
                             <div className="text-[10px] text-slate-400 font-mono bg-slate-950/40 p-2 rounded-lg border border-white/5 mt-2">
-                              Required Checks: <span className="text-purple-300">{(g.required_checks || []).join(", ")}</span>
+                              Required Checks:{" "}
+                              <span className="text-purple-300">
+                                {(g.required_checks || []).join(", ")}
+                              </span>
                             </div>
                             {g.status === "pending" && (
                               <button
@@ -2151,7 +2330,9 @@ const EnterpriseOpsView = () => {
                         <h2 className="font-extrabold text-sm uppercase tracking-wider text-white">
                           Lean MLOps Deployment Center
                         </h2>
-                        <span className="text-[10px] text-slate-400 font-mono block">Automated Model Training &amp; Prediction Pipeline</span>
+                        <span className="text-[10px] text-slate-400 font-mono block">
+                          Automated Model Training &amp; Prediction Pipeline
+                        </span>
                       </div>
                     </div>
                     <button
@@ -2167,7 +2348,9 @@ const EnterpriseOpsView = () => {
                     <div className="space-y-3">
                       <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1 flex items-center justify-between">
                         <span>Algorithmic Models ({models.length})</span>
-                        <span className="font-mono text-cyan-400">Production Instances</span>
+                        <span className="font-mono text-cyan-400">
+                          Production Instances
+                        </span>
                       </div>
                       <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
                         {models.map((m) => (
@@ -2177,10 +2360,17 @@ const EnterpriseOpsView = () => {
                           >
                             <div className="font-bold text-slate-200 text-xs flex justify-between items-center mb-1.5">
                               <span>{m.model_name}</span>
-                              <span className="font-mono text-cyan-400 text-[10px]">{m.version}</span>
+                              <span className="font-mono text-cyan-400 text-[10px]">
+                                {m.version}
+                              </span>
                             </div>
                             <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono bg-slate-950/40 p-2 rounded-lg border border-white/5">
-                              <span>Status: <strong className="text-emerald-400 uppercase">{m.status}</strong></span>
+                              <span>
+                                Status:{" "}
+                                <strong className="text-emerald-400 uppercase">
+                                  {m.status}
+                                </strong>
+                              </span>
                               <span>
                                 Risk Rate:{" "}
                                 <strong className="text-slate-100">
@@ -2197,7 +2387,9 @@ const EnterpriseOpsView = () => {
                     <div className="space-y-3">
                       <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1 flex items-center justify-between">
                         <span>High-Risk Scoring Output (Top Preview)</span>
-                        <span className="font-mono text-rose-400">Priority Review</span>
+                        <span className="font-mono text-rose-400">
+                          Priority Review
+                        </span>
                       </div>
                       <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
                         {modelTop.map((r) => (
@@ -2220,7 +2412,8 @@ const EnterpriseOpsView = () => {
                         ))}
                         {!modelTop.length && (
                           <div className="text-center py-10 rounded-xl border border-white/5 border-dashed bg-white/[0.01] text-slate-500 text-xs">
-                            Run 'Train &amp; Score Engine' to generate real-time risk predictions.
+                            Run 'Train &amp; Score Engine' to generate real-time
+                            risk predictions.
                           </div>
                         )}
                       </div>
@@ -2239,26 +2432,41 @@ const EnterpriseOpsView = () => {
             {activeModal && selectedReview && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
                 <div className="w-full max-w-lg rounded-2xl border border-cyan-500/30 bg-slate-900/95 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200 text-left">
-
                   {/* Modal 1: ESCALATE TO ACTIVE PLAN */}
-                  {activeModal === 'escalate' && (
+                  {activeModal === "escalate" && (
                     <>
                       <div className="flex justify-between items-center border-b border-white/10 pb-3">
                         <div className="flex items-center gap-2">
                           <Zap size={18} className="text-amber-400" />
-                          <h3 className="font-bold text-white text-base">Escalate to Active Retention Plan</h3>
+                          <h3 className="font-bold text-white text-base">
+                            Escalate to Active Retention Plan
+                          </h3>
                         </div>
-                        <button onClick={() => { setActiveModal(null); setSelectedReview(null); }} className="text-slate-400 hover:text-white text-sm">✕</button>
+                        <button
+                          onClick={() => {
+                            setActiveModal(null);
+                            setSelectedReview(null);
+                          }}
+                          className="text-slate-400 hover:text-white text-sm"
+                        >
+                          ✕
+                        </button>
                       </div>
 
                       <div className="space-y-4 text-xs">
                         <div className="bg-slate-950/60 p-3 rounded-xl border border-white/5">
-                          <span className="text-[10px] font-bold uppercase text-cyan-300 block">Target Request:</span>
-                          <span className="font-bold text-white text-sm">{selectedReview.title}</span>
+                          <span className="text-[10px] font-bold uppercase text-cyan-300 block">
+                            Target Request:
+                          </span>
+                          <span className="font-bold text-white text-sm">
+                            {selectedReview.title}
+                          </span>
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Allocated Retention Budget ($)</label>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                            Allocated Retention Budget ($)
+                          </label>
                           <input
                             type="number"
                             value={modalBudget}
@@ -2270,7 +2478,9 @@ const EnterpriseOpsView = () => {
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Assigned HRBP Owner</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                              Assigned HRBP Owner
+                            </label>
                             <input
                               type="text"
                               value={modalOwner}
@@ -2280,20 +2490,26 @@ const EnterpriseOpsView = () => {
                           </div>
 
                           <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Escalation Priority</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                              Escalation Priority
+                            </label>
                             <PremiumSelect
                               value={modalPriority}
                               onChange={(e) => setModalPriority(e.target.value)}
                               className="w-full h-10 px-3 rounded-xl bg-slate-950/80 border border-white/10 text-white text-xs outline-none"
                             >
                               <option value="high">High Priority</option>
-                              <option value="critical">Critical Priority</option>
+                              <option value="critical">
+                                Critical Priority
+                              </option>
                             </PremiumSelect>
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Action Strategy / Notes</label>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                            Action Strategy / Notes
+                          </label>
                           <textarea
                             rows={3}
                             value={modalNotes}
@@ -2305,7 +2521,10 @@ const EnterpriseOpsView = () => {
 
                         <div className="flex justify-end gap-3 pt-2">
                           <button
-                            onClick={() => { setActiveModal(null); setSelectedReview(null); }}
+                            onClick={() => {
+                              setActiveModal(null);
+                              setSelectedReview(null);
+                            }}
                             className="px-4 py-2 rounded-xl border border-white/10 text-slate-400 hover:text-white text-xs font-bold"
                           >
                             Cancel
@@ -2315,7 +2534,9 @@ const EnterpriseOpsView = () => {
                             disabled={outcomeLoading[selectedReview.id]}
                             className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:scale-95 transition-all"
                           >
-                            {outcomeLoading[selectedReview.id] ? "Deploying..." : "Confirm Escalation"}
+                            {outcomeLoading[selectedReview.id]
+                              ? "Deploying..."
+                              : "Confirm Escalation"}
                           </button>
                         </div>
                       </div>
@@ -2323,24 +2544,40 @@ const EnterpriseOpsView = () => {
                   )}
 
                   {/* Modal 2: SCHEDULE RETENTION MEETING */}
-                  {activeModal === 'schedule' && (
+                  {activeModal === "schedule" && (
                     <>
                       <div className="flex justify-between items-center border-b border-white/10 pb-3">
                         <div className="flex items-center gap-2">
                           <Clock size={18} className="text-cyan-400" />
-                          <h3 className="font-bold text-white text-base">Schedule Retention Meeting</h3>
+                          <h3 className="font-bold text-white text-base">
+                            Schedule Retention Meeting
+                          </h3>
                         </div>
-                        <button onClick={() => { setActiveModal(null); setSelectedReview(null); }} className="text-slate-400 hover:text-white text-sm">✕</button>
+                        <button
+                          onClick={() => {
+                            setActiveModal(null);
+                            setSelectedReview(null);
+                          }}
+                          className="text-slate-400 hover:text-white text-sm"
+                        >
+                          ✕
+                        </button>
                       </div>
 
                       <div className="space-y-4 text-xs">
                         <div className="bg-slate-950/60 p-3 rounded-xl border border-white/5">
-                          <span className="text-[10px] font-bold uppercase text-cyan-300 block">Target Request:</span>
-                          <span className="font-bold text-white text-sm">{selectedReview.title}</span>
+                          <span className="text-[10px] font-bold uppercase text-cyan-300 block">
+                            Target Request:
+                          </span>
+                          <span className="font-bold text-white text-sm">
+                            {selectedReview.title}
+                          </span>
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Scheduled Date & Time</label>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                            Scheduled Date & Time
+                          </label>
                           <input
                             type="datetime-local"
                             value={modalDate}
@@ -2350,7 +2587,9 @@ const EnterpriseOpsView = () => {
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Assigned HRBP Lead</label>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                            Assigned HRBP Lead
+                          </label>
                           <input
                             type="text"
                             value={modalOwner}
@@ -2360,7 +2599,9 @@ const EnterpriseOpsView = () => {
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Meeting Agenda Topics</label>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                            Meeting Agenda Topics
+                          </label>
                           <textarea
                             rows={3}
                             value={modalAgenda}
@@ -2371,7 +2612,10 @@ const EnterpriseOpsView = () => {
 
                         <div className="flex justify-end gap-3 pt-2">
                           <button
-                            onClick={() => { setActiveModal(null); setSelectedReview(null); }}
+                            onClick={() => {
+                              setActiveModal(null);
+                              setSelectedReview(null);
+                            }}
                             className="px-4 py-2 rounded-xl border border-white/10 text-slate-400 hover:text-white text-xs font-bold"
                           >
                             Cancel
@@ -2381,7 +2625,9 @@ const EnterpriseOpsView = () => {
                             disabled={outcomeLoading[selectedReview.id]}
                             className="px-5 py-2 rounded-xl bg-cyan-500 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:scale-95 transition-all"
                           >
-                            {outcomeLoading[selectedReview.id] ? "Saving..." : "Schedule & Lock Date"}
+                            {outcomeLoading[selectedReview.id]
+                              ? "Saving..."
+                              : "Schedule & Lock Date"}
                           </button>
                         </div>
                       </div>
@@ -2389,39 +2635,66 @@ const EnterpriseOpsView = () => {
                   )}
 
                   {/* Modal 3: DISMISS RISK SIGNAL */}
-                  {activeModal === 'dismiss' && (
+                  {activeModal === "dismiss" && (
                     <>
                       <div className="flex justify-between items-center border-b border-white/10 pb-3">
                         <div className="flex items-center gap-2">
                           <AlertTriangle size={18} className="text-slate-400" />
-                          <h3 className="font-bold text-white text-base">Dismiss Risk Review Signal</h3>
+                          <h3 className="font-bold text-white text-base">
+                            Dismiss Risk Review Signal
+                          </h3>
                         </div>
-                        <button onClick={() => { setActiveModal(null); setSelectedReview(null); }} className="text-slate-400 hover:text-white text-sm">✕</button>
+                        <button
+                          onClick={() => {
+                            setActiveModal(null);
+                            setSelectedReview(null);
+                          }}
+                          className="text-slate-400 hover:text-white text-sm"
+                        >
+                          ✕
+                        </button>
                       </div>
 
                       <div className="space-y-4 text-xs">
                         <div className="bg-slate-950/60 p-3 rounded-xl border border-white/5">
-                          <span className="text-[10px] font-bold uppercase text-cyan-300 block">Target Request:</span>
-                          <span className="font-bold text-white text-sm">{selectedReview.title}</span>
+                          <span className="text-[10px] font-bold uppercase text-cyan-300 block">
+                            Target Request:
+                          </span>
+                          <span className="font-bold text-white text-sm">
+                            {selectedReview.title}
+                          </span>
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Dismissal Reason / Audit Justification</label>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                            Dismissal Reason / Audit Justification
+                          </label>
                           <PremiumSelect
                             value={modalReason}
                             onChange={(e) => setModalReason(e.target.value)}
                             className="w-full h-10 px-3 rounded-xl bg-slate-950/80 border border-white/10 text-white text-xs outline-none"
                           >
-                            <option value="False positive risk signal / Employee satisfied">False positive risk signal / Employee satisfied</option>
-                            <option value="Employee recently received promotion/pay rise">Employee recently received promotion/pay rise</option>
-                            <option value="Planned departure / Not retaining">Planned departure / Not retaining</option>
-                            <option value="Duplicate review ticket">Duplicate review ticket</option>
+                            <option value="False positive risk signal / Employee satisfied">
+                              False positive risk signal / Employee satisfied
+                            </option>
+                            <option value="Employee recently received promotion/pay rise">
+                              Employee recently received promotion/pay rise
+                            </option>
+                            <option value="Planned departure / Not retaining">
+                              Planned departure / Not retaining
+                            </option>
+                            <option value="Duplicate review ticket">
+                              Duplicate review ticket
+                            </option>
                           </PremiumSelect>
                         </div>
 
                         <div className="flex justify-end gap-3 pt-2">
                           <button
-                            onClick={() => { setActiveModal(null); setSelectedReview(null); }}
+                            onClick={() => {
+                              setActiveModal(null);
+                              setSelectedReview(null);
+                            }}
                             className="px-4 py-2 rounded-xl border border-white/10 text-slate-400 hover:text-white text-xs font-bold"
                           >
                             Cancel
@@ -2431,24 +2704,42 @@ const EnterpriseOpsView = () => {
                             disabled={outcomeLoading[selectedReview.id]}
                             className="px-5 py-2 rounded-xl bg-slate-800 text-rose-300 border border-rose-500/30 font-bold text-xs uppercase tracking-wider hover:bg-rose-500/20 active:scale-95 transition-all"
                           >
-                            {outcomeLoading[selectedReview.id] ? "Archiving..." : "Archive & Dismiss"}
+                            {outcomeLoading[selectedReview.id]
+                              ? "Archiving..."
+                              : "Archive & Dismiss"}
                           </button>
                         </div>
                       </div>
                     </>
                   )}
-
                 </div>
               </div>
             )}
             {/* SUB-TAB NAVIGATION BAR */}
             <div className="flex items-center gap-2 p-2 rounded-2xl bg-[#06101e]/95 border border-cyan-500/30 shadow-[0_12px_40px_rgba(0,0,0,0.7)] backdrop-blur-2xl overflow-x-auto custom-scrollbar">
               {[
-                { id: "reviews", label: "Reviews Queue", icon: BriefcaseBusiness, badge: interventions.filter((i) => i.status === "planned").length },
+                {
+                  id: "reviews",
+                  label: "Reviews Queue",
+                  icon: BriefcaseBusiness,
+                  badge: interventions.filter((i) => i.status === "planned")
+                    .length,
+                },
                 { id: "create", label: "Create Intervention", icon: Plus },
-                { id: "active", label: "Active Interventions Workflow", icon: Activity, badge: interventions.filter((i) => i.status === "active" || i.status === "in_progress").length },
+                {
+                  id: "active",
+                  label: "Active Interventions Workflow",
+                  icon: Activity,
+                  badge: interventions.filter(
+                    (i) => i.status === "active" || i.status === "in_progress",
+                  ).length,
+                },
                 { id: "cfo", label: "CFO Scenario Lab", icon: BarChart3 },
-                { id: "attrition", label: "Explainable Attrition", icon: ShieldAlert },
+                {
+                  id: "attrition",
+                  label: "Explainable Attrition",
+                  icon: ShieldAlert,
+                },
               ].map((st) => {
                 const Icon = st.icon;
                 const isActive = riskView === st.id;
@@ -2462,7 +2753,10 @@ const EnterpriseOpsView = () => {
                         : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent"
                     }`}
                   >
-                    <Icon size={14} className={isActive ? "text-cyan-400" : "text-slate-500"} />
+                    <Icon
+                      size={14}
+                      className={isActive ? "text-cyan-400" : "text-slate-500"}
+                    />
                     <span>{st.label}</span>
                     {st.badge !== undefined && (
                       <span
@@ -2487,46 +2781,82 @@ const EnterpriseOpsView = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="premium-card p-4 border border-cyan-500/20 bg-slate-900/60 backdrop-blur-xl rounded-2xl">
                     <div className="flex justify-between items-center text-slate-400 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Pending Reviews</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        Pending Reviews
+                      </span>
                       <BriefcaseBusiness size={16} className="text-cyan-400" />
                     </div>
                     <div className="text-2xl font-extrabold text-white">
-                      {interventions.filter(i => i.status === 'planned').length}
+                      {
+                        interventions.filter((i) => i.status === "planned")
+                          .length
+                      }
                     </div>
-                    <span className="text-[10px] text-cyan-300 font-medium">Awaiting HR Triage & Stay Meeting</span>
+                    <span className="text-[10px] text-cyan-300 font-medium">
+                      Awaiting HR Triage & Stay Meeting
+                    </span>
                   </div>
 
                   <div className="premium-card p-4 border border-amber-500/20 bg-slate-900/60 backdrop-blur-xl rounded-2xl">
                     <div className="flex justify-between items-center text-slate-400 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider">High Risk Alerts</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        High Risk Alerts
+                      </span>
                       <AlertTriangle size={16} className="text-amber-400" />
                     </div>
                     <div className="text-2xl font-extrabold text-amber-300">
-                      {interventions.filter(i => i.priority === 'high' || i.priority === 'critical').length}
+                      {
+                        interventions.filter(
+                          (i) =>
+                            i.priority === "high" || i.priority === "critical",
+                        ).length
+                      }
                     </div>
-                    <span className="text-[10px] text-amber-400/80 font-medium">High priority retention flags</span>
+                    <span className="text-[10px] text-amber-400/80 font-medium">
+                      High priority retention flags
+                    </span>
                   </div>
 
                   <div className="premium-card p-4 border border-purple-500/20 bg-slate-900/60 backdrop-blur-xl rounded-2xl">
                     <div className="flex justify-between items-center text-slate-400 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Escalated to Plans</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        Escalated to Plans
+                      </span>
                       <CheckCircle2 size={16} className="text-purple-400" />
                     </div>
                     <div className="text-2xl font-extrabold text-purple-300">
-                      {interventions.filter(i => i.status === 'in_progress' || i.status === 'approved').length}
+                      {
+                        interventions.filter(
+                          (i) =>
+                            i.status === "in_progress" ||
+                            i.status === "approved",
+                        ).length
+                      }
                     </div>
-                    <span className="text-[10px] text-purple-300/80 font-medium">Active HR retention programs</span>
+                    <span className="text-[10px] text-purple-300/80 font-medium">
+                      Active HR retention programs
+                    </span>
                   </div>
 
                   <div className="premium-card p-4 border border-emerald-500/20 bg-slate-900/60 backdrop-blur-xl rounded-2xl">
                     <div className="flex justify-between items-center text-slate-400 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Dismissed / Resolved</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        Dismissed / Resolved
+                      </span>
                       <Clock size={16} className="text-emerald-400" />
                     </div>
                     <div className="text-2xl font-extrabold text-emerald-300">
-                      {interventions.filter(i => i.status === 'completed' || i.status === 'cancelled').length}
+                      {
+                        interventions.filter(
+                          (i) =>
+                            i.status === "completed" ||
+                            i.status === "cancelled",
+                        ).length
+                      }
                     </div>
-                    <span className="text-[10px] text-emerald-300/80 font-medium">Triaged and closed</span>
+                    <span className="text-[10px] text-emerald-300/80 font-medium">
+                      Triaged and closed
+                    </span>
                   </div>
                 </div>
 
@@ -2542,7 +2872,9 @@ const EnterpriseOpsView = () => {
                     />
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Priority:</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Priority:
+                    </span>
                     <PremiumSelect
                       value={reviewPriorityFilter}
                       onChange={(e) => setReviewPriorityFilter(e.target.value)}
@@ -2555,15 +2887,25 @@ const EnterpriseOpsView = () => {
                       <option value="low">Low</option>
                     </PremiumSelect>
 
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dept:</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Dept:
+                    </span>
                     <PremiumSelect
                       value={reviewDeptFilter}
                       onChange={(e) => setReviewDeptFilter(e.target.value)}
                       className="h-9 px-3 rounded-xl bg-slate-950/60 border border-white/10 text-slate-200 text-xs outline-none"
                     >
                       <option value="all">All Departments</option>
-                      {Array.from(new Set(interventions.map(i => i.target_department).filter(Boolean))).map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
+                      {Array.from(
+                        new Set(
+                          interventions
+                            .map((i) => i.target_department)
+                            .filter(Boolean),
+                        ),
+                      ).map((dept) => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
                       ))}
                     </PremiumSelect>
                   </div>
@@ -2572,41 +2914,90 @@ const EnterpriseOpsView = () => {
                 {/* Review Queue Cards Grid (1 col mobile, 2 col tablet, 3 col desktop - items-start prevents sibling cards stretching height on drawer expand) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 items-start">
                   {interventions
-                    .filter(i => i.status === 'planned')
-                    .filter((item, index, self) =>
-                      index === self.findIndex(t =>
-                        t.status === 'planned' && (
-                          (t.target_employee_id && t.target_employee_id === item.target_employee_id) ||
-                          (t.title && item.title && t.title.trim().toLowerCase() === item.title.trim().toLowerCase())
-                        )
-                      )
+                    .filter((i) => i.status === "planned")
+                    .filter(
+                      (item, index, self) =>
+                        index ===
+                        self.findIndex(
+                          (t) =>
+                            t.status === "planned" &&
+                            ((t.target_employee_id &&
+                              t.target_employee_id ===
+                                item.target_employee_id) ||
+                              (t.title &&
+                                item.title &&
+                                t.title.trim().toLowerCase() ===
+                                  item.title.trim().toLowerCase())),
+                        ),
                     )
-                    .filter(i => !reviewSearchText || i.title.toLowerCase().includes(reviewSearchText.toLowerCase()) || (i.owner_name && i.owner_name.toLowerCase().includes(reviewSearchText.toLowerCase())))
-                    .filter(i => reviewPriorityFilter === 'all' || i.priority === reviewPriorityFilter)
-                    .filter(i => reviewDeptFilter === 'all' || i.target_department === reviewDeptFilter)
-                    .map(i => (
-                      <div key={i.id} className="premium-card p-4 sm:p-5 border border-white/10 bg-slate-900/50 hover:border-cyan-500/30 transition-all rounded-2xl space-y-4 flex flex-col">
+                    .filter(
+                      (i) =>
+                        !reviewSearchText ||
+                        i.title
+                          .toLowerCase()
+                          .includes(reviewSearchText.toLowerCase()) ||
+                        (i.owner_name &&
+                          i.owner_name
+                            .toLowerCase()
+                            .includes(reviewSearchText.toLowerCase())),
+                    )
+                    .filter(
+                      (i) =>
+                        reviewPriorityFilter === "all" ||
+                        i.priority === reviewPriorityFilter,
+                    )
+                    .filter(
+                      (i) =>
+                        reviewDeptFilter === "all" ||
+                        i.target_department === reviewDeptFilter,
+                    )
+                    .map((i) => (
+                      <div
+                        key={i.id}
+                        className="premium-card p-4 sm:p-5 border border-white/10 bg-slate-900/50 hover:border-cyan-500/30 transition-all rounded-2xl space-y-4 flex flex-col"
+                      >
                         <div className="space-y-2 border-b border-white/10 pb-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="px-2 py-0.5 rounded-md bg-cyan-400/10 text-cyan-300 border border-cyan-400/20 text-[10px] font-bold uppercase tracking-wider shrink-0">Review Request</span>
+                              <span className="px-2 py-0.5 rounded-md bg-cyan-400/10 text-cyan-300 border border-cyan-400/20 text-[10px] font-bold uppercase tracking-wider shrink-0">
+                                Review Request
+                              </span>
                               {getPriorityBadge(i.priority)}
                             </div>
                             <div className="shrink-0">
                               {getStatusBadge(i.status)}
                             </div>
                           </div>
-                          <h3 className="font-bold text-white text-sm sm:text-base leading-snug break-words">{i.title}</h3>
+                          <h3 className="font-bold text-white text-sm sm:text-base leading-snug break-words">
+                            {i.title}
+                          </h3>
                           <div className="text-[11px] text-slate-400 font-mono flex flex-wrap gap-x-3 gap-y-1">
-                            <span>Scope: <strong className="text-slate-200 uppercase">{i.target_scope}</strong></span>
-                            <span>Dept: <strong className="text-slate-200">{i.target_department || 'General'}</strong></span>
-                            <span>HRBP: <strong className="text-cyan-300">{i.owner_name || 'Unassigned'}</strong></span>
+                            <span>
+                              Scope:{" "}
+                              <strong className="text-slate-200 uppercase">
+                                {i.target_scope}
+                              </strong>
+                            </span>
+                            <span>
+                              Dept:{" "}
+                              <strong className="text-slate-200">
+                                {i.target_department || "General"}
+                              </strong>
+                            </span>
+                            <span>
+                              HRBP:{" "}
+                              <strong className="text-cyan-300">
+                                {i.owner_name || "Unassigned"}
+                              </strong>
+                            </span>
                           </div>
                         </div>
 
                         {i.expected_impact && (
                           <div className="bg-slate-950/60 p-3 rounded-xl border border-white/5 text-xs text-slate-300">
-                            <strong className="text-cyan-300 font-bold uppercase text-[10px] tracking-wider block mb-1">Recommended Triage Action / Evidence Signal:</strong>
+                            <strong className="text-cyan-300 font-bold uppercase text-[10px] tracking-wider block mb-1">
+                              Recommended Triage Action / Evidence Signal:
+                            </strong>
                             {i.expected_impact}
                           </div>
                         )}
@@ -2625,11 +3016,16 @@ const EnterpriseOpsView = () => {
 
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                           <div className="text-[10px] text-slate-500 font-mono">
-                            Flagged: {i.created_at ? new Date(i.created_at).toLocaleString() : 'Recent'}
+                            Flagged:{" "}
+                            {i.created_at
+                              ? new Date(i.created_at).toLocaleString()
+                              : "Recent"}
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             <button
-                              disabled={outcomeLoading[i.id] || i.status !== 'planned'}
+                              disabled={
+                                outcomeLoading[i.id] || i.status !== "planned"
+                              }
                               onClick={() => openEscalateModal(i)}
                               className="h-8 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-500/30 text-amber-200 hover:from-amber-500/30 hover:to-rose-500/30 text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-40"
                             >
@@ -2637,7 +3033,9 @@ const EnterpriseOpsView = () => {
                             </button>
 
                             <button
-                              disabled={outcomeLoading[i.id] || i.status !== 'planned'}
+                              disabled={
+                                outcomeLoading[i.id] || i.status !== "planned"
+                              }
                               onClick={() => openScheduleModal(i)}
                               className="h-8 px-3 rounded-xl bg-cyan-400/10 border border-cyan-400/20 text-cyan-200 hover:bg-cyan-400/20 text-xs font-bold transition-all active:scale-95 disabled:opacity-40"
                             >
@@ -2645,7 +3043,9 @@ const EnterpriseOpsView = () => {
                             </button>
 
                             <button
-                              disabled={outcomeLoading[i.id] || i.status !== 'planned'}
+                              disabled={
+                                outcomeLoading[i.id] || i.status !== "planned"
+                              }
                               onClick={() => openDismissModal(i)}
                               className="h-8 px-3 rounded-xl bg-slate-800/60 border border-white/10 text-slate-400 hover:text-slate-200 hover:bg-slate-800 text-xs font-bold transition-all active:scale-95 disabled:opacity-40"
                             >
@@ -2664,11 +3064,20 @@ const EnterpriseOpsView = () => {
                       </div>
                     ))}
 
-                  {!interventions.filter(i => i.status === 'planned').length && (
+                  {!interventions.filter((i) => i.status === "planned")
+                    .length && (
                     <div className="text-center py-12 rounded-2xl border border-white/5 border-dashed bg-white/[0.01]">
-                      <HelpCircle size={28} className="mx-auto text-slate-600 mb-2" />
-                      <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">No Pending Reviews</div>
-                      <p className="text-[10px] text-slate-500 mt-1">Review requests created from Operational Analytics will appear here.</p>
+                      <HelpCircle
+                        size={28}
+                        className="mx-auto text-slate-600 mb-2"
+                      />
+                      <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                        No Pending Reviews
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Review requests created from Operational Analytics will
+                        appear here.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -2697,7 +3106,9 @@ const EnterpriseOpsView = () => {
                           className="w-full h-10 px-3 rounded-xl bg-slate-950/60 border border-white/10 text-slate-200 placeholder:text-slate-600 text-xs focus:border-cyan-500/50 outline-none"
                           placeholder="e.g. Compensation Adjustment & Growth Career Plan"
                           value={intForm.title}
-                          onChange={(e) => setIntForm((p) => ({ ...p, title: e.target.value }))}
+                          onChange={(e) =>
+                            setIntForm((p) => ({ ...p, title: e.target.value }))
+                          }
                         />
                       </div>
 
@@ -2709,7 +3120,12 @@ const EnterpriseOpsView = () => {
                           <PremiumSelect
                             className="w-full h-10 px-3 rounded-xl bg-slate-950/60 border border-white/10 text-slate-200 text-xs outline-none"
                             value={intForm.target_scope}
-                            onChange={(e) => setIntForm((p) => ({ ...p, target_scope: e.target.value }))}
+                            onChange={(e) =>
+                              setIntForm((p) => ({
+                                ...p,
+                                target_scope: e.target.value,
+                              }))
+                            }
                           >
                             <option value="employee">Employee</option>
                             <option value="team">Team</option>
@@ -2725,12 +3141,21 @@ const EnterpriseOpsView = () => {
                           <PremiumSelect
                             className="w-full h-10 px-3 rounded-xl bg-slate-950/60 border border-white/10 text-slate-200 text-xs outline-none"
                             value={intForm.priority}
-                            onChange={(e) => setIntForm((p) => ({ ...p, priority: e.target.value }))}
+                            onChange={(e) =>
+                              setIntForm((p) => ({
+                                ...p,
+                                priority: e.target.value,
+                              }))
+                            }
                           >
                             <option value="low">Low</option>
                             <option value="medium">Medium</option>
-                            <option value="high">High (Requires Admin Approval)</option>
-                            <option value="critical">Critical (Requires Admin Approval)</option>
+                            <option value="high">
+                              High (Requires Admin Approval)
+                            </option>
+                            <option value="critical">
+                              Critical (Requires Admin Approval)
+                            </option>
                           </PremiumSelect>
                         </div>
                       </div>
@@ -2745,7 +3170,12 @@ const EnterpriseOpsView = () => {
                             className="w-full h-10 px-3 rounded-xl bg-slate-950/60 border border-white/10 text-slate-200 placeholder:text-slate-600 text-xs outline-none"
                             placeholder="e.g. Engineering"
                             value={intForm.target_department}
-                            onChange={(e) => setIntForm((p) => ({ ...p, target_department: e.target.value }))}
+                            onChange={(e) =>
+                              setIntForm((p) => ({
+                                ...p,
+                                target_department: e.target.value,
+                              }))
+                            }
                           />
                         </div>
 
@@ -2758,7 +3188,12 @@ const EnterpriseOpsView = () => {
                             className="w-full h-10 px-3 rounded-xl bg-slate-950/60 border border-white/10 text-slate-200 placeholder:text-slate-600 text-xs outline-none"
                             placeholder="Owner name"
                             value={intForm.owner_name}
-                            onChange={(e) => setIntForm((p) => ({ ...p, owner_name: e.target.value }))}
+                            onChange={(e) =>
+                              setIntForm((p) => ({
+                                ...p,
+                                owner_name: e.target.value,
+                              }))
+                            }
                           />
                         </div>
                       </div>
@@ -2772,7 +3207,12 @@ const EnterpriseOpsView = () => {
                           className="w-full h-10 px-3 rounded-xl bg-slate-950/60 border border-white/10 text-slate-200 placeholder:text-slate-600 text-xs outline-none"
                           placeholder="e.g. Retain high-risk key engineers for 6+ months"
                           value={intForm.expected_impact}
-                          onChange={(e) => setIntForm((p) => ({ ...p, expected_impact: e.target.value }))}
+                          onChange={(e) =>
+                            setIntForm((p) => ({
+                              ...p,
+                              expected_impact: e.target.value,
+                            }))
+                          }
                         />
                       </div>
 
@@ -2788,18 +3228,25 @@ const EnterpriseOpsView = () => {
 
                 <div className="space-y-6">
                   <div className="premium-card p-5 border border-white/10 bg-slate-900/40 rounded-2xl space-y-3">
-                    <h3 className="font-bold text-white text-sm">Intervention Governance Guidelines</h3>
+                    <h3 className="font-bold text-white text-sm">
+                      Intervention Governance Guidelines
+                    </h3>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      Manual interventions allow HR partners to deploy structured retention programs.
+                      Manual interventions allow HR partners to deploy
+                      structured retention programs.
                     </p>
                     <ul className="space-y-2 text-xs text-slate-300">
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={14} className="text-cyan-400" />
-                        <span>Medium/Low priority can be deployed by any HRBP.</span>
+                        <span>
+                          Medium/Low priority can be deployed by any HRBP.
+                        </span>
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={14} className="text-amber-400" />
-                        <span>High/Critical escalation requires Admin authorization.</span>
+                        <span>
+                          High/Critical escalation requires Admin authorization.
+                        </span>
                       </li>
                     </ul>
                   </div>
@@ -2814,46 +3261,71 @@ const EnterpriseOpsView = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="premium-card p-4 border border-cyan-500/20 bg-slate-900/60 backdrop-blur-xl rounded-2xl">
                     <div className="flex justify-between items-center text-slate-400 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Total Active Plans</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        Total Active Plans
+                      </span>
                       <BriefcaseBusiness size={16} className="text-cyan-400" />
                     </div>
                     <div className="text-2xl font-extrabold text-white">
                       {openInterventions.length}
                     </div>
-                    <span className="text-[10px] text-cyan-300 font-medium">In-flight active interventions</span>
+                    <span className="text-[10px] text-cyan-300 font-medium">
+                      In-flight active interventions
+                    </span>
                   </div>
 
                   <div className="premium-card p-4 border border-emerald-500/20 bg-slate-900/60 backdrop-blur-xl rounded-2xl">
                     <div className="flex justify-between items-center text-slate-400 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Completed Plans</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        Completed Plans
+                      </span>
                       <CheckCircle2 size={16} className="text-emerald-400" />
                     </div>
                     <div className="text-2xl font-extrabold text-emerald-300">
-                      {interventions.filter(i => i.status === 'completed').length}
+                      {
+                        interventions.filter((i) => i.status === "completed")
+                          .length
+                      }
                     </div>
-                    <span className="text-[10px] text-emerald-300/80 font-medium">Successfully executed retention actions</span>
+                    <span className="text-[10px] text-emerald-300/80 font-medium">
+                      Successfully executed retention actions
+                    </span>
                   </div>
 
                   <div className="premium-card p-4 border border-amber-500/20 bg-slate-900/60 backdrop-blur-xl rounded-2xl">
                     <div className="flex justify-between items-center text-slate-400 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Intervention Investment</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        Intervention Investment
+                      </span>
                       <Zap size={16} className="text-amber-400" />
                     </div>
                     <div className="text-2xl font-extrabold text-amber-300">
-                      ${interventions.reduce((sum, i) => sum + (Number(i.estimated_cost) || 12500), 0).toLocaleString()}
+                      $
+                      {interventions
+                        .reduce(
+                          (sum, i) => sum + (Number(i.estimated_cost) || 12500),
+                          0,
+                        )
+                        .toLocaleString()}
                     </div>
-                    <span className="text-[10px] text-amber-400/80 font-medium">Total estimated cost committed</span>
+                    <span className="text-[10px] text-amber-400/80 font-medium">
+                      Total estimated cost committed
+                    </span>
                   </div>
 
                   <div className="premium-card p-4 border border-purple-500/20 bg-slate-900/60 backdrop-blur-xl rounded-2xl">
                     <div className="flex justify-between items-center text-slate-400 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider">90-Day Success Rate</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        90-Day Success Rate
+                      </span>
                       <Activity size={16} className="text-purple-400" />
                     </div>
                     <div className="text-2xl font-extrabold text-purple-300">
                       92.4%
                     </div>
-                    <span className="text-[10px] text-purple-300/80 font-medium">Retention outcome score</span>
+                    <span className="text-[10px] text-purple-300/80 font-medium">
+                      Retention outcome score
+                    </span>
                   </div>
                 </div>
 
@@ -2869,7 +3341,9 @@ const EnterpriseOpsView = () => {
                     />
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status:</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Status:
+                    </span>
                     <PremiumSelect
                       value={activeStatusFilter}
                       onChange={(e) => setActiveStatusFilter(e.target.value)}
@@ -2882,7 +3356,9 @@ const EnterpriseOpsView = () => {
                       <option value="cancelled">Cancelled</option>
                     </PremiumSelect>
 
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Scope:</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Scope:
+                    </span>
                     <PremiumSelect
                       value={activeScopeFilter}
                       onChange={(e) => setActiveScopeFilter(e.target.value)}
@@ -2900,11 +3376,32 @@ const EnterpriseOpsView = () => {
                 {/* Active Intervention Cards Grid (1 col mobile, 2 col tablet, 3 col desktop - items-start prevents sibling cards stretching height on drawer expand) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 items-start">
                   {interventions
-                    .filter(i => activeStatusFilter === 'all' || i.status === activeStatusFilter)
-                    .filter(i => activeScopeFilter === 'all' || i.target_scope === activeScopeFilter)
-                    .filter(i => !activeSearchText || i.title.toLowerCase().includes(activeSearchText.toLowerCase()) || (i.owner_name && i.owner_name.toLowerCase().includes(activeSearchText.toLowerCase())))
-                    .map(i => (
-                      <div key={i.id} className="premium-card p-4 sm:p-5 border border-white/10 bg-slate-900/50 hover:border-cyan-500/30 transition-all rounded-2xl space-y-4 flex flex-col">
+                    .filter(
+                      (i) =>
+                        activeStatusFilter === "all" ||
+                        i.status === activeStatusFilter,
+                    )
+                    .filter(
+                      (i) =>
+                        activeScopeFilter === "all" ||
+                        i.target_scope === activeScopeFilter,
+                    )
+                    .filter(
+                      (i) =>
+                        !activeSearchText ||
+                        i.title
+                          .toLowerCase()
+                          .includes(activeSearchText.toLowerCase()) ||
+                        (i.owner_name &&
+                          i.owner_name
+                            .toLowerCase()
+                            .includes(activeSearchText.toLowerCase())),
+                    )
+                    .map((i) => (
+                      <div
+                        key={i.id}
+                        className="premium-card p-4 sm:p-5 border border-white/10 bg-slate-900/50 hover:border-cyan-500/30 transition-all rounded-2xl space-y-4 flex flex-col"
+                      >
                         <div className="space-y-2 border-b border-white/10 pb-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-2">
@@ -2914,17 +3411,36 @@ const EnterpriseOpsView = () => {
                               {getStatusBadge(i.status)}
                             </div>
                           </div>
-                          <h3 className="font-bold text-white text-sm sm:text-base leading-snug break-words">{i.title}</h3>
+                          <h3 className="font-bold text-white text-sm sm:text-base leading-snug break-words">
+                            {i.title}
+                          </h3>
                           <div className="text-[11px] text-slate-400 font-mono flex flex-wrap gap-x-3 gap-y-1">
-                            <span>Scope: <strong className="text-slate-200 uppercase">{i.target_scope}</strong></span>
-                            <span>Dept: <strong className="text-slate-200">{i.target_department || 'General'}</strong></span>
-                            <span>Owner: <strong className="text-cyan-300">{i.owner_name || 'HRBP'}</strong></span>
+                            <span>
+                              Scope:{" "}
+                              <strong className="text-slate-200 uppercase">
+                                {i.target_scope}
+                              </strong>
+                            </span>
+                            <span>
+                              Dept:{" "}
+                              <strong className="text-slate-200">
+                                {i.target_department || "General"}
+                              </strong>
+                            </span>
+                            <span>
+                              Owner:{" "}
+                              <strong className="text-cyan-300">
+                                {i.owner_name || "HRBP"}
+                              </strong>
+                            </span>
                           </div>
                         </div>
 
                         {i.expected_impact && (
                           <div className="bg-slate-950/60 p-3 rounded-xl border border-white/5 text-xs text-slate-300">
-                            <strong className="text-cyan-300 font-bold uppercase text-[10px] tracking-wider block mb-1">Expected Impact Metric:</strong>
+                            <strong className="text-cyan-300 font-bold uppercase text-[10px] tracking-wider block mb-1">
+                              Expected Impact Metric:
+                            </strong>
                             {i.expected_impact}
                           </div>
                         )}
@@ -2937,43 +3453,89 @@ const EnterpriseOpsView = () => {
 
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/5">
                           <div className="text-[10px] text-slate-500 font-mono">
-                            {i.created_at ? `Created ${new Date(i.created_at).toLocaleString()}` : "Active"}
+                            {i.created_at
+                              ? `Created ${new Date(i.created_at).toLocaleString()}`
+                              : "Active"}
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">
                             <button
-                              disabled={outcomeLoading[i.id] || !["planned", "approved"].includes(i.status)}
+                              disabled={
+                                outcomeLoading[i.id] ||
+                                !["planned", "approved"].includes(i.status)
+                              }
                               className="h-8 px-3 rounded-xl border border-white/10 hover:bg-white/10 text-xs font-bold uppercase tracking-wider text-slate-300 inline-flex items-center gap-1 transition-all active:scale-95 disabled:opacity-40"
-                              onClick={() => setInterventionStatus(i.id, "in_progress")}
+                              onClick={() =>
+                                setInterventionStatus(i.id, "in_progress")
+                              }
                             >
                               Start
                             </button>
                             <button
-                              disabled={outcomeLoading[i.id] || i.status !== "in_progress"}
+                              disabled={
+                                outcomeLoading[i.id] ||
+                                i.status !== "in_progress"
+                              }
                               className="h-8 px-3 rounded-xl border border-white/10 hover:bg-white/10 text-xs font-bold uppercase tracking-wider text-slate-300 inline-flex items-center gap-1 transition-all active:scale-95 disabled:opacity-40"
-                              onClick={() => setInterventionStatus(i.id, "completed")}
+                              onClick={() =>
+                                setInterventionStatus(i.id, "completed")
+                              }
                             >
                               Complete
                             </button>
                             <div className="h-4 w-px bg-white/10 mx-1" />
                             <button
-                              disabled={outcomeLoading[i.id] || ["planned", "cancelled"].includes(i.status) || Boolean((interventionOutcomes[i.id] || []).some((item) => item.checkpoint_day === 30))}
+                              disabled={
+                                outcomeLoading[i.id] ||
+                                ["planned", "cancelled"].includes(i.status) ||
+                                Boolean(
+                                  (interventionOutcomes[i.id] || []).some(
+                                    (item) => item.checkpoint_day === 30,
+                                  ),
+                                )
+                              }
                               className="h-8 px-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25 transition-all text-xs font-extrabold uppercase disabled:opacity-40"
-                              onClick={() => upsertOutcome(i.id, 30, "improved")}
+                              onClick={() =>
+                                upsertOutcome(i.id, 30, "improved")
+                              }
                             >
                               30d Improve
                             </button>
                             <button
-                              disabled={outcomeLoading[i.id] || ["planned", "cancelled"].includes(i.status) || Boolean((interventionOutcomes[i.id] || []).some((item) => item.checkpoint_day === 60)) || !(interventionOutcomes[i.id] || []).some((item) => item.checkpoint_day === 30)}
+                              disabled={
+                                outcomeLoading[i.id] ||
+                                ["planned", "cancelled"].includes(i.status) ||
+                                Boolean(
+                                  (interventionOutcomes[i.id] || []).some(
+                                    (item) => item.checkpoint_day === 60,
+                                  ),
+                                ) ||
+                                !(interventionOutcomes[i.id] || []).some(
+                                  (item) => item.checkpoint_day === 30,
+                                )
+                              }
                               className="h-8 px-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/25 transition-all text-xs font-extrabold uppercase disabled:opacity-40"
                               onClick={() => upsertOutcome(i.id, 60, "neutral")}
                             >
                               60d Equal
                             </button>
                             <button
-                              disabled={outcomeLoading[i.id] || ["planned", "cancelled"].includes(i.status) || Boolean((interventionOutcomes[i.id] || []).some((item) => item.checkpoint_day === 90)) || !(interventionOutcomes[i.id] || []).some((item) => item.checkpoint_day === 60)}
+                              disabled={
+                                outcomeLoading[i.id] ||
+                                ["planned", "cancelled"].includes(i.status) ||
+                                Boolean(
+                                  (interventionOutcomes[i.id] || []).some(
+                                    (item) => item.checkpoint_day === 90,
+                                  ),
+                                ) ||
+                                !(interventionOutcomes[i.id] || []).some(
+                                  (item) => item.checkpoint_day === 60,
+                                )
+                              }
                               className="h-8 px-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/25 transition-all text-xs font-extrabold uppercase disabled:opacity-40"
-                              onClick={() => upsertOutcome(i.id, 90, "worsened")}
+                              onClick={() =>
+                                upsertOutcome(i.id, 90, "worsened")
+                              }
                             >
                               90d Degrade
                             </button>
@@ -3019,11 +3581,17 @@ const EnterpriseOpsView = () => {
                         </div>
                         <div className="flex justify-between items-center text-slate-300">
                           <span>Max Budget Cap:</span>
-                          <span className="text-white font-bold">${scenarioResult.input?.budget_cap?.toLocaleString() || scenarioResult.input_payload?.budget_cap?.toLocaleString()}</span>
+                          <span className="text-white font-bold">
+                            $
+                            {scenarioResult.input?.budget_cap?.toLocaleString() ||
+                              scenarioResult.input_payload?.budget_cap?.toLocaleString()}
+                          </span>
                         </div>
                         <div className="flex justify-between items-center text-slate-300">
                           <span>Target Hires:</span>
-                          <span>{scenarioResult.input?.target_hires || 20}</span>
+                          <span>
+                            {scenarioResult.input?.target_hires || 20}
+                          </span>
                         </div>
                       </div>
 
@@ -3033,24 +3601,41 @@ const EnterpriseOpsView = () => {
                         </div>
                         <div className="flex justify-between items-center text-slate-200">
                           <span>Retention Actions:</span>
-                          <span className="text-white font-bold">{scenarioResult.recommendation?.retention_actions || scenarioResult.output_payload?.retention_actions}</span>
+                          <span className="text-white font-bold">
+                            {scenarioResult.recommendation?.retention_actions ||
+                              scenarioResult.output_payload?.retention_actions}
+                          </span>
                         </div>
                         <div className="flex justify-between items-center text-slate-200">
                           <span>Hiring Actions:</span>
-                          <span className="text-white font-bold">{scenarioResult.recommendation?.hiring_actions || scenarioResult.output_payload?.hiring_actions}</span>
+                          <span className="text-white font-bold">
+                            {scenarioResult.recommendation?.hiring_actions ||
+                              scenarioResult.output_payload?.hiring_actions}
+                          </span>
                         </div>
                         <div className="h-px bg-cyan-400/20 my-2" />
                         <div className="flex justify-between items-center text-cyan-300">
                           <span>Used Budget:</span>
-                          <span className="font-bold">${scenarioResult.recommendation?.used_budget?.toLocaleString()}</span>
+                          <span className="font-bold">
+                            $
+                            {scenarioResult.recommendation?.used_budget?.toLocaleString()}
+                          </span>
                         </div>
                       </div>
                     </div>
                   ) : (
                     <div className="text-center py-12 border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
-                      <HelpCircle size={28} className="mx-auto text-slate-600 mb-2" />
-                      <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">No Scenario Computed</div>
-                      <p className="text-[10px] text-slate-500 mt-1">Click 'Run Scenario Simulation' to project budget allocations.</p>
+                      <HelpCircle
+                        size={28}
+                        className="mx-auto text-slate-600 mb-2"
+                      />
+                      <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                        No Scenario Computed
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Click 'Run Scenario Simulation' to project budget
+                        allocations.
+                      </p>
                     </div>
                   )}
                 </section>
@@ -3062,7 +3647,10 @@ const EnterpriseOpsView = () => {
               <div className="space-y-6">
                 <section className="premium-card p-6 border border-white/10 bg-slate-900/50 rounded-2xl space-y-4">
                   <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-                    <ShieldAlert size={18} className="text-rose-400 animate-pulse" />
+                    <ShieldAlert
+                      size={18}
+                      className="text-rose-400 animate-pulse"
+                    />
                     <h2 className="font-bold text-base uppercase tracking-wider text-white">
                       Explainable Attrition Analysis (Highest Risks)
                     </h2>
@@ -3070,23 +3658,40 @@ const EnterpriseOpsView = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {attrition.map((a) => (
-                      <div key={a.employee_id} className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-xs text-left relative overflow-hidden space-y-3">
+                      <div
+                        key={a.employee_id}
+                        className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-xs text-left relative overflow-hidden space-y-3"
+                      >
                         <div className="flex justify-between items-start">
                           <div>
-                            <span className="font-bold text-slate-200 text-sm">{a.full_name}</span>
-                            <span className="text-[10px] text-slate-400 block font-mono mt-0.5">{a.role} | {a.department}</span>
+                            <span className="font-bold text-slate-200 text-sm">
+                              {a.full_name}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-mono mt-0.5">
+                              {a.role} | {a.department}
+                            </span>
                           </div>
                           <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-500/20 text-rose-300 border border-rose-500/30">
                             Risk: {(a.risk_probability * 100).toFixed(0)}%
                           </span>
                         </div>
                         <div className="h-px bg-white/5" />
-                        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Algorithmic Drivers:</div>
+                        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                          Algorithmic Drivers:
+                        </div>
                         <ul className="space-y-1 text-slate-300 font-mono text-[11px]">
                           {(a.drivers || []).slice(0, 2).map((d, idx) => (
-                            <li key={`${a.employee_id}-${idx}`} className="flex items-start gap-1.5">
+                            <li
+                              key={`${a.employee_id}-${idx}`}
+                              className="flex items-start gap-1.5"
+                            >
                               <span className="text-rose-400 font-bold">•</span>
-                              <span>{d.factor}: <strong className="text-slate-400">{d.evidence}</strong></span>
+                              <span>
+                                {d.factor}:{" "}
+                                <strong className="text-slate-400">
+                                  {d.evidence}
+                                </strong>
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -3105,9 +3710,24 @@ const EnterpriseOpsView = () => {
             {/* Sub-Tab Navigation Bar */}
             <div className="flex items-center gap-2 p-2 rounded-2xl bg-[#06101e]/95 border border-cyan-500/30 shadow-[0_12px_40px_rgba(0,0,0,0.7)] backdrop-blur-2xl overflow-x-auto custom-scrollbar">
               {[
-                { id: "briefings_audit", label: "Executive Briefings & Audit Logs", icon: FileText, badge: auditEvents.length },
-                { id: "policies_contracts", label: "Governance Policies & Contracts", icon: Globe, badge: policies.length + procurementArtifacts.length },
-                { id: "dr_sre", label: "DR & SRE Runbooks", icon: Shield, badge: drRunbooks.length },
+                {
+                  id: "briefings_audit",
+                  label: "Executive Briefings & Audit Logs",
+                  icon: FileText,
+                  badge: auditEvents.length,
+                },
+                {
+                  id: "policies_contracts",
+                  label: "Governance Policies & Contracts",
+                  icon: Globe,
+                  badge: policies.length + procurementArtifacts.length,
+                },
+                {
+                  id: "dr_sre",
+                  label: "DR & SRE Runbooks",
+                  icon: Shield,
+                  badge: drRunbooks.length,
+                },
               ].map((st) => {
                 const Icon = st.icon;
                 const isActive = compSubTab === st.id;
@@ -3121,7 +3741,10 @@ const EnterpriseOpsView = () => {
                         : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent"
                     }`}
                   >
-                    <Icon size={14} className={isActive ? "text-cyan-400" : "text-slate-500"} />
+                    <Icon
+                      size={14}
+                      className={isActive ? "text-cyan-400" : "text-slate-500"}
+                    />
                     <span>{st.label}</span>
                     {st.badge !== undefined && (
                       <span
@@ -3154,7 +3777,9 @@ const EnterpriseOpsView = () => {
                         <h2 className="font-extrabold text-sm uppercase tracking-wider text-white">
                           CHRO &amp; CFO Executive Briefing Packet
                         </h2>
-                        <span className="text-[10px] text-slate-400 font-mono block">Automated Monthly Risk &amp; Governance Snapshot</span>
+                        <span className="text-[10px] text-slate-400 font-mono block">
+                          Automated Monthly Risk &amp; Governance Snapshot
+                        </span>
                       </div>
                     </div>
                     <button
@@ -3213,12 +3838,16 @@ const EnterpriseOpsView = () => {
                           Recommended HRBP Action Items
                         </div>
                         <ul className="space-y-2 text-slate-300 text-[11px] list-none">
-                          {(executivePacket.actions || []).map((action, idx) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <span className="text-cyan-400 font-bold mt-0.5">•</span>
-                              <span className="leading-snug">{action}</span>
-                            </li>
-                          ))}
+                          {(executivePacket.actions || []).map(
+                            (action, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-cyan-400 font-bold mt-0.5">
+                                  •
+                                </span>
+                                <span className="leading-snug">{action}</span>
+                              </li>
+                            ),
+                          )}
                         </ul>
                       </div>
 
@@ -3272,23 +3901,26 @@ const EnterpriseOpsView = () => {
                           Top System Risk Drivers
                         </div>
                         <div className="space-y-2 max-h-[140px] overflow-y-auto font-mono text-[10px] pr-1">
-                          {(executivePacket.risk_drivers || []).map((driver) => (
-                            <div
-                              key={driver.factor}
-                              className="flex justify-between items-center text-slate-300 bg-slate-950/40 p-2 rounded-lg border border-white/5"
-                            >
-                              <span>{driver.factor}</span>
-                              <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[9px] font-bold">
-                                {driver.count} impacted
-                              </span>
-                            </div>
-                          ))}
+                          {(executivePacket.risk_drivers || []).map(
+                            (driver) => (
+                              <div
+                                key={driver.factor}
+                                className="flex justify-between items-center text-slate-300 bg-slate-950/40 p-2 rounded-lg border border-white/5"
+                              >
+                                <span>{driver.factor}</span>
+                                <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[9px] font-bold">
+                                  {driver.count} impacted
+                                </span>
+                              </div>
+                            ),
+                          )}
                         </div>
                       </div>
                     </div>
                   ) : (
                     <div className="text-center py-10 rounded-xl border border-white/5 border-dashed bg-white/[0.01] text-slate-500 text-xs">
-                      No executive packet generated yet. Click 'Refresh Packet' to build live brief.
+                      No executive packet generated yet. Click 'Refresh Packet'
+                      to build live brief.
                     </div>
                   )}
                 </section>
@@ -3318,7 +3950,10 @@ const EnterpriseOpsView = () => {
                             {e.action}
                           </span>
                           <span className="text-slate-400">
-                            Resource: <strong className="text-cyan-300">{e.resource_type}</strong>
+                            Resource:{" "}
+                            <strong className="text-cyan-300">
+                              {e.resource_type}
+                            </strong>
                           </span>
                         </div>
                         <span className="text-[10px] text-slate-500 font-normal">
@@ -3391,7 +4026,10 @@ const EnterpriseOpsView = () => {
                           placeholder="Region (e.g. EU, US)"
                           value={policyForm.region}
                           onChange={(e) =>
-                            setPolicyForm((p) => ({ ...p, region: e.target.value }))
+                            setPolicyForm((p) => ({
+                              ...p,
+                              region: e.target.value,
+                            }))
                           }
                         />
                         <input
@@ -3478,7 +4116,10 @@ const EnterpriseOpsView = () => {
                         placeholder="Artifact Title"
                         value={artifactForm.title}
                         onChange={(e) =>
-                          setArtifactForm((p) => ({ ...p, title: e.target.value }))
+                          setArtifactForm((p) => ({
+                            ...p,
+                            title: e.target.value,
+                          }))
                         }
                       />
                       <div className="grid grid-cols-2 gap-3">
@@ -3520,7 +4161,9 @@ const EnterpriseOpsView = () => {
                           Policies Registry
                         </h2>
                       </div>
-                      <span className="text-xs text-slate-400 font-mono">Active: {policies.length}</span>
+                      <span className="text-xs text-slate-400 font-mono">
+                        Active: {policies.length}
+                      </span>
                     </div>
                     <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
                       {policies.map((p) => (
@@ -3558,7 +4201,9 @@ const EnterpriseOpsView = () => {
                           Compliance Artifacts
                         </h2>
                       </div>
-                      <span className="text-xs text-slate-400 font-mono">Artifacts: {procurementArtifacts.length}</span>
+                      <span className="text-xs text-slate-400 font-mono">
+                        Artifacts: {procurementArtifacts.length}
+                      </span>
                     </div>
                     <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
                       {procurementArtifacts.map((a) => (
@@ -3607,7 +4252,9 @@ const EnterpriseOpsView = () => {
                         <h2 className="font-extrabold text-sm uppercase tracking-wider text-white">
                           Disaster Recovery &amp; SRE Recoveries
                         </h2>
-                        <span className="text-[10px] text-slate-400 font-mono block">Automated Failover &amp; Recovery Playbooks</span>
+                        <span className="text-[10px] text-slate-400 font-mono block">
+                          Automated Failover &amp; Recovery Playbooks
+                        </span>
                       </div>
                     </div>
                     <button
@@ -3703,8 +4350,12 @@ const EnterpriseOpsView = () => {
                     {/* Runbooks list & drill result column */}
                     <div className="lg:col-span-2 space-y-4">
                       <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1 flex items-center justify-between">
-                        <span>Active Recovery Runbooks ({drRunbooks.length})</span>
-                        <span className="font-mono text-cyan-400">SRE Telemetry Active</span>
+                        <span>
+                          Active Recovery Runbooks ({drRunbooks.length})
+                        </span>
+                        <span className="font-mono text-cyan-400">
+                          SRE Telemetry Active
+                        </span>
                       </div>
                       <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
                         {drRunbooks.map((r) => (
@@ -3741,19 +4392,24 @@ const EnterpriseOpsView = () => {
                       {drillResult && (
                         <div className="rounded-xl border border-cyan-400/30 bg-cyan-500/5 p-4 text-xs text-left font-mono animate-in fade-in duration-200 shadow-xl">
                           <div className="font-bold text-cyan-400 mb-2 uppercase font-sans text-xs tracking-wider flex items-center gap-2">
-                            <Shield size={14} /> Drill Recovery Logs &amp; Execution Output
+                            <Shield size={14} /> Drill Recovery Logs &amp;
+                            Execution Output
                           </div>
                           <div className="text-slate-300 text-xs leading-relaxed space-y-1">
                             <div>
                               • Runbook Target:{" "}
                               <span className="text-white font-extrabold">
-                                {drillResult.runbook_name || drillResult.name || "n/a"}
+                                {drillResult.runbook_name ||
+                                  drillResult.name ||
+                                  "n/a"}
                               </span>
                             </div>
                             <div>
                               • Status Result:{" "}
                               <span className="text-emerald-400 font-extrabold uppercase">
-                                {drillResult.result || drillResult.status || "complete"}
+                                {drillResult.result ||
+                                  drillResult.status ||
+                                  "complete"}
                               </span>
                             </div>
                             <div>
@@ -3774,146 +4430,238 @@ const EnterpriseOpsView = () => {
         )}
 
         {/* AUDITABLE EVIDENCE & HISTORY MODAL OVERLAY */}
-        {evidenceModalIntervention && (() => {
-          const i = evidenceModalIntervention;
-          const metrics = getEmployeeMetrics(i);
-          return (
-            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
-              <div className="bg-slate-900 border border-cyan-500/30 rounded-3xl p-6 max-w-3xl w-full space-y-6 shadow-2xl relative text-left">
-                {/* Modal Header */}
-                <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-cyan-400/10 border border-cyan-400/20 text-cyan-300">
-                      <Activity size={20} />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest block font-mono">
-                        Auditable Evidence &amp; History Record
-                      </span>
-                      <h2 className="text-base font-extrabold text-white mt-0.5">{i.title}</h2>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setEvidenceModalIntervention(null)}
-                    className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                {/* Section 1: AI Algorithmic Risk Drivers */}
-                <div className="space-y-3">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 font-mono">
-                    1. AI Algorithmic Risk Drivers &amp; Morale Breakdown:
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="bg-slate-950/80 p-3.5 rounded-xl border border-white/10 space-y-1.5">
-                      <div className="text-[10px] text-slate-400 uppercase font-bold">Flight Risk Probability</div>
-                      <div className="text-xl font-extrabold text-rose-400">{metrics.flightRisk}% <span className="text-[10px] font-normal text-rose-300">({Number(metrics.flightRisk) > 75 ? 'Critical' : 'High'} Risk)</span></div>
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-rose-500" style={{ width: `${metrics.flightRisk}%` }} />
+        {evidenceModalIntervention &&
+          (() => {
+            const i = evidenceModalIntervention;
+            const metrics = getEmployeeMetrics(i);
+            return (
+              <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+                <div className="bg-slate-900 border border-cyan-500/30 rounded-3xl p-6 max-w-3xl w-full space-y-6 shadow-2xl relative text-left">
+                  {/* Modal Header */}
+                  <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-cyan-400/10 border border-cyan-400/20 text-cyan-300">
+                        <Activity size={20} />
                       </div>
-                    </div>
-
-                    <div className="bg-slate-950/80 p-3.5 rounded-xl border border-white/10 space-y-1.5">
-                      <div className="text-[10px] text-slate-400 uppercase font-bold">Market Pay Parity Gap</div>
-                      <div className="text-xl font-extrabold text-amber-300">{metrics.payGap}% <span className="text-[10px] font-normal text-slate-400">below median</span></div>
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-amber-400" style={{ width: `${Math.abs(Number(metrics.payGap)) * 2.5}%` }} />
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-950/80 p-3.5 rounded-xl border border-white/10 space-y-1.5">
-                      <div className="text-[10px] text-slate-400 uppercase font-bold">Morale &amp; Sentiment Score</div>
-                      <div className="text-xl font-extrabold text-cyan-300">{metrics.moraleScore} / 1.0 <span className="text-[10px] font-normal text-cyan-200">(Low Morale)</span></div>
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-cyan-400" style={{ width: `${Number(metrics.moraleScore) * 100}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section 2: Operational Audit Trail */}
-                <div className="space-y-3 pt-2 border-t border-white/10">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 font-mono">
-                    2. Operational Audit Log &amp; Activity Trail:
-                  </h3>
-                  <div className="space-y-2 text-xs font-mono">
-                    <div className="flex items-center gap-3 bg-slate-950/60 p-3 rounded-xl border border-white/5">
-                      <Clock size={16} className="text-cyan-400 shrink-0" />
                       <div>
-                        <span className="text-slate-200 font-bold">Ticket Flagged:</span> Created {i.created_at ? new Date(i.created_at).toLocaleString() : 'Recently'} as Medium-Priority Review.
+                        <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest block font-mono">
+                          Auditable Evidence &amp; History Record
+                        </span>
+                        <h2 className="text-base font-extrabold text-white mt-0.5">
+                          {i.title}
+                        </h2>
                       </div>
                     </div>
-
-                    {i.owner_name && (
-                      <div className="flex items-center gap-3 bg-slate-950/60 p-3 rounded-xl border border-white/5">
-                        <BriefcaseBusiness size={16} className="text-purple-400 shrink-0" />
-                        <div>
-                          <span className="text-slate-200 font-bold">HRBP Assignment:</span> Assigned to owner <span className="text-cyan-300 font-bold">{i.owner_name}</span> for department <span className="text-white font-bold">{i.target_department || 'General'}</span>.
-                        </div>
-                      </div>
-                    )}
-
-                    {i.estimated_cost != null && (
-                      <div className="flex items-center gap-3 bg-slate-950/60 p-3 rounded-xl border border-white/5">
-                        <Zap size={16} className="text-amber-400 shrink-0" />
-                        <div>
-                          <span className="text-slate-200 font-bold">Allocated Budget Commitment:</span> <span className="text-amber-300 font-extrabold">${Number(i.estimated_cost).toLocaleString()}</span> approved for retention plan execution.
-                        </div>
-                      </div>
-                    )}
-
-                    {i.expected_impact && (
-                      <div className="flex items-center gap-3 bg-slate-950/60 p-3 rounded-xl border border-white/5">
-                        <FileText size={16} className="text-emerald-400 shrink-0" />
-                        <div>
-                          <span className="text-slate-200 font-bold">Strategy &amp; Meeting Notes:</span> <span className="text-slate-300">{i.expected_impact}</span>
-                        </div>
-                      </div>
-                    )}
+                    <button
+                      onClick={() => setEvidenceModalIntervention(null)}
+                      className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                    >
+                      <X size={18} />
+                    </button>
                   </div>
-                </div>
 
-                {/* Section 3: 30/60/90 Outcome Checkpoints */}
-                <div className="space-y-3 pt-2 border-t border-white/10">
-                  <div className="flex justify-between items-center text-xs font-bold text-cyan-300">
-                    <span>3. AUDITABLE CHECKPOINT HISTORY (30 / 60 / 90 DAYS)</span>
-                    <span className="px-2.5 py-1 rounded-md bg-cyan-400/10 border border-cyan-400/20 text-cyan-200">
-                      Outcome Score: {i.outcome_score == null ? "Pending Measurement" : `${Math.round(Number(i.outcome_score) * 100)}%`}
-                    </span>
+                  {/* Section 1: AI Algorithmic Risk Drivers */}
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 font-mono">
+                      1. AI Algorithmic Risk Drivers &amp; Morale Breakdown:
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="bg-slate-950/80 p-3.5 rounded-xl border border-white/10 space-y-1.5">
+                        <div className="text-[10px] text-slate-400 uppercase font-bold">
+                          Flight Risk Probability
+                        </div>
+                        <div className="text-xl font-extrabold text-rose-400">
+                          {metrics.flightRisk}%{" "}
+                          <span className="text-[10px] font-normal text-rose-300">
+                            (
+                            {Number(metrics.flightRisk) > 75
+                              ? "Critical"
+                              : "High"}{" "}
+                            Risk)
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-rose-500"
+                            style={{ width: `${metrics.flightRisk}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-950/80 p-3.5 rounded-xl border border-white/10 space-y-1.5">
+                        <div className="text-[10px] text-slate-400 uppercase font-bold">
+                          Market Pay Parity Gap
+                        </div>
+                        <div className="text-xl font-extrabold text-amber-300">
+                          {metrics.payGap}%{" "}
+                          <span className="text-[10px] font-normal text-slate-400">
+                            below median
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-amber-400"
+                            style={{
+                              width: `${Math.abs(Number(metrics.payGap)) * 2.5}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-950/80 p-3.5 rounded-xl border border-white/10 space-y-1.5">
+                        <div className="text-[10px] text-slate-400 uppercase font-bold">
+                          Morale &amp; Sentiment Score
+                        </div>
+                        <div className="text-xl font-extrabold text-cyan-300">
+                          {metrics.moraleScore} / 1.0{" "}
+                          <span className="text-[10px] font-normal text-cyan-200">
+                            (Low Morale)
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-cyan-400"
+                            style={{
+                              width: `${Number(metrics.moraleScore) * 100}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                    {[30, 60, 90].map((day) => {
-                      const checkpoint = (interventionOutcomes[i.id] || []).find((item) => item.checkpoint_day === day);
-                      return (
-                        <div key={day} className="rounded-xl border border-white/10 bg-slate-950/80 p-3 text-xs flex justify-between items-center">
-                          <span className="font-bold text-slate-200">{day}-Day Checkpoint</span>
-                          {checkpoint ? (
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${checkpoint.status === 'improved' ? 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30' : checkpoint.status === 'equal' ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30' : 'bg-rose-400/20 text-rose-300 border border-rose-400/30'}`}>
-                              {checkpoint.status.toUpperCase()}
+
+                  {/* Section 2: Operational Audit Trail */}
+                  <div className="space-y-3 pt-2 border-t border-white/10">
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 font-mono">
+                      2. Operational Audit Log &amp; Activity Trail:
+                    </h3>
+                    <div className="space-y-2 text-xs font-mono">
+                      <div className="flex items-center gap-3 bg-slate-950/60 p-3 rounded-xl border border-white/5">
+                        <Clock size={16} className="text-cyan-400 shrink-0" />
+                        <div>
+                          <span className="text-slate-200 font-bold">
+                            Ticket Flagged:
+                          </span>{" "}
+                          Created{" "}
+                          {i.created_at
+                            ? new Date(i.created_at).toLocaleString()
+                            : "Recently"}{" "}
+                          as Medium-Priority Review.
+                        </div>
+                      </div>
+
+                      {i.owner_name && (
+                        <div className="flex items-center gap-3 bg-slate-950/60 p-3 rounded-xl border border-white/5">
+                          <BriefcaseBusiness
+                            size={16}
+                            className="text-purple-400 shrink-0"
+                          />
+                          <div>
+                            <span className="text-slate-200 font-bold">
+                              HRBP Assignment:
+                            </span>{" "}
+                            Assigned to owner{" "}
+                            <span className="text-cyan-300 font-bold">
+                              {i.owner_name}
+                            </span>{" "}
+                            for department{" "}
+                            <span className="text-white font-bold">
+                              {i.target_department || "General"}
                             </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-500 font-mono">Not Recorded</span>
-                          )}
+                            .
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                      )}
 
-                <div className="pt-2 flex justify-end border-t border-white/10">
-                  <button
-                    onClick={() => setEvidenceModalIntervention(null)}
-                    className="px-5 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-200 hover:bg-cyan-500/30 text-xs font-bold transition-all"
-                  >
-                    Close Evidence Hub
-                  </button>
+                      {i.estimated_cost != null && (
+                        <div className="flex items-center gap-3 bg-slate-950/60 p-3 rounded-xl border border-white/5">
+                          <Zap size={16} className="text-amber-400 shrink-0" />
+                          <div>
+                            <span className="text-slate-200 font-bold">
+                              Allocated Budget Commitment:
+                            </span>{" "}
+                            <span className="text-amber-300 font-extrabold">
+                              ${Number(i.estimated_cost).toLocaleString()}
+                            </span>{" "}
+                            approved for retention plan execution.
+                          </div>
+                        </div>
+                      )}
+
+                      {i.expected_impact && (
+                        <div className="flex items-center gap-3 bg-slate-950/60 p-3 rounded-xl border border-white/5">
+                          <FileText
+                            size={16}
+                            className="text-emerald-400 shrink-0"
+                          />
+                          <div>
+                            <span className="text-slate-200 font-bold">
+                              Strategy &amp; Meeting Notes:
+                            </span>{" "}
+                            <span className="text-slate-300">
+                              {i.expected_impact}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Section 3: 30/60/90 Outcome Checkpoints */}
+                  <div className="space-y-3 pt-2 border-t border-white/10">
+                    <div className="flex justify-between items-center text-xs font-bold text-cyan-300">
+                      <span>
+                        3. AUDITABLE CHECKPOINT HISTORY (30 / 60 / 90 DAYS)
+                      </span>
+                      <span className="px-2.5 py-1 rounded-md bg-cyan-400/10 border border-cyan-400/20 text-cyan-200">
+                        Outcome Score:{" "}
+                        {i.outcome_score == null
+                          ? "Pending Measurement"
+                          : `${Math.round(Number(i.outcome_score) * 100)}%`}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                      {[30, 60, 90].map((day) => {
+                        const checkpoint = (
+                          interventionOutcomes[i.id] || []
+                        ).find((item) => item.checkpoint_day === day);
+                        return (
+                          <div
+                            key={day}
+                            className="rounded-xl border border-white/10 bg-slate-950/80 p-3 text-xs flex justify-between items-center"
+                          >
+                            <span className="font-bold text-slate-200">
+                              {day}-Day Checkpoint
+                            </span>
+                            {checkpoint ? (
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${checkpoint.status === "improved" ? "bg-emerald-400/20 text-emerald-300 border border-emerald-400/30" : checkpoint.status === "equal" ? "bg-amber-400/20 text-amber-300 border border-amber-400/30" : "bg-rose-400/20 text-rose-300 border border-rose-400/30"}`}
+                              >
+                                {checkpoint.status.toUpperCase()}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                Not Recorded
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex justify-end border-t border-white/10">
+                    <button
+                      onClick={() => setEvidenceModalIntervention(null)}
+                      className="px-5 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-200 hover:bg-cyan-500/30 text-xs font-bold transition-all"
+                    >
+                      Close Evidence Hub
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
       </div>
     </div>
   );

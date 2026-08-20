@@ -65,7 +65,10 @@ const TalentCard = ({ talent, onOpenProfile }) => {
             </Badge>
           </div>
 
-          <div className="mt-1 max-w-full truncate text-[10px] text-slate-500" title={talent.email || ""}>
+          <div
+            className="mt-1 max-w-full truncate text-[10px] text-slate-500"
+            title={talent.email || ""}
+          >
             {talent.email || "Verified profile"}
           </div>
 

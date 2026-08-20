@@ -5,7 +5,14 @@
   "main": "start-all.js",
   "scripts": {
     "dev": "node start-all.js",
-    "dev:down": "docker compose -f docker-compose.dev.yml down"
+    "dev:down": "docker compose -f docker-compose.dev.yml down",
+    "release": "standard-version && git push --follow-tags",
+    "typecheck": "pnpm --prefix client tsc --noEmit",
+    "lint": "pnpm --prefix client eslint .",
+    "lint:fix": "pnpm --prefix client eslint . --fix",
+    "format:check": "pnpm --prefix client prettier --check .",
+    "format": "pnpm --prefix client prettier --write .",
+    "test": "pnpm --prefix client vitest run"
   },
   "keywords": [
     "talent",
@@ -15,5 +22,8 @@
     "vite"
   ],
   "author": "Google DeepMind pair-programmer",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "standard-version": "^9.5.0"
+  }
 }

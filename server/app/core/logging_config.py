@@ -2,11 +2,10 @@
 Professional logging and error handling setup
 """
 
-import logging
-from datetime import datetime
-from typing import Optional
-import sys
 import json
+import logging
+import sys
+from datetime import datetime
 
 # ============ LOGGING CONFIGURATION ============
 
@@ -68,7 +67,7 @@ class AurelinxException(Exception):
         error_code: str,
         message: str,
         status_code: int = 400,
-        details: Optional[dict] = None,
+        details: dict | None = None,
     ):
         self.error_code = error_code
         self.message = message
@@ -132,7 +131,7 @@ class InternalServerError(AurelinxException):
 # ============ ERROR HANDLERS ============
 
 
-def format_error_response(exc: AurelinxException, request_id: Optional[str] = None):
+def format_error_response(exc: AurelinxException, request_id: str | None = None):
     """Format exception as JSON response"""
     return {
         "error_code": exc.error_code,

@@ -1,9 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       colors: {
@@ -16,13 +13,14 @@ export default {
         risk: "#ef4444",
       },
       fontFamily: {
-        sans: ['Outfit', 'Inter', 'sans-serif'],
+        sans: ["Outfit", "Inter", "sans-serif"],
       },
       backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'mesh-gradient': 'radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(34, 211, 238, 0.1) 0px, transparent 50%)',
-      }
+        "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
+        "mesh-gradient":
+          "radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(34, 211, 238, 0.1) 0px, transparent 50%)",
+      },
     },
   },
   plugins: [],
-}
+};

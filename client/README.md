@@ -16,6 +16,7 @@ Modern React frontend built with Next.js, TypeScript, Tailwind CSS, and Framer M
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js 18.x or later
 - npm or yarn
 
@@ -23,11 +24,13 @@ Modern React frontend built with Next.js, TypeScript, Tailwind CSS, and Framer M
 
 1. Clone the repository
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Create `.env.local` from the example:
+
 ```bash
 cp .env.local.example .env.local
 ```
@@ -37,6 +40,7 @@ cp .env.local.example .env.local
 ### Development
 
 Run the development server:
+
 ```bash
 npm run dev
 ```
@@ -46,11 +50,13 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 ### Building for Production
 
 Build the application:
+
 ```bash
 npm run build
 ```
 
 Start the production server:
+
 ```bash
 npm start
 ```
@@ -58,6 +64,7 @@ npm start
 ### Linting
 
 Run ESLint:
+
 ```bash
 npm run lint
 ```
@@ -99,6 +106,7 @@ client/
 ## Environment Variables
 
 See `.env.local.example` for available configuration options:
+
 - `NEXT_PUBLIC_API_URL` - Backend API endpoint
 
 ## Deployment
@@ -118,4 +126,3 @@ vercel
 - [React Documentation](https://react.dev)
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
 - [Framer Motion Documentation](https://www.framer.com/motion)
-

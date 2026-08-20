@@ -12,9 +12,9 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
 
 from sqlmodel import Session, select
 
@@ -22,7 +22,7 @@ SERVER_ROOT = Path(__file__).resolve().parent.parent
 if str(SERVER_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVER_ROOT))
 
-from app.models.database import (  # noqa: E402
+from app.models.database import (
     CandidateTable,
     EmployeeTable,
     ExperienceTable,
@@ -49,7 +49,7 @@ class ImportStats:
     skipped: int = 0
 
 
-def _read_csv(path: Path) -> Tuple[List[Dict[str, str]], List[str]]:
+def _read_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
     if not path.exists():
         raise FileNotFoundError(f"CSV file not found: {path}")
     with path.open("r", encoding="utf-8-sig", newline="") as f:
@@ -77,7 +77,7 @@ def _to_bool(value: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "y"}
 
 
-def _to_float(value: str, default: Optional[float] = None) -> Optional[float]:
+def _to_float(value: str, default: float | None = None) -> float | None:
     if value == "":
         return default
     try:
@@ -87,10 +87,10 @@ def _to_float(value: str, default: Optional[float] = None) -> Optional[float]:
 
 
 def _upsert_employees(
-    session: Session, rows: List[Dict[str, str]]
-) -> Tuple[ImportStats, Dict[str, EmployeeTable]]:
+    session: Session, rows: list[dict[str, str]]
+) -> tuple[ImportStats, dict[str, EmployeeTable]]:
     stats = ImportStats()
-    email_index: Dict[str, EmployeeTable] = {}
+    email_index: dict[str, EmployeeTable] = {}
     for row in rows:
         email = row.get("email", "").lower()
         if not email:
@@ -141,10 +141,10 @@ def _upsert_employees(
 
 
 def _upsert_candidates(
-    session: Session, rows: List[Dict[str, str]]
-) -> Tuple[ImportStats, Dict[str, CandidateTable]]:
+    session: Session, rows: list[dict[str, str]]
+) -> tuple[ImportStats, dict[str, CandidateTable]]:
     stats = ImportStats()
-    email_index: Dict[str, CandidateTable] = {}
+    email_index: dict[str, CandidateTable] = {}
     for row in rows:
         email = row.get("email", "").lower()
         if not email:
@@ -191,9 +191,9 @@ def _upsert_candidates(
 
 def _import_skills(
     session: Session,
-    rows: List[Dict[str, str]],
-    employee_index: Dict[str, EmployeeTable],
-    candidate_index: Dict[str, CandidateTable],
+    rows: list[dict[str, str]],
+    employee_index: dict[str, EmployeeTable],
+    candidate_index: dict[str, CandidateTable],
 ) -> ImportStats:
     stats = ImportStats()
     for row in rows:
@@ -246,9 +246,9 @@ def _import_skills(
 
 def _import_experience(
     session: Session,
-    rows: List[Dict[str, str]],
-    employee_index: Dict[str, EmployeeTable],
-    candidate_index: Dict[str, CandidateTable],
+    rows: list[dict[str, str]],
+    employee_index: dict[str, EmployeeTable],
+    candidate_index: dict[str, CandidateTable],
 ) -> ImportStats:
     stats = ImportStats()
     for row in rows:
@@ -330,8 +330,8 @@ def main() -> None:
         )
 
     with Session(engine) as session:
-        employee_index: Dict[str, EmployeeTable] = {}
-        candidate_index: Dict[str, CandidateTable] = {}
+        employee_index: dict[str, EmployeeTable] = {}
+        candidate_index: dict[str, CandidateTable] = {}
 
         if args.employees:
             rows, headers = _read_csv(args.employees)

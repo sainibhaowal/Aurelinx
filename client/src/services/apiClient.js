@@ -169,6 +169,10 @@ async function consumeEventStream(response, handlers = {}, signal = null) {
 
   try {
     while (true) {
+      if (signal?.aborted) {
+        await reader.cancel();
+        break;
+      }
       const { done, value } = await reader.read();
       if (done) break;
 
@@ -280,21 +284,21 @@ async function request(url, options = {}, responseType = "json") {
         let requestIndex = 0;
         requestIndex < requestUrls.length;
         requestIndex++
-        ) {
-          const requestUrl = requestUrls[requestIndex];
-          const controller = new AbortController();
-          let timedOut = false;
-          const timeoutId = setTimeout(() => {
-            timedOut = true;
-            controller.abort();
-          }, timeoutMs);
+      ) {
+        const requestUrl = requestUrls[requestIndex];
+        const controller = new AbortController();
+        let timedOut = false;
+        const timeoutId = setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+        }, timeoutMs);
 
-          try {
-            response = await fetch(requestUrl, {
-              ...fetchOptions,
-              headers,
-              signal: controller.signal,
-            });
+        try {
+          response = await fetch(requestUrl, {
+            ...fetchOptions,
+            headers,
+            signal: controller.signal,
+          });
           requestUrlUsed = requestUrl;
           break;
         } catch (error) {
@@ -398,9 +402,10 @@ async function request(url, options = {}, responseType = "json") {
         error?.name === "AbortError" ||
         /aborted/i.test(error?.message || "")
       ) {
-        const isTimeoutAbort = error?.message?.includes("timeout") || 
-                               error?.message?.includes("timed out") ||
-                               (error?.name === "AbortError" && !error?.message?.includes("reason"));
+        const isTimeoutAbort =
+          error?.message?.includes("timeout") ||
+          error?.message?.includes("timed out") ||
+          (error?.name === "AbortError" && !error?.message?.includes("reason"));
         if (isTimeoutAbort) {
           lastError = new Error(`Request timed out after ${timeoutMs}ms`);
           if (attempt < MAX_RETRIES - 1) {
@@ -555,7 +560,15 @@ export const authAPI = {
  * Employees API
  */
 export const employeesAPI = {
-  list: (skip = 0, limit = 10, department = null, atRiskOnly = false, q = null, sentimentMin = null, sentimentMax = null) => {
+  list: (
+    skip = 0,
+    limit = 10,
+    department = null,
+    atRiskOnly = false,
+    q = null,
+    sentimentMin = null,
+    sentimentMax = null,
+  ) => {
     const params = new URLSearchParams();
     params.append("skip", skip);
     params.append("limit", limit);
@@ -569,7 +582,13 @@ export const employeesAPI = {
     });
   },
 
-  count: (q = null, atRiskOnly = false, department = null, sentimentMin = null, sentimentMax = null) => {
+  count: (
+    q = null,
+    atRiskOnly = false,
+    department = null,
+    sentimentMin = null,
+    sentimentMax = null,
+  ) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (atRiskOnly) params.set("at_risk_only", "true");
@@ -606,7 +625,14 @@ export const employeesAPI = {
  * Candidates API
  */
 export const candidatesAPI = {
-  list: (skip = 0, limit = 10, department = null, q = null, sentimentMin = null, sentimentMax = null) => {
+  list: (
+    skip = 0,
+    limit = 10,
+    department = null,
+    q = null,
+    sentimentMin = null,
+    sentimentMax = null,
+  ) => {
     const params = new URLSearchParams();
     params.append("skip", skip);
     params.append("limit", limit);
@@ -619,7 +645,12 @@ export const candidatesAPI = {
     });
   },
 
-  count: (q = null, department = null, sentimentMin = null, sentimentMax = null) => {
+  count: (
+    q = null,
+    department = null,
+    sentimentMin = null,
+    sentimentMax = null,
+  ) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (department) params.set("department", department);
@@ -635,9 +666,19 @@ export const candidatesAPI = {
 
 /** Organizational network analysis (shared with Intel Center). */
 export const intelligenceAPI = {
-  ona: (limit = 45) => request(`${API_V1}/intelligence/ona?limit=${encodeURIComponent(limit)}`, { timeoutMs: LONG_REQUEST_TIMEOUT }),
+  ona: (limit = 45) =>
+    request(`${API_V1}/intelligence/ona?limit=${encodeURIComponent(limit)}`, {
+      timeoutMs: LONG_REQUEST_TIMEOUT,
+    }),
 
-  explain: (subtab, context, provider = "lmstudio", apiKey = null, baseUrl = null, model = null) =>
+  explain: (
+    subtab,
+    context,
+    provider = "lmstudio",
+    apiKey = null,
+    baseUrl = null,
+    model = null,
+  ) =>
     request(`${API_V1}/intelligence/explain`, {
       method: "POST",
       body: JSON.stringify({
@@ -688,12 +729,27 @@ export const analysisAPI = {
     }),
 
   getAnalyticsHistory: (limit = 24) =>
-    request(`${API_V1}/ai/analytics/history?limit=${encodeURIComponent(limit)}`, {
+    request(
+      `${API_V1}/ai/analytics/history?limit=${encodeURIComponent(limit)}`,
+      {
+        timeoutMs: LONG_REQUEST_TIMEOUT,
+      },
+    ),
+  getAnalyticsOverview: ({
+    department = "",
+    riskOnly = false,
+    offset = 0,
+    limit = 100,
+  } = {}) => {
+    const params = new URLSearchParams({
+      department,
+      risk_only: String(riskOnly),
+      offset: String(offset),
+      limit: String(limit),
+    });
+    return request(`${API_V1}/ai/analytics/overview?${params}`, {
       timeoutMs: LONG_REQUEST_TIMEOUT,
-    }),
-  getAnalyticsOverview: ({ department = "", riskOnly = false, offset = 0, limit = 100 } = {}) => {
-    const params = new URLSearchParams({ department, risk_only: String(riskOnly), offset: String(offset), limit: String(limit) });
-    return request(`${API_V1}/ai/analytics/overview?${params}`, { timeoutMs: LONG_REQUEST_TIMEOUT });
+    });
   },
 
   streamAnalytics: (handlers = {}, signal = null) =>
@@ -1040,14 +1096,18 @@ export const chatAPI = {
           signal,
         },
       );
-      return consumeEventStream(response, {
-        chunk: handlers.onChunk,
-        status: handlers.onStatus,
-        agent_step: handlers.onAgentStep,
-        model_reasoning_delta: handlers.onReasoningDelta,
-        done: handlers.onDone,
-        error: handlers.onError,
-      }, signal);
+      return consumeEventStream(
+        response,
+        {
+          chunk: handlers.onChunk,
+          status: handlers.onStatus,
+          agent_step: handlers.onAgentStep,
+          model_reasoning_delta: handlers.onReasoningDelta,
+          done: handlers.onDone,
+          error: handlers.onError,
+        },
+        signal,
+      );
     } catch (error) {
       if (error?.name === "AbortError") {
         return false;
@@ -1060,13 +1120,19 @@ export const chatAPI = {
   listWorkflowEvents: (runId) =>
     request(`${API_V1}/chat/workflows/${runId}/events`),
   approveWorkflow: (runId, approvalId) =>
-    request(`${API_V1}/chat/workflows/${runId}/approvals/${approvalId}/approve`, {
-      method: "POST",
-    }),
+    request(
+      `${API_V1}/chat/workflows/${runId}/approvals/${approvalId}/approve`,
+      {
+        method: "POST",
+      },
+    ),
   rejectWorkflow: (runId, approvalId) =>
-    request(`${API_V1}/chat/workflows/${runId}/approvals/${approvalId}/reject`, {
-      method: "POST",
-    }),
+    request(
+      `${API_V1}/chat/workflows/${runId}/approvals/${approvalId}/reject`,
+      {
+        method: "POST",
+      },
+    ),
 };
 
 /**
@@ -1076,7 +1142,6 @@ export const healthAPI = {
   check: () =>
     request(`${API_BASE}/health`).catch(() => ({ status: "offline" })),
 };
-
 
 export default {
   authAPI,

@@ -3,30 +3,31 @@ Main FastAPI application
 Production-grade setup with middleware, exception handling, and security
 """
 
+import uuid
+from contextlib import asynccontextmanager
+from datetime import datetime
+
+import httpx
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
-import uuid
-from datetime import datetime
-import httpx
 
-from app.models.database import create_db_and_tables
-from app.core.config import settings
-from app.core.logging_config import setup_logging, AurelinxException, get_logger
-from app.core.provider_utils import build_local_provider_base_candidates
 from app.api.v1 import (
-    auth,
-    employees,
     analysis,
+    auth,
     candidates,
     chat,
+    employees,
     enterprise,
-    lean_enterprise,
-    intelligence,
     integrations,
+    intelligence,
+    lean_enterprise,
 )
+from app.core.config import settings
+from app.core.logging_config import AurelinxException, get_logger, setup_logging
+from app.core.provider_utils import build_local_provider_base_candidates
+from app.models.database import create_db_and_tables
 
 # Setup logging
 logger_setup = setup_logging(settings.LOG_LEVEL)
@@ -183,7 +184,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     request_id = getattr(request.state, "request_id", None)
 
     logger.error(
-        f"[{request_id}] Unhandled exception: {str(exc)}",
+        f"[{request_id}] Unhandled exception: {exc!s}",
         exc_info=True,
         extra={"request_id": request_id},
     )

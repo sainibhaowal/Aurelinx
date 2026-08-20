@@ -3,10 +3,10 @@ Pydantic schemas for request/response validation
 Ensures type safety and automatic documentation
 """
 
-from pydantic import BaseModel, Field, EmailStr, field_validator, ConfigDict
-from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 # ============ AUTHENTICATION SCHEMAS ============
 
@@ -31,6 +31,7 @@ class LoginResponse(BaseModel):
 
 class VerifyCodeRequest(BaseModel):
     """Request to verify an Admin ID"""
+
     code: str = Field(..., min_length=8, max_length=32)
 
 
@@ -127,23 +128,23 @@ class EmployeeCreate(BaseModel):
     email: EmailStr
     department: str = Field(..., min_length=1, max_length=100)
     role: str = Field(..., min_length=1, max_length=100)
-    sentiment_score: Optional[float] = Field(default=0.5, ge=0.0, le=1.0)
-    salary: Optional[int] = None
-    join_date: Optional[datetime] = None
-    skills: Optional[List[SkillCreate]] = []
-    experiences: Optional[List[ExperienceCreate]] = []
+    sentiment_score: float | None = Field(default=0.5, ge=0.0, le=1.0)
+    salary: int | None = None
+    join_date: datetime | None = None
+    skills: list[SkillCreate] | None = []
+    experiences: list[ExperienceCreate] | None = []
 
 
 class EmployeeUpdate(BaseModel):
     """Update employee"""
 
-    full_name: Optional[str] = None
-    department: Optional[str] = None
-    role: Optional[str] = None
-    sentiment_score: Optional[float] = Field(None, ge=0.0, le=1.0)
-    is_at_risk: Optional[bool] = None
-    salary: Optional[int] = None
-    join_date: Optional[datetime] = None
+    full_name: str | None = None
+    department: str | None = None
+    role: str | None = None
+    sentiment_score: float | None = Field(None, ge=0.0, le=1.0)
+    is_at_risk: bool | None = None
+    salary: int | None = None
+    join_date: datetime | None = None
 
 
 class EmployeeOut(BaseModel):
@@ -156,19 +157,19 @@ class EmployeeOut(BaseModel):
     role: str
     sentiment_score: float
     is_at_risk: bool
-    retention_prob: Optional[float]
-    salary: Optional[int] = None
-    join_date: Optional[datetime] = None
-    skills: List[SkillOut] = []
-    experiences: List[ExperienceOut] = []
+    retention_prob: float | None
+    salary: int | None = None
+    join_date: datetime | None = None
+    skills: list[SkillOut] = []
+    experiences: list[ExperienceOut] = []
     created_at: datetime
     updated_at: datetime
     source_type: str = "database_record"
     source_version: str = "directory-v1"
     validation_status: str = "valid"
-    missing_fields: List[str] = []
-    duplicate_warnings: List[str] = []
-    audit_history: List[dict] = []
+    missing_fields: list[str] = []
+    duplicate_warnings: list[str] = []
+    audit_history: list[dict] = []
 
 
 class EmployeeListOut(BaseModel):
@@ -181,9 +182,9 @@ class EmployeeListOut(BaseModel):
     role: str
     sentiment_score: float
     is_at_risk: bool
-    retention_prob: Optional[float]
-    salary: Optional[int] = None
-    join_date: Optional[datetime] = None
+    retention_prob: float | None
+    salary: int | None = None
+    join_date: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -198,9 +199,9 @@ class CandidateCreate(BaseModel):
     email: EmailStr
     department: str = Field(..., min_length=1, max_length=100)
     role: str = Field(..., min_length=1, max_length=100)
-    salary: Optional[int] = None
-    skills: Optional[List[SkillCreate]] = []
-    experiences: Optional[List[ExperienceCreate]] = []
+    salary: int | None = None
+    skills: list[SkillCreate] | None = []
+    experiences: list[ExperienceCreate] | None = []
 
 
 class CandidateOut(BaseModel):
@@ -212,19 +213,19 @@ class CandidateOut(BaseModel):
     department: str
     role: str
     sentiment_score: float
-    match_score: Optional[float]
-    salary: Optional[int] = None
-    skills: List[SkillOut] = []
-    experiences: List[ExperienceOut] = []
+    match_score: float | None
+    salary: int | None = None
+    skills: list[SkillOut] = []
+    experiences: list[ExperienceOut] = []
     application_date: datetime
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
     source_type: str = "database_record"
     source_version: str = "directory-v1"
     validation_status: str = "valid"
-    missing_fields: List[str] = []
-    duplicate_warnings: List[str] = []
-    audit_history: List[dict] = []
+    missing_fields: list[str] = []
+    duplicate_warnings: list[str] = []
+    audit_history: list[dict] = []
 
 
 class CandidateListOut(BaseModel):
@@ -236,8 +237,8 @@ class CandidateListOut(BaseModel):
     department: str
     role: str
     sentiment_score: float
-    match_score: Optional[float]
-    salary: Optional[int] = None
+    match_score: float | None
+    salary: int | None = None
     application_date: datetime
     created_at: datetime
 
@@ -252,9 +253,9 @@ class AIAnalysisRequest(BaseModel):
         ..., min_length=5, max_length=1000, description="What are you looking for?"
     )
     provider: str = Field(..., description="LLM provider: openai, claude, or groq")
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
-    model: Optional[str] = None
+    api_key: str | None = None
+    base_url: str | None = None
+    model: str | None = None
 
     @field_validator("provider")
     def validate_provider(cls, v):
@@ -286,11 +287,11 @@ class AIAnalysisResponse(BaseModel):
     # Scout cards intentionally use the same public field shape, but omit
     # heavy experience payloads. The existing profile endpoint remains the
     # source of full details when a card is opened.
-    candidates: List[dict] = []
-    confidence_score: Optional[float]
+    candidates: list[dict] = []
+    confidence_score: float | None
     processing_time_ms: float
-    searched_records: Optional[int] = None
-    returned_records: Optional[int] = None
+    searched_records: int | None = None
+    returned_records: int | None = None
 
 
 class AICopilotRequest(BaseModel):
@@ -305,10 +306,10 @@ class AICopilotRequest(BaseModel):
         default="lmstudio",
         description="LLM provider: openai, claude, groq, lmstudio, gemini",
     )
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
-    model: Optional[str] = None
-    page_context: Optional[dict] = None
+    api_key: str | None = None
+    base_url: str | None = None
+    model: str | None = None
+    page_context: dict | None = None
 
     @field_validator("provider")
     def validate_provider(cls, v):
@@ -337,10 +338,10 @@ class AICopilotResponse(BaseModel):
 
     headline: str
     answer: str
-    evidence: List[str] = []
-    recommendations: List[str] = []
-    actions: List[str] = []
-    warnings: List[str] = []
+    evidence: list[str] = []
+    recommendations: list[str] = []
+    actions: list[str] = []
+    warnings: list[str] = []
     context: dict
     confidence_score: float
     provider: str
@@ -351,7 +352,7 @@ class AICopilotResponse(BaseModel):
 class SentimentReportRequest(BaseModel):
     """Request sentiment analysis report"""
 
-    department: Optional[str] = None
+    department: str | None = None
     include_at_risk_only: bool = False
 
 
@@ -370,8 +371,8 @@ class SentimentReportResponse(BaseModel):
     total_employees: int
     at_risk_count: int
     at_risk_percentage: float
-    metrics: List[SentimentMetric]
-    recommendations: List[str]
+    metrics: list[SentimentMetric]
+    recommendations: list[str]
 
 
 # ============ ERROR RESPONSE SCHEMAS ============
@@ -382,8 +383,8 @@ class ErrorResponse(BaseModel):
 
     error_code: str
     message: str
-    details: Optional[dict] = None
-    request_id: Optional[str] = None
+    details: dict | None = None
+    request_id: str | None = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -393,7 +394,7 @@ class ValidationErrorResponse(BaseModel):
     error_code: str = "VALIDATION_ERROR"
     message: str = "Request validation failed"
     errors: dict  # Field name -> error message
-    request_id: Optional[str] = None
+    request_id: str | None = None
 
 
 # ============ PAGINATION ============
@@ -404,7 +405,7 @@ class PaginationParams(BaseModel):
 
     skip: int = Field(default=0, ge=0)
     limit: int = Field(default=10, ge=1, le=100)
-    sort_by: Optional[str] = None
+    sort_by: str | None = None
     sort_order: str = Field(default="asc", pattern="^(asc|desc)$")
 
 
@@ -414,14 +415,14 @@ class PaginatedResponse(BaseModel):
     total: int
     skip: int
     limit: int
-    items: List[dict]
+    items: list[dict]
 
 
 # ============ CHAT SCHEMAS ============
 
 
 class ChatSessionCreate(BaseModel):
-    title: Optional[str] = "New Session"
+    title: str | None = "New Session"
 
 
 class ChatSessionRename(BaseModel):
@@ -437,15 +438,15 @@ class ChatSessionOut(BaseModel):
 
 
 class ChatBulkDeleteRequest(BaseModel):
-    session_ids: List[UUID]
+    session_ids: list[UUID]
 
 
 class ChatMessageCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=12000)
-    provider: Optional[str] = "lmstudio"
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
-    model: Optional[str] = None
+    provider: str | None = "lmstudio"
+    api_key: str | None = None
+    base_url: str | None = None
+    model: str | None = None
 
 
 class ChatMessageOut(BaseModel):
@@ -453,22 +454,22 @@ class ChatMessageOut(BaseModel):
     session_id: str
     role: str
     content: str
-    tool_trace: Optional[str] = None
+    tool_trace: str | None = None
     created_at: datetime
-    workflow_run_id: Optional[str] = None
-    workflow_events: List[dict] = Field(default_factory=list)
+    workflow_run_id: str | None = None
+    workflow_events: list[dict] = Field(default_factory=list)
 
 
 class ChatAttachmentOut(BaseModel):
     id: str
     session_id: str
-    message_id: Optional[str] = None
+    message_id: str | None = None
     original_name: str
-    content_type: Optional[str] = None
+    content_type: str | None = None
     file_path: str
     file_size: int
     parsing_status: str
-    parsing_error: Optional[str] = None
+    parsing_error: str | None = None
     created_at: datetime
 
 
@@ -494,73 +495,71 @@ class AttritionExplainOut(BaseModel):
     role: str
     risk_probability: float = Field(..., ge=0.0, le=1.0)
     confidence: float = Field(..., ge=0.0, le=1.0)
-    recommended_actions: List[str]
-    drivers: List[AttritionDriverOut]
+    recommended_actions: list[str]
+    drivers: list[AttritionDriverOut]
 
 
 class AttritionExplainResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
     generated_at: datetime
     model_version: str
-    items: List[AttritionExplainOut]
+    items: list[AttritionExplainOut]
 
 
 class InterventionCreate(BaseModel):
     title: str = Field(..., min_length=3, max_length=200)
-    description: Optional[str] = None
+    description: str | None = None
     target_scope: str = Field(
         default="team", pattern="^(employee|team|department|org)$"
     )
-    target_employee_id: Optional[UUID] = None
-    target_department: Optional[str] = None
+    target_employee_id: UUID | None = None
+    target_department: str | None = None
     priority: str = Field(default="medium", pattern="^(low|medium|high|critical)$")
     status: str = Field(
         default="planned",
         pattern="^(planned|approved|in_progress|completed|cancelled)$",
     )
-    owner_name: Optional[str] = None
-    due_date: Optional[datetime] = None
-    expected_impact: Optional[str] = None
-    estimated_cost: Optional[float] = Field(default=None, ge=0.0)
+    owner_name: str | None = None
+    due_date: datetime | None = None
+    expected_impact: str | None = None
+    estimated_cost: float | None = Field(default=None, ge=0.0)
 
 
 class InterventionUpdate(BaseModel):
-    title: Optional[str] = Field(default=None, min_length=3, max_length=200)
-    description: Optional[str] = None
-    target_scope: Optional[str] = Field(
+    title: str | None = Field(default=None, min_length=3, max_length=200)
+    description: str | None = None
+    target_scope: str | None = Field(
         default=None, pattern="^(employee|team|department|org)$"
     )
-    target_employee_id: Optional[UUID] = None
-    target_department: Optional[str] = None
-    priority: Optional[str] = Field(
-        default=None, pattern="^(low|medium|high|critical)$"
-    )
-    status: Optional[str] = Field(
+    target_employee_id: UUID | None = None
+    target_department: str | None = None
+    priority: str | None = Field(default=None, pattern="^(low|medium|high|critical)$")
+    status: str | None = Field(
         default=None, pattern="^(planned|approved|in_progress|completed|cancelled)$"
     )
-    owner_name: Optional[str] = None
-    due_date: Optional[datetime] = None
-    expected_impact: Optional[str] = None
-    estimated_cost: Optional[float] = Field(default=None, ge=0.0)
-    outcome_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    owner_name: str | None = None
+    due_date: datetime | None = None
+    expected_impact: str | None = None
+    estimated_cost: float | None = Field(default=None, ge=0.0)
+    outcome_score: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class InterventionOut(BaseModel):
     id: UUID
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     target_scope: str
-    target_employee_id: Optional[UUID] = None
-    target_department: Optional[str] = None
+    target_employee_id: UUID | None = None
+    target_department: str | None = None
     priority: str
     status: str
-    owner_name: Optional[str] = None
-    due_date: Optional[datetime] = None
-    expected_impact: Optional[str] = None
-    estimated_cost: Optional[float] = None
-    outcome_score: Optional[float] = None
-    closed_at: Optional[datetime] = None
-    created_by: Optional[str] = None
+    owner_name: str | None = None
+    due_date: datetime | None = None
+    expected_impact: str | None = None
+    estimated_cost: float | None = None
+    outcome_score: float | None = None
+    closed_at: datetime | None = None
+    created_by: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -572,43 +571,43 @@ class IntegrationConnectionCreate(BaseModel):
     )
     provider: str = Field(..., min_length=2, max_length=80)
     status: str = Field(default="draft", pattern="^(draft|active|paused|error)$")
-    base_url: Optional[str] = None
+    base_url: str | None = None
     auth_type: str = Field(default="api_key", pattern="^(api_key|oauth2|basic)$")
-    encrypted_secret_ref: Optional[str] = None
-    sync_interval_minutes: Optional[int] = Field(default=60, ge=5, le=10080)
+    encrypted_secret_ref: str | None = None
+    sync_interval_minutes: int | None = Field(default=60, ge=5, le=10080)
 
 
 class IntegrationConnectionUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=2, max_length=120)
-    source_type: Optional[str] = Field(
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    source_type: str | None = Field(
         default=None, pattern="^(hris|ats|engagement|productivity|finance)$"
     )
-    provider: Optional[str] = Field(default=None, min_length=2, max_length=80)
-    status: Optional[str] = Field(default=None, pattern="^(draft|active|paused|error)$")
-    base_url: Optional[str] = None
-    auth_type: Optional[str] = Field(default=None, pattern="^(api_key|oauth2|basic)$")
-    encrypted_secret_ref: Optional[str] = None
-    sync_interval_minutes: Optional[int] = Field(default=None, ge=5, le=10080)
-    last_sync_status: Optional[str] = None
-    last_sync_summary: Optional[str] = None
+    provider: str | None = Field(default=None, min_length=2, max_length=80)
+    status: str | None = Field(default=None, pattern="^(draft|active|paused|error)$")
+    base_url: str | None = None
+    auth_type: str | None = Field(default=None, pattern="^(api_key|oauth2|basic)$")
+    encrypted_secret_ref: str | None = None
+    sync_interval_minutes: int | None = Field(default=None, ge=5, le=10080)
+    last_sync_status: str | None = None
+    last_sync_summary: str | None = None
 
 
 class IntegrationConnectionOut(BaseModel):
     id: UUID
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     name: str
     source_type: str
     provider: str
     status: str
-    base_url: Optional[str] = None
+    base_url: str | None = None
     auth_type: str
-    encrypted_secret_ref: Optional[str] = None
+    encrypted_secret_ref: str | None = None
     sync_interval_minutes: int = 60
-    next_sync_at: Optional[datetime] = None
+    next_sync_at: datetime | None = None
     sync_retry_count: int = 0
-    last_sync_at: Optional[datetime] = None
-    last_sync_status: Optional[str] = None
-    last_sync_summary: Optional[str] = None
+    last_sync_at: datetime | None = None
+    last_sync_status: str | None = None
+    last_sync_summary: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -618,9 +617,9 @@ class InterventionOutcomeCreate(BaseModel):
     status: str = Field(
         default="tracking", pattern="^(tracking|improved|neutral|worsened)$"
     )
-    risk_delta: Optional[float] = None
-    retention_delta: Optional[float] = None
-    notes: Optional[str] = None
+    risk_delta: float | None = None
+    retention_delta: float | None = None
+    notes: str | None = None
 
 
 class InterventionOutcomeOut(BaseModel):
@@ -629,9 +628,9 @@ class InterventionOutcomeOut(BaseModel):
     checkpoint_day: int
     measured_at: datetime
     status: str
-    risk_delta: Optional[float] = None
-    retention_delta: Optional[float] = None
-    notes: Optional[str] = None
+    risk_delta: float | None = None
+    retention_delta: float | None = None
+    notes: str | None = None
     created_at: datetime
 
 
@@ -647,7 +646,7 @@ class ConnectionSyncStatusOut(BaseModel):
 class ConnectorFieldMappingCreate(BaseModel):
     source_field: str = Field(..., min_length=1, max_length=120)
     canonical_field: str = Field(..., min_length=1, max_length=120)
-    transform_rule: Optional[str] = None
+    transform_rule: str | None = None
     required: bool = True
 
 
@@ -656,7 +655,7 @@ class ConnectorFieldMappingOut(BaseModel):
     connection_id: UUID
     source_field: str
     canonical_field: str
-    transform_rule: Optional[str] = None
+    transform_rule: str | None = None
     required: bool
     created_at: datetime
     updated_at: datetime
@@ -664,7 +663,7 @@ class ConnectorFieldMappingOut(BaseModel):
 
 class ConnectorSyncJobOut(BaseModel):
     id: UUID
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     connection_id: UUID
     status: str
     source_type: str
@@ -672,9 +671,9 @@ class ConnectorSyncJobOut(BaseModel):
     bronze_events: int
     silver_upserts: int
     quarantined: int
-    error_message: Optional[str] = None
+    error_message: str | None = None
     started_at: datetime
-    finished_at: Optional[datetime] = None
+    finished_at: datetime | None = None
 
 
 class RiskDriverDrilldownItem(BaseModel):
@@ -683,7 +682,7 @@ class RiskDriverDrilldownItem(BaseModel):
     department: str
     role: str
     sentiment_score: float
-    retention_prob: Optional[float] = None
+    retention_prob: float | None = None
     risk_probability: float
     evidence: str
 
@@ -691,7 +690,7 @@ class RiskDriverDrilldownItem(BaseModel):
 class RiskDriverDrilldownResponse(BaseModel):
     factor: str
     generated_at: datetime
-    items: List[RiskDriverDrilldownItem]
+    items: list[RiskDriverDrilldownItem]
 
 
 class CompliancePolicyCreate(BaseModel):
@@ -703,20 +702,20 @@ class CompliancePolicyCreate(BaseModel):
     min_confidence: float = Field(default=0.75, ge=0.0, le=1.0)
     requires_approval: bool = True
     blocked_if_missing_evidence: bool = True
-    blocked_actions: List[str] = Field(default_factory=list)
+    blocked_actions: list[str] = Field(default_factory=list)
     status: str = Field(default="active", pattern="^(active|paused)$")
 
 
 class CompliancePolicyOut(BaseModel):
     id: UUID
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     region: str
     policy_name: str
     action_type: str
     min_confidence: float
     requires_approval: bool
     blocked_if_missing_evidence: bool
-    blocked_actions: List[str]
+    blocked_actions: list[str]
     status: str
     created_at: datetime
     updated_at: datetime
@@ -725,15 +724,15 @@ class CompliancePolicyOut(BaseModel):
 class PolicyCheckRequest(BaseModel):
     action_type: str = Field(..., pattern="^(intervention|export|sync|recommendation)$")
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
-    evidence: Optional[str] = None
+    evidence: str | None = None
     region: str = Field(default="global")
     high_impact: bool = False
 
 
 class PolicyCheckResponse(BaseModel):
     allowed: bool
-    reasons: List[str]
-    matched_policies: List[str]
+    reasons: list[str]
+    matched_policies: list[str]
 
 
 class ForecastScenarioCreate(BaseModel):
@@ -749,39 +748,39 @@ class ForecastScenarioCreate(BaseModel):
 
 class ForecastScenarioOut(BaseModel):
     id: UUID
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     scenario_name: str
     input_payload: dict
     output_payload: dict
-    created_by: Optional[str] = None
+    created_by: str | None = None
     created_at: datetime
 
 
 class MLDriftSnapshotOut(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
     id: UUID
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     model_name: str
     model_version: str
     drift_score: float
     needs_retraining: bool
-    notes: Optional[str] = None
+    notes: str | None = None
     created_at: datetime
 
 
 class MLModelCardOut(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
     id: UUID
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     model_name: str
     version: str
     status: str
     pr_auc: float
     calibration_error: float
     fairness_gap: float
-    notes: Optional[str] = None
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
+    notes: str | None = None
+    approved_by: str | None = None
+    approved_at: datetime | None = None
     created_at: datetime
 
 
@@ -789,28 +788,28 @@ class ReleaseGateCreate(BaseModel):
     environment: str = Field(default="dev", pattern="^(dev|stage|prod)$")
     artifact_name: str = Field(..., min_length=2, max_length=120)
     version: str = Field(..., min_length=1, max_length=80)
-    required_checks: List[str] = Field(default_factory=list)
-    notes: Optional[str] = None
+    required_checks: list[str] = Field(default_factory=list)
+    notes: str | None = None
 
 
 class ReleaseGateOut(BaseModel):
     id: UUID
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     environment: str
     artifact_name: str
     version: str
     status: str
-    required_checks: List[str]
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
-    notes: Optional[str] = None
+    required_checks: list[str]
+    approved_by: str | None = None
+    approved_at: datetime | None = None
+    notes: str | None = None
     created_at: datetime
 
 
 class FairnessSummaryOut(BaseModel):
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     reference_group: str
-    groups: List[dict]
+    groups: list[dict]
     max_gap: float
     compliant: bool
 
@@ -823,20 +822,20 @@ class DRRunbookCreate(BaseModel):
     status: str = Field(
         default="draft", pattern="^(draft|ready|validated|needs_review)$"
     )
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class DRRunbookOut(BaseModel):
     id: UUID
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     runbook_name: str
     environment: str
     rto_minutes: int
     rpo_minutes: int
     status: str
-    last_drill_at: Optional[datetime] = None
-    last_drill_result: Optional[str] = None
-    notes: Optional[str] = None
+    last_drill_at: datetime | None = None
+    last_drill_result: str | None = None
+    notes: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -846,15 +845,15 @@ class ProcurementArtifactCreate(BaseModel):
     title: str = Field(..., min_length=3, max_length=120)
     version: str = Field(default="v1", max_length=40)
     status: str = Field(default="draft", pattern="^(draft|ready|approved)$")
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class ProcurementArtifactOut(BaseModel):
     id: UUID
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     artifact_type: str
     title: str
     version: str
     status: str
-    notes: Optional[str] = None
+    notes: str | None = None
     created_at: datetime

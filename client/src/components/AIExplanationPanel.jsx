@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Bot, ChevronDown, ChevronUp, Loader2, Sparkles, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Sparkles, X } from "lucide-react";
 import { intelligenceAPI } from "../services/apiClient";
 
 const MarkdownRenderer = ({ children }) => (
@@ -47,9 +47,7 @@ const MarkdownRenderer = ({ children }) => (
         </ol>
       ),
       li: ({ children }) => (
-        <li className="text-sm text-slate-200 leading-relaxed">
-          {children}
-        </li>
+        <li className="text-sm text-slate-200 leading-relaxed">{children}</li>
       ),
       table: ({ children }) => (
         <div className="my-4 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/20 shadow-lg shadow-black/30">
@@ -94,7 +92,8 @@ const MarkdownRenderer = ({ children }) => (
 );
 
 const getProviderConfig = () => {
-  if (typeof window === "undefined") return { provider: "lmstudio", key: null, baseUrl: null, model: null };
+  if (typeof window === "undefined")
+    return { provider: "lmstudio", key: null, baseUrl: null, model: null };
   try {
     const raw = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
     if (raw) {
@@ -102,11 +101,16 @@ const getProviderConfig = () => {
       return {
         provider: cfg.activeProvider || "lmstudio",
         key: cfg.providers?.[cfg.activeProvider]?.key || null,
-        baseUrl: cfg.providers?.[cfg.activeProvider]?.endpoint || cfg.providers?.[cfg.activeProvider]?.base_url || null,
+        baseUrl:
+          cfg.providers?.[cfg.activeProvider]?.endpoint ||
+          cfg.providers?.[cfg.activeProvider]?.base_url ||
+          null,
         model: cfg.providers?.[cfg.activeProvider]?.selectedModel || null,
       };
     }
-  } catch {}
+  } catch (err) {
+    void err;
+  }
   return { provider: "lmstudio", key: null, baseUrl: null, model: null };
 };
 
@@ -138,12 +142,20 @@ export default function AIExplanationPanel({
 
   const fetchExplanation = useCallback(
     async (ctx) => {
-      if (!ctx || (typeof ctx === "object" && Object.keys(ctx).length === 0)) return;
+      if (!ctx || (typeof ctx === "object" && Object.keys(ctx).length === 0))
+        return;
       setLoading(true);
       setError("");
       try {
         const { provider, key, baseUrl, model } = getProviderConfig();
-        const res = await intelligenceAPI.explain(subtab, ctx, provider, key, baseUrl, model);
+        const res = await intelligenceAPI.explain(
+          subtab,
+          ctx,
+          provider,
+          key,
+          baseUrl,
+          model,
+        );
         setExplanation(res.explanation || "No explanation returned.");
         setHasFetched(true);
       } catch (err) {
@@ -152,7 +164,7 @@ export default function AIExplanationPanel({
         setLoading(false);
       }
     },
-    [subtab]
+    [subtab],
   );
 
   const handleManualClick = () => {
@@ -202,7 +214,9 @@ export default function AIExplanationPanel({
           )}
           {buttonText}
           {open && !loading && <ChevronUp size={14} className="ml-1" />}
-          {!open && !loading && disabled && <ChevronDown size={14} className="ml-1 opacity-40" />}
+          {!open && !loading && disabled && (
+            <ChevronDown size={14} className="ml-1 opacity-40" />
+          )}
         </button>
         {open && (
           <button
@@ -241,7 +255,9 @@ export default function AIExplanationPanel({
             </div>
           )}
           {!loading && !explanation && !error && (
-            <div className="text-xs text-slate-500 py-4">No explanation available.</div>
+            <div className="text-xs text-slate-500 py-4">
+              No explanation available.
+            </div>
           )}
         </div>
       )}

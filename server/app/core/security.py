@@ -3,15 +3,14 @@ Professional-Grade Security Module
 Handles JWT authentication, password hashing, and token management
 """
 
+import logging
 import os
 from datetime import datetime, timedelta
-from typing import Optional
+
+from fastapi import Depends, Header, HTTPException, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from fastapi import Depends, HTTPException, status
-from fastapi import Header
-import logging
 
 from app.core.config import settings
 
@@ -27,7 +26,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 
 # Security scheme for Swagger documentation
 try:
-    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
     security = HTTPBearer(auto_error=False)
 except ImportError:
@@ -63,7 +62,7 @@ class TenantContext(BaseModel):
     tenant_id: str = "default"
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Create a JWT access token"""
     to_encode = data.copy()
 
@@ -102,6 +101,7 @@ def verify_access_token(token: str) -> TokenData:
         # Validate that user_id is a valid UUID string to prevent downstream crashes (e.g. from legacy email-sub tokens)
         try:
             from uuid import UUID
+
             UUID(user_id)
         except ValueError:
             raise credentials_exception
@@ -114,7 +114,7 @@ def verify_access_token(token: str) -> TokenData:
         raise credentials_exception
 
 
-def _get_dev_fallback_user() -> Optional[TokenData]:
+def _get_dev_fallback_user() -> TokenData | None:
     """
     Return a seeded local-dev user when no bearer token is supplied.
     This keeps presentation builds usable without weakening production auth.
@@ -124,7 +124,8 @@ def _get_dev_fallback_user() -> Optional[TokenData]:
 
     try:
         from sqlmodel import Session, select
-        from app.models.database import engine, UserTable
+
+        from app.models.database import UserTable, engine
 
         with Session(engine) as session:
             user = session.exec(
@@ -147,7 +148,7 @@ def _get_dev_fallback_user() -> Optional[TokenData]:
 
 # ============ DEPENDENCY INJECTION ============
 async def get_current_user_from_header(
-    authorization: Optional[str] = Depends(lambda: None),
+    authorization: str | None = Depends(lambda: None),
 ) -> TokenData:
     """Extract token from Authorization header"""
     if not authorization:
@@ -169,7 +170,7 @@ async def get_current_user_from_header(
 
 
 def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> TokenData:
     """Dependency to get current authenticated user from Bearer token."""
     if not credentials:
@@ -191,7 +192,7 @@ def get_current_user(
 
 
 def get_current_user_strict(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> TokenData:
     """Strict user auth dependency for production-sensitive endpoints."""
     if not credentials:
@@ -215,7 +216,7 @@ def get_current_admin_user(
 
 
 def get_current_admin_user_strict(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> TokenData:
     """Strict admin auth dependency."""
     if not credentials:
@@ -237,7 +238,7 @@ def get_current_admin_user_strict(
 
 
 def get_tenant_context(
-    x_tenant_id: Optional[str] = Header(default="default"),
+    x_tenant_id: str | None = Header(default="default"),
 ) -> TenantContext:
     """Resolve the active tenant from a request header."""
     tenant_id = (x_tenant_id or "default").strip().lower()

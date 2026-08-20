@@ -1,5 +1,6 @@
 import os
-from typing import Iterable, List
+from collections.abc import Iterable
+
 from app.core.config import settings
 
 
@@ -23,7 +24,7 @@ def _is_mock_email(email: str) -> bool:
     )
 
 
-def filter_real_records(records: Iterable) -> List:
+def filter_real_records(records: Iterable) -> list:
     if include_sample_data():
         return list(records)
     return [r for r in records if not _is_mock_email(getattr(r, "email", ""))]

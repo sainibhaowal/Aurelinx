@@ -1,5 +1,6 @@
 from sqlmodel import Session, select
-from app.models.database import engine, EmployeeTable
+
+from app.models.database import EmployeeTable, engine
 
 
 class SentimentAnalyzer:

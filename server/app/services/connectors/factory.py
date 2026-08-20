@@ -1,5 +1,5 @@
-from app.services.connectors.workday import WorkdayConnector
 from app.services.connectors.greenhouse import GreenhouseConnector
+from app.services.connectors.workday import WorkdayConnector
 
 CONNECTOR_MAP = {
     "workday": WorkdayConnector,

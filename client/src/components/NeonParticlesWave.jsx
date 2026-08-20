@@ -33,10 +33,10 @@ const NeonParticlesWave = () => {
     let burst = null;
 
     const colors = [
-      { base: "163, 230, 53", glow: "190, 242, 100" },   // Lime
-      { base: "52, 211, 153", glow: "110, 231, 183" },   // Emerald
-      { base: "129, 140, 248", glow: "165, 180, 252" },  // Violet
-      { base: "217, 70, 239", glow: "240, 171, 252" },   // Fuchsia
+      { base: "163, 230, 53", glow: "190, 242, 100" }, // Lime
+      { base: "52, 211, 153", glow: "110, 231, 183" }, // Emerald
+      { base: "129, 140, 248", glow: "165, 180, 252" }, // Violet
+      { base: "217, 70, 239", glow: "240, 171, 252" }, // Fuchsia
     ];
 
     for (let i = 0; i < particleCount; i++) {
@@ -70,7 +70,8 @@ const NeonParticlesWave = () => {
 
     // Only interact when the cursor is actually over the hero canvas —
     // scrolled-away page areas must never trigger particle effects
-    const inBounds = (x, y) => x >= -20 && y >= -20 && x <= width + 20 && y <= height + 20;
+    const inBounds = (x, y) =>
+      x >= -20 && y >= -20 && x <= width + 20 && y <= height + 20;
 
     const handleMouseMove = (e) => {
       const px = e.clientX - rect.left;
@@ -158,8 +159,12 @@ const NeonParticlesWave = () => {
       // Soft halo light that follows the cursor through the atom field
       if (mouse.x !== null && mouse.y !== null) {
         const halo = ctx.createRadialGradient(
-          mouse.x, mouse.y, 0,
-          mouse.x, mouse.y, 48,
+          mouse.x,
+          mouse.y,
+          0,
+          mouse.x,
+          mouse.y,
+          48,
         );
         halo.addColorStop(0, "rgba(110, 231, 183, 0.06)");
         halo.addColorStop(1, "rgba(110, 231, 183, 0)");
@@ -279,7 +284,7 @@ const NeonParticlesWave = () => {
           }
         }
       },
-      { threshold: 0.01 }
+      { threshold: 0.01 },
     );
 
     observer.observe(canvas);

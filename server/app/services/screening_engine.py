@@ -1,7 +1,8 @@
 import numpy as np
-from sqlmodel import Session, select
-from app.models.database import engine, CandidateTable, SkillTable
 from langchain_openai import OpenAIEmbeddings
+from sqlmodel import Session, select
+
+from app.models.database import CandidateTable, SkillTable, engine
 
 
 class ScreeningEngine:

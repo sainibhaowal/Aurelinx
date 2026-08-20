@@ -3,37 +3,65 @@ Candidate management endpoints
 """
 
 import json
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlmodel import Session, select
-from typing import List
 from uuid import UUID
-from sqlalchemy import func, or_
 
-from app.schemas.schemas import CandidateOut, CandidateListOut, SkillOut, ExperienceOut
-from app.models.database import AuditLogTable, CandidateTable, SkillTable, ExperienceTable, get_session
-from app.core.security import get_current_user, TokenData
-from app.core.logging_config import get_logger
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_
+from sqlmodel import Session, select
+
 from app.core.data_policy import filter_real_records, include_sample_data
+from app.core.logging_config import get_logger
+from app.core.security import TokenData, get_current_user
+from app.models.database import (
+    AuditLogTable,
+    CandidateTable,
+    ExperienceTable,
+    SkillTable,
+    get_session,
+)
+from app.schemas.schemas import CandidateListOut, CandidateOut, ExperienceOut, SkillOut
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
 logger = get_logger(__name__)
 
 
-def _candidate_quality(cand: CandidateTable, session: Session, current_user: TokenData | None = None) -> dict:
-    missing = [field for field, value in {
-        "full_name": cand.full_name,
-        "email": cand.email,
-        "department": cand.department,
-        "role": cand.role,
-    }.items() if not str(value or "").strip()]
+def _candidate_quality(
+    cand: CandidateTable, session: Session, current_user: TokenData | None = None
+) -> dict:
+    missing = [
+        field
+        for field, value in {
+            "full_name": cand.full_name,
+            "email": cand.email,
+            "department": cand.department,
+            "role": cand.role,
+        }.items()
+        if not str(value or "").strip()
+    ]
     if cand.sentiment_score is None:
         missing.append("sentiment_score")
     if cand.match_score is None:
         missing.append("match_score")
     duplicate_warnings = []
-    if cand.email and len(session.exec(select(CandidateTable).where(CandidateTable.email == cand.email)).all()) > 1:
+    if (
+        cand.email
+        and len(
+            session.exec(
+                select(CandidateTable).where(CandidateTable.email == cand.email)
+            ).all()
+        )
+        > 1
+    ):
         duplicate_warnings.append("duplicate candidate email")
-    if cand.full_name and len(session.exec(select(CandidateTable).where(CandidateTable.full_name == cand.full_name)).all()) > 1:
+    if (
+        cand.full_name
+        and len(
+            session.exec(
+                select(CandidateTable).where(CandidateTable.full_name == cand.full_name)
+            ).all()
+        )
+        > 1
+    ):
         duplicate_warnings.append("duplicate candidate name")
     audit_history = []
     user_uuid = None
@@ -45,15 +73,26 @@ def _candidate_quality(cand: CandidateTable, session: Session, current_user: Tok
     if user_uuid:
         rows = session.exec(
             select(AuditLogTable)
-            .where(AuditLogTable.resource_type == "candidate", AuditLogTable.resource_id == cand.id, AuditLogTable.user_id == user_uuid)
-            .order_by(AuditLogTable.created_at.desc()).limit(50)
+            .where(
+                AuditLogTable.resource_type == "candidate",
+                AuditLogTable.resource_id == cand.id,
+                AuditLogTable.user_id == user_uuid,
+            )
+            .order_by(AuditLogTable.created_at.desc())
+            .limit(50)
         ).all()
         for row in rows:
             try:
                 details = json.loads(row.details or "{}")
             except (TypeError, ValueError):
                 details = {"raw": row.details}
-            audit_history.append({"action": row.action, "details": details, "created_at": row.created_at.isoformat()})
+            audit_history.append(
+                {
+                    "action": row.action,
+                    "details": details,
+                    "created_at": row.created_at.isoformat(),
+                }
+            )
     return {
         "source_type": "database_record",
         "source_version": "directory-v1",
@@ -64,7 +103,9 @@ def _candidate_quality(cand: CandidateTable, session: Session, current_user: Tok
     }
 
 
-def get_candidate_out(cand: CandidateTable, session: Session, current_user: TokenData | None = None) -> CandidateOut:
+def get_candidate_out(
+    cand: CandidateTable, session: Session, current_user: TokenData | None = None
+) -> CandidateOut:
     skills = session.exec(
         select(SkillTable).where(SkillTable.candidate_id == cand.id)
     ).all()
@@ -102,7 +143,7 @@ def get_candidate_out(cand: CandidateTable, session: Session, current_user: Toke
     )
 
 
-@router.get("", response_model=List[CandidateListOut])
+@router.get("", response_model=list[CandidateListOut])
 async def list_candidates(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=10000),
@@ -123,12 +164,14 @@ async def list_candidates(
         query = query.where(CandidateTable.department == department)
     if q and q.strip():
         pattern = f"%{q.strip()}%"
-        query = query.where(or_(
-            CandidateTable.full_name.ilike(pattern),
-            CandidateTable.email.ilike(pattern),
-            CandidateTable.role.ilike(pattern),
-            CandidateTable.department.ilike(pattern),
-        ))
+        query = query.where(
+            or_(
+                CandidateTable.full_name.ilike(pattern),
+                CandidateTable.email.ilike(pattern),
+                CandidateTable.role.ilike(pattern),
+                CandidateTable.department.ilike(pattern),
+            )
+        )
     if sentiment_min is not None:
         query = query.where(CandidateTable.sentiment_score >= sentiment_min)
     if sentiment_max is not None:
@@ -162,12 +205,14 @@ async def count_candidates(
         query = query.where(CandidateTable.department == department)
     if q and q.strip():
         pattern = f"%{q.strip()}%"
-        query = query.where(or_(
-            CandidateTable.full_name.ilike(pattern),
-            CandidateTable.email.ilike(pattern),
-            CandidateTable.role.ilike(pattern),
-            CandidateTable.department.ilike(pattern),
-        ))
+        query = query.where(
+            or_(
+                CandidateTable.full_name.ilike(pattern),
+                CandidateTable.email.ilike(pattern),
+                CandidateTable.role.ilike(pattern),
+                CandidateTable.department.ilike(pattern),
+            )
+        )
     if sentiment_min is not None:
         query = query.where(CandidateTable.sentiment_score >= sentiment_min)
     if sentiment_max is not None:
@@ -180,12 +225,14 @@ async def count_candidates(
     return {"count": int(session.exec(query).one() or 0)}
 
 
-@router.get("/departments", response_model=List[str])
+@router.get("/departments", response_model=list[str])
 async def list_candidate_departments(
     current_user: TokenData = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    query = select(CandidateTable.department).where(CandidateTable.department.is_not(None))
+    query = select(CandidateTable.department).where(
+        CandidateTable.department.is_not(None)
+    )
     if not include_sample_data():
         query = query.where(
             ~CandidateTable.email.ilike("%@company.com"),

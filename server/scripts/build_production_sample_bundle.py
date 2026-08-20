@@ -14,7 +14,6 @@ import random
 import zipfile
 from pathlib import Path
 
-
 FILES = (
     "employees_public.csv",
     "candidates_public.csv",
@@ -25,16 +24,75 @@ FILES = (
 )
 
 ENTERPRISE_DEPARTMENTS_AND_ROLES = [
-    ("Sales", ["Sales Executive", "Account Executive", "Sales Representative", "Sales Manager"]),
-    ("Research & Development", ["Research Scientist", "Laboratory Technician", "Research Associate", "Research Director"]),
-    ("Engineering & IT", ["Software Engineer", "IT Specialist", "System Architect", "DevOps Engineer"]),
-    ("Product Management", ["Product Analyst", "Product Manager", "Business Associate", "UX Researcher"]),
-    ("Marketing", ["Growth Marketing Specialist", "Content Strategist", "Digital Marketing Lead", "Brand Specialist"]),
-    ("Human Resources", ["HR Generalist", "Talent Partner", "People Operations", "Recruiting Specialist"]),
-    ("Operations", ["Operations Manager", "Manufacturing Director", "Process Improvement Lead", "Supply Chain Analyst"]),
-    ("Customer Support", ["Customer Support Specialist", "Support Operations Lead", "Client Success Manager"]),
-    ("Healthcare & Services", ["Healthcare Representative", "Field Services Specialist", "Compliance Lead"]),
-    ("Finance & Accounting", ["Financial Analyst", "Senior Accountant", "Finance Lead", "Audit Specialist"]),
+    (
+        "Sales",
+        [
+            "Sales Executive",
+            "Account Executive",
+            "Sales Representative",
+            "Sales Manager",
+        ],
+    ),
+    (
+        "Research & Development",
+        [
+            "Research Scientist",
+            "Laboratory Technician",
+            "Research Associate",
+            "Research Director",
+        ],
+    ),
+    (
+        "Engineering & IT",
+        ["Software Engineer", "IT Specialist", "System Architect", "DevOps Engineer"],
+    ),
+    (
+        "Product Management",
+        ["Product Analyst", "Product Manager", "Business Associate", "UX Researcher"],
+    ),
+    (
+        "Marketing",
+        [
+            "Growth Marketing Specialist",
+            "Content Strategist",
+            "Digital Marketing Lead",
+            "Brand Specialist",
+        ],
+    ),
+    (
+        "Human Resources",
+        [
+            "HR Generalist",
+            "Talent Partner",
+            "People Operations",
+            "Recruiting Specialist",
+        ],
+    ),
+    (
+        "Operations",
+        [
+            "Operations Manager",
+            "Manufacturing Director",
+            "Process Improvement Lead",
+            "Supply Chain Analyst",
+        ],
+    ),
+    (
+        "Customer Support",
+        [
+            "Customer Support Specialist",
+            "Support Operations Lead",
+            "Client Success Manager",
+        ],
+    ),
+    (
+        "Healthcare & Services",
+        ["Healthcare Representative", "Field Services Specialist", "Compliance Lead"],
+    ),
+    (
+        "Finance & Accounting",
+        ["Financial Analyst", "Senior Accountant", "Finance Lead", "Audit Specialist"],
+    ),
 ]
 
 # Realistic enterprise headcount weights per department (share of population).
@@ -53,16 +111,64 @@ DEPT_WEIGHTS = {
 
 # Occupational mix inside each department (weight per role).
 ROLE_WEIGHTS = {
-    "Sales": {"Account Executive": 34, "Sales Representative": 28, "Sales Executive": 22, "Sales Manager": 16},
-    "Research & Development": {"Research Scientist": 40, "Research Associate": 30, "Laboratory Technician": 22, "Research Director": 8},
-    "Engineering & IT": {"Software Engineer": 45, "DevOps Engineer": 20, "IT Specialist": 20, "System Architect": 15},
-    "Product Management": {"Product Manager": 40, "Product Analyst": 28, "UX Researcher": 20, "Business Associate": 12},
-    "Marketing": {"Growth Marketing Specialist": 34, "Content Strategist": 28, "Brand Specialist": 22, "Digital Marketing Lead": 16},
-    "Human Resources": {"HR Generalist": 40, "Recruiting Specialist": 26, "Talent Partner": 22, "People Operations": 12},
-    "Operations": {"Operations Manager": 44, "Supply Chain Analyst": 28, "Process Improvement Lead": 18, "Manufacturing Director": 10},
-    "Customer Support": {"Customer Support Specialist": 62, "Client Success Manager": 24, "Support Operations Lead": 14},
-    "Healthcare & Services": {"Healthcare Representative": 44, "Field Services Specialist": 34, "Compliance Lead": 22},
-    "Finance & Accounting": {"Financial Analyst": 44, "Senior Accountant": 28, "Audit Specialist": 15, "Finance Lead": 13},
+    "Sales": {
+        "Account Executive": 34,
+        "Sales Representative": 28,
+        "Sales Executive": 22,
+        "Sales Manager": 16,
+    },
+    "Research & Development": {
+        "Research Scientist": 40,
+        "Research Associate": 30,
+        "Laboratory Technician": 22,
+        "Research Director": 8,
+    },
+    "Engineering & IT": {
+        "Software Engineer": 45,
+        "DevOps Engineer": 20,
+        "IT Specialist": 20,
+        "System Architect": 15,
+    },
+    "Product Management": {
+        "Product Manager": 40,
+        "Product Analyst": 28,
+        "UX Researcher": 20,
+        "Business Associate": 12,
+    },
+    "Marketing": {
+        "Growth Marketing Specialist": 34,
+        "Content Strategist": 28,
+        "Brand Specialist": 22,
+        "Digital Marketing Lead": 16,
+    },
+    "Human Resources": {
+        "HR Generalist": 40,
+        "Recruiting Specialist": 26,
+        "Talent Partner": 22,
+        "People Operations": 12,
+    },
+    "Operations": {
+        "Operations Manager": 44,
+        "Supply Chain Analyst": 28,
+        "Process Improvement Lead": 18,
+        "Manufacturing Director": 10,
+    },
+    "Customer Support": {
+        "Customer Support Specialist": 62,
+        "Client Success Manager": 24,
+        "Support Operations Lead": 14,
+    },
+    "Healthcare & Services": {
+        "Healthcare Representative": 44,
+        "Field Services Specialist": 34,
+        "Compliance Lead": 22,
+    },
+    "Finance & Accounting": {
+        "Financial Analyst": 44,
+        "Senior Accountant": 28,
+        "Audit Specialist": 15,
+        "Finance Lead": 13,
+    },
 }
 
 # Annualized base attrition rates per department (drives at-risk population).
@@ -95,36 +201,151 @@ DEPT_SENTIMENT = {
 
 # Broad department-level skill pools (extras beyond the 4 role core skills).
 SKILL_POOLS = {
-    "Engineering & IT": ("TypeScript", "React", "Go", "AWS", "PostgreSQL", "REST APIs",
-                         "Docker", "Kubernetes", "CI/CD", "Microservices", "Testing",
-                         "Terraform", "Observability", "Linux", "Git", "Security"),
-    "Sales": ("Cold Calling", "Product Demos", "Forecasting", "Pipeline Management",
-              "Presentation", "Pricing Strategy", "Contract Negotiation", "Sales Planning",
-              "Customer Success", "Quota Management", "CRM", "Market Research", "Prospecting", "Demo Management"),
-    "Research & Development": ("Statistical Analysis", "Data Visualization", "Machine Learning",
-                               "ETL", "Peer Review", "Scientific Writing", "Hypothesis Testing",
-                               "Python", "Survey Design", "Literature Review", "Experiment Design", "Mentoring"),
-    "Customer Support": ("Ticketing", "Documentation", "Training", "Escalation Management",
-                         "Quality Assurance", "Product Knowledge", "Knowledge Base", "SLA Management",
-                         "Self-Service Design", "Onboarding", "Feedback Loops", "Diagnostics"),
-    "Finance & Accounting": ("GAAP", "Variance Analysis", "Risk Management", "Internal Controls",
-                             "Power BI", "Data Reconciliation", "Budgeting", "Forecasting",
-                             "Tax Compliance", "Financial Reporting", "ERP", "Payroll", "Audit Support"),
-    "Operations": ("Enterprise Resource Planning", "Inventory Management", "Lean", "Six Sigma",
-                   "Vendor Management", "Quality Control", "Cost Optimization", "Scheduling",
-                   "Supply Chain", "Logistics", "KPI Reporting", "Change Management"),
-    "Marketing": ("Analytics", "Google Analytics", "Social Media", "Campaign Management", "Brand Management",
-                  "Email Marketing", "Marketing Automation", "Event Planning", "Market Research",
-                  "Paid Ads", "Segmentation", "Landing Pages"),
-    "Healthcare & Services": ("Medical Compliance", "Documentation", "Patient Communication",
-                              "Field Documentation", "Regulatory Standards", "Risk Mitigation",
-                              "Audit Readiness", "Client Reporting", "Service Excellence", "Scheduling"),
-    "Human Resources": ("Performance Management", "Benefits Administration", "Payroll", "Onboarding",
-                        "Employee Engagement", "Compensation Analysis", "Labor Relations", "Succession Planning",
-                        "Learning & Development", "Conflict Resolution", "HR Metrics", "Policy Design"),
-    "Product Management": ("Agile", "User Stories", "A/B Testing", "Product Analytics", "Stakeholder Management",
-                           "Data Analysis", "Pricing Strategy", "Competitive Analysis", "Prototyping",
-                           "Release Management", "Customer Discovery", "Metrics Design"),
+    "Engineering & IT": (
+        "TypeScript",
+        "React",
+        "Go",
+        "AWS",
+        "PostgreSQL",
+        "REST APIs",
+        "Docker",
+        "Kubernetes",
+        "CI/CD",
+        "Microservices",
+        "Testing",
+        "Terraform",
+        "Observability",
+        "Linux",
+        "Git",
+        "Security",
+    ),
+    "Sales": (
+        "Cold Calling",
+        "Product Demos",
+        "Forecasting",
+        "Pipeline Management",
+        "Presentation",
+        "Pricing Strategy",
+        "Contract Negotiation",
+        "Sales Planning",
+        "Customer Success",
+        "Quota Management",
+        "CRM",
+        "Market Research",
+        "Prospecting",
+        "Demo Management",
+    ),
+    "Research & Development": (
+        "Statistical Analysis",
+        "Data Visualization",
+        "Machine Learning",
+        "ETL",
+        "Peer Review",
+        "Scientific Writing",
+        "Hypothesis Testing",
+        "Python",
+        "Survey Design",
+        "Literature Review",
+        "Experiment Design",
+        "Mentoring",
+    ),
+    "Customer Support": (
+        "Ticketing",
+        "Documentation",
+        "Training",
+        "Escalation Management",
+        "Quality Assurance",
+        "Product Knowledge",
+        "Knowledge Base",
+        "SLA Management",
+        "Self-Service Design",
+        "Onboarding",
+        "Feedback Loops",
+        "Diagnostics",
+    ),
+    "Finance & Accounting": (
+        "GAAP",
+        "Variance Analysis",
+        "Risk Management",
+        "Internal Controls",
+        "Power BI",
+        "Data Reconciliation",
+        "Budgeting",
+        "Forecasting",
+        "Tax Compliance",
+        "Financial Reporting",
+        "ERP",
+        "Payroll",
+        "Audit Support",
+    ),
+    "Operations": (
+        "Enterprise Resource Planning",
+        "Inventory Management",
+        "Lean",
+        "Six Sigma",
+        "Vendor Management",
+        "Quality Control",
+        "Cost Optimization",
+        "Scheduling",
+        "Supply Chain",
+        "Logistics",
+        "KPI Reporting",
+        "Change Management",
+    ),
+    "Marketing": (
+        "Analytics",
+        "Google Analytics",
+        "Social Media",
+        "Campaign Management",
+        "Brand Management",
+        "Email Marketing",
+        "Marketing Automation",
+        "Event Planning",
+        "Market Research",
+        "Paid Ads",
+        "Segmentation",
+        "Landing Pages",
+    ),
+    "Healthcare & Services": (
+        "Medical Compliance",
+        "Documentation",
+        "Patient Communication",
+        "Field Documentation",
+        "Regulatory Standards",
+        "Risk Mitigation",
+        "Audit Readiness",
+        "Client Reporting",
+        "Service Excellence",
+        "Scheduling",
+    ),
+    "Human Resources": (
+        "Performance Management",
+        "Benefits Administration",
+        "Payroll",
+        "Onboarding",
+        "Employee Engagement",
+        "Compensation Analysis",
+        "Labor Relations",
+        "Succession Planning",
+        "Learning & Development",
+        "Conflict Resolution",
+        "HR Metrics",
+        "Policy Design",
+    ),
+    "Product Management": (
+        "Agile",
+        "User Stories",
+        "A/B Testing",
+        "Product Analytics",
+        "Stakeholder Management",
+        "Data Analysis",
+        "Pricing Strategy",
+        "Competitive Analysis",
+        "Prototyping",
+        "Release Management",
+        "Customer Discovery",
+        "Metrics Design",
+    ),
 }
 
 # Skill count per person, mirroring the observed 6-12 distribution from the legacy DB
@@ -189,23 +410,48 @@ ROLE_PROFILES = {
         "companies": ("Pioneer Analytics", "PeopleFirst Group", "Cedar Works"),
     },
     "support operations lead": {
-        "skills": ("Operations", "Ticketing", "Process Improvement", "Customer Service"),
+        "skills": (
+            "Operations",
+            "Ticketing",
+            "Process Improvement",
+            "Customer Service",
+        ),
         "companies": ("Pioneer Analytics", "Summit Partners", "Cedar Works"),
     },
     "client success manager": {
-        "skills": ("Account Strategy", "Relationship Management", "Communication", "CRM"),
+        "skills": (
+            "Account Strategy",
+            "Relationship Management",
+            "Communication",
+            "CRM",
+        ),
         "companies": ("Summit Partners", "Pioneer Analytics", "Vertex Dynamics"),
     },
     "operations manager": {
-        "skills": ("Operations", "Project Management", "Leadership", "Process Improvement"),
+        "skills": (
+            "Operations",
+            "Project Management",
+            "Leadership",
+            "Process Improvement",
+        ),
         "companies": ("Summit Partners", "Vertex Dynamics", "NorthBridge AI"),
     },
     "manufacturing director": {
-        "skills": ("Operations", "Leadership", "Quality Control", "Process Improvement"),
+        "skills": (
+            "Operations",
+            "Leadership",
+            "Quality Control",
+            "Process Improvement",
+        ),
         "companies": ("Summit Partners", "Vertex Dynamics", "BlueOrbit Systems"),
     },
     "process improvement lead": {
-        "skills": ("Process Improvement", "Operations", "Data Analysis", "Project Management"),
+        "skills": (
+            "Process Improvement",
+            "Operations",
+            "Data Analysis",
+            "Project Management",
+        ),
         "companies": ("Vertex Dynamics", "Summit Partners", "Cedar Works"),
     },
     "supply chain analyst": {
@@ -221,7 +467,12 @@ ROLE_PROFILES = {
         "companies": ("Vertex Dynamics", "NorthBridge AI", "Summit Partners"),
     },
     "ux researcher": {
-        "skills": ("User Research", "Usability Testing", "Wireframing", "Communication"),
+        "skills": (
+            "User Research",
+            "Usability Testing",
+            "Wireframing",
+            "Communication",
+        ),
         "companies": ("Pioneer Analytics", "Vertex Dynamics", "Summit Partners"),
     },
     "growth marketing specialist": {
@@ -241,7 +492,12 @@ ROLE_PROFILES = {
         "companies": ("Pioneer Analytics", "Cedar Works", "Vertex Dynamics"),
     },
     "research associate": {
-        "skills": ("Research Methods", "Data Analysis", "Statistics", "Technical Writing"),
+        "skills": (
+            "Research Methods",
+            "Data Analysis",
+            "Statistics",
+            "Technical Writing",
+        ),
         "companies": ("NorthBridge AI", "Pioneer Analytics", "Summit Partners"),
     },
     "research scientist": {
@@ -249,15 +505,30 @@ ROLE_PROFILES = {
         "companies": ("NorthBridge AI", "Pioneer Analytics", "Vertex Dynamics"),
     },
     "laboratory technician": {
-        "skills": ("Laboratory Safety", "Data Recording", "Quality Control", "Research Methods"),
+        "skills": (
+            "Laboratory Safety",
+            "Data Recording",
+            "Quality Control",
+            "Research Methods",
+        ),
         "companies": ("Pioneer Analytics", "NorthBridge AI", "Cedar Works"),
     },
     "research director": {
-        "skills": ("Leadership", "Research Methods", "Statistics", "Project Management"),
+        "skills": (
+            "Leadership",
+            "Research Methods",
+            "Statistics",
+            "Project Management",
+        ),
         "companies": ("NorthBridge AI", "Summit Partners", "Vertex Dynamics"),
     },
     "healthcare representative": {
-        "skills": ("Communication", "Relationship Management", "Compliance", "Negotiation"),
+        "skills": (
+            "Communication",
+            "Relationship Management",
+            "Compliance",
+            "Negotiation",
+        ),
         "companies": ("PeopleFirst Group", "Cedar Works", "Pioneer Analytics"),
     },
     "field services specialist": {
@@ -277,7 +548,12 @@ ROLE_PROFILES = {
         "companies": ("Summit Partners", "Cedar Works", "Pioneer Analytics"),
     },
     "finance lead": {
-        "skills": ("Financial Planning", "Budgeting", "Leadership", "Financial Modeling"),
+        "skills": (
+            "Financial Planning",
+            "Budgeting",
+            "Leadership",
+            "Financial Modeling",
+        ),
         "companies": ("Summit Partners", "Vertex Dynamics", "BlueOrbit Systems"),
     },
     "audit specialist": {
@@ -287,7 +563,12 @@ ROLE_PROFILES = {
 }
 
 DEFAULT_PROFILE = {
-    "skills": ("Communication", "Problem Solving", "Data Analysis", "Project Management"),
+    "skills": (
+        "Communication",
+        "Problem Solving",
+        "Data Analysis",
+        "Project Management",
+    ),
     "companies": ("Vertex Dynamics", "BlueOrbit Systems", "Pioneer Analytics"),
 }
 
@@ -327,7 +608,9 @@ def _allocate_counts(count: int, weights: dict[str, int]) -> list[str]:
     raw = {name: count * weight / total_w for name, weight in weights.items()}
     result = {name: int(value) for name, value in raw.items()}
     remaining = count - sum(result.values())
-    for name, _ in sorted(raw.items(), key=lambda item: item[1] - result[item[0]], reverse=True)[:remaining]:
+    for name, _ in sorted(
+        raw.items(), key=lambda item: item[1] - result[item[0]], reverse=True
+    )[:remaining]:
         result[name] += 1
     return [name for name, value in result.items() for _ in range(value)]
 
@@ -345,7 +628,9 @@ def _dept_role_plan(total: int, seed: str) -> list[tuple[str, str]]:
     return plan
 
 
-def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dict[str, int | str]:
+def build(
+    input_dir: Path, output_dir: Path, raw_dir: Path | None = None
+) -> dict[str, int | str]:
     source = {filename: read_csv(input_dir / filename) for filename in FILES}
     employees = source["employees_public.csv"]
     candidates = source["candidates_public.csv"]
@@ -358,7 +643,9 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
     skill_levels: dict[str, list[int]] = {}
     for filename in ("employee_skills_public.csv", "candidate_skills_public.csv"):
         for row in source[filename]:
-            skill_levels.setdefault(row["email"], []).append(max(1, min(5, int(float(row["level"])))))
+            skill_levels.setdefault(row["email"], []).append(
+                max(1, min(5, int(float(row["level"]))))
+            )
 
     # Assign weighted departments and roles across employees (enterprise-shaped, shuffled)
     employee_plan = _dept_role_plan(len(employees), "employees:dept-plan")
@@ -382,7 +669,9 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
 
             # Continuous sentiment anchored on IBM telemetry, tilted per department,
             # with per-person gaussian noise so values are mostly unique.
-            base_sent = (job_sat * 0.35 + env_sat * 0.25 + work_life * 0.25 + job_inv * 0.15) / 4.0
+            base_sent = (
+                job_sat * 0.35 + env_sat * 0.25 + work_life * 0.25 + job_inv * 0.15
+            ) / 4.0
             dept_tilt = DEPT_SENTIMENT.get(dept_name, 0.0)
             noise = (_hash01(email + ":sent") - 0.5) * 0.16
             sentiment = clamp(0.10 + base_sent * 0.70 + dept_tilt + noise, 0.08, 0.98)
@@ -399,14 +688,22 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
 
             # Continuous retention probability driven by sentiment, risk and hike
             retention = clamp(
-                0.34 + 0.55 * sentiment - 0.42 * float(is_at_risk)
-                + (hike / 100.0) * 0.20 + (_hash01(email + ":ret") - 0.5) * 0.10,
-                0.05, 0.98,
+                0.34
+                + 0.55 * sentiment
+                - 0.42 * float(is_at_risk)
+                + (hike / 100.0) * 0.20
+                + (_hash01(email + ":ret") - 0.5) * 0.10,
+                0.05,
+                0.98,
             )
         else:
-            sentiment = clamp(0.30 + (_hash01(email + ":sent") - 0.5) * 0.70, 0.08, 0.98)
+            sentiment = clamp(
+                0.30 + (_hash01(email + ":sent") - 0.5) * 0.70, 0.08, 0.98
+            )
             is_at_risk = _hash01(email + ":risk") < DEPT_ATTRITION.get(dept_name, 0.15)
-            retention = clamp(0.25 + 0.65 * sentiment - 0.35 * float(is_at_risk), 0.05, 0.98)
+            retention = clamp(
+                0.25 + 0.65 * sentiment - 0.35 * float(is_at_risk), 0.05, 0.98
+            )
 
         row["sentiment_score"] = f"{sentiment:.3f}"
         row["is_at_risk"] = "true" if is_at_risk else "false"
@@ -426,12 +723,18 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
 
         # Continuous sentiment & match scores with realistic variance
         sentiment = clamp(
-            0.46 + (_hash01(email + ":cs") - 0.5) * 0.36 + (skill_strength - 0.60) * 0.28,
-            0.10, 0.98,
+            0.46
+            + (_hash01(email + ":cs") - 0.5) * 0.36
+            + (skill_strength - 0.60) * 0.28,
+            0.10,
+            0.98,
         )
         match_score = clamp(
-            0.30 * sentiment + 0.52 * skill_strength + (_hash01(email + ":cm") - 0.5) * 0.16,
-            0.15, 0.99,
+            0.30 * sentiment
+            + 0.52 * skill_strength
+            + (_hash01(email + ":cm") - 0.5) * 0.16,
+            0.15,
+            0.99,
         )
 
         row["sentiment_score"] = f"{sentiment:.3f}"
@@ -443,7 +746,7 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
         ("candidate_skills_public.csv", "candidates_public.csv"),
     ):
         by_email = {row["email"]: row for row in source[base_filename]}
-        templates: dict[str, dict] = {email: row for row in source[filename]}
+        templates: dict[str, dict] = {row["email"]: row for row in source[filename]}
         rebuilt: list[dict[str, str]] = []
         for email, person in by_email.items():
             profile = profile_for(person["role"])
@@ -452,11 +755,17 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
                 list(SKILL_COUNT_DIST), weights=list(SKILL_COUNT_DIST.values()), k=1
             )[0]
             core = list(profile["skills"])
-            pool = [s for s in SKILL_POOLS.get(person["department"], ()) if s not in core]
+            pool = [
+                s for s in SKILL_POOLS.get(person["department"], ()) if s not in core
+            ]
             chosen = list(core) + rng.sample(pool, count - len(core))
-            template = templates.get(email, {"email": email, "skill_name": "", "level": ""})
+            template = templates.get(
+                email, {"email": email, "skill_name": "", "level": ""}
+            )
             for index, skill in enumerate(chosen):
-                level = max(1, min(5, round(3.3 + (_hash01(f"{email}:lv{index}") - 0.5) * 2.4)))
+                level = max(
+                    1, min(5, round(3.3 + (_hash01(f"{email}:lv{index}") - 0.5) * 2.4))
+                )
                 rebuilt.append(
                     {
                         "email": template.get("email", email),
@@ -479,7 +788,9 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
             company = profile["companies"][email_hash % len(profile["companies"])]
             row["company"] = company
             row["position"] = person["role"]
-            row["description"] = f"Role-aligned experience in {person['role']} at {company}."
+            row["description"] = (
+                f"Role-aligned experience in {person['role']} at {company}."
+            )
 
     # Write output CSV files
     for filename in FILES:
@@ -497,6 +808,7 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
         for filename in FILES:
             zipf.write(output_dir / filename, arcname=filename)
 
+    counts: dict[str, int] = {filename: len(source[filename]) for filename in FILES}
     manifest = {
         "source_bundle": str(input_dir),
         "raw_telemetry": str(raw_dir / "ibm_hr_attrition.csv") if raw_dir else "None",
@@ -504,16 +816,22 @@ def build(input_dir: Path, output_dir: Path, raw_dir: Path | None = None) -> dic
         "retention_formula": "Continuous multivariate HR score derived from IBM HR Attrition telemetry",
         "candidate_match_formula": "Continuous skill-strength & sentiment evaluation model",
         "departments": [d[0] for d in ENTERPRISE_DEPARTMENTS_AND_ROLES],
-        "counts": {filename: len(source[filename]) for filename in FILES},
+        "counts": counts,
     }
-    (output_dir / "PROVENANCE.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    return {"output": str(output_dir), **manifest["counts"]}
+    (output_dir / "PROVENANCE.json").write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
+    return {"output": str(output_dir), **counts}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", type=Path, default=Path("Docs/datasets/production_sample_20260725"))
-    parser.add_argument("--output", type=Path, default=Path("Docs/datasets/production_sample_20260725"))
+    parser.add_argument(
+        "--input", type=Path, default=Path("Docs/datasets/production_sample_20260725")
+    )
+    parser.add_argument(
+        "--output", type=Path, default=Path("Docs/datasets/production_sample_20260725")
+    )
     parser.add_argument("--raw", type=Path, default=Path("Docs/datasets/raw"))
     args = parser.parse_args()
     print(json.dumps(build(args.input, args.output, args.raw), indent=2))

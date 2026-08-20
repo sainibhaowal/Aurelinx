@@ -3,16 +3,15 @@ Aurelinx Intelligence Chat endpoints
 Persistent sessions, messages, uploads, and tool-enabled agent responses.
 """
 
-from datetime import datetime
-from datetime import timedelta
-import hashlib
 import asyncio
+import hashlib
 import json
 import os
 import re
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from uuid import UUID, uuid4
 
 import httpx
@@ -23,8 +22,8 @@ from sqlalchemy import String, func, or_
 from sqlmodel import Session, select
 
 from app.core.config import settings
-from app.core.logging_config import get_logger
 from app.core.data_policy import filter_real_records
+from app.core.logging_config import get_logger
 from app.core.provider_utils import (
     build_local_provider_base_candidates,
     normalize_local_provider_base,
@@ -33,39 +32,38 @@ from app.core.security import TokenData, get_current_user
 from app.models.database import (
     AuditLogTable,
     CandidateTable,
-    ChatAttachmentTable,
-    ChatMessageTable,
-    ChatSessionTable,
-    ChatFeedbackTable,
     CanonicalCandidateTable,
     CanonicalEmployeeTable,
-    EmployeeTable,
-    SkillTable,
-    IntegrationConnectionTable,
+    ChatAttachmentTable,
+    ChatFeedbackTable,
+    ChatMessageTable,
+    ChatSessionTable,
     CompliancePolicyTable,
-    InterventionTable,
-    ExperienceTable,
-    GoldMetricSnapshotTable,
-    MLModelCardTable,
-    MLDriftSnapshotTable,
-    ReleaseGateTable,
-    DRRunbookTable,
-    ProcurementArtifactTable,
-    RawEventTable,
-    QuarantineEventTable,
-    ConnectorSyncJobTable,
     ConnectorFieldMappingTable,
-    WorkflowRunTable,
-    WorkflowEventTable,
-    WorkflowApprovalTable,
+    ConnectorSyncJobTable,
+    DataContractTable,
+    DRRunbookTable,
+    EmployeeTable,
+    ExperienceTable,
+    ForecastScenarioTable,
+    GoldMetricSnapshotTable,
     IntegrationApiKeyTable,
+    IntegrationConnectionTable,
     IntegrationLogTable,
     IntegrationWebhookEventTable,
-    MLModelRegistryTable,
-    DataContractTable,
-    ForecastScenarioTable,
     InterventionOutcomeTable,
+    InterventionTable,
+    MLDriftSnapshotTable,
+    MLModelCardTable,
+    MLModelRegistryTable,
+    QuarantineEventTable,
+    RawEventTable,
+    ReleaseGateTable,
+    SkillTable,
     UserTable,
+    WorkflowApprovalTable,
+    WorkflowEventTable,
+    WorkflowRunTable,
     engine,
     get_session,
 )
@@ -96,7 +94,7 @@ UPLOAD_ROOT = Path(os.getenv("CHAT_UPLOAD_ROOT", "/app/data/chat")).resolve()
 UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 
 
-def _json_dumps(payload: Dict) -> str:
+def _json_dumps(payload: dict) -> str:
     """Serialize SSE payloads safely, including UUID/datetime values."""
     return json.dumps(payload, default=str)
 
@@ -202,7 +200,7 @@ def _write_audit(
     action: str,
     resource_type: str,
     resource_id: str,
-    details: Dict,
+    details: dict,
 ):
     audit = AuditLogTable(
         user_id=None,  # token user id is string in this project, keep optional DB FK null-safe
@@ -215,17 +213,19 @@ def _write_audit(
     db.add(audit)
 
 
-def _tokenize(text: str) -> List[str]:
+def _tokenize(text: str) -> list[str]:
     return re.findall(r"[a-z0-9\+\#\.]{2,}", text.lower())
 
 
-def _skills_by_entity(db: Session, rows: List[Any], entity_field: str) -> Dict[UUID, List[SkillTable]]:
+def _skills_by_entity(
+    db: Session, rows: list[Any], entity_field: str
+) -> dict[UUID, list[SkillTable]]:
     """Load all skills for a result set in one query (avoids N+1 searches)."""
     ids = [row.id for row in rows]
     if not ids:
         return {}
     field = getattr(SkillTable, entity_field)
-    grouped: Dict[UUID, List[SkillTable]] = {}
+    grouped: dict[UUID, list[SkillTable]] = {}
     for skill in db.exec(select(SkillTable).where(field.in_(ids))).all():
         entity_id = getattr(skill, entity_field)
         if entity_id:
@@ -235,20 +235,28 @@ def _skills_by_entity(db: Session, rows: List[Any], entity_field: str) -> Dict[U
 
 def _search_employees(
     db: Session, query_text: str, limit: int = 5, offset: int = 0
-) -> List[EmployeeTable]:
+) -> list[EmployeeTable]:
     employees = db.exec(select(EmployeeTable)).all()
     skills_by_employee = _skills_by_entity(db, employees, "employee_id")
     query_lower = query_text.lower()
     scored = []
-    
+
     # Identify query intent flags
-    wants_at_risk = any(k in query_lower for k in ["risk", "flight", "hazard", "leaving", "attrition"])
-    wants_high_morale = any(k in query_lower for k in ["high morale", "happy", "satisfied", "good sentiment"])
-    wants_low_morale = any(k in query_lower for k in ["low morale", "unhappy", "dissatisfied", "bad sentiment"])
-    
+    wants_at_risk = any(
+        k in query_lower for k in ["risk", "flight", "hazard", "leaving", "attrition"]
+    )
+    wants_high_morale = any(
+        k in query_lower
+        for k in ["high morale", "happy", "satisfied", "good sentiment"]
+    )
+    wants_low_morale = any(
+        k in query_lower
+        for k in ["low morale", "unhappy", "dissatisfied", "bad sentiment"]
+    )
+
     for emp in employees:
         score = 0.0
-        
+
         # 1. Direct substring checks (name, role, department)
         if emp.full_name and emp.full_name.lower() in query_lower:
             score += 10.0
@@ -260,7 +268,7 @@ def _search_employees(
                     score += 3.0
                 if emp.department and token in emp.department.lower():
                     score += 4.0
-                    
+
         # 2. Intent matching
         if wants_at_risk:
             if emp.is_at_risk:
@@ -272,35 +280,41 @@ def _search_employees(
             score += (1.0 - (emp.sentiment_score or 0.5)) * 15.0
         elif wants_high_morale:
             score += (emp.sentiment_score or 0.5) * 15.0
-            
+
         # 3. Skills overlap
         skills = skills_by_employee.get(emp.id, [])
         for s in skills:
             if s.name and s.name.lower() in query_lower:
                 score += 5.0
-                
+
         scored.append((score, emp))
-        
+
     scored.sort(key=lambda x: x[0], reverse=True)
     return [row[1] for row in scored[offset : offset + limit]]
 
 
 def _search_candidates(
     db: Session, query_text: str, limit: int = 5, offset: int = 0
-) -> List[CandidateTable]:
+) -> list[CandidateTable]:
     candidates = db.exec(select(CandidateTable)).all()
     skills_by_candidate = _skills_by_entity(db, candidates, "candidate_id")
     query_lower = query_text.lower()
     scored = []
-    
+
     # Identify query intent flags
-    wants_high_match = any(k in query_lower for k in ["best", "top", "highly matched", "match", "scout"])
-    wants_high_morale = any(k in query_lower for k in ["high morale", "happy", "good sentiment"])
-    wants_low_morale = any(k in query_lower for k in ["low morale", "unhappy", "bad sentiment"])
-    
+    wants_high_match = any(
+        k in query_lower for k in ["best", "top", "highly matched", "match", "scout"]
+    )
+    wants_high_morale = any(
+        k in query_lower for k in ["high morale", "happy", "good sentiment"]
+    )
+    wants_low_morale = any(
+        k in query_lower for k in ["low morale", "unhappy", "bad sentiment"]
+    )
+
     for c in candidates:
         score = 0.0
-        
+
         # 1. Direct substring checks
         if c.full_name and c.full_name.lower() in query_lower:
             score += 10.0
@@ -312,7 +326,7 @@ def _search_candidates(
                     score += 3.0
                 if c.department and token in c.department.lower():
                     score += 4.0
-                    
+
         # 2. Intent matching
         if wants_high_match:
             score += (c.match_score or 0.0) * 15.0
@@ -320,20 +334,20 @@ def _search_candidates(
             score += (1.0 - (c.sentiment_score or 0.5)) * 10.0
         elif wants_high_morale:
             score += (c.sentiment_score or 0.5) * 10.0
-            
+
         # 3. Skills overlap
         skills = skills_by_candidate.get(c.id, [])
         for s in skills:
             if s.name and s.name.lower() in query_lower:
                 score += 5.0
-                
+
         scored.append((score, c))
-        
+
     scored.sort(key=lambda x: x[0], reverse=True)
     return [row[1] for row in scored[offset : offset + limit]]
 
 
-def _compute_dashboard_snapshot(db: Session) -> Dict:
+def _compute_dashboard_snapshot(db: Session) -> dict:
     employees = db.exec(select(EmployeeTable)).all()
     total = len(employees)
     at_risk = len([e for e in employees if e.is_at_risk])
@@ -351,16 +365,16 @@ def _compute_dashboard_snapshot(db: Session) -> Dict:
     }
 
 
-def _department_risk_summary(employees: List[EmployeeTable]) -> List[Dict[str, Any]]:
-    dept_map: Dict[str, int] = {}
-    dept_risk: Dict[str, int] = {}
+def _department_risk_summary(employees: list[EmployeeTable]) -> list[dict[str, Any]]:
+    dept_map: dict[str, int] = {}
+    dept_risk: dict[str, int] = {}
     for e in employees:
         dept = e.department or "Unknown"
         dept_map[dept] = dept_map.get(dept, 0) + 1
         if e.is_at_risk:
             dept_risk[dept] = dept_risk.get(dept, 0) + 1
 
-    summary: List[Dict[str, Any]] = []
+    summary: list[dict[str, Any]] = []
     for dept, total in sorted(dept_map.items(), key=lambda item: (-item[1], item[0])):
         at_risk = dept_risk.get(dept, 0)
         summary.append(
@@ -394,29 +408,71 @@ def _top_match_score_candidate(candidate: CandidateTable) -> float:
     return round(min(1.0, max(0.0, score)), 3)
 
 
-def _workspace_snapshot(db: Session, user_text: str = "") -> Dict[str, Any]:
+def _workspace_snapshot(db: Session, user_text: str = "") -> dict[str, Any]:
     query_lower = user_text.lower() if user_text else ""
     snapshot = {}
 
     # Check query intent keywords
-    wants_risk = any(k in query_lower for k in ["risk", "morale", "sentiment", "unhappy", "leaving", "hazard", "at-risk", "employee"])
-    wants_candidates = any(k in query_lower for k in ["candidate", "scout", "match", "hiring", "talent"])
-    wants_integrations = any(k in query_lower for k in ["integration", "connection", "connect", "greenhouse", "slack", "jira", "workday"])
-    wants_compliance = any(k in query_lower for k in ["compliance", "policy", "policies", "gate", "release"])
-    wants_interventions = any(k in query_lower for k in ["intervention", "mitigate", "action"])
-    wants_events = any(k in query_lower for k in ["event", "quarantine", "ops", "bronze", "silver", "sync"])
+    wants_risk = any(
+        k in query_lower
+        for k in [
+            "risk",
+            "morale",
+            "sentiment",
+            "unhappy",
+            "leaving",
+            "hazard",
+            "at-risk",
+            "employee",
+        ]
+    )
+    wants_candidates = any(
+        k in query_lower for k in ["candidate", "scout", "match", "hiring", "talent"]
+    )
+    wants_integrations = any(
+        k in query_lower
+        for k in [
+            "integration",
+            "connection",
+            "connect",
+            "greenhouse",
+            "slack",
+            "jira",
+            "workday",
+        ]
+    )
+    wants_compliance = any(
+        k in query_lower
+        for k in ["compliance", "policy", "policies", "gate", "release"]
+    )
+    wants_interventions = any(
+        k in query_lower for k in ["intervention", "mitigate", "action"]
+    )
+    wants_events = any(
+        k in query_lower
+        for k in ["event", "quarantine", "ops", "bronze", "silver", "sync"]
+    )
 
     # If it is a generic query and none of the above are matched, we don't fetch any snapshot details!
-    if not (wants_risk or wants_candidates or wants_integrations or wants_compliance or wants_interventions or wants_events):
+    if not (
+        wants_risk
+        or wants_candidates
+        or wants_integrations
+        or wants_compliance
+        or wants_interventions
+        or wants_events
+    ):
         return {}
 
     # Query only what is requested!
     if wants_risk:
         employees = filter_real_records(db.exec(select(EmployeeTable)).all())
         dept_summary = _department_risk_summary(employees)
-        top_risk_employees = sorted(employees, key=_top_risk_score_employee, reverse=True)[:5]
+        top_risk_employees = sorted(
+            employees, key=_top_risk_score_employee, reverse=True
+        )[:5]
         workforce = _compute_dashboard_snapshot(db)
-        
+
         snapshot["workforce"] = {
             "total_workforce": workforce["total_workforce"],
             "at_risk": workforce["at_risk"],
@@ -450,14 +506,17 @@ def _workspace_snapshot(db: Session, user_text: str = "") -> Dict[str, Any]:
     if wants_candidates:
         candidates = filter_real_records(db.exec(select(CandidateTable)).all())
         candidate_match_avg = (
-            round(sum(float(c.match_score or 0.0) for c in candidates) / len(candidates), 3)
+            round(
+                sum(float(c.match_score or 0.0) for c in candidates) / len(candidates),
+                3,
+            )
             if candidates
             else 0.0
         )
         top_candidate_matches = sorted(
             candidates, key=_top_match_score_candidate, reverse=True
         )[:5]
-        
+
         snapshot["talent_scout"] = {
             "candidates_total": len(candidates),
             "candidate_match_avg": candidate_match_avg,
@@ -471,7 +530,7 @@ def _workspace_snapshot(db: Session, user_text: str = "") -> Dict[str, Any]:
                     "match_score": c.match_score,
                 }
                 for c in top_candidate_matches
-            ]
+            ],
         }
 
     if wants_integrations:
@@ -499,7 +558,9 @@ def _workspace_snapshot(db: Session, user_text: str = "") -> Dict[str, Any]:
             .order_by(CompliancePolicyTable.created_at.desc())
         ).all()
         release_gates = db.exec(
-            select(ReleaseGateTable).order_by(ReleaseGateTable.created_at.desc()).limit(5)
+            select(ReleaseGateTable)
+            .order_by(ReleaseGateTable.created_at.desc())
+            .limit(5)
         ).all()
         snapshot["enterprise_ops"] = snapshot.get("enterprise_ops", {})
         snapshot["enterprise_ops"]["policy_packs"] = [
@@ -555,7 +616,7 @@ def _workspace_snapshot(db: Session, user_text: str = "") -> Dict[str, Any]:
                     "status": j.status,
                 }
                 for j in connector_jobs
-            ]
+            ],
         }
 
     return snapshot
@@ -678,7 +739,7 @@ def _direct_workspace_answer(db: Session, user_text: str) -> str | None:
     return "\n".join(lines)
 
 
-def _workspace_snapshot_summary_lines(snapshot: Dict[str, Any]) -> List[str]:
+def _workspace_snapshot_summary_lines(snapshot: dict[str, Any]) -> list[str]:
     workforce = snapshot.get("workforce", {})
     talent = snapshot.get("talent_scout", {})
     data_ops = snapshot.get("data_ops", {})
@@ -720,26 +781,32 @@ def _workspace_snapshot_summary_lines(snapshot: Dict[str, Any]) -> List[str]:
     if connections:
         lines.append("\nIntegration Connections:")
         for conn in connections:
-            lines.append(f"  * {conn.get('name')} ({conn.get('provider')} - {conn.get('source_type')}): Status {conn.get('status')}")
+            lines.append(
+                f"  * {conn.get('name')} ({conn.get('provider')} - {conn.get('source_type')}): Status {conn.get('status')}"
+            )
 
     # 4. Compliance Policies details
     policies = ops.get("policy_packs", [])
     if policies:
         lines.append("\nActive Compliance Policies:")
         for p in policies:
-            lines.append(f"  * {p.get('policy_name')} (Region: {p.get('region')}, Action: {p.get('action_type')}): Status {p.get('status')}")
+            lines.append(
+                f"  * {p.get('policy_name')} (Region: {p.get('region')}, Action: {p.get('action_type')}): Status {p.get('status')}"
+            )
 
     # 5. Active Interventions details
     interventions = ops.get("active_interventions", [])
     if interventions:
         lines.append("\nActive Interventions:")
         for i in interventions:
-            lines.append(f"  * {i.get('title')} (Priority: {i.get('priority')}): Status {i.get('status')}")
+            lines.append(
+                f"  * {i.get('title')} (Priority: {i.get('priority')}): Status {i.get('status')}"
+            )
 
     return lines
 
 
-def _record_counts(db: Session) -> Dict[str, int]:
+def _record_counts(db: Session) -> dict[str, int]:
     def _count(model) -> int:
         value = db.exec(select(func.count()).select_from(model)).one()
         if isinstance(value, tuple):
@@ -808,7 +875,7 @@ def _direct_count_answer(db: Session, user_text: str) -> str | None:
     return None
 
 
-def _parse_csv_and_ingest(db: Session, attachments: List[ChatAttachmentTable]) -> Dict:
+def _parse_csv_and_ingest(db: Session, attachments: list[ChatAttachmentTable]) -> dict:
     import csv
 
     ingest_log = {
@@ -824,7 +891,7 @@ def _parse_csv_and_ingest(db: Session, attachments: List[ChatAttachmentTable]) -
         if not path.exists() or path.suffix.lower() != ".csv":
             continue
         try:
-            with open(path, mode="r", encoding="utf-8", errors="ignore") as f:
+            with open(path, encoding="utf-8", errors="ignore") as f:
                 content_sample = f.read(2048)
                 f.seek(0)
                 delimiter = ","
@@ -954,7 +1021,7 @@ def _parse_csv_and_ingest(db: Session, attachments: List[ChatAttachmentTable]) -
     return ingest_log
 
 
-def _apply_data_mutation(db: Session, user_text: str) -> Dict:
+def _apply_data_mutation(db: Session, user_text: str) -> dict:
     """
     Highly powerful natural language data orchestration mutation layer.
     Supports creating, updating and fixing all entries:
@@ -970,7 +1037,9 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
 
     # Extract email and standard fields robustly
     email = None
-    email_match = re.search(r"([a-zA-Z0-9\.\-\_\+]+@[a-zA-Z0-9\.\-\_]+\.[a-zA-Z]{2,})", user_text)
+    email_match = re.search(
+        r"([a-zA-Z0-9\.\-\_\+]+@[a-zA-Z0-9\.\-\_]+\.[a-zA-Z]{2,})", user_text
+    )
     if email_match:
         email = email_match.group(1)
 
@@ -979,7 +1048,9 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
         val_match = re.search(r"\b(true|false|yes|no|high|low)\b", lowered)
         if email and val_match:
             value = val_match.group(1) in ["true", "yes", "high"]
-            emp = db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
+            emp = db.exec(
+                select(EmployeeTable).where(EmployeeTable.email == email)
+            ).first()
             if emp:
                 emp.is_at_risk = value
                 emp.updated_at = datetime.utcnow()
@@ -989,13 +1060,19 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
 
     # 2. Check for department moves
     if any(k in lowered for k in ["move", "transfer", "change department", "dept"]):
-        dept_match = re.search(r"(?:to|department|dept)\s+(?:is\s+|:\s*|of\s+)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+for|\s+email)", user_text, re.IGNORECASE)
+        dept_match = re.search(
+            r"(?:to|department|dept)\s+(?:is\s+|:\s*|of\s+)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+for|\s+email)",
+            user_text,
+            re.IGNORECASE,
+        )
         if email and dept_match:
             dept = dept_match.group(1).strip().title()
             for prefix in ["department", "dept"]:
                 if dept.lower().startswith(prefix + " "):
-                    dept = dept[len(prefix)+1:].strip()
-            emp = db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
+                    dept = dept[len(prefix) + 1 :].strip()
+            emp = db.exec(
+                select(EmployeeTable).where(EmployeeTable.email == email)
+            ).first()
             if emp:
                 emp.department = dept
                 emp.updated_at = datetime.utcnow()
@@ -1004,14 +1081,18 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
                 mutation_log["actions"].append(f"Moved {email} to {dept}")
 
     # 3. Add Employee / Candidate
-    is_add_employee = ("employee" in lowered) and any(kw in lowered for kw in ["add", "create", "insert", "register"])
-    is_add_candidate = ("candidate" in lowered) and any(kw in lowered for kw in ["add", "create", "insert", "register"])
+    is_add_employee = ("employee" in lowered) and any(
+        kw in lowered for kw in ["add", "create", "insert", "register"]
+    )
+    is_add_candidate = ("candidate" in lowered) and any(
+        kw in lowered for kw in ["add", "create", "insert", "register"]
+    )
 
     if is_add_employee or is_add_candidate:
         name = None
         name_patterns = [
             r"(?:name|employee|candidate)\s+(?:is\s+|:\s*|named\s+)?([a-zA-Z\s]+?)(?:,|$|\s+email|\s+role|\s+dept|\s+department|\s+with)",
-            r"(?:add|create|insert|register)\s+(?:employee|candidate|new\s+employee|new\s+candidate)?\s+([a-zA-Z\s]+?)(?:,|$|\s+email|\s+role|\s+dept|\s+department|\s+with)"
+            r"(?:add|create|insert|register)\s+(?:employee|candidate|new\s+employee|new\s+candidate)?\s+([a-zA-Z\s]+?)(?:,|$|\s+email|\s+role|\s+dept|\s+department|\s+with)",
         ]
         for pattern in name_patterns:
             m = re.search(pattern, user_text, re.IGNORECASE)
@@ -1019,16 +1100,24 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
                 name = m.group(1).strip()
                 for prefix in ["named", "is", "employee", "candidate", "new", "a"]:
                     if name.lower().startswith(prefix + " "):
-                        name = name[len(prefix)+1:].strip()
+                        name = name[len(prefix) + 1 :].strip()
                 break
 
         role = "Software Engineer"
-        role_match = re.search(r"role\s+(?:is\s+|:\s*|to\s+)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+email|\s+dept|\s+department|\s+with)", user_text, re.IGNORECASE)
+        role_match = re.search(
+            r"role\s+(?:is\s+|:\s*|to\s+)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+email|\s+dept|\s+department|\s+with)",
+            user_text,
+            re.IGNORECASE,
+        )
         if role_match:
             role = role_match.group(1).strip().title()
 
         dept = "Engineering"
-        dept_match = re.search(r"(?:dept|department)\s+(?:is\s+|:\s*|to\s+)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+email|\s+role|\s+with)", user_text, re.IGNORECASE)
+        dept_match = re.search(
+            r"(?:dept|department)\s+(?:is\s+|:\s*|to\s+)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+email|\s+role|\s+with)",
+            user_text,
+            re.IGNORECASE,
+        )
         if dept_match:
             dept = dept_match.group(1).strip().title()
 
@@ -1072,29 +1161,48 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
                     )
 
     # 4. General updates
-    if any(k in lowered for k in ["update", "correct", "change", "fix", "set"]) and email:
+    if (
+        any(k in lowered for k in ["update", "correct", "change", "fix", "set"])
+        and email
+    ):
         emp = db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
         if emp:
             updated = False
-            role_match = re.search(r"role\s+(?:to\s+|set\s+|is\s+|:\s*)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+for)", user_text, re.IGNORECASE)
+            role_match = re.search(
+                r"role\s+(?:to\s+|set\s+|is\s+|:\s*)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+for)",
+                user_text,
+                re.IGNORECASE,
+            )
             if role_match:
                 val = role_match.group(1).strip().title()
                 emp.role = val
                 mutation_log["actions"].append(f"Updated role to {val} for {email}")
                 updated = True
-            
-            dept_match = re.search(r"(?:dept|department)\s+(?:to\s+|set\s+|is\s+|:\s*)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+for)", user_text, re.IGNORECASE)
+
+            dept_match = re.search(
+                r"(?:dept|department)\s+(?:to\s+|set\s+|is\s+|:\s*)?([a-zA-Z0-9\s\-\_]+?)(?:,|$|\.|\s+for)",
+                user_text,
+                re.IGNORECASE,
+            )
             if dept_match:
                 val = dept_match.group(1).strip().title()
                 emp.department = val
-                mutation_log["actions"].append(f"Updated department to {val} for {email}")
+                mutation_log["actions"].append(
+                    f"Updated department to {val} for {email}"
+                )
                 updated = True
 
-            name_match = re.search(r"name\s+(?:to\s+|set\s+|is\s+|:\s*)?([a-zA-Z\s]+?)(?:,|$|\.|\s+for)", user_text, re.IGNORECASE)
+            name_match = re.search(
+                r"name\s+(?:to\s+|set\s+|is\s+|:\s*)?([a-zA-Z\s]+?)(?:,|$|\.|\s+for)",
+                user_text,
+                re.IGNORECASE,
+            )
             if name_match:
                 val = name_match.group(1).strip().title()
                 emp.full_name = val
-                mutation_log["actions"].append(f"Updated full name to {val} for {email}")
+                mutation_log["actions"].append(
+                    f"Updated full name to {val} for {email}"
+                )
                 updated = True
 
             if updated:
@@ -1147,7 +1255,9 @@ def _apply_data_mutation(db: Session, user_text: str) -> Dict:
     return mutation_log
 
 
-def _verify_mutation(db: Session, user_text: str, mutation_log: Dict[str, Any]) -> Dict[str, Any]:
+def _verify_mutation(
+    db: Session, user_text: str, mutation_log: dict[str, Any]
+) -> dict[str, Any]:
     """Read back the exact target after a permitted mutation.
 
     This is intentionally a separate tool step. A successful write is not
@@ -1166,7 +1276,10 @@ def _verify_mutation(db: Session, user_text: str, mutation_log: Dict[str, Any]) 
         r"([a-zA-Z0-9.\-_+]+@[a-zA-Z0-9.\-_]+\.[a-zA-Z]{2,})", user_text
     )
     if not email_match:
-        return {"verified": False, "reason": "Mutation result did not include a verifiable email target"}
+        return {
+            "verified": False,
+            "reason": "Mutation result did not include a verifiable email target",
+        }
 
     email = email_match.group(1)
     lowered = user_text.lower()
@@ -1177,7 +1290,10 @@ def _verify_mutation(db: Session, user_text: str, mutation_log: Dict[str, Any]) 
         else db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
     )
     if not row:
-        return {"verified": False, "reason": f"Committed target {email} was not found on read-back"}
+        return {
+            "verified": False,
+            "reason": f"Committed target {email} was not found on read-back",
+        }
 
     return {
         "verified": True,
@@ -1191,7 +1307,7 @@ def _verify_mutation(db: Session, user_text: str, mutation_log: Dict[str, Any]) 
 
 
 def _attachment_text_context(
-    attachments: List[ChatAttachmentTable], max_chars: int = 12000
+    attachments: list[ChatAttachmentTable], max_chars: int = 12000
 ) -> str:
     chunks = []
     consumed = 0
@@ -1230,7 +1346,7 @@ def _attachment_text_context(
     return "".join(chunks).strip()
 
 
-def _parse_attachment_for_index(path: Path) -> Tuple[str, str, str]:
+def _parse_attachment_for_index(path: Path) -> tuple[str, str, str]:
     suffix = path.suffix.lower()
     try:
         if suffix in [".txt", ".md", ".csv", ".json", ".log"]:
@@ -1255,7 +1371,7 @@ def _parse_attachment_for_index(path: Path) -> Tuple[str, str, str]:
         return "", "failed", str(e)
 
 
-def _resolve_api_key(provider: Optional[str], inline_key: Optional[str]) -> Optional[str]:
+def _resolve_api_key(provider: str | None, inline_key: str | None) -> str | None:
     if inline_key:
         return inline_key
     return {
@@ -1272,13 +1388,17 @@ async def _llm_stream_response(
     base_url: str,
     model: str,
     user_text: str,
-    context_payload: Dict,
-    system_override: Optional[str] = None,
-    temperature_override: Optional[float] = None,
-    user_content_override: Optional[str] = None,
+    context_payload: dict,
+    system_override: str | None = None,
+    temperature_override: float | None = None,
+    user_content_override: str | None = None,
 ):
     provider = (provider or "lmstudio").lower()
-    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
+    provider = {
+        "anthropic": "claude",
+        "google": "gemini",
+        "google-gemini": "gemini",
+    }.get(provider, provider)
     casual_chat = _is_casual_chat(user_text)
 
     if provider == "lmstudio":
@@ -1310,12 +1430,19 @@ async def _llm_stream_response(
     elif provider == "claude":
         endpoint = "https://api.anthropic.com/v1/messages"
         model_name = model or "claude-3-5-sonnet-20241022"
-        headers = {"Content-Type": "application/json", "anthropic-version": "2023-06-01"}
+        headers = {
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01",
+        }
         if api_key:
             headers["x-api-key"] = api_key
     elif provider == "gemini":
         model_name = model or "gemini-1.5-pro"
-        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:streamGenerateContent?key={api_key}" if api_key else None
+        endpoint = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:streamGenerateContent?key={api_key}"
+            if api_key
+            else None
+        )
         if not endpoint:
             yield "Gemini requires an API key."
             return
@@ -1367,7 +1494,6 @@ async def _llm_stream_response(
 
     tool_ctx = context_payload.get("tool_context", {})
     tool_runs = tool_ctx.get("tool_runs", [])
-    has_tool_output = bool(tool_runs)
 
     tool_summary_lines = []
     for run in tool_runs:
@@ -1382,7 +1508,9 @@ async def _llm_stream_response(
             )
         else:
             output = run.get("output", [])
-            tool_summary_lines.append(f"- {tool_name}: {json.dumps(output, default=str)}")
+            tool_summary_lines.append(
+                f"- {tool_name}: {json.dumps(output, default=str)}"
+            )
 
     integrations = tool_ctx.get("integration_connections", [])
     compliance = tool_ctx.get("compliance_policies", [])
@@ -1397,7 +1525,11 @@ async def _llm_stream_response(
         user_content = user_content_override
         history_messages = []
     elif not casual_chat:
-        tool_block = "\n".join(tool_summary_lines) if tool_summary_lines else "- No specific tool queries executed."
+        tool_block = (
+            "\n".join(tool_summary_lines)
+            if tool_summary_lines
+            else "- No specific tool queries executed."
+        )
         workspace_block = (
             "\n".join(_workspace_snapshot_summary_lines(workspace_snapshot))
             if workspace_snapshot
@@ -1482,100 +1614,109 @@ async def _llm_stream_response(
         }
 
     in_thinking = False
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        async with client.stream(
-            "POST", endpoint, json=payload, headers=headers
-        ) as resp:
-            resp.raise_for_status()
+    async with (
+        httpx.AsyncClient(timeout=60.0) as client,
+        client.stream("POST", endpoint, json=payload, headers=headers) as resp,
+    ):
+        resp.raise_for_status()
 
-            if provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
-                async for line in resp.aiter_lines():
-                    if line.startswith("data:"):
-                        data_str = line[5:].strip()
-                        if data_str == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(data_str)
-                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+        if provider in [
+            "openai",
+            "lmstudio",
+            "groq",
+            "opencode",
+            "ollama",
+            "custom",
+        ]:
+            async for line in resp.aiter_lines():
+                if line.startswith("data:"):
+                    data_str = line[5:].strip()
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data_str)
+                        delta = chunk.get("choices", [{}])[0].get("delta", {})
 
-                            content = delta.get("content")
-                            reasoning = (
-                                delta.get("reasoning_content")
-                                or delta.get("reasoning")
-                                or delta.get("thinking")
+                        content = delta.get("content")
+                        reasoning = (
+                            delta.get("reasoning_content")
+                            or delta.get("reasoning")
+                            or delta.get("thinking")
+                        )
+
+                        if reasoning:
+                            if not in_thinking:
+                                yield "<think>"
+                                in_thinking = True
+                            yield reasoning
+                        if content:
+                            if in_thinking:
+                                yield "</think>"
+                                in_thinking = False
+                            yield content
+                    except Exception:
+                        continue
+
+        elif provider == "claude":
+            async for line in resp.aiter_lines():
+                if line.startswith("data:"):
+                    data_str = line[5:].strip()
+                    try:
+                        chunk = json.loads(data_str)
+                        if chunk.get("type") == "content_block_delta":
+                            delta = chunk.get("delta", {})
+                            reasoning = delta.get("thinking", "") or delta.get(
+                                "reasoning", ""
                             )
-
+                            text = delta.get("text", "")
                             if reasoning:
                                 if not in_thinking:
                                     yield "<think>"
                                     in_thinking = True
                                 yield reasoning
-                            if content:
-                                if in_thinking:
-                                    yield "</think>"
-                                    in_thinking = False
-                                yield content
-                        except Exception:
-                            continue
-
-            elif provider == "claude":
-                async for line in resp.aiter_lines():
-                    if line.startswith("data:"):
-                        data_str = line[5:].strip()
-                        try:
-                            chunk = json.loads(data_str)
-                            if chunk.get("type") == "content_block_delta":
-                                delta = chunk.get("delta", {})
-                                reasoning = delta.get("thinking", "") or delta.get("reasoning", "")
-                                text = delta.get("text", "")
-                                if reasoning:
-                                    if not in_thinking:
-                                        yield "<think>"
-                                        in_thinking = True
-                                    yield reasoning
-                                if text:
-                                    if in_thinking:
-                                        yield "</think>"
-                                        in_thinking = False
-                                    yield text
-                        except Exception:
-                            continue
-
-            elif provider == "gemini":
-                # Handle Gemini chunk-by-chunk stream response beautifully
-                async for chunk_bytes in resp.aiter_bytes():
-                    chunk_str = chunk_bytes.decode("utf-8", errors="ignore")
-                    try:
-                        obj = json.loads(chunk_str.strip())
-                        parts = (
-                            obj.get("candidates", [{}])[0]
-                            .get("content", {})
-                            .get("parts", [])
-                        )
-                        for part in parts:
-                            text = part.get("text", "")
-                            if not text:
-                                continue
-                            if part.get("thought"):
-                                if not in_thinking:
-                                    yield "<think>"
-                                    in_thinking = True
-                                yield text
-                            else:
+                            if text:
                                 if in_thinking:
                                     yield "</think>"
                                     in_thinking = False
                                 yield text
                     except Exception:
-                        import re
+                        continue
 
-                        for m in re.finditer(
-                            r'"text"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"', chunk_str
-                        ):
-                            try:
-                                yield m.group(1).encode().decode("unicode-escape")
-                            except Exception:
-                                pass
+        elif provider == "gemini":
+            # Handle Gemini chunk-by-chunk stream response beautifully
+            async for chunk_bytes in resp.aiter_bytes():
+                chunk_str = chunk_bytes.decode("utf-8", errors="ignore")
+                try:
+                    obj = json.loads(chunk_str.strip())
+                    parts = (
+                        obj.get("candidates", [{}])[0]
+                        .get("content", {})
+                        .get("parts", [])
+                    )
+                    for part in parts:
+                        text = part.get("text", "")
+                        if not text:
+                            continue
+                        if part.get("thought"):
+                            if not in_thinking:
+                                yield "<think>"
+                                in_thinking = True
+                            yield text
+                        else:
+                            if in_thinking:
+                                yield "</think>"
+                                in_thinking = False
+                            yield text
+                except Exception:
+                    import re
+
+                    for m in re.finditer(
+                        r'"text"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"', chunk_str
+                    ):
+                        try:
+                            yield m.group(1).encode().decode("unicode-escape")
+                        except Exception:
+                            pass
 
     if in_thinking:
         yield "</think>"
@@ -1587,12 +1728,16 @@ async def _llm_response(
     base_url: str,
     model: str,
     user_text: str,
-    context_payload: Dict,
-    system_override: Optional[str] = None,
-    temperature_override: Optional[float] = None,
+    context_payload: dict,
+    system_override: str | None = None,
+    temperature_override: float | None = None,
 ) -> str:
     provider = (provider or "lmstudio").lower()
-    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
+    provider = {
+        "anthropic": "claude",
+        "google": "gemini",
+        "google-gemini": "gemini",
+    }.get(provider, provider)
 
     if provider == "lmstudio":
         endpoint = (
@@ -1623,12 +1768,19 @@ async def _llm_response(
     elif provider == "claude":
         endpoint = "https://api.anthropic.com/v1/messages"
         model_name = model or "claude-3-5-sonnet-20241022"
-        headers = {"Content-Type": "application/json", "anthropic-version": "2023-06-01"}
+        headers = {
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01",
+        }
         if api_key:
             headers["x-api-key"] = api_key
     elif provider == "gemini":
         model_name = model or "gemini-1.5-pro"
-        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}" if api_key else None
+        endpoint = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+            if api_key
+            else None
+        )
         if not endpoint:
             return "Gemini requires an API key."
         headers = {"Content-Type": "application/json"}
@@ -1680,7 +1832,6 @@ async def _llm_response(
     # Build clean tool summary — never pass nested session_history inside the tool block
     tool_ctx = context_payload.get("tool_context", {})
     tool_runs = tool_ctx.get("tool_runs", [])
-    has_tool_output = bool(tool_runs)
 
     # Produce a compact, readable tool summary string (not raw JSON of entire payload)
     tool_summary_lines = []
@@ -1696,7 +1847,9 @@ async def _llm_response(
             )
         else:
             output = run.get("output", [])
-            tool_summary_lines.append(f"- {tool_name}: {json.dumps(output, default=str)}")
+            tool_summary_lines.append(
+                f"- {tool_name}: {json.dumps(output, default=str)}"
+            )
 
     integrations = tool_ctx.get("integration_connections", [])
     compliance = tool_ctx.get("compliance_policies", [])
@@ -1705,7 +1858,11 @@ async def _llm_response(
     workspace_snapshot = tool_ctx.get("workspace_snapshot", {})
 
     if not casual_chat:
-        tool_block = "\n".join(tool_summary_lines) if tool_summary_lines else "- No specific tool queries executed."
+        tool_block = (
+            "\n".join(tool_summary_lines)
+            if tool_summary_lines
+            else "- No specific tool queries executed."
+        )
         workspace_block = (
             "\n".join(_workspace_snapshot_summary_lines(workspace_snapshot))
             if workspace_snapshot
@@ -1817,7 +1974,7 @@ async def _llm_response(
         )
 
 
-def _request_plan(user_text: str, has_attachments: bool = False) -> Dict[str, Any]:
+def _request_plan(user_text: str, has_attachments: bool = False) -> dict[str, Any]:
     """Route a request before retrieval or mutation.
 
     This is deliberately an operational intent router, not hidden model reasoning.
@@ -1825,13 +1982,89 @@ def _request_plan(user_text: str, has_attachments: bool = False) -> Dict[str, An
     tools and mutations/deletions are never inferred from a vague sentence.
     """
     text = user_text.strip().lower()
-    mutation_words = ("add", "create", "insert", "update", "set", "move", "transfer", "correct", "fix", "change", "ingest", "import", "register")
+    mutation_words = (
+        "add",
+        "create",
+        "insert",
+        "update",
+        "set",
+        "move",
+        "transfer",
+        "correct",
+        "fix",
+        "change",
+        "ingest",
+        "import",
+        "register",
+    )
     delete_words = ("delete", "remove", "purge", "clear")
-    employee_words = ("employee", "employees", "staff", "workforce", "team member", "people", "directory", "worker")
-    candidate_words = ("candidate", "candidates", "applicant", "applicants", "talent scout", "hiring", "recruit")
-    analytics_words = ("dashboard", "analytics", "metric", "metrics", "sentiment", "morale", "retention", "at-risk", "at risk", "risk", "burnout")
-    enterprise_words = ("integration", "connection", "compliance", "policy", "policies", "release gate", "quarantine", "sync", "runbook", "intervention")
-    data_verbs = ("show", "find", "search", "list", "lookup", "look up", "who", "which", "count", "how many", "analyze", "compare", "rank", "top", "current", "live", "our", "my", "data", "records", "report")
+    employee_words = (
+        "employee",
+        "employees",
+        "staff",
+        "workforce",
+        "team member",
+        "people",
+        "directory",
+        "worker",
+    )
+    candidate_words = (
+        "candidate",
+        "candidates",
+        "applicant",
+        "applicants",
+        "talent scout",
+        "hiring",
+        "recruit",
+    )
+    analytics_words = (
+        "dashboard",
+        "analytics",
+        "metric",
+        "metrics",
+        "sentiment",
+        "morale",
+        "retention",
+        "at-risk",
+        "at risk",
+        "risk",
+        "burnout",
+    )
+    enterprise_words = (
+        "integration",
+        "connection",
+        "compliance",
+        "policy",
+        "policies",
+        "release gate",
+        "quarantine",
+        "sync",
+        "runbook",
+        "intervention",
+    )
+    data_verbs = (
+        "show",
+        "find",
+        "search",
+        "list",
+        "lookup",
+        "look up",
+        "who",
+        "which",
+        "count",
+        "how many",
+        "analyze",
+        "compare",
+        "rank",
+        "top",
+        "current",
+        "live",
+        "our",
+        "my",
+        "data",
+        "records",
+        "report",
+    )
 
     is_mutation = any(word in text for word in mutation_words)
     is_delete = any(word in text for word in delete_words)
@@ -1840,7 +2073,9 @@ def _request_plan(user_text: str, has_attachments: bool = False) -> Dict[str, An
     mentions_analytics = any(word in text for word in analytics_words)
     mentions_enterprise = any(word in text for word in enterprise_words)
     asks_for_data = any(word in text for word in data_verbs)
-    asks_count = any(word in text for word in ("count", "how many", "total", "number of"))
+    asks_count = any(
+        word in text for word in ("count", "how many", "total", "number of")
+    )
     workspace_signal = (
         mentions_employee
         or mentions_candidate
@@ -1851,11 +2086,24 @@ def _request_plan(user_text: str, has_attachments: bool = False) -> Dict[str, An
 
     capabilities = ["conversation_context"]
     if workspace_signal:
-        if mentions_employee or (not mentions_candidate and not mentions_enterprise and (mentions_analytics or asks_for_data)):
+        if mentions_employee or (
+            not mentions_candidate
+            and not mentions_enterprise
+            and (mentions_analytics or asks_for_data)
+        ):
             capabilities.append("search_employees")
         if mentions_candidate:
             capabilities.append("search_candidates")
-        if mentions_analytics or asks_count or (workspace_signal and not mentions_employee and not mentions_candidate and not mentions_enterprise):
+        if (
+            mentions_analytics
+            or asks_count
+            or (
+                workspace_signal
+                and not mentions_employee
+                and not mentions_candidate
+                and not mentions_enterprise
+            )
+        ):
             capabilities.append("dashboard_snapshot")
         if mentions_enterprise:
             capabilities.append("workspace_snapshot")
@@ -1863,7 +2111,9 @@ def _request_plan(user_text: str, has_attachments: bool = False) -> Dict[str, An
         capabilities.append("mutate_data")
     if is_delete:
         capabilities.append("human_approval_delete")
-    if has_attachments or any(word in text for word in ("csv", "excel", "spreadsheet", "file", "attachment")):
+    if has_attachments or any(
+        word in text for word in ("csv", "excel", "spreadsheet", "file", "attachment")
+    ):
         capabilities.append("parse_csv_attachment")
 
     if is_delete:
@@ -1879,12 +2129,18 @@ def _request_plan(user_text: str, has_attachments: bool = False) -> Dict[str, An
         "mode": mode,
         "needs_live_data": workspace_signal,
         "capabilities": list(dict.fromkeys(capabilities)),
-        "reason": "live workspace evidence requested" if workspace_signal else "general conversation or knowledge request",
+        "reason": (
+            "live workspace evidence requested"
+            if workspace_signal
+            else "general conversation or knowledge request"
+        ),
     }
 
 
-def _tool_policy(user_text: str, has_attachments: bool = False) -> List[str]:
-    return _request_plan(user_text, has_attachments).get("capabilities", ["conversation_context"])
+def _tool_policy(user_text: str, has_attachments: bool = False) -> list[str]:
+    return _request_plan(user_text, has_attachments).get(
+        "capabilities", ["conversation_context"]
+    )
 
 
 TOOL_RBAC = {
@@ -1928,9 +2184,11 @@ def _agent_tool_label(tool_name: str) -> str:
     }.get(tool_name, tool_name.replace(".", " "))
 
 
-def _agent_tool_result_message(tool_name: str, result: Dict[str, Any]) -> str:
+def _agent_tool_result_message(tool_name: str, result: dict[str, Any]) -> str:
     if result.get("blocked"):
-        return f"I could not run {_agent_tool_label(tool_name)} because policy blocked it."
+        return (
+            f"I could not run {_agent_tool_label(tool_name)} because policy blocked it."
+        )
     if tool_name == "search":
         return f"I searched the system and found {result.get('returned', 0)} matching record(s)."
     if tool_name == "read":
@@ -1958,23 +2216,36 @@ def _agent_tool_result_message(tool_name: str, result: Dict[str, Any]) -> str:
     return f"The {_agent_tool_label(tool_name)} step completed."
 
 
-def _parse_agent_decision(raw_text: str, request_text: str = "") -> Dict[str, Any]:
+def _parse_agent_decision(raw_text: str, request_text: str = "") -> dict[str, Any]:
     """Parse one controller decision and normalize common local-model output."""
     text = (raw_text or "").strip()
     if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE | re.DOTALL).strip()
+        text = re.sub(
+            r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE | re.DOTALL
+        ).strip()
     try:
         payload = json.loads(text)
     except Exception:
         start = text.find("{")
         end = text.rfind("}")
         if start < 0 or end <= start:
-            lowered = text.lower()
             request_lower = request_text.lower()
             # Small local models often answer the controller prompt in plain
             # language. Convert only safe, read-only intents; never infer a
             # mutation from prose.
-            if any(word in request_lower for word in ("database", "db", "record", "records", "entry", "entries", "table", "tables")):
+            if any(
+                word in request_lower
+                for word in (
+                    "database",
+                    "db",
+                    "record",
+                    "records",
+                    "entry",
+                    "entries",
+                    "table",
+                    "tables",
+                )
+            ):
                 return {
                     "action": "tool",
                     "tool": "database.overview",
@@ -1982,7 +2253,10 @@ def _parse_agent_decision(raw_text: str, request_text: str = "") -> Dict[str, An
                     "message": "The model requested a verified database record overview.",
                     "normalized": True,
                 }
-            if any(word in request_lower for word in ("employee", "employees", "staff", "workforce", "worker")):
+            if any(
+                word in request_lower
+                for word in ("employee", "employees", "staff", "workforce", "worker")
+            ):
                 return {
                     "action": "tool",
                     "tool": "employee.search",
@@ -1990,7 +2264,10 @@ def _parse_agent_decision(raw_text: str, request_text: str = "") -> Dict[str, An
                     "message": "The model requested a verified employee search.",
                     "normalized": True,
                 }
-            if any(word in request_lower for word in ("candidate", "candidates", "applicant", "applicants")):
+            if any(
+                word in request_lower
+                for word in ("candidate", "candidates", "applicant", "applicants")
+            ):
                 return {
                     "action": "tool",
                     "tool": "candidate.search",
@@ -2005,7 +2282,10 @@ def _parse_agent_decision(raw_text: str, request_text: str = "") -> Dict[str, An
                     "answer": text[:12000],
                     "normalized": True,
                 }
-            return {"action": "invalid", "error": "Controller did not return a decision"}
+            return {
+                "action": "invalid",
+                "error": "Controller did not return a decision",
+            }
         try:
             payload = json.loads(text[start : end + 1])
         except Exception:
@@ -2043,12 +2323,16 @@ def _parse_agent_decision(raw_text: str, request_text: str = "") -> Dict[str, An
             "action": "tool",
             "tool": tool,
             "arguments": args,
-            "message": str(payload.get("message", "Model selected the next bounded tool"))[:500],
+            "message": str(
+                payload.get("message", "Model selected the next bounded tool")
+            )[:500],
         }
     if action == "approval_required":
         return {
             "action": "approval_required",
-            "message": str(payload.get("message", "Human approval is required before this action"))[:500],
+            "message": str(
+                payload.get("message", "Human approval is required before this action")
+            )[:500],
         }
     return {
         "action": "respond",
@@ -2059,12 +2343,14 @@ def _parse_agent_decision(raw_text: str, request_text: str = "") -> Dict[str, An
 
 def _agent_controller_prompt(
     user_text: str,
-    history: List[Dict[str, str]],
-    tool_transcript: List[Dict[str, Any]],
+    history: list[dict[str, str]],
+    tool_transcript: list[dict[str, Any]],
     current_user: TokenData,
     has_attachments: bool,
 ) -> str:
-    catalog = "\n".join(f"- {name}: {description}" for name, description in AGENT_TOOL_CATALOG.items())
+    catalog = "\n".join(
+        f"- {name}: {description}" for name, description in AGENT_TOOL_CATALOG.items()
+    )
     return (
         "You are the Aurelinx execution controller. Choose exactly one next action and return ONLY valid JSON.\n"
         "You are not the private chain-of-thought writer. Do not expose chain-of-thought.\n"
@@ -2268,7 +2554,7 @@ def _normalize_entity(raw: Any) -> str:
     return ""
 
 
-def _safe_row(record) -> Dict[str, Any]:
+def _safe_row(record) -> dict[str, Any]:
     """One record as a JSON-safe dict with secret columns removed."""
     if record is None:
         return {}
@@ -2278,7 +2564,7 @@ def _safe_row(record) -> Dict[str, Any]:
             entity = name
             break
     secrets = set(_TOOL_ENTITIES.get(entity, {}).get("secret_cols", []))
-    out: Dict[str, Any] = {}
+    out: dict[str, Any] = {}
     for column in record.__table__.columns:
         key = column.name
         if key in secrets:
@@ -2291,11 +2577,11 @@ def _safe_row(record) -> Dict[str, Any]:
     return out
 
 
-def _safe_rows(records) -> List[Dict[str, Any]]:
+def _safe_rows(records) -> list[dict[str, Any]]:
     return [_safe_row(record) for record in records]
 
 
-def _resolve_definition(entity: str, db: Session) -> Optional[Dict[str, Any]]:
+def _resolve_definition(entity: str, db: Session) -> dict[str, Any] | None:
     spec = _TOOL_ENTITIES.get(entity)
     if not spec:
         return None
@@ -2304,26 +2590,139 @@ def _resolve_definition(entity: str, db: Session) -> Optional[Dict[str, Any]]:
     return spec
 
 
-_SEARCH_STOPWORDS = frozenset({
-    "a", "an", "and", "or", "of", "for", "to", "in", "on", "with", "my",
-    "our", "your", "their", "his", "her", "its", "this", "that", "these",
-    "those", "from", "by", "at", "all", "any", "please", "give", "tell",
-    "show", "find", "look", "search", "list", "rank", "top", "most", "least",
-    "current", "latest", "recent", "new", "what", "which", "who", "where",
-    "when", "why", "how", "many", "much", "total", "count", "about", "within",
-    "between", "than", "then", "they", "them", "we", "you", "your", "i",
-    "it", "me", "us", "the", "and", "record", "records", "employee",
-    "employees", "candidate", "candidates", "data", "status", "state",
-    "activity", "now", "also", "then", "into", "out", "up", "down", "more",
-    "less", "each", "every", "some", "are", "is", "was", "were", "be",
-    "been", "will", "would", "can", "could", "should", "do", "did", "does",
-    "get", "having", "has", "have", "return", "returns", "send", "using",
-    "use", "used", "check", "per", "see", "view", "verify", "read", "write",
-    "update", "modify", "change", "delete", "remove", "add", "create",
-})
+_SEARCH_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "or",
+        "of",
+        "for",
+        "to",
+        "in",
+        "on",
+        "with",
+        "my",
+        "our",
+        "your",
+        "their",
+        "his",
+        "her",
+        "its",
+        "this",
+        "that",
+        "these",
+        "those",
+        "from",
+        "by",
+        "at",
+        "all",
+        "any",
+        "please",
+        "give",
+        "tell",
+        "show",
+        "find",
+        "look",
+        "search",
+        "list",
+        "rank",
+        "top",
+        "most",
+        "least",
+        "current",
+        "latest",
+        "recent",
+        "new",
+        "what",
+        "which",
+        "who",
+        "where",
+        "when",
+        "why",
+        "how",
+        "many",
+        "much",
+        "total",
+        "count",
+        "about",
+        "within",
+        "between",
+        "than",
+        "then",
+        "they",
+        "them",
+        "we",
+        "you",
+        "i",
+        "it",
+        "me",
+        "us",
+        "the",
+        "record",
+        "records",
+        "employee",
+        "employees",
+        "candidate",
+        "candidates",
+        "data",
+        "status",
+        "state",
+        "activity",
+        "now",
+        "also",
+        "into",
+        "out",
+        "up",
+        "down",
+        "more",
+        "less",
+        "each",
+        "every",
+        "some",
+        "are",
+        "is",
+        "was",
+        "were",
+        "be",
+        "been",
+        "will",
+        "would",
+        "can",
+        "could",
+        "should",
+        "do",
+        "did",
+        "does",
+        "get",
+        "having",
+        "has",
+        "have",
+        "return",
+        "returns",
+        "send",
+        "using",
+        "use",
+        "used",
+        "check",
+        "per",
+        "see",
+        "view",
+        "verify",
+        "read",
+        "write",
+        "update",
+        "modify",
+        "change",
+        "delete",
+        "remove",
+        "add",
+        "create",
+    }
+)
 
 
-def _search_tokens(query: str) -> List[str]:
+def _search_tokens(query: str) -> list[str]:
     import re as _re
 
     tokens = _re.split(r"[^A-Za-z0-9._+@-]+", (query or "").lower())
@@ -2331,9 +2730,7 @@ def _search_tokens(query: str) -> List[str]:
     return [tok for tok in cleaned if len(tok) >= 2 and tok not in _SEARCH_STOPWORDS]
 
 
-def _browse_records(
-    db: Session, model: Any, limit: int, offset: int
-) -> List[Any]:
+def _browse_records(db: Session, model: Any, limit: int, offset: int) -> list[Any]:
     sort_column = getattr(model, "created_at", None) or getattr(model, "id", None)
     statement = select(model)
     if sort_column is not None:
@@ -2342,8 +2739,8 @@ def _browse_records(
 
 
 def _match_records(
-    db: Session, spec: Dict[str, Any], query: str, limit: int, offset: int
-) -> List[Any]:
+    db: Session, spec: dict[str, Any], query: str, limit: int, offset: int
+) -> list[Any]:
     """Tokenized ILIKE search across an entity's safe columns.
 
     The query is split into real search tokens (stopwords stripped) so a
@@ -2361,11 +2758,7 @@ def _match_records(
         column = getattr(model, col, None)
         if column is not None:
             columns.append(column)
-    conditions = [
-        column.ilike(f"%{tok}%")
-        for column in columns
-        for tok in tokens
-    ]
+    conditions = [column.ilike(f"%{tok}%") for column in columns for tok in tokens]
     if not conditions:
         return []
     statement = select(model).where(or_(*conditions))
@@ -2385,8 +2778,8 @@ def _match_records(
 
 
 def _records_by_identifier(
-    db: Session, spec: Dict[str, Any], identifier: str
-) -> List[Any]:
+    db: Session, spec: dict[str, Any], identifier: str
+) -> list[Any]:
     model = spec["model"]
     identifier = (identifier or "").strip()
     conditions = []
@@ -2403,7 +2796,7 @@ def _records_by_identifier(
     return db.exec(select(model).where(or_(*conditions)).limit(25)).all()
 
 
-def _modify_column(entity: str, field: str) -> Optional[Any]:
+def _modify_column(entity: str, field: str) -> Any | None:
     """Return the ORM column for a modifiable field, or None if not allowed."""
     spec = _TOOL_ENTITIES.get(entity)
     if not spec or field in spec.get("secret_cols", []) or field == "id":
@@ -2415,7 +2808,7 @@ def _modify_column(entity: str, field: str) -> Optional[Any]:
 
 def _prepare_delete_spec(
     entity: str, identifier: str, user_text: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return {
         "entity": entity,
         "identifier": identifier,
@@ -2428,13 +2821,13 @@ def _analyse_engine(
     scope: str,
     query: str,
     session_id: str,
-    attachments: List[Any],
+    attachments: list[Any],
     current_user: TokenData,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Analyse the full application: records, chat, values, sentiment,
     analytics, intel, workflows, and data operations. Returns a structured
     analysis bundle the answer model turns into a user answer."""
-    analysis: Dict[str, Any] = {"scope": scope or "system"}
+    analysis: dict[str, Any] = {"scope": scope or "system"}
 
     analysis["record_counts"] = _record_counts(db)
     account = {}
@@ -2461,19 +2854,30 @@ def _analyse_engine(
     analysis["sentiment"] = {
         "employee_count": len(employees_scores),
         "candidate_count": len(candidates_scores),
-        "average_sentiment": round(sum(all_scores) / len(all_scores), 3) if all_scores else None,
+        "average_sentiment": (
+            round(sum(all_scores) / len(all_scores), 3) if all_scores else None
+        ),
         "low_sentiment_employees": [
-            {"name": row.full_name, "email": row.email, "sentiment": row.sentiment_score}
+            {
+                "name": row.full_name,
+                "email": row.email,
+                "sentiment": row.sentiment_score,
+            }
             for row in sentiment_employees
             if (row.sentiment_score or 0) < 0.4
         ][:10],
     }
 
-    risk_rows = db.exec(select(EmployeeTable).where(EmployeeTable.is_at_risk == True)).all()  # noqa: E712
+    risk_rows = db.exec(select(EmployeeTable).where(EmployeeTable.is_at_risk)).all()
     analysis["risk"] = {
         "at_risk_total": len(risk_rows),
         "at_risk": [
-            {"name": row.full_name, "email": row.email, "role": row.role, "department": row.department}
+            {
+                "name": row.full_name,
+                "email": row.email,
+                "role": row.role,
+                "department": row.department,
+            }
             for row in risk_rows[:15]
         ],
     }
@@ -2507,13 +2911,17 @@ def _analyse_engine(
                 {
                     "status": run.status,
                     "phase": run.current_phase,
-                    "created_at": run.created_at.isoformat() if run.created_at else None,
+                    "created_at": (
+                        run.created_at.isoformat() if run.created_at else None
+                    ),
                 }
                 for run in recent_runs
             ],
             "active_approvals": len(
                 db.exec(
-                    select(WorkflowApprovalTable).where(WorkflowApprovalTable.status == "pending")
+                    select(WorkflowApprovalTable).where(
+                        WorkflowApprovalTable.status == "pending"
+                    )
                 ).all()
             ),
         }
@@ -2525,12 +2933,12 @@ def _analyse_engine(
     return analysis
 
 
-def _enterprise_knowledge(db: Session) -> Dict[str, Any]:
+def _enterprise_knowledge(db: Session) -> dict[str, Any]:
     """One safe, secret-redacted summary of every Aurelinx module so the
     answer model can explain anything an admin asks about."""
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
 
-    def count(model: Any, filters: Optional[List[Any]] = None) -> int:
+    def count(model: Any, filters: list[Any] | None = None) -> int:
         try:
             statement = select(func.count()).select_from(model)
             if filters:
@@ -2539,10 +2947,16 @@ def _enterprise_knowledge(db: Session) -> Dict[str, Any]:
         except Exception:
             return 0
 
-    def recent(model: Any, limit: int = 3) -> List[Dict[str, Any]]:
+    def recent(model: Any, limit: int = 3) -> list[dict[str, Any]]:
         try:
             return _safe_rows(
-                db.exec(select(model).order_by(getattr(model, "created_at", getattr(model, "id", None)).desc()).limit(limit)).all()
+                db.exec(
+                    select(model)
+                    .order_by(
+                        getattr(model, "created_at", getattr(model, "id", None)).desc()
+                    )
+                    .limit(limit)
+                ).all()
             )
         except Exception:
             return []
@@ -2555,9 +2969,7 @@ def _enterprise_knowledge(db: Session) -> Dict[str, Any]:
     result["workflows"] = {
         "runs": count(WorkflowRunTable),
         "by_status": {
-            status: count(
-                WorkflowRunTable, [WorkflowRunTable.status == status]
-            )
+            status: count(WorkflowRunTable, [WorkflowRunTable.status == status])
             for status in ("received", "running", "completed", "failed", "canceled")
         },
         "approvals_pending": count(
@@ -2615,7 +3027,10 @@ def _enterprise_knowledge(db: Session) -> Dict[str, Any]:
         total_workforce = len(employees_all)
         at_risk_count = sum(1 for e in employees_all if e.is_at_risk)
         avg_morale = (
-            round(sum((e.sentiment_score or 0) for e in employees_all) / total_workforce, 3)
+            round(
+                sum((e.sentiment_score or 0) for e in employees_all) / total_workforce,
+                3,
+            )
             if total_workforce
             else 0.0
         )
@@ -2636,22 +3051,32 @@ def _enterprise_knowledge(db: Session) -> Dict[str, Any]:
             "computed_now": {
                 "total_workforce": total_workforce,
                 "at_risk": at_risk_count,
-                "at_risk_rate": round(at_risk_count / total_workforce, 3) if total_workforce else None,
+                "at_risk_rate": (
+                    round(at_risk_count / total_workforce, 3)
+                    if total_workforce
+                    else None
+                ),
                 "avg_morale": avg_morale,
                 "departments": {
                     dept: {
                         "total": stats["total"],
                         "at_risk": stats["at_risk"],
-                        "at_risk_rate": round(stats["at_risk"] / stats["total"], 3) if stats["total"] else 0.0,
+                        "at_risk_rate": (
+                            round(stats["at_risk"] / stats["total"], 3)
+                            if stats["total"]
+                            else 0.0
+                        ),
                     }
-                    for dept, stats in sorted(dept_stats.items(), key=lambda item: -item[1]["total"])
+                    for dept, stats in sorted(
+                        dept_stats.items(), key=lambda item: -item[1]["total"]
+                    )
                 },
             },
         }
     except Exception:
         result["business_logic"] = {"formulas": {}, "computed_now": {}}
     result["safety"] = {
-        "secret_columns_hidden": "[redacted]",
+        "secret_columns_hidden": "[redacted]",  # nosec B105
         "policy": "Never expose api_key, payload, headers, file_path, ip_address, or hashed credentials in any answer.",
     }
     return result
@@ -2661,14 +3086,16 @@ def _observe_engine(
     db: Session,
     query: str,
     session_id: str,
-    attachments: List[Any],
+    attachments: list[Any],
     current_user: TokenData,
-    prior_observations: Optional[List[Dict[str, Any]]] = None,
-) -> Dict[str, Any]:
+    prior_observations: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Observation cycle: capture current state, compare with prior
     observations, detect symptoms/patterns/deltas, predict, then let the LLM
     answer from the observation bundle."""
-    analysis = _analyse_engine(db, "observe", query, session_id, attachments, current_user)
+    analysis = _analyse_engine(
+        db, "observe", query, session_id, attachments, current_user
+    )
     employees = db.exec(select(EmployeeTable)).all()
     candidates = db.exec(select(CandidateTable)).all()
 
@@ -2678,8 +3105,12 @@ def _observe_engine(
     observations = {
         "analysis": analysis,
         "patterns": {
-            "at_risk_ratio": round(len(high_risk) / len(employees), 3) if employees else None,
-            "low_sentiment_ratio": round(len(low_sentiment) / len(employees), 3) if employees else None,
+            "at_risk_ratio": (
+                round(len(high_risk) / len(employees), 3) if employees else None
+            ),
+            "low_sentiment_ratio": (
+                round(len(low_sentiment) / len(employees), 3) if employees else None
+            ),
             "records_without_salary": len(missing_salary),
             "employees_total": len(employees),
             "candidates_total": len(candidates),
@@ -2698,18 +3129,25 @@ def _observe_engine(
             "salary data is incomplete; compensation analytics will use role estimates"
         )
     if high_risk:
-        observations["symptoms"].append(f"{len(high_risk)} employee(s) flagged at risk of attrition")
+        observations["symptoms"].append(
+            f"{len(high_risk)} employee(s) flagged at risk of attrition"
+        )
     if low_sentiment:
         observations["symptoms"].append(
             f"{len(low_sentiment)} employee(s) below the 0.4 sentiment threshold"
         )
     if candidates and not low_sentiment:
-        observations["symptoms"].append("candidate pipeline healthy but not validated for sentiment")
+        observations["symptoms"].append(
+            "candidate pipeline healthy but not validated for sentiment"
+        )
 
     previous = (prior_observations or [])[-1] if prior_observations else None
     current_at_risk = len(high_risk)
     observations["patterns"]["employee_at_risk_total"] = current_at_risk
-    if previous and previous.get("patterns", {}).get("employee_at_risk_total") is not None:
+    if (
+        previous
+        and previous.get("patterns", {}).get("employee_at_risk_total") is not None
+    ):
         delta = current_at_risk - previous["patterns"]["employee_at_risk_total"]
         observations["symptoms"].append(
             f"at-risk workforce {'increased' if delta > 0 else 'decreased'} by {abs(delta)} since last observation"
@@ -2734,15 +3172,19 @@ def _observe_engine(
 def _apply_structured_modify(
     db: Session,
     entity: str,
-    spec: Dict[str, Any],
+    spec: dict[str, Any],
     identifier: str,
-    fields: Dict[str, Any],
+    fields: dict[str, Any],
     user_text: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Modify records by exact identifier with an explicit field whitelist."""
     targets = _records_by_identifier(db, spec, identifier)
     if not targets:
-        return {"tool": "modify", "blocked": True, "reason": f"No {entity} matched {identifier}"}
+        return {
+            "tool": "modify",
+            "blocked": True,
+            "reason": f"No {entity} matched {identifier}",
+        }
     if len(targets) > 1:
         return {
             "tool": "modify",
@@ -2752,7 +3194,7 @@ def _apply_structured_modify(
 
     record = targets[0]
     allowed_field_updates = 0
-    changed: Dict[str, Any] = {}
+    changed: dict[str, Any] = {}
     for field, value in (fields or {}).items():
         column = _modify_column(entity, str(field))
         if column is None:
@@ -2773,7 +3215,11 @@ def _apply_structured_modify(
         setattr(record, str(field), value)
         changed[str(field)] = {"from": previous, "to": value}
     if not allowed_field_updates:
-        return {"tool": "modify", "blocked": True, "reason": "No modifiable field was provided"}
+        return {
+            "tool": "modify",
+            "blocked": True,
+            "reason": "No modifiable field was provided",
+        }
 
     if "updated_at" in record.__table__.columns:
         record.updated_at = datetime.utcnow()
@@ -2793,31 +3239,54 @@ def _apply_structured_modify(
 
 
 def _apply_agent_write(
-    db: Session, entity: str, spec: Dict[str, Any], data: Dict[str, Any]
-) -> Dict[str, Any]:
-    model = spec["model"]
+    db: Session, entity: str, spec: dict[str, Any], data: dict[str, Any]
+) -> dict[str, Any]:
     if entity == "employee":
         if not data.get("email") or not data.get("full_name"):
-            return {"tool": "write", "blocked": True, "reason": "write requires at least full_name and email"}
-        exists = db.exec(select(EmployeeTable).where(EmployeeTable.email == data["email"])).first()
+            return {
+                "tool": "write",
+                "blocked": True,
+                "reason": "write requires at least full_name and email",
+            }
+        exists = db.exec(
+            select(EmployeeTable).where(EmployeeTable.email == data["email"])
+        ).first()
         if exists:
-            return {"tool": "write", "blocked": True, "reason": "An employee with this email already exists"}
+            return {
+                "tool": "write",
+                "blocked": True,
+                "reason": "An employee with this email already exists",
+            }
         record = EmployeeTable(
             full_name=str(data["full_name"]).strip(),
             email=str(data["email"]).strip().lower(),
             department=str(data.get("department") or "General").strip(),
             role=str(data.get("role") or "Employee").strip(),
             sentiment_score=float(data.get("sentiment_score") or 0.5),
-            is_at_risk=bool(data.get("is_at_risk")) if "is_at_risk" not in data else data.get("is_at_risk"),
+            is_at_risk=(
+                bool(data.get("is_at_risk"))
+                if "is_at_risk" not in data
+                else data.get("is_at_risk")
+            ),
             salary=int(data["salary"]) if data.get("salary") is not None else None,
             join_date=datetime.utcnow(),
         )
     elif entity == "candidate":
         if not data.get("email") or not data.get("full_name"):
-            return {"tool": "write", "blocked": True, "reason": "write requires at least full_name and email"}
-        exists = db.exec(select(CandidateTable).where(CandidateTable.email == data["email"])).first()
+            return {
+                "tool": "write",
+                "blocked": True,
+                "reason": "write requires at least full_name and email",
+            }
+        exists = db.exec(
+            select(CandidateTable).where(CandidateTable.email == data["email"])
+        ).first()
         if exists:
-            return {"tool": "write", "blocked": True, "reason": "A candidate with this email already exists"}
+            return {
+                "tool": "write",
+                "blocked": True,
+                "reason": "A candidate with this email already exists",
+            }
         record = CandidateTable(
             full_name=str(data["full_name"]).strip(),
             email=str(data["email"]).strip().lower(),
@@ -2829,15 +3298,24 @@ def _apply_agent_write(
         )
     elif entity == "intervention":
         record = InterventionTable(
-            title=str(data.get("title") or data.get("name") or "New intervention").strip(),
-            priority=str(data.get("priority") or "medium").strip().lower()
-            if str(data.get("priority") or "medium").strip().lower() in {"low", "medium", "high", "critical"}
-            else "medium",
+            title=str(
+                data.get("title") or data.get("name") or "New intervention"
+            ).strip(),
+            priority=(
+                str(data.get("priority") or "medium").strip().lower()
+                if str(data.get("priority") or "medium").strip().lower()
+                in {"low", "medium", "high", "critical"}
+                else "medium"
+            ),
             target_scope=str(data.get("target_scope") or "org").strip(),
             description=str(data.get("description") or "").strip() or None,
         )
     else:
-        return {"tool": "write", "blocked": True, "reason": f"write is not supported for {entity}"}
+        return {
+            "tool": "write",
+            "blocked": True,
+            "reason": f"write is not supported for {entity}",
+        }
 
     db.add(record)
     db.commit()
@@ -2850,16 +3328,18 @@ def _apply_agent_write(
 
 def _execute_agent_tool(
     tool_name: str,
-    arguments: Dict[str, Any],
+    arguments: dict[str, Any],
     user_text: str,
     current_user: TokenData,
     session_id: str,
-    mutation_state: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    mutation_state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Execute exactly one supported dynamic tool in an isolated DB session."""
     with Session(engine) as db:
         attachments = db.exec(
-            select(ChatAttachmentTable).where(ChatAttachmentTable.session_id == str(session_id))
+            select(ChatAttachmentTable).where(
+                ChatAttachmentTable.session_id == str(session_id)
+            )
         ).all()
         query = str(arguments.get("query") or user_text)[:12000]
 
@@ -2873,7 +3353,7 @@ def _execute_agent_tool(
             requested_limit = max(1, min(int(arguments.get("limit", 20)), 200))
             offset = max(0, int(arguments.get("offset", 0)))
             entity_hint = _normalize_entity(arguments.get("entity"))
-            groups: List[Dict[str, Any]] = []
+            groups: list[dict[str, Any]] = []
             entities = [entity_hint] if entity_hint else list(_TOOL_ENTITIES.keys())
             for entity in entities:
                 spec = _TOOL_ENTITIES[entity]
@@ -2905,11 +3385,22 @@ def _execute_agent_tool(
             }
 
         if tool_name == "read":
-            entity = _normalize_entity(arguments.get("entity") or arguments.get("type") or "employee")
+            entity = _normalize_entity(
+                arguments.get("entity") or arguments.get("type") or "employee"
+            )
             spec = _TOOL_ENTITIES.get(entity)
             if not spec:
-                return {"tool": tool_name, "blocked": True, "reason": f"Unknown entity: {entity}"}
-            identifier = str(arguments.get("identifier") or arguments.get("id") or arguments.get("email") or "")[:500]
+                return {
+                    "tool": tool_name,
+                    "blocked": True,
+                    "reason": f"Unknown entity: {entity}",
+                }
+            identifier = str(
+                arguments.get("identifier")
+                or arguments.get("id")
+                or arguments.get("email")
+                or ""
+            )[:500]
             limit = max(1, min(int(arguments.get("limit", 10)), 50))
             records = _records_by_identifier(db, spec, identifier)[:limit]
             return {
@@ -2921,45 +3412,102 @@ def _execute_agent_tool(
 
         if tool_name == "modify":
             if not current_user.is_admin:
-                return {"tool": tool_name, "blocked": True, "reason": "RBAC requires an admin for modify"}
+                return {
+                    "tool": tool_name,
+                    "blocked": True,
+                    "reason": "RBAC requires an admin for modify",
+                }
             entity = _normalize_entity(arguments.get("entity") or "employee")
             spec = _TOOL_ENTITIES.get(entity)
             if not spec:
-                return {"tool": tool_name, "blocked": True, "reason": f"Unknown entity: {entity}"}
-            identifier = str(arguments.get("identifier") or arguments.get("id") or arguments.get("email") or "")[:500]
+                return {
+                    "tool": tool_name,
+                    "blocked": True,
+                    "reason": f"Unknown entity: {entity}",
+                }
+            identifier = str(
+                arguments.get("identifier")
+                or arguments.get("id")
+                or arguments.get("email")
+                or ""
+            )[:500]
             if not identifier:
-                return {"tool": tool_name, "blocked": True, "reason": "modify requires an exact identifier (email or id)"}
-            fields = arguments.get("fields") or arguments.get("changes") or arguments.get("updates") or {}
-            result = _apply_structured_modify(db, entity, spec, identifier, fields, user_text)
+                return {
+                    "tool": tool_name,
+                    "blocked": True,
+                    "reason": "modify requires an exact identifier (email or id)",
+                }
+            fields = (
+                arguments.get("fields")
+                or arguments.get("changes")
+                or arguments.get("updates")
+                or {}
+            )
+            result = _apply_structured_modify(
+                db, entity, spec, identifier, fields, user_text
+            )
             return result
 
         if tool_name == "write":
             if not current_user.is_admin:
-                return {"tool": tool_name, "blocked": True, "reason": "RBAC requires an admin for write"}
+                return {
+                    "tool": tool_name,
+                    "blocked": True,
+                    "reason": "RBAC requires an admin for write",
+                }
             entity = _normalize_entity(arguments.get("entity") or "employee")
             spec = _TOOL_ENTITIES.get(entity)
             if not spec:
-                return {"tool": tool_name, "blocked": True, "reason": f"Unknown entity: {entity}"}
+                return {
+                    "tool": tool_name,
+                    "blocked": True,
+                    "reason": f"Unknown entity: {entity}",
+                }
             data = arguments.get("data") or arguments.get("record") or {}
             if not isinstance(data, dict) or not data:
-                return {"tool": tool_name, "blocked": True, "reason": "write requires a data object"}
+                return {
+                    "tool": tool_name,
+                    "blocked": True,
+                    "reason": "write requires a data object",
+                }
             try:
                 return _apply_agent_write(db, entity, spec, data)
             except Exception as exc:
                 db.rollback()
-                return {"tool": tool_name, "blocked": True, "reason": f"write failed: {str(exc)[:300]}"}
+                return {
+                    "tool": tool_name,
+                    "blocked": True,
+                    "reason": f"write failed: {str(exc)[:300]}",
+                }
 
         if tool_name == "delete":
             entity = _normalize_entity(arguments.get("entity") or "employee")
             spec = _TOOL_ENTITIES.get(entity)
             if not spec:
-                return {"tool": tool_name, "blocked": True, "reason": f"Unknown entity: {entity}"}
-            identifier = str(arguments.get("identifier") or arguments.get("id") or arguments.get("email") or "")[:500]
+                return {
+                    "tool": tool_name,
+                    "blocked": True,
+                    "reason": f"Unknown entity: {entity}",
+                }
+            identifier = str(
+                arguments.get("identifier")
+                or arguments.get("id")
+                or arguments.get("email")
+                or ""
+            )[:500]
             if not identifier:
-                return {"tool": tool_name, "blocked": True, "reason": "delete requires an exact identifier (email or id)"}
+                return {
+                    "tool": tool_name,
+                    "blocked": True,
+                    "reason": "delete requires an exact identifier (email or id)",
+                }
             targets = _records_by_identifier(db, spec, identifier)
             if not targets:
-                return {"tool": tool_name, "blocked": True, "reason": f"No {entity} matched {identifier}"}
+                return {
+                    "tool": tool_name,
+                    "blocked": True,
+                    "reason": f"No {entity} matched {identifier}",
+                }
             delete_spec = _prepare_delete_spec(entity, identifier, user_text)
             return {
                 "tool": tool_name,
@@ -2971,7 +3519,12 @@ def _execute_agent_tool(
             }
 
         if tool_name == "analyse":
-            return {"tool": tool_name, "analysis": _analyse_engine(db, query, query, session_id, attachments, current_user)}
+            return {
+                "tool": tool_name,
+                "analysis": _analyse_engine(
+                    db, query, query, session_id, attachments, current_user
+                ),
+            }
 
         if tool_name == "observe":
             if not isinstance(mutation_state, dict):
@@ -2979,7 +3532,9 @@ def _execute_agent_tool(
             prior = mutation_state.get("observations")
             if isinstance(prior, dict):
                 prior = [prior]
-            observation = _observe_engine(db, query, session_id, attachments, current_user, prior)
+            observation = _observe_engine(
+                db, query, session_id, attachments, current_user, prior
+            )
             observations = list(mutation_state.get("observations") or [])
             observations.append(observation)
             mutation_state["observations"] = observations
@@ -3024,7 +3579,7 @@ def _transient_provider_error(error: Exception) -> bool:
     )
 
 
-def _try_reasoning_json(raw: Optional[str]) -> Optional[Dict[str, Any]]:
+def _try_reasoning_json(raw: str | None) -> dict[str, Any] | None:
     """Return the dict when the captured reasoning text is pure structured JSON."""
     if not raw:
         return None
@@ -3038,7 +3593,7 @@ def _try_reasoning_json(raw: Optional[str]) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _humanize_reasoning_dict(parsed: Dict[str, Any]) -> Optional[str]:
+def _humanize_reasoning_dict(parsed: dict[str, Any]) -> str | None:
     """Render a structured controller/answer decision as natural, user-facing language."""
     if not isinstance(parsed, dict):
         return None
@@ -3057,7 +3612,7 @@ def _humanize_reasoning_dict(parsed: Dict[str, Any]) -> Optional[str]:
             trimmed = query.strip()
             if len(trimmed) > 90:
                 trimmed = trimmed[:90] + "…"
-            parts.append(f"with \"{trimmed}\"")
+            parts.append(f'with "{trimmed}"')
         return " ".join(parts)
     if action == "approval_required":
         return "the execution model prepared the deletion request; an authorized human must approve it before anything changes"
@@ -3074,7 +3629,7 @@ def _humanize_reasoning_dict(parsed: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _friendly_reasoning_text(raw: Optional[str]) -> str:
+def _friendly_reasoning_text(raw: str | None) -> str:
     """Thinking text for the UI: raw natural-language when available, otherwise a
     natural rendering of the structured decision. Raw JSON is never shown."""
     text = (raw or "").strip()
@@ -3088,7 +3643,7 @@ def _friendly_reasoning_text(raw: Optional[str]) -> str:
     return text
 
 
-def _extract_answer_from_reasoning(raw: Optional[str]) -> Optional[str]:
+def _extract_answer_from_reasoning(raw: str | None) -> str | None:
     """When the response model streams its full answer inside JSON thinking
     (file 'answer' key), return the answer text so the UI can render it as
     the normal assistant answer instead of JSON."""
@@ -3150,21 +3705,29 @@ def _provider_error_detail(error: Any) -> str:
         return "The provider rejected the request credentials. Check the API key and provider account permissions."
     if "429" in text or "rate limit" in text or "too many requests" in text:
         return "The provider rate limit was reached. Wait briefly or switch providers."
-    if "connection refused" in text or "failed to connect" in text or "connecterror" in text:
+    if (
+        "connection refused" in text
+        or "failed to connect" in text
+        or "connecterror" in text
+    ):
         return "The configured local provider is unreachable. Start the provider and verify its base URL."
     if "400" in text or "bad request" in text or "invalid request" in text:
         return "The provider rejected the request. Check the model name and compatibility of the endpoint."
-    return "The provider did not return a successful response. Check its status and retry."
+    return (
+        "The provider did not return a successful response. Check its status and retry."
+    )
 
 
 def _visible_answer_preview(text: str, limit: int = 1200) -> str:
     """Keep private reasoning markers out of visible workflow event summaries."""
-    visible = re.sub(r"<think>.*?</think>", "", text or "", flags=re.IGNORECASE | re.DOTALL)
+    visible = re.sub(
+        r"<think>.*?</think>", "", text or "", flags=re.IGNORECASE | re.DOTALL
+    )
     visible = visible.replace("<think>", "").replace("</think>", "").strip()
     return visible[:limit]
 
 
-def _safe_provider_failure_reply(context_payload: Dict, error: Any = None) -> str:
+def _safe_provider_failure_reply(context_payload: dict, error: Any = None) -> str:
     """Return a useful failure response without leaking raw internal payloads."""
     tool_context = context_payload.get("tool_context", {})
     runs = tool_context.get("tool_runs", [])
@@ -3182,7 +3745,9 @@ def _safe_provider_failure_reply(context_payload: Dict, error: Any = None) -> st
             else:
                 summaries.append(f"{name}: completed")
     evidence = "; ".join(summaries) if summaries else "no retrieval tools were required"
-    reason = _provider_error_label(error) if error else "provider did not return a response"
+    reason = (
+        _provider_error_label(error) if error else "provider did not return a response"
+    )
     return (
         "I completed the permitted retrieval and safety checks, but the configured language "
         f"model provider returned a {reason}. No unsupported database change was made. "
@@ -3195,10 +3760,10 @@ def _build_context_payload(
     session_id: UUID,
     user_text: str,
     current_user: TokenData,
-    attachments: List[ChatAttachmentTable],
-    workflow_run_id: Optional[str] = None,
+    attachments: list[ChatAttachmentTable],
+    workflow_run_id: str | None = None,
     event_sink=None,
-) -> Dict:
+) -> dict:
     """
     Build a lean, token-safe context payload.
     - Casual prompts skip history entirely.
@@ -3246,11 +3811,16 @@ def _build_context_payload(
             sink=event_sink,
         )
         context_scope.start({"session_id": str(session_id), "turn_limit": 6})
-        context_scope.complete({"messages_loaded": len(clean_history), "mode": request_plan["mode"]})
+        context_scope.complete(
+            {"messages_loaded": len(clean_history), "mode": request_plan["mode"]}
+        )
         tool_context.setdefault("tool_runs", []).append(
             {
                 "tool": "conversation_context",
-                "output": {"messages_loaded": len(clean_history), "mode": request_plan["mode"]},
+                "output": {
+                    "messages_loaded": len(clean_history),
+                    "mode": request_plan["mode"],
+                },
             }
         )
 
@@ -3265,16 +3835,16 @@ def _execute_tools(
     db: Session,
     user_text: str,
     current_user: TokenData,
-    attachments: List[ChatAttachmentTable],
-    workflow_run_id: Optional[str] = None,
+    attachments: list[ChatAttachmentTable],
+    workflow_run_id: str | None = None,
     event_sink=None,
-) -> Dict:
+) -> dict:
     request_plan = _request_plan(user_text, bool(attachments))
     tools = request_plan["capabilities"]
     result = {"tool_policy": tools, "tool_runs": [], "request_plan": request_plan}
     mutation_log = {"updated": False, "actions": [], "blocked": False}
 
-    def scope(tool_name: str, phase: str, message: str) -> Optional[ToolEventScope]:
+    def scope(tool_name: str, phase: str, message: str) -> ToolEventScope | None:
         if not workflow_run_id:
             return None
         current = ToolEventScope(
@@ -3322,7 +3892,11 @@ def _execute_tools(
                 }
             )
             if tool_scope:
-                tool_scope.complete({"reason": "RBAC policy denied"}, status="blocked", error_code="RBAC_DENIED")
+                tool_scope.complete(
+                    {"reason": "RBAC policy denied"},
+                    status="blocked",
+                    error_code="RBAC_DENIED",
+                )
     if "search_candidates" in tools:
         tool_scope = scope(
             "candidate.search",
@@ -3356,7 +3930,11 @@ def _execute_tools(
                 }
             )
             if tool_scope:
-                tool_scope.complete({"reason": "RBAC policy denied"}, status="blocked", error_code="RBAC_DENIED")
+                tool_scope.complete(
+                    {"reason": "RBAC policy denied"},
+                    status="blocked",
+                    error_code="RBAC_DENIED",
+                )
     if "dashboard_snapshot" in tools:
         tool_scope = scope(
             "dashboard.snapshot",
@@ -3372,7 +3950,9 @@ def _execute_tools(
                 }
             )
             if tool_scope:
-                tool_scope.complete({"record_count": snapshot.get("total_workforce", 0)})
+                tool_scope.complete(
+                    {"record_count": snapshot.get("total_workforce", 0)}
+                )
         else:
             result["tool_runs"].append(
                 {
@@ -3382,7 +3962,11 @@ def _execute_tools(
                 }
             )
             if tool_scope:
-                tool_scope.complete({"reason": "RBAC policy denied"}, status="blocked", error_code="RBAC_DENIED")
+                tool_scope.complete(
+                    {"reason": "RBAC policy denied"},
+                    status="blocked",
+                    error_code="RBAC_DENIED",
+                )
     if "mutate_data" in tools:
         tool_scope = scope(
             "data.mutate",
@@ -3430,7 +4014,9 @@ def _execute_tools(
                 status="blocked",
                 error_code="HUMAN_APPROVAL_REQUIRED",
             )
-    if "parse_csv_attachment" in tools or any(att.original_name.lower().endswith(".csv") for att in attachments):
+    if "parse_csv_attachment" in tools or any(
+        att.original_name.lower().endswith(".csv") for att in attachments
+    ):
         tool_scope = scope(
             "document.csv_ingest",
             "retrieval",
@@ -3529,10 +4115,10 @@ async def _stream_true_agent_loop(
     current_user: TokenData,
 ):
     """Run the model-directed, bounded tool loop and stream actual events."""
-    events: List[Dict[str, Any]] = []
-    tool_transcript: List[Dict[str, Any]] = []
-    mutation_state: Dict[str, Any] = {}
-    approval_id: Optional[str] = None
+    events: list[dict[str, Any]] = []
+    tool_transcript: list[dict[str, Any]] = []
+    mutation_state: dict[str, Any] = {}
+    approval_id: str | None = None
     awaiting_approval = False
     max_iterations = 6
 
@@ -3542,11 +4128,11 @@ async def _stream_true_agent_loop(
         message: str,
         *,
         status: str = "running",
-        tool_name: Optional[str] = None,
+        tool_name: str | None = None,
         safe_input: Any = None,
         result_summary: Any = None,
-        error_code: Optional[str] = None,
-        duration_ms: Optional[int] = None,
+        error_code: str | None = None,
+        duration_ms: int | None = None,
     ) -> str:
         event = emit_workflow_event(
             workflow_run.id,
@@ -3563,7 +4149,13 @@ async def _stream_true_agent_loop(
         events.append(event)
         return f"event: agent_step\ndata: {_json_dumps(event)}\n\n"
 
-    def reasoning_delta(event_id: Optional[str], phase: str, iteration: Optional[int], characters: int, text: str = "") -> str:
+    def reasoning_delta(
+        event_id: str | None,
+        phase: str,
+        iteration: int | None,
+        characters: int,
+        text: str = "",
+    ) -> str:
         """Stream live reasoning text as the provider's thinking arrives."""
         return (
             "event: model_reasoning_delta\n"
@@ -3571,13 +4163,13 @@ async def _stream_true_agent_loop(
         )
 
     def update_event_sse(
-        event_id: Optional[str],
+        event_id: str | None,
         message: str,
         *,
         status: str = "completed",
         result_summary: Any = None,
-        error_code: Optional[str] = None,
-        duration_ms: Optional[int] = None,
+        error_code: str | None = None,
+        duration_ms: int | None = None,
     ) -> str:
         """Finish the existing reasoning card in place so the timeline never
         shows a duplicate 'completed' sibling for the same thinking phase."""
@@ -3598,7 +4190,16 @@ async def _stream_true_agent_loop(
         events.append(updated)
         return f"event: agent_step\ndata: {_json_dumps(updated)}\n\n"
 
-    async def paced_reasoning_deltas(event_id: Optional[str], phase: str, iteration: Optional[int], token: str, running_chars: int, text: str = "", step: int = 8, gap_ms: int = 14):
+    async def paced_reasoning_deltas(
+        event_id: str | None,
+        phase: str,
+        iteration: int | None,
+        token: str,
+        running_chars: int,
+        text: str = "",
+        step: int = 8,
+        gap_ms: int = 14,
+    ):
         """Emit the live counter in small visible increments even when the provider
         delivers a large reasoning burst inside one stream chunk, so the UI always
         shows real motion instead of 0 -> 178 in a single flash."""
@@ -3610,7 +4211,9 @@ async def _stream_true_agent_loop(
             yield chars, reasoning_delta(event_id, phase, iteration, chars, text)
             await asyncio.sleep(gap_ms / 1000.0)
         if not token:
-            yield len(text), reasoning_delta(event_id, phase, iteration, len(text), text)
+            yield len(text), reasoning_delta(
+                event_id, phase, iteration, len(text), text
+            )
 
     yield emit(
         "workflow_started",
@@ -3626,10 +4229,14 @@ async def _stream_true_agent_loop(
         .order_by(ChatMessageTable.created_at.desc())
         .limit(6)
     ).all()
-    history: List[Dict[str, str]] = []
+    history: list[dict[str, str]] = []
     for row in reversed(history_rows):
         content = (row.content or "").strip()
-        if content and not content.startswith("LLM failed") and not content.startswith('{"tool_context'):
+        if (
+            content
+            and not content.startswith("LLM failed")
+            and not content.startswith('{"tool_context')
+        ):
             history.append({"role": row.role, "content": content[:600]})
 
     yield emit(
@@ -3651,10 +4258,20 @@ async def _stream_true_agent_loop(
     )
 
     overview_markers = [
-        "what does aurelinx know", "what do you know", "what do we know",
-        "cover every module", "everything you know", "whole system", "full picture",
-        "every module", "explain the system", "company overview", "operations overview",
-        "what is going on", "knows everything", "tell me everything",
+        "what does aurelinx know",
+        "what do you know",
+        "what do we know",
+        "cover every module",
+        "everything you know",
+        "whole system",
+        "full picture",
+        "every module",
+        "explain the system",
+        "company overview",
+        "operations overview",
+        "what is going on",
+        "knows everything",
+        "tell me everything",
     ]
     user_text_lc = (request.content or "").lower()
     overview_hint = ""
@@ -3688,22 +4305,28 @@ async def _stream_true_agent_loop(
     for iteration in range(1, max_iterations + 1):
         # Fresh card per round: reset the round's reasoning state so iteration 2
         # gets its own card while transient retries within one round reuse it.
-        round_reasoning_id: Optional[str] = None
-        round_reasoning_frame: Optional[Dict] = None
-        round_started_t: Optional[float] = None
+        round_reasoning_id: str | None = None
+        round_reasoning_frame: dict | None = None
+        round_started_t: float | None = None
         reasoning_event_text = ""
         planner_prompt = _agent_controller_prompt(
             request.content,
             history,
             tool_transcript,
             current_user,
-            bool(db.exec(select(ChatAttachmentTable).where(ChatAttachmentTable.session_id == str(chat_session.id))).all()),
+            bool(
+                db.exec(
+                    select(ChatAttachmentTable).where(
+                        ChatAttachmentTable.session_id == str(chat_session.id)
+                    )
+                ).all()
+            ),
         )
         raw_decision = ""
         reasoning_active = False
         reasoning_event_chars = 0
         reasoning_event_id = None
-        reasoning_started_t: Optional[float] = None
+        reasoning_started_t: float | None = None
         controller_context = {
             "request_plan": {"mode": "agent_controller", "needs_live_data": False},
             "tool_context": {
@@ -3713,13 +4336,17 @@ async def _stream_true_agent_loop(
             "session_history": history,
         }
 
-        async def controller_turn_attempt():
+        async def controller_turn_attempt(
+            turn_iteration: int = iteration,
+            turn_prompt: str = planner_prompt,
+            turn_context: dict[str, Any] = controller_context,
+        ):
             nonlocal reasoning_active, reasoning_event_chars, reasoning_event_id, raw_decision, reasoning_started_t, round_reasoning_id, round_reasoning_frame, round_started_t
             reasoning_active = True
             reasoning_event_chars = 0
             reasoning_event_text = ""
             raw_decision = ""
-            
+
             # Emit this round's thinking card immediately so the UI shows live
             # thinking as the controller stream starts. Reused across transient
             # retries of this round, and finalized once when the round ends.
@@ -3732,7 +4359,7 @@ async def _stream_true_agent_loop(
                     "The execution model is thinking about the next step",
                     status="running",
                     result_summary={
-                        "iteration": iteration,
+                        "iteration": turn_iteration,
                         "provider": request.provider or "lmstudio",
                         "model": request.model or "provider_default",
                     },
@@ -3751,11 +4378,11 @@ async def _stream_true_agent_loop(
                 api_key=_resolve_api_key(request.provider, request.api_key),
                 base_url=request.base_url,
                 model=request.model,
-                user_text=planner_prompt,
-                context_payload=controller_context,
+                user_text=turn_prompt,
+                context_payload=turn_context,
                 system_override=controller_system,
                 temperature_override=0.0,
-                user_content_override=planner_prompt,
+                user_content_override=turn_prompt,
             ):
                 if token in ("<think>", " thinking", "<thought>"):
                     if not reasoning_active:
@@ -3768,7 +4395,12 @@ async def _stream_true_agent_loop(
                 if reasoning_active:
                     reasoning_event_text = (reasoning_event_text or "") + (token or "")
                     async for running_chars, delta_sse in paced_reasoning_deltas(
-                        reasoning_event_id, "planning", iteration, token or "", reasoning_event_chars, reasoning_event_text
+                        reasoning_event_id,
+                        "planning",
+                        turn_iteration,
+                        token or "",
+                        reasoning_event_chars,
+                        reasoning_event_text,
                     ):
                         reasoning_event_chars = running_chars
                         yield delta_sse
@@ -3786,13 +4418,19 @@ async def _stream_true_agent_loop(
                     round_reasoning_id,
                     "Reasoning complete",
                     status="completed",
-                    duration_ms=int((time.monotonic() - round_started_t) * 1000) if round_started_t else None,
-                    result_summary={
-                        "characters": len(reasoning_event_text),
-                        "text": reasoning_event_text,
-                    }
-                    if reasoning_event_text
-                    else {"characters": 0},
+                    duration_ms=(
+                        int((time.monotonic() - round_started_t) * 1000)
+                        if round_started_t
+                        else None
+                    ),
+                    result_summary=(
+                        {
+                            "characters": len(reasoning_event_text),
+                            "text": reasoning_event_text,
+                        }
+                        if reasoning_event_text
+                        else {"characters": 0}
+                    ),
                 )
 
         try:
@@ -3803,7 +4441,9 @@ async def _stream_true_agent_loop(
                     break
                 except Exception as exc:
                     if attempt_round < 4 and _transient_provider_error(exc):
-                        logger.warning(f"[chat] transient controller failure on attempt {attempt_round}/4, retrying: {exc}")
+                        logger.warning(
+                            f"[chat] transient controller failure on attempt {attempt_round}/4, retrying: {exc}"
+                        )
                         await asyncio.sleep(min(24, 4 * attempt_round))
                         continue
                     raise
@@ -3816,13 +4456,19 @@ async def _stream_true_agent_loop(
                     round_reasoning_id,
                     "Reasoning stopped",
                     status="failed",
-                    duration_ms=int((time.monotonic() - round_started_t) * 1000) if round_started_t else None,
-                    result_summary={
-                        "characters": len(reasoning_event_text),
-                        "text": reasoning_event_text,
-                    }
-                    if reasoning_event_text
-                    else {"characters": 0},
+                    duration_ms=(
+                        int((time.monotonic() - round_started_t) * 1000)
+                        if round_started_t
+                        else None
+                    ),
+                    result_summary=(
+                        {
+                            "characters": len(reasoning_event_text),
+                            "text": reasoning_event_text,
+                        }
+                        if reasoning_event_text
+                        else {"characters": 0}
+                    ),
                     error_code=_provider_error_code(exc),
                 )
             raw_status = re.search(r"'([^']+)'", str(exc))
@@ -3833,7 +4479,10 @@ async def _stream_true_agent_loop(
                 "planning",
                 f"Provider call failed: {status_line}",
                 status="failed",
-                result_summary={"iteration": iteration, "reason": _provider_error_label(exc)},
+                result_summary={
+                    "iteration": iteration,
+                    "reason": _provider_error_label(exc),
+                },
                 error_code=_provider_error_code(exc),
             )
             events.append(controller_failed)
@@ -3841,7 +4490,13 @@ async def _stream_true_agent_loop(
             break
         decision = _parse_agent_decision(raw_decision, request.content)
 
-        if any(word in request.content.lower() for word in ("delete", "remove", "purge", "clear")) and decision.get("action") == "respond":
+        if (
+            any(
+                word in request.content.lower()
+                for word in ("delete", "remove", "purge", "clear")
+            )
+            and decision.get("action") == "respond"
+        ):
             decision = {
                 "action": "approval_required",
                 "message": "The request is destructive; human approval is required before any delete action",
@@ -3858,21 +4513,45 @@ async def _stream_true_agent_loop(
             )
             if iteration == 1:
                 request_lower = request.content.lower()
-                if any(word in request_lower for word in ("database", "db", "record", "records", "entry", "entries", "table", "tables")):
+                if any(
+                    word in request_lower
+                    for word in (
+                        "database",
+                        "db",
+                        "record",
+                        "records",
+                        "entry",
+                        "entries",
+                        "table",
+                        "tables",
+                    )
+                ):
                     decision = {
                         "action": "tool",
                         "tool": "analyse",
                         "arguments": {"scope": request.content},
                         "message": "The controller requested a verified database analysis.",
                     }
-                elif any(word in request_lower for word in ("employee", "employees", "staff", "workforce", "worker")):
+                elif any(
+                    word in request_lower
+                    for word in (
+                        "employee",
+                        "employees",
+                        "staff",
+                        "workforce",
+                        "worker",
+                    )
+                ):
                     decision = {
                         "action": "tool",
                         "tool": "search",
                         "arguments": {"entity": "employee", "query": request.content},
                         "message": "The controller requested a verified employee search.",
                     }
-                elif any(word in request_lower for word in ("candidate", "candidates", "applicant", "applicants")):
+                elif any(
+                    word in request_lower
+                    for word in ("candidate", "candidates", "applicant", "applicants")
+                ):
                     decision = {
                         "action": "tool",
                         "tool": "search",
@@ -3960,7 +4639,9 @@ async def _stream_true_agent_loop(
                     tenant_id=getattr(current_user, "tenant_id", None) or "default",
                     requested_by=str(current_user.user_id),
                     action_type="delete",
-                    action_payload_hash=hashlib.sha256(approval_payload.encode("utf-8")).hexdigest(),
+                    action_payload_hash=hashlib.sha256(
+                        approval_payload.encode("utf-8")
+                    ).hexdigest(),
                     action_payload=approval_payload,
                     status="pending",
                     reason="LLM controller requested human approval for deletion",
@@ -3974,22 +4655,32 @@ async def _stream_true_agent_loop(
                 "governance",
                 "Deletion is blocked until an authorized human approves it",
                 status="blocked",
-                result_summary={"approval_required": True, "action": "delete", "approval_id": approval_id},
+                result_summary={
+                    "approval_required": True,
+                    "action": "delete",
+                    "approval_id": approval_id,
+                },
                 error_code="HUMAN_APPROVAL_REQUIRED",
             )
             break
 
         if action == "respond":
-            if mutation_state.get("updated") and not mutation_state.get("verification", {}).get("verified"):
-                decision = {"action": "tool", "tool": "data.verify", "arguments": {}, "message": "Policy requires read-back verification before final response"}
+            if mutation_state.get("updated") and not mutation_state.get(
+                "verification", {}
+            ).get("verified"):
+                decision = {
+                    "action": "tool",
+                    "tool": "data.verify",
+                    "arguments": {},
+                    "message": "Policy requires read-back verification before final response",
+                }
             else:
                 # Conversation-only turns can use the controller's answer directly.
                 # This avoids a needless second provider request (and avoids making
                 # a free/rate-limited provider fail after a valid controller call).
                 controller_answer = _sanitize_llm_response(
-                    decision.get("answer", "") or (
-                        decision.get("message", "") if not tool_transcript else ""
-                    ),
+                    decision.get("answer", "")
+                    or (decision.get("message", "") if not tool_transcript else ""),
                     request.content,
                 )
                 break
@@ -4021,7 +4712,9 @@ async def _stream_true_agent_loop(
         if tool_name == "data.verify" and isinstance(result.get("result"), dict):
             mutation_state["verification"] = result["result"]
         safe_result = safe_summary(result)
-        tool_transcript.append({"tool": tool_name, "arguments": arguments, "result": safe_result})
+        tool_transcript.append(
+            {"tool": tool_name, "arguments": arguments, "result": safe_result}
+        )
         yield emit(
             "tool_result",
             "execution" if tool_name.startswith("data.") else "retrieval",
@@ -4033,14 +4726,16 @@ async def _stream_true_agent_loop(
             error_code="TOOL_BLOCKED" if result.get("blocked") else None,
         )
 
-    tool_runs = [{"tool": item["tool"], "output": item["result"]} for item in tool_transcript]
+    tool_runs = [
+        {"tool": item["tool"], "output": item["result"]} for item in tool_transcript
+    ]
     feedback_rows = db.exec(
         select(ChatFeedbackTable)
         .where(ChatFeedbackTable.session_id == str(chat_session.id))
         .order_by(ChatFeedbackTable.created_at.desc())
         .limit(10)
     ).all()
-    feedback_notes: List[str] = []
+    feedback_notes: list[str] = []
     for fnote in reversed(feedback_rows):
         snippet = (fnote.assistant_preview or "").strip()
         excerpt = snippet[:600].replace("\n", " ")
@@ -4048,7 +4743,7 @@ async def _stream_true_agent_loop(
             continue
         if excerpt:
             feedback_notes.append(
-                f'• The admin marked the previous answer as unsatisfactory. '
+                f"• The admin marked the previous answer as unsatisfactory. "
                 f'That answer was: "{excerpt}". Provide a more accurate, complete, '
                 f"and clearly sourced answer this time."
             )
@@ -4075,23 +4770,31 @@ async def _stream_true_agent_loop(
     yield emit(
         "validation_completed",
         "validation",
-        "Controller output and tool results passed workflow validation"
-        if not controller_error
-        else "Validation stopped because the controller provider failed",
+        (
+            "Controller output and tool results passed workflow validation"
+            if not controller_error
+            else "Validation stopped because the controller provider failed"
+        ),
         status="completed" if not controller_error else "failed",
         result_summary={
             "iterations": len(tool_transcript) + 1,
             "tool_calls": len(tool_transcript),
-            **({"reason": _provider_error_label(controller_error)} if controller_error else {}),
+            **(
+                {"reason": _provider_error_label(controller_error)}
+                if controller_error
+                else {}
+            ),
         },
         error_code=_provider_error_code(controller_error) if controller_error else None,
     )
     response_source = (
         "provider_failure"
         if controller_error
-        else "controller"
-        if controller_answer and not tool_transcript
-        else "response_model"
+        else (
+            "controller"
+            if controller_answer and not tool_transcript
+            else "response_model"
+        )
     )
     model_started = emit_workflow_event(
         workflow_run.id,
@@ -4116,14 +4819,16 @@ async def _stream_true_agent_loop(
     reasoning_event_text = ""
     # The answer phase gets its own thinking card, finalized in place when the
     # final stream ends (completed) or fails (failed) - exactly one row.
-    answer_reasoning_id: Optional[str] = None
-    answer_started_t: Optional[float] = None
+    answer_reasoning_id: str | None = None
+    answer_started_t: float | None = None
     answer_card_finalized = False
-    reasoning_started_a: Optional[float] = None
+    reasoning_started_a: float | None = None
     try:
         if controller_error:
             last_err = controller_error
-            assistant_text = _safe_provider_failure_reply(context_payload, controller_error)
+            assistant_text = _safe_provider_failure_reply(
+                context_payload, controller_error
+            )
             # Stream word-by-word so the UI sees live delta instead of a single flush
             words = assistant_text.split(" ")
             for i, word in enumerate(words):
@@ -4153,7 +4858,7 @@ async def _stream_true_agent_loop(
                         user_text=request.content,
                         context_payload=context_payload,
                     ):
-                        if token == " thinking":
+                        if token == " thinking":  # nosec B105
                             if not reasoning_active:
                                 reasoning_active = True
                                 reasoning_started_a = time.monotonic()
@@ -4166,22 +4871,35 @@ async def _stream_true_agent_loop(
                                         status="running",
                                         result_summary={
                                             "provider": request.provider or "lmstudio",
-                                            "model": request.model or "provider_default",
+                                            "model": request.model
+                                            or "provider_default",
                                         },
                                     )
-                                    answer_reasoning_id = reasoning_event_id = reasoning_frame["event_id"]
+                                    answer_reasoning_id = reasoning_event_id = (
+                                        reasoning_frame["event_id"]
+                                    )
                                     answer_started_t = reasoning_started_a
                                     events.append(reasoning_frame)
                                     yield f"event: agent_step\ndata: {_json_dumps(reasoning_frame)}\n\n"
                             continue
-                        if token == " response":
+                        if token == " response":  # nosec B105
                             if reasoning_active:
                                 reasoning_active = False
                             continue
                         if reasoning_active:
-                            reasoning_event_text = (reasoning_event_text or "") + (token or "")
-                            async for running_chars, delta_sse in paced_reasoning_deltas(
-                                reasoning_event_id, "response", None, token or "", reasoning_event_chars, reasoning_event_text
+                            reasoning_event_text = (reasoning_event_text or "") + (
+                                token or ""
+                            )
+                            async for (
+                                running_chars,
+                                delta_sse,
+                            ) in paced_reasoning_deltas(
+                                reasoning_event_id,
+                                "response",
+                                None,
+                                token or "",
+                                reasoning_event_chars,
+                                reasoning_event_text,
                             ):
                                 reasoning_event_chars = running_chars
                                 yield delta_sse
@@ -4194,16 +4912,24 @@ async def _stream_true_agent_loop(
                             answer_reasoning_id,
                             "Reasoning complete",
                             status="completed",
-                            duration_ms=int((time.monotonic() - answer_started_t) * 1000) if answer_started_t else None,
-                            result_summary={
-                                "characters": len(reasoning_event_text),
-                                "text": reasoning_event_text,
-                            }
-                            if reasoning_event_text
-                            else {"characters": 0},
+                            duration_ms=(
+                                int((time.monotonic() - answer_started_t) * 1000)
+                                if answer_started_t
+                                else None
+                            ),
+                            result_summary=(
+                                {
+                                    "characters": len(reasoning_event_text),
+                                    "text": reasoning_event_text,
+                                }
+                                if reasoning_event_text
+                                else {"characters": 0}
+                            ),
                         )
                     if not assistant_text:
-                        embedded_answer = _extract_answer_from_reasoning(reasoning_event_text)
+                        embedded_answer = _extract_answer_from_reasoning(
+                            reasoning_event_text
+                        )
                         if embedded_answer:
                             words = embedded_answer.split(" ")
                             for i, word in enumerate(words):
@@ -4215,9 +4941,13 @@ async def _stream_true_agent_loop(
                 except Exception as exc:
                     last_err = str(exc)
                     if attempt_round >= 4 or not _transient_provider_error(exc):
-                        logger.warning(f"[chat] final answer stream failed on attempt {attempt_round}/4: {exc}")
+                        logger.warning(
+                            f"[chat] final answer stream failed on attempt {attempt_round}/4: {exc}"
+                        )
                         raise
-                    logger.warning(f"[chat] transient provider failure on attempt {attempt_round}/4, retrying: {exc}")
+                    logger.warning(
+                        f"[chat] transient provider failure on attempt {attempt_round}/4, retrying: {exc}"
+                    )
                     assistant_text = assistant_text[:content_before_attempt]
                     await asyncio.sleep(min(24, 4 * attempt_round))
                     continue
@@ -4229,13 +4959,19 @@ async def _stream_true_agent_loop(
                 answer_reasoning_id,
                 "Reasoning stopped",
                 status="failed",
-                duration_ms=int((time.monotonic() - answer_started_t) * 1000) if answer_started_t else None,
-                result_summary={
-                    "characters": len(reasoning_event_text),
-                    "text": reasoning_event_text,
-                }
-                if reasoning_event_text
-                else {"characters": 0},
+                duration_ms=(
+                    int((time.monotonic() - answer_started_t) * 1000)
+                    if answer_started_t
+                    else None
+                ),
+                result_summary=(
+                    {
+                        "characters": len(reasoning_event_text),
+                        "text": reasoning_event_text,
+                    }
+                    if reasoning_event_text
+                    else {"characters": 0}
+                ),
                 error_code=_provider_error_code(exc),
             )
         assistant_text = _safe_provider_failure_reply(context_payload, exc)
@@ -4279,7 +5015,11 @@ async def _stream_true_agent_loop(
         action="CHAT_MESSAGE_AGENT_LOOP",
         resource_type="chat_session",
         resource_id=chat_session.id,
-        details={"tool_calls": len(tool_transcript), "iterations": len(tool_transcript) + 1, "controller": "llm"},
+        details={
+            "tool_calls": len(tool_transcript),
+            "iterations": len(tool_transcript) + 1,
+            "controller": "llm",
+        },
     )
     db.commit()
     db.refresh(assistant_msg)
@@ -4293,9 +5033,16 @@ async def _stream_true_agent_loop(
         workflow_run.id,
         "workflow_paused" if awaiting_approval else "workflow_completed",
         "governance" if awaiting_approval else "completed",
-        "Workflow paused for authorized approval" if awaiting_approval else "Workflow completed from the live agent loop",
+        (
+            "Workflow paused for authorized approval"
+            if awaiting_approval
+            else "Workflow completed from the live agent loop"
+        ),
         status="waiting" if awaiting_approval else "completed",
-        result_summary={"assistant_message_id": assistant_msg.id, "tool_calls": len(tool_transcript)},
+        result_summary={
+            "assistant_message_id": assistant_msg.id,
+            "tool_calls": len(tool_transcript),
+        },
     )
     events.append(completed)
     context_payload["workflow_events"] = events
@@ -4307,7 +5054,7 @@ async def _stream_true_agent_loop(
     yield f"event: done\ndata: {_json_dumps({'assistant_message': _to_message_out(assistant_msg).model_dump(mode='json'), 'user_message': _to_message_out(user_msg).model_dump(mode='json'), 'session': _to_session_out(chat_session).model_dump(mode='json')})}\n\n"
 
 
-@router.get("/sessions", response_model=List[ChatSessionOut])
+@router.get("/sessions", response_model=list[ChatSessionOut])
 async def list_sessions(
     current_user: TokenData = Depends(get_current_user),
     db: Session = Depends(get_session),
@@ -4435,7 +5182,7 @@ async def delete_sessions_bulk(
     db.commit()
 
 
-@router.get("/sessions/{session_id}/messages", response_model=List[ChatMessageOut])
+@router.get("/sessions/{session_id}/messages", response_model=list[ChatMessageOut])
 async def list_messages(
     session_id: UUID,
     current_user: TokenData = Depends(get_current_user),
@@ -4456,7 +5203,7 @@ async def list_messages(
 @router.post("/sessions/{session_id}/feedback")
 async def submit_feedback(
     session_id: UUID,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     current_user: TokenData = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
@@ -4499,7 +5246,7 @@ async def submit_feedback(
 
 
 @router.get(
-    "/sessions/{session_id}/attachments", response_model=List[ChatAttachmentOut]
+    "/sessions/{session_id}/attachments", response_model=list[ChatAttachmentOut]
 )
 async def list_attachments(
     session_id: UUID,
@@ -4572,13 +5319,17 @@ async def list_workflow_events(
     return [workflow_event_dict(event) for event in events]
 
 
-def _perform_approved_delete(db: Session, payload: str) -> Dict[str, Any]:
+def _perform_approved_delete(db: Session, payload: str) -> dict[str, Any]:
     """Delete the exact record(s) approved by an authorized human."""
-    spec_payload: Optional[Dict[str, Any]] = None
+    spec_payload: dict[str, Any] | None = None
     if payload and payload.lstrip().startswith("{"):
         try:
             parsed = json.loads(payload)
-            if isinstance(parsed, dict) and parsed.get("entity") and parsed.get("identifier"):
+            if (
+                isinstance(parsed, dict)
+                and parsed.get("entity")
+                and parsed.get("identifier")
+            ):
                 spec_payload = parsed
         except Exception:
             spec_payload = None
@@ -4586,7 +5337,10 @@ def _perform_approved_delete(db: Session, payload: str) -> Dict[str, Any]:
     if spec_payload:
         spec = _TOOL_ENTITIES.get(_normalize_entity(str(spec_payload["entity"])))
         if not spec:
-            raise HTTPException(status_code=422, detail=f"Unsupported entity in approved deletion: {spec_payload.get('entity')}")
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unsupported entity in approved deletion: {spec_payload.get('entity')}",
+            )
         targets = _records_by_identifier(
             db,
             spec,
@@ -4599,15 +5353,23 @@ def _perform_approved_delete(db: Session, payload: str) -> Dict[str, Any]:
             )
         resource_type = str(spec_payload["entity"])
         if resource_type in {"employee", "candidate"}:
-            child_skill = SkillTable.employee_id if resource_type == "employee" else SkillTable.candidate_id
+            child_skill = (
+                SkillTable.employee_id
+                if resource_type == "employee"
+                else SkillTable.candidate_id
+            )
             child_experience = (
                 ExperienceTable.employee_id
                 if resource_type == "employee"
                 else ExperienceTable.candidate_id
             )
-            skills = db.exec(select(SkillTable).where(child_skill.in_([row.id for row in targets]))).all()
+            skills = db.exec(
+                select(SkillTable).where(child_skill.in_([row.id for row in targets]))
+            ).all()
             experiences = db.exec(
-                select(ExperienceTable).where(child_experience.in_([row.id for row in targets]))
+                select(ExperienceTable).where(
+                    child_experience.in_([row.id for row in targets])
+                )
             ).all()
             for item in skills + experiences:
                 db.delete(item)
@@ -4638,7 +5400,9 @@ def _perform_approved_delete(db: Session, payload: str) -> Dict[str, Any]:
         r"([a-zA-Z0-9.\-_+]+@[a-zA-Z0-9.\-_]+\.[a-zA-Z]{2,})", payload
     )
     if not email_match:
-        raise HTTPException(status_code=422, detail="Approved deletion requires an exact email")
+        raise HTTPException(
+            status_code=422, detail="Approved deletion requires an exact email"
+        )
     email = email_match.group(1).lower()
     lowered = payload.lower()
     is_candidate = "candidate" in lowered
@@ -4650,22 +5414,32 @@ def _perform_approved_delete(db: Session, payload: str) -> Dict[str, Any]:
         )
 
     if is_candidate:
-        record = db.exec(select(CandidateTable).where(CandidateTable.email == email)).first()
+        record = db.exec(
+            select(CandidateTable).where(CandidateTable.email == email)
+        ).first()
         resource_type = "candidate"
     else:
-        record = db.exec(select(EmployeeTable).where(EmployeeTable.email == email)).first()
+        record = db.exec(
+            select(EmployeeTable).where(EmployeeTable.email == email)
+        ).first()
         resource_type = "employee"
     if not record:
-        raise HTTPException(status_code=404, detail=f"No {resource_type} found for {email}")
+        raise HTTPException(
+            status_code=404, detail=f"No {resource_type} found for {email}"
+        )
 
     skills = db.exec(
         select(SkillTable).where(
-            SkillTable.candidate_id == record.id if is_candidate else SkillTable.employee_id == record.id
+            SkillTable.candidate_id == record.id
+            if is_candidate
+            else SkillTable.employee_id == record.id
         )
     ).all()
     experiences = db.exec(
         select(ExperienceTable).where(
-            ExperienceTable.candidate_id == record.id if is_candidate else ExperienceTable.employee_id == record.id
+            ExperienceTable.candidate_id == record.id
+            if is_candidate
+            else ExperienceTable.employee_id == record.id
         )
     ).all()
     for item in skills + experiences:
@@ -4696,7 +5470,9 @@ async def approve_workflow_action(
     if not approval or approval.run_id != run_id:
         raise HTTPException(status_code=404, detail="Approval not found")
     if approval.status != "pending":
-        raise HTTPException(status_code=409, detail=f"Approval is already {approval.status}")
+        raise HTTPException(
+            status_code=409, detail=f"Approval is already {approval.status}"
+        )
     if approval.expires_at < datetime.utcnow():
         approval.status = "expired"
         approval.resolved_at = datetime.utcnow()
@@ -4705,8 +5481,13 @@ async def approve_workflow_action(
         update_workflow_run(run_id, "failed", "governance", "Approval expired")
         raise HTTPException(status_code=410, detail="Approval expired")
 
-    if hashlib.sha256(approval.action_payload.encode("utf-8")).hexdigest() != approval.action_payload_hash:
-        raise HTTPException(status_code=409, detail="Approval payload integrity check failed")
+    if (
+        hashlib.sha256(approval.action_payload.encode("utf-8")).hexdigest()
+        != approval.action_payload_hash
+    ):
+        raise HTTPException(
+            status_code=409, detail="Approval payload integrity check failed"
+        )
 
     result = _perform_approved_delete(db, approval.action_payload)
     approval.status = "approved"
@@ -4756,7 +5537,12 @@ async def approve_workflow_action(
         status="completed",
         result_summary=result,
     )
-    return {"status": "completed", "run_id": run_id, "approval_id": approval_id, "result": result}
+    return {
+        "status": "completed",
+        "run_id": run_id,
+        "approval_id": approval_id,
+        "result": result,
+    }
 
 
 @router.post("/workflows/{run_id}/approvals/{approval_id}/reject")
@@ -4772,7 +5558,9 @@ async def reject_workflow_action(
     if not approval or approval.run_id != run_id:
         raise HTTPException(status_code=404, detail="Approval not found")
     if approval.status != "pending":
-        raise HTTPException(status_code=409, detail=f"Approval is already {approval.status}")
+        raise HTTPException(
+            status_code=409, detail=f"Approval is already {approval.status}"
+        )
     approval.status = "rejected"
     approval.approved_by = str(current_user.user_id)
     approval.resolved_at = datetime.utcnow()
@@ -4874,7 +5662,11 @@ async def send_message(
     )
     tool_context = context_payload.get("tool_context", {})
     resolved_provider = (request.provider or "lmstudio").lower()
-    resolved_provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(resolved_provider, resolved_provider)
+    resolved_provider = {
+        "anthropic": "claude",
+        "google": "gemini",
+        "google-gemini": "gemini",
+    }.get(resolved_provider, resolved_provider)
     resolved_api_key = _resolve_api_key(request.provider, request.api_key)
     assistant_text = ""
     last_err = None
@@ -4947,7 +5739,7 @@ async def send_message_stream(
         user_text: str,
         workflow_run_id: str,
         event_sink,
-    ) -> Dict:
+    ) -> dict:
         """Run blocking retrieval/tool work off the event loop with its own DB session."""
         with Session(engine) as worker_db:
             worker_attachments = worker_db.exec(
@@ -4999,7 +5791,7 @@ async def send_message_stream(
                 )
             ).all()
 
-            def workflow_sse(event: Dict[str, Any]) -> str:
+            def workflow_sse(event: dict[str, Any]) -> str:
                 return f"event: agent_step\ndata: {_json_dumps(event)}\n\n"
 
             started = emit_workflow_event(
@@ -5044,16 +5836,28 @@ async def send_message_stream(
             queue: asyncio.Queue = asyncio.Queue()
             loop = asyncio.get_running_loop()
 
-            def event_sink(event: Dict[str, Any]) -> None:
+            def event_sink(event: dict[str, Any]) -> None:
                 asyncio.run_coroutine_threadsafe(queue.put(event), loop)
 
-            context_phase = "retrieval" if request_plan["needs_live_data"] else "context"
-            context_status = "retrieving" if request_plan["needs_live_data"] else "contextualizing"
+            context_phase = (
+                "retrieval" if request_plan["needs_live_data"] else "context"
+            )
+            context_status = (
+                "retrieving" if request_plan["needs_live_data"] else "contextualizing"
+            )
             context_started = emit_workflow_event(
                 workflow_run.id,
-                "retrieval_started" if request_plan["needs_live_data"] else "context_started",
+                (
+                    "retrieval_started"
+                    if request_plan["needs_live_data"]
+                    else "context_started"
+                ),
                 context_phase,
-                "Retrieving verified live records and attachment context" if request_plan["needs_live_data"] else "Loading conversation context and request state",
+                (
+                    "Retrieving verified live records and attachment context"
+                    if request_plan["needs_live_data"]
+                    else "Loading conversation context and request state"
+                ),
                 status="running",
             )
             yield workflow_sse(context_started)
@@ -5091,12 +5895,22 @@ async def send_message_stream(
 
             context_completed = emit_workflow_event(
                 workflow_run.id,
-                "retrieval_completed" if request_plan["needs_live_data"] else "context_completed",
+                (
+                    "retrieval_completed"
+                    if request_plan["needs_live_data"]
+                    else "context_completed"
+                ),
                 context_phase,
-                "Verified live records and attachment context retrieved" if request_plan["needs_live_data"] else "Conversation context and request state loaded",
+                (
+                    "Verified live records and attachment context retrieved"
+                    if request_plan["needs_live_data"]
+                    else "Conversation context and request state loaded"
+                ),
                 status="completed",
                 result_summary={
-                    "tool_runs": len(context_payload.get("tool_context", {}).get("tool_runs", [])),
+                    "tool_runs": len(
+                        context_payload.get("tool_context", {}).get("tool_runs", [])
+                    ),
                 },
             )
             yield workflow_sse(context_completed)
@@ -5104,11 +5918,19 @@ async def send_message_stream(
                 workflow_run.id,
                 "validation_completed",
                 "validation",
-                "Retrieved data passed workflow validation checks" if request_plan["needs_live_data"] else "Conversation context passed workflow validation checks",
+                (
+                    "Retrieved data passed workflow validation checks"
+                    if request_plan["needs_live_data"]
+                    else "Conversation context passed workflow validation checks"
+                ),
                 status="completed",
                 result_summary={
-                    "tool_runs": len(context_payload.get("tool_context", {}).get("tool_runs", [])),
-                    "record_counts": context_payload.get("tool_context", {}).get("record_counts", {}),
+                    "tool_runs": len(
+                        context_payload.get("tool_context", {}).get("tool_runs", [])
+                    ),
+                    "record_counts": context_payload.get("tool_context", {}).get(
+                        "record_counts", {}
+                    ),
                 },
             )
             yield workflow_sse(validation)
@@ -5134,7 +5956,9 @@ async def send_message_stream(
                     request.content,
                     tool_context.get("mutations", {}),
                 )
-                tool_context.setdefault("mutations", {})["verification"] = mutation_verification
+                tool_context.setdefault("mutations", {})[
+                    "verification"
+                ] = mutation_verification
                 tool_context.setdefault("tool_runs", []).append(
                     {"tool": "data.verify", "output": mutation_verification}
                 )
@@ -5143,10 +5967,18 @@ async def send_message_stream(
                     "verification_result",
                     "verification",
                     "Committed mutation read-back completed",
-                    status="completed" if mutation_verification.get("verified") else "failed",
+                    status=(
+                        "completed"
+                        if mutation_verification.get("verified")
+                        else "failed"
+                    ),
                     tool_name="data.verify",
                     result_summary=mutation_verification,
-                    error_code=None if mutation_verification.get("verified") else "MUTATION_READBACK_FAILED",
+                    error_code=(
+                        None
+                        if mutation_verification.get("verified")
+                        else "MUTATION_READBACK_FAILED"
+                    ),
                 )
                 yield workflow_sse(mutation_verified)
             if "human_approval_delete" in tool_context.get("tool_policy", []):
@@ -5159,7 +5991,9 @@ async def send_message_stream(
                     tenant_id=getattr(current_user, "tenant_id", None) or "default",
                     requested_by=str(current_user.user_id),
                     action_type="delete",
-                    action_payload_hash=hashlib.sha256(approval_payload.encode("utf-8")).hexdigest(),
+                    action_payload_hash=hashlib.sha256(
+                        approval_payload.encode("utf-8")
+                    ).hexdigest(),
                     action_payload=approval_payload,
                     status="pending",
                     reason="Deletion requested through workflow chat",
@@ -5174,7 +6008,11 @@ async def send_message_stream(
                     "governance",
                     "Deletion is blocked until an authorized human approves it",
                     status="blocked",
-                    result_summary={"approval_required": True, "action": "delete", "approval_id": approval_id},
+                    result_summary={
+                        "approval_required": True,
+                        "action": "delete",
+                        "approval_id": approval_id,
+                    },
                     error_code="HUMAN_APPROVAL_REQUIRED",
                 )
                 yield workflow_sse(approval)
@@ -5192,8 +6030,12 @@ async def send_message_stream(
                 ),
                 result_summary={
                     "rbac_role": tool_context.get("rbac_role"),
-                    "mutation_blocked": tool_context.get("mutations", {}).get("blocked", False),
-                    "mutation_verification": tool_context.get("mutations", {}).get("verification"),
+                    "mutation_blocked": tool_context.get("mutations", {}).get(
+                        "blocked", False
+                    ),
+                    "mutation_verification": tool_context.get("mutations", {}).get(
+                        "verification"
+                    ),
                 },
             )
             yield workflow_sse(verified)
@@ -5204,7 +6046,10 @@ async def send_message_stream(
                 "response",
                 "Generating an evidence-grounded response from verified context",
                 status="running",
-                result_summary={"provider": request.provider or "lmstudio", "model": request.model},
+                result_summary={
+                    "provider": request.provider or "lmstudio",
+                    "model": request.model,
+                },
             )
             yield workflow_sse(model_started)
             update_workflow_run(workflow_run.id, "executing", "response")
@@ -5284,7 +6129,11 @@ async def send_message_stream(
                 workflow_run.id,
                 "workflow_paused" if awaiting_approval else "workflow_completed",
                 "governance" if awaiting_approval else "completed",
-                "Workflow paused until an authorized admin resolves the approval" if awaiting_approval else "Workflow completed with an auditable result",
+                (
+                    "Workflow paused until an authorized admin resolves the approval"
+                    if awaiting_approval
+                    else "Workflow completed with an auditable result"
+                ),
                 status="waiting" if awaiting_approval else "completed",
                 result_summary={"assistant_message_id": assistant_msg.id},
             )
@@ -5294,7 +6143,9 @@ async def send_message_stream(
                 .order_by(WorkflowEventTable.sequence.asc())
             ).all()
             context_payload["workflow_run_id"] = workflow_run.id
-            context_payload["workflow_events"] = [workflow_event_dict(row) for row in event_rows]
+            context_payload["workflow_events"] = [
+                workflow_event_dict(row) for row in event_rows
+            ]
             assistant_msg.tool_trace = json.dumps(context_payload, default=str)
             db.add(assistant_msg)
             db.commit()
@@ -5400,9 +6251,9 @@ async def delete_attachment(
 
 class ProviderPingRequest(BaseModel):
     provider: str
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
-    model: Optional[str] = None
+    api_key: str | None = None
+    base_url: str | None = None
+    model: str | None = None
 
 
 @router.post("/providers/ping")
@@ -5410,7 +6261,11 @@ async def ping_provider(req: ProviderPingRequest):
     import httpx
 
     provider = req.provider.lower()
-    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
+    provider = {
+        "anthropic": "claude",
+        "google": "gemini",
+        "google-gemini": "gemini",
+    }.get(provider, provider)
     api_key = req.api_key or ""
     base_url = req.base_url or ""
     model = req.model or ""
@@ -5465,7 +6320,10 @@ async def ping_provider(req: ProviderPingRequest):
         elif provider == "claude":
             endpoint = "https://api.anthropic.com/v1/messages"
             model_name = model or "claude-3-5-sonnet-20241022"
-            headers = {"Content-Type": "application/json", "anthropic-version": "2023-06-01"}
+            headers = {
+                "Content-Type": "application/json",
+                "anthropic-version": "2023-06-01",
+            }
             if api_key:
                 headers["x-api-key"] = api_key
             payload = {
@@ -5498,7 +6356,10 @@ async def ping_provider(req: ProviderPingRequest):
             }
         elif provider == "custom":
             if not base_url:
-                return {"status": "error", "message": "Custom provider requires a base URL."}
+                return {
+                    "status": "error",
+                    "message": "Custom provider requires a base URL.",
+                }
             endpoint = f"{base_url.rstrip('/')}/chat/completions"
             model_name = model or "gpt-4o-mini"
             headers = {"Content-Type": "application/json"}
@@ -5550,13 +6411,13 @@ async def ping_provider(req: ProviderPingRequest):
                 "message": f"Server returned error code {resp.status_code}: {resp.text[:200]}",
             }
     except Exception as e:
-        return {"status": "offline", "message": f"Ping connection failed: {str(e)}"}
+        return {"status": "offline", "message": f"Ping connection failed: {e!s}"}
 
 
 class ProviderDiscoverRequest(BaseModel):
     provider: str
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
+    api_key: str | None = None
+    base_url: str | None = None
 
 
 @router.post("/providers/discover")
@@ -5564,7 +6425,11 @@ async def discover_provider_models(req: ProviderDiscoverRequest):
     import httpx
 
     provider = req.provider.lower()
-    provider = {"anthropic": "claude", "google": "gemini", "google-gemini": "gemini"}.get(provider, provider)
+    provider = {
+        "anthropic": "claude",
+        "google": "gemini",
+        "google-gemini": "gemini",
+    }.get(provider, provider)
     api_key = req.api_key or ""
     base_url = req.base_url or ""
 

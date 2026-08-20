@@ -12,30 +12,32 @@ from uuid import uuid4
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:5432/aurelinx_db"
+    "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:55433/aurelinx_db"
     "?options=-csearch_path%3Dtest,public",
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["ALLOWED_HOSTS"] = "*"
 os.environ.setdefault("ENVIRONMENT", "development")
 
-from datetime import datetime, timedelta  # noqa: E402
+from datetime import datetime, timedelta
 
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import create_engine  # noqa: E402
-from sqlmodel import Session as SQLSession  # noqa: E402
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import (
+    create_engine,
+    select,
+)
+from sqlmodel import Session as SQLSession
 
-from app.main import app  # noqa: E402
-from app.core.security import get_current_user, get_tenant_id, TokenData  # noqa: E402
-from app.models.database import (  # noqa: E402
-    SQLModel,
+from app.core.security import TokenData, get_current_user, get_tenant_id
+from app.main import app
+from app.models import database as db
+from app.models.database import (
     EmployeeTable,
     SkillTable,
+    SQLModel,
     get_session,
 )
-from sqlalchemy import select  # noqa: E402
-from app.models import database as db  # noqa: E402
 
 
 @pytest.fixture()
@@ -97,7 +99,7 @@ def _seed_employees(engine, count=8):
 
 def test_team_optimize_uses_real_salary_and_full_history(client_db):
     engine = client_db["engine"]
-    employees = _seed_employees(engine, count=8)
+    _seed_employees(engine, count=8)
 
     payload = {
         "target_skills": [

@@ -3,46 +3,62 @@ Employee management endpoints
 """
 
 import json
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlmodel import Session, select
-from uuid import UUID
-from typing import List
 from datetime import datetime
-from sqlalchemy import func, or_
+from uuid import UUID
 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_
+from sqlmodel import Session, select
+
+from app.core.data_policy import filter_real_records, include_sample_data
+from app.core.logging_config import get_logger
+from app.core.security import TokenData, get_current_user
+from app.models.database import (
+    AuditLogTable,
+    EmployeeTable,
+    ExperienceTable,
+    SkillTable,
+    get_session,
+)
 from app.schemas.schemas import (
     EmployeeCreate,
-    EmployeeOut,
     EmployeeListOut,
+    EmployeeOut,
     EmployeeUpdate,
-    SkillOut,
     ExperienceOut,
+    SkillOut,
 )
-from app.models.database import AuditLogTable, EmployeeTable, SkillTable, ExperienceTable, get_session
-from app.core.security import get_current_user, TokenData
-from app.core.logging_config import get_logger
-from app.core.data_policy import filter_real_records, include_sample_data
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 logger = get_logger(__name__)
 
 
-def _employee_quality(emp: EmployeeTable, session: Session, current_user: TokenData | None = None) -> dict:
-    missing = [field for field, value in {
-        "full_name": emp.full_name,
-        "email": emp.email,
-        "department": emp.department,
-        "role": emp.role,
-    }.items() if not str(value or "").strip()]
+def _employee_quality(
+    emp: EmployeeTable, session: Session, current_user: TokenData | None = None
+) -> dict:
+    missing = [
+        field
+        for field, value in {
+            "full_name": emp.full_name,
+            "email": emp.email,
+            "department": emp.department,
+            "role": emp.role,
+        }.items()
+        if not str(value or "").strip()
+    ]
     if emp.sentiment_score is None:
         missing.append("sentiment_score")
     duplicate_warnings = []
     if emp.email:
-        email_count = session.exec(select(EmployeeTable).where(EmployeeTable.email == emp.email)).all()
+        email_count = session.exec(
+            select(EmployeeTable).where(EmployeeTable.email == emp.email)
+        ).all()
         if len(email_count) > 1:
             duplicate_warnings.append("duplicate employee email")
     if emp.full_name:
-        name_count = session.exec(select(EmployeeTable).where(EmployeeTable.full_name == emp.full_name)).all()
+        name_count = session.exec(
+            select(EmployeeTable).where(EmployeeTable.full_name == emp.full_name)
+        ).all()
         if len(name_count) > 1:
             duplicate_warnings.append("duplicate employee name")
     audit_history = []
@@ -53,12 +69,27 @@ def _employee_quality(emp: EmployeeTable, session: Session, current_user: TokenD
         except ValueError:
             user_uuid = None
     if user_uuid:
-        for row in session.exec(select(AuditLogTable).where(AuditLogTable.resource_type == "employee", AuditLogTable.resource_id == emp.id, AuditLogTable.user_id == user_uuid).order_by(AuditLogTable.created_at.desc()).limit(50)).all():
+        for row in session.exec(
+            select(AuditLogTable)
+            .where(
+                AuditLogTable.resource_type == "employee",
+                AuditLogTable.resource_id == emp.id,
+                AuditLogTable.user_id == user_uuid,
+            )
+            .order_by(AuditLogTable.created_at.desc())
+            .limit(50)
+        ).all():
             try:
                 details = json.loads(row.details or "{}")
             except (TypeError, ValueError):
                 details = {"raw": row.details}
-            audit_history.append({"action": row.action, "details": details, "created_at": row.created_at.isoformat()})
+            audit_history.append(
+                {
+                    "action": row.action,
+                    "details": details,
+                    "created_at": row.created_at.isoformat(),
+                }
+            )
     return {
         "source_type": "database_record",
         "source_version": "directory-v1",
@@ -69,7 +100,9 @@ def _employee_quality(emp: EmployeeTable, session: Session, current_user: TokenD
     }
 
 
-def get_employee_out(emp: EmployeeTable, session: Session, current_user: TokenData | None = None) -> EmployeeOut:
+def get_employee_out(
+    emp: EmployeeTable, session: Session, current_user: TokenData | None = None
+) -> EmployeeOut:
     skills = session.exec(
         select(SkillTable).where(SkillTable.employee_id == emp.id)
     ).all()
@@ -108,7 +141,7 @@ def get_employee_out(emp: EmployeeTable, session: Session, current_user: TokenDa
     )
 
 
-@router.get("", response_model=List[EmployeeListOut])
+@router.get("", response_model=list[EmployeeListOut])
 async def list_employees(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=10000),
@@ -140,12 +173,14 @@ async def list_employees(
         query = query.where(EmployeeTable.is_at_risk)
     if q and q.strip():
         pattern = f"%{q.strip()}%"
-        query = query.where(or_(
-            EmployeeTable.full_name.ilike(pattern),
-            EmployeeTable.email.ilike(pattern),
-            EmployeeTable.role.ilike(pattern),
-            EmployeeTable.department.ilike(pattern),
-        ))
+        query = query.where(
+            or_(
+                EmployeeTable.full_name.ilike(pattern),
+                EmployeeTable.email.ilike(pattern),
+                EmployeeTable.role.ilike(pattern),
+                EmployeeTable.department.ilike(pattern),
+            )
+        )
     if sentiment_min is not None:
         query = query.where(EmployeeTable.sentiment_score >= sentiment_min)
     if sentiment_max is not None:
@@ -222,12 +257,14 @@ async def count_employees(
         query = query.where(EmployeeTable.department == department)
     if q and q.strip():
         pattern = f"%{q.strip()}%"
-        query = query.where(or_(
-            EmployeeTable.full_name.ilike(pattern),
-            EmployeeTable.email.ilike(pattern),
-            EmployeeTable.role.ilike(pattern),
-            EmployeeTable.department.ilike(pattern),
-        ))
+        query = query.where(
+            or_(
+                EmployeeTable.full_name.ilike(pattern),
+                EmployeeTable.email.ilike(pattern),
+                EmployeeTable.role.ilike(pattern),
+                EmployeeTable.department.ilike(pattern),
+            )
+        )
     if at_risk_only:
         query = query.where(EmployeeTable.is_at_risk)
     if sentiment_min is not None:
@@ -242,12 +279,14 @@ async def count_employees(
     return {"count": int(session.exec(query).one() or 0)}
 
 
-@router.get("/departments", response_model=List[str])
+@router.get("/departments", response_model=list[str])
 async def list_employee_departments(
     current_user: TokenData = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    query = select(EmployeeTable.department).where(EmployeeTable.department.is_not(None))
+    query = select(EmployeeTable.department).where(
+        EmployeeTable.department.is_not(None)
+    )
     if not include_sample_data():
         query = query.where(
             ~EmployeeTable.email.ilike("%@company.com"),

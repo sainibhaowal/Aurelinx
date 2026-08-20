@@ -1,14 +1,14 @@
 """Scheduler to enqueue due webhook events into RQ for delivery."""
 
-import time
-from datetime import datetime
 import logging
 import os
+import time
+from datetime import datetime
 
 from redis import Redis
 from rq import Queue
 
-from app.models.database import get_session, IntegrationWebhookEventTable
+from app.models.database import IntegrationWebhookEventTable, get_session
 
 logger = logging.getLogger("retry_scheduler")
 logging.basicConfig(level=logging.INFO)

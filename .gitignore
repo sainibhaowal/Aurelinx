@@ -63,6 +63,7 @@ Thumbs.db
 *.bak
 *.tmp
 *.temp
+*.tsbuildinfo
 
 # Logs and error logs
 logs/

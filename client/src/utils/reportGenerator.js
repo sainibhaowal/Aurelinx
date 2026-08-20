@@ -61,10 +61,18 @@ function buildCandidatesTableRows(candidates = []) {
 
 function normalizeReportData(input) {
   if (Array.isArray(input)) return { employees: input, candidates: [] };
-  return { employees: input?.employees || [], candidates: input?.candidates || [] };
+  return {
+    employees: input?.employees || [],
+    candidates: input?.candidates || [],
+  };
 }
 
-function drawLetterhead(doc, timestamp, section = "Management Intelligence", logo = null) {
+function drawLetterhead(
+  doc,
+  timestamp,
+  section = "Management Intelligence",
+  logo = null,
+) {
   // Keep the cover header deliberately restrained: a deep enterprise navy,
   // one teal accent, and a transparent logo lockup. Avoid the pale blue
   // browser-like strip that made the previous export look unfinished.
@@ -76,7 +84,11 @@ function drawLetterhead(doc, timestamp, section = "Management Intelligence", log
   doc.setLineWidth(0.35);
   doc.roundedRect(10, 7, 190, 30, 4, 4, "S");
   if (logo) {
-    try { doc.addImage(logo, "PNG", 16, 13, 16, 16, undefined, "FAST"); } catch { /* logo is optional if a browser blocks the asset */ }
+    try {
+      doc.addImage(logo, "PNG", 16, 13, 16, 16, undefined, "FAST");
+    } catch {
+      /* logo is optional if a browser blocks the asset */
+    }
   }
   doc.setTextColor(248, 250, 252);
   doc.setFont("helvetica", "bold");
@@ -103,7 +115,9 @@ function drawFooter(doc, pageNumber) {
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139);
   doc.text("Aurelinx · Confidential management report", 15, pageHeight - 8);
-  doc.text(`Page ${pageNumber}`, pageWidth - 15, pageHeight - 8, { align: "right" });
+  doc.text(`Page ${pageNumber}`, pageWidth - 15, pageHeight - 8, {
+    align: "right",
+  });
 }
 
 async function exportPdf(input = [], analysis = "") {
@@ -132,8 +146,13 @@ async function exportPdf(input = [], analysis = "") {
     const x = 15 + index * 45;
     doc.setFillColor(241, 245, 249);
     doc.roundedRect(x, 60, 40, 23, 2, 2, "F");
-    doc.setFontSize(7); doc.setTextColor(100, 116, 139); doc.text(label, x + 3, 67);
-    doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(15, 23, 42); doc.text(String(value), x + 3, 77);
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text(label, x + 3, 67);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(value), x + 3, 77);
     doc.setFont("helvetica", "normal");
   });
 
@@ -170,14 +189,17 @@ async function exportPdf(input = [], analysis = "") {
       cellPadding: 2.2,
       overflow: "linebreak",
     },
-      alternateRowStyles: {
+    alternateRowStyles: {
       fillColor: [245, 247, 250],
     },
     willDrawPage: tablePage,
   });
 
   doc.addPage();
-  doc.setTextColor(15, 23, 42); doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text("Candidate Records", 15, 20);
+  doc.setTextColor(15, 23, 42);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Candidate Records", 15, 20);
   autoTable(doc, {
     startY: 28,
     head: [["Name", "Role", "Department", "Sentiment", "Match", "Email"]],
@@ -186,7 +208,9 @@ async function exportPdf(input = [], analysis = "") {
     headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
     styles: { fontSize: 7, cellPadding: 1.8, overflow: "linebreak" },
     alternateRowStyles: { fillColor: [245, 247, 250] },
-    willDrawPage: (hookData) => { drawFooter(doc, hookData.pageNumber); },
+    willDrawPage: (hookData) => {
+      drawFooter(doc, hookData.pageNumber);
+    },
   });
 
   for (let page = 1; page <= doc.getNumberOfPages(); page += 1) {
@@ -304,16 +328,30 @@ function exportExcel(input = [], analysis = "") {
   summarySheet["!cols"] = [{ wch: 28 }, { wch: 72 }];
   summarySheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
   employeesSheet["!freeze"] = { xSplit: 0, ySplit: 1 };
-  employeesSheet["!autofilter"] = { ref: `A1:G${Math.max(1, employees.length + 1)}` };
+  employeesSheet["!autofilter"] = {
+    ref: `A1:G${Math.max(1, employees.length + 1)}`,
+  };
   employeesSheet["!cols"] = [
-    { wch: 28 }, { wch: 26 }, { wch: 26 }, { wch: 16 },
-    { wch: 16 }, { wch: 16 }, { wch: 38 },
+    { wch: 28 },
+    { wch: 26 },
+    { wch: 26 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 38 },
   ];
   candidatesSheet["!freeze"] = { xSplit: 0, ySplit: 1 };
-  candidatesSheet["!autofilter"] = { ref: `A1:G${Math.max(1, candidates.length + 1)}` };
+  candidatesSheet["!autofilter"] = {
+    ref: `A1:G${Math.max(1, candidates.length + 1)}`,
+  };
   candidatesSheet["!cols"] = [
-    { wch: 28 }, { wch: 38 }, { wch: 26 }, { wch: 26 },
-    { wch: 16 }, { wch: 16 }, { wch: 18 },
+    { wch: 28 },
+    { wch: 38 },
+    { wch: 26 },
+    { wch: 26 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 18 },
   ];
 
   XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");

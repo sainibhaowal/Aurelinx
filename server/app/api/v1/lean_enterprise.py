@@ -10,12 +10,12 @@ Lean Enterprise v1 APIs:
 import asyncio
 import csv
 import io
-from datetime import datetime, timedelta
-from pathlib import Path
 import json
 import threading
 import zipfile
-from typing import Any, Dict, List
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -33,49 +33,49 @@ from app.models.database import (
     CandidateTable,
     CanonicalCandidateTable,
     CanonicalEmployeeTable,
-    DRRunbookTable,
+    CompliancePolicyTable,
     ConnectorFieldMappingTable,
     ConnectorSyncJobTable,
     DataContractTable,
-    CompliancePolicyTable,
+    DRRunbookTable,
+    EmployeeTable,
+    ExperienceTable,
+    ForecastScenarioTable,
     GoldMetricSnapshotTable,
     IntegrationConnectionTable,
-    ForecastScenarioTable,
+    InterventionOutcomeTable,
+    InterventionTable,
     MLDriftSnapshotTable,
     MLModelCardTable,
     MLModelRegistryTable,
-    EmployeeTable,
-    ExperienceTable,
-    InterventionOutcomeTable,
-    InterventionTable,
-    SkillTable,
-    ReleaseGateTable,
     ProcurementArtifactTable,
     QuarantineEventTable,
     RawEventTable,
+    ReleaseGateTable,
+    SkillTable,
     engine,
     get_session,
 )
-from app.services.connectors.factory import get_connector
 from app.schemas.schemas import (
+    CompliancePolicyCreate,
+    CompliancePolicyOut,
     ConnectorFieldMappingCreate,
     ConnectorFieldMappingOut,
     ConnectorSyncJobOut,
-    CompliancePolicyCreate,
-    CompliancePolicyOut,
-    FairnessSummaryOut,
     DRRunbookCreate,
     DRRunbookOut,
-    PolicyCheckRequest,
-    PolicyCheckResponse,
+    FairnessSummaryOut,
     ForecastScenarioOut,
     MLDriftSnapshotOut,
     MLModelCardOut,
-    ReleaseGateCreate,
-    ReleaseGateOut,
+    PolicyCheckRequest,
+    PolicyCheckResponse,
     ProcurementArtifactCreate,
     ProcurementArtifactOut,
+    ReleaseGateCreate,
+    ReleaseGateOut,
 )
+from app.services.connectors.factory import get_connector
 
 router = APIRouter(prefix="/lean", tags=["lean-enterprise"])
 _SCHEDULER_TASK: asyncio.Task | None = None
@@ -88,10 +88,10 @@ _BUNDLE_FILE_NAMES = {
     "candidate_experience": "candidate_experience_public.csv",
 }
 _IMPORT_JOB_LOCK = threading.Lock()
-_IMPORT_JOBS: Dict[str, Dict[str, Any]] = {}
+_IMPORT_JOBS: dict[str, dict[str, Any]] = {}
 
 
-def _load_required_fields(contract: DataContractTable) -> List[str]:
+def _load_required_fields(contract: DataContractTable) -> list[str]:
     try:
         parsed = json.loads(contract.required_fields or "[]")
         return [str(x) for x in parsed]
@@ -127,13 +127,13 @@ def _update_import_job(job_id: str, **fields: Any) -> None:
         job["updated_at"] = datetime.utcnow().isoformat()
 
 
-def _get_import_job(job_id: str) -> Dict[str, Any] | None:
+def _get_import_job(job_id: str) -> dict[str, Any] | None:
     with _IMPORT_JOB_LOCK:
         job = _IMPORT_JOBS.get(job_id)
         return dict(job) if job else None
 
 
-def _validate_payload(payload: Dict[str, Any], required_fields: List[str]) -> List[str]:
+def _validate_payload(payload: dict[str, Any], required_fields: list[str]) -> list[str]:
     missing = []
     for field in required_fields:
         if field not in payload or payload[field] in [None, ""]:
@@ -142,10 +142,10 @@ def _validate_payload(payload: Dict[str, Any], required_fields: List[str]) -> Li
 
 
 def _build_quality_score(
-    rows: List[Dict[str, Any]],
-    required_fields: List[str],
+    rows: list[dict[str, Any]],
+    required_fields: list[str],
     unique_field: str = "email",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     total_rows = len(rows)
     if total_rows == 0:
         return {
@@ -161,7 +161,7 @@ def _build_quality_score(
     missing_required_fields = 0
     seen_values: set[str] = set()
     duplicate_rows = 0
-    issue_samples: List[str] = []
+    issue_samples: list[str] = []
 
     for idx, row in enumerate(rows):
         missing = _validate_payload(row, required_fields)
@@ -242,8 +242,8 @@ def _policy_check(
         .where(CompliancePolicyTable.status == "active")
         .order_by(CompliancePolicyTable.created_at.desc())
     ).all()
-    reasons: List[str] = []
-    matched: List[str] = []
+    reasons: list[str] = []
+    matched: list[str] = []
     allowed = True
     for policy in policies:
         if policy.action_type != action_type:
@@ -291,7 +291,7 @@ def _audit(
     action: str,
     resource_type: str,
     resource_id: UUID | None = None,
-    details: Dict[str, Any] | None = None,
+    details: dict[str, Any] | None = None,
 ):
     user_uuid = None
     if current_user.user_id:
@@ -312,9 +312,9 @@ def _audit(
 
 
 def _fairness_summary(
-    rows: List[CanonicalEmployeeTable], tenant_id: str
+    rows: list[CanonicalEmployeeTable], tenant_id: str
 ) -> FairnessSummaryOut:
-    groups: List[dict] = []
+    groups: list[dict] = []
     if not rows:
         return FairnessSummaryOut(
             tenant_id=tenant_id,
@@ -323,7 +323,7 @@ def _fairness_summary(
             max_gap=0.0,
             compliant=True,
         )
-    buckets: Dict[str, List[CanonicalEmployeeTable]] = {}
+    buckets: dict[str, list[CanonicalEmployeeTable]] = {}
     for row in rows:
         buckets.setdefault(row.department or "Unknown", []).append(row)
     reference = "Unknown"
@@ -357,7 +357,7 @@ def _fairness_summary(
     )
 
 
-def _analytics_snapshot(db: Session) -> Dict[str, Any]:
+def _analytics_snapshot(db: Session) -> dict[str, Any]:
     rows = db.exec(select(CanonicalEmployeeTable)).all()
     if not rows:
         rows = [
@@ -383,8 +383,8 @@ def _analytics_snapshot(db: Session) -> Dict[str, Any]:
         if total
         else 0.0
     )
-    dept_map: Dict[str, int] = {}
-    dept_risk: Dict[str, int] = {}
+    dept_map: dict[str, int] = {}
+    dept_risk: dict[str, int] = {}
     for row in rows:
         dept_map[row.department] = dept_map.get(row.department, 0) + 1
         if row.is_at_risk:
@@ -494,7 +494,7 @@ def _procurement_artifact_out(row: ProcurementArtifactTable) -> ProcurementArtif
     )
 
 
-def _normalize_header_map(row: Dict[str, Any]) -> Dict[str, Any]:
+def _normalize_header_map(row: dict[str, Any]) -> dict[str, Any]:
     normalized = {}
     for key, value in row.items():
         normalized[(key or "").strip().lower().replace(" ", "_").replace("-", "_")] = (
@@ -503,7 +503,7 @@ def _normalize_header_map(row: Dict[str, Any]) -> Dict[str, Any]:
     return normalized
 
 
-def _first_value(data: Dict[str, Any], keys: List[str], default: Any = None) -> Any:
+def _first_value(data: dict[str, Any], keys: list[str], default: Any = None) -> Any:
     for key in keys:
         value = data.get(key)
         if value not in [None, ""]:
@@ -511,7 +511,7 @@ def _first_value(data: Dict[str, Any], keys: List[str], default: Any = None) -> 
     return default
 
 
-def _load_csv_rows(file_path: Path) -> List[Dict[str, Any]]:
+def _load_csv_rows(file_path: Path) -> list[dict[str, Any]]:
     with file_path.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         return [_normalize_header_map(row) for row in reader]
@@ -527,7 +527,7 @@ def _csv_value(value: Any) -> str:
     return str(value)
 
 
-def _rows_to_csv_bytes(rows: List[Dict[str, Any]], fieldnames: List[str]) -> bytes:
+def _rows_to_csv_bytes(rows: list[dict[str, Any]], fieldnames: list[str]) -> bytes:
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=fieldnames)
     writer.writeheader()
@@ -536,7 +536,7 @@ def _rows_to_csv_bytes(rows: List[Dict[str, Any]], fieldnames: List[str]) -> byt
     return buffer.getvalue().encode("utf-8")
 
 
-def _parse_employee_row(row: Dict[str, Any]) -> Dict[str, Any]:
+def _parse_employee_row(row: dict[str, Any]) -> dict[str, Any]:
     email = (
         str(_first_value(row, ["email", "work_email", "employee_email"], ""))
         .strip()
@@ -589,7 +589,7 @@ def _parse_employee_row(row: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _parse_candidate_row(row: Dict[str, Any]) -> Dict[str, Any]:
+def _parse_candidate_row(row: dict[str, Any]) -> dict[str, Any]:
     email = (
         str(_first_value(row, ["email", "candidate_email", "work_email"], ""))
         .strip()
@@ -637,7 +637,7 @@ def _parse_candidate_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _import_rows_for_kind(
-    db: Session, tenant_id: str, kind: str, rows: List[Dict[str, Any]]
+    db: Session, tenant_id: str, kind: str, rows: list[dict[str, Any]]
 ) -> int:
     imported = 0
     if kind == "employees":
@@ -1040,8 +1040,8 @@ def _export_dataset_bundle_bytes(db: Session) -> bytes:
 
 
 def _upsert_employee_like(
-    db: Session, tenant_id: str, row: Dict[str, Any]
-) -> Dict[str, Any]:
+    db: Session, tenant_id: str, row: dict[str, Any]
+) -> dict[str, Any]:
     email = (
         str(_first_value(row, ["email", "work_email", "employee_email"], ""))
         .strip()
@@ -1113,8 +1113,8 @@ def _upsert_employee_like(
 
 
 def _upsert_candidate_like(
-    db: Session, tenant_id: str, row: Dict[str, Any]
-) -> Dict[str, Any]:
+    db: Session, tenant_id: str, row: dict[str, Any]
+) -> dict[str, Any]:
     email = (
         str(_first_value(row, ["email", "candidate_email", "work_email"], ""))
         .strip()
@@ -1179,7 +1179,7 @@ def _upsert_candidate_like(
 
 
 def _upsert_canonical_employee_from_local(
-    db: Session, tenant_id: str, row: Dict[str, Any]
+    db: Session, tenant_id: str, row: dict[str, Any]
 ) -> None:
     email = (
         str(_first_value(row, ["email", "work_email", "employee_email"], ""))
@@ -1254,7 +1254,7 @@ def _upsert_canonical_employee_from_local(
 
 
 def _upsert_canonical_candidate_from_local(
-    db: Session, tenant_id: str, row: Dict[str, Any]
+    db: Session, tenant_id: str, row: dict[str, Any]
 ) -> None:
     email = (
         str(_first_value(row, ["email", "candidate_email", "work_email"], ""))
@@ -1342,7 +1342,7 @@ async def list_contracts(
 
 @router.post("/contracts")
 async def create_contract(
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     current_user: TokenData = Depends(get_current_user),
     tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
@@ -1383,7 +1383,7 @@ async def create_contract(
 
 def _run_connection_sync(
     connection_id: UUID, tenant_id: str, db: Session
-) -> Dict[str, int]:
+) -> dict[str, int]:
     conn = db.get(IntegrationConnectionTable, connection_id)
     if not conn or conn.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Connection not found")
@@ -1628,7 +1628,7 @@ async def sync_connection_into_pipeline(
 
 @router.get(
     "/connections/{connection_id}/mappings",
-    response_model=List[ConnectorFieldMappingOut],
+    response_model=list[ConnectorFieldMappingOut],
 )
 async def list_field_mappings(
     connection_id: UUID,
@@ -1696,7 +1696,7 @@ async def create_field_mapping(
 
 
 @router.get(
-    "/connections/{connection_id}/sync-jobs", response_model=List[ConnectorSyncJobOut]
+    "/connections/{connection_id}/sync-jobs", response_model=list[ConnectorSyncJobOut]
 )
 async def list_sync_jobs(
     connection_id: UUID,
@@ -1778,7 +1778,7 @@ async def train_attrition_model(
             status_code=422, detail="Need both risky and stable records for training"
         )
 
-    def avg(values: List[float]) -> float:
+    def avg(values: list[float]) -> float:
         return sum(values) / len(values) if values else 0.0
 
     r_sent = avg([float(r.sentiment_score or 0.5) for r in risky])
@@ -1951,7 +1951,7 @@ async def score_attrition(
 
 @router.post("/optimizer/scenario")
 async def optimize_workforce_scenario(
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     current_user: TokenData = Depends(get_current_user),
     tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
@@ -2023,7 +2023,7 @@ async def optimize_workforce_scenario(
     return {**result, "scenario_id": str(row.id)}
 
 
-@router.get("/policy/packs", response_model=List[CompliancePolicyOut])
+@router.get("/policy/packs", response_model=list[CompliancePolicyOut])
 async def list_policy_packs(
     current_user: TokenData = Depends(get_current_user),
     tenant_id: str = Depends(get_tenant_id),
@@ -2088,7 +2088,7 @@ async def check_policy(
     )
 
 
-@router.get("/ml/drift", response_model=List[MLDriftSnapshotOut])
+@router.get("/ml/drift", response_model=list[MLDriftSnapshotOut])
 async def list_ml_drift(
     current_user: TokenData = Depends(get_current_user),
     tenant_id: str = Depends(get_tenant_id),
@@ -2125,7 +2125,7 @@ async def retrain_model(
     )
 
 
-@router.get("/scenarios", response_model=List[ForecastScenarioOut])
+@router.get("/scenarios", response_model=list[ForecastScenarioOut])
 async def list_scenarios(
     current_user: TokenData = Depends(get_current_user),
     tenant_id: str = Depends(get_tenant_id),
@@ -2150,7 +2150,7 @@ async def list_scenarios(
     ]
 
 
-@router.get("/ml/cards", response_model=List[MLModelCardOut])
+@router.get("/ml/cards", response_model=list[MLModelCardOut])
 async def list_model_cards(
     current_user: TokenData = Depends(get_current_user),
     tenant_id: str = Depends(get_tenant_id),
@@ -2288,7 +2288,7 @@ async def get_fairness_summary(
     return _fairness_summary(rows, tenant_id)
 
 
-@router.get("/release-gates", response_model=List[ReleaseGateOut])
+@router.get("/release-gates", response_model=list[ReleaseGateOut])
 async def list_release_gates(
     current_user: TokenData = Depends(get_current_user),
     tenant_id: str = Depends(get_tenant_id),
@@ -2382,7 +2382,7 @@ async def list_audit_events(
     ]
 
 
-@router.get("/dr/runbooks", response_model=List[DRRunbookOut])
+@router.get("/dr/runbooks", response_model=list[DRRunbookOut])
 async def list_dr_runbooks(
     current_user: TokenData = Depends(get_current_user),
     tenant_id: str = Depends(get_tenant_id),
@@ -2459,7 +2459,7 @@ async def run_dr_drill(
     return _dr_runbook_out(row)
 
 
-@router.get("/procurement/artifacts", response_model=List[ProcurementArtifactOut])
+@router.get("/procurement/artifacts", response_model=list[ProcurementArtifactOut])
 async def list_procurement_artifacts(
     current_user: TokenData = Depends(get_current_user),
     tenant_id: str = Depends(get_tenant_id),
@@ -2611,7 +2611,7 @@ def _bundle_job_runner(file_name: str, archive_bytes: bytes, current_user: Token
             )
             try:
                 with zipfile.ZipFile(io.BytesIO(archive_bytes)) as zipf:
-                    bundle_members: Dict[str, str] = {}
+                    bundle_members: dict[str, str] = {}
                     for member in zipf.namelist():
                         base_name = Path(member).name.lower()
                         for kind, expected_name in _BUNDLE_FILE_NAMES.items():
@@ -2637,7 +2637,7 @@ def _bundle_job_runner(file_name: str, archive_bytes: bytes, current_user: Token
                     _reset_local_demo_data_sync(db, current_user)
 
                     ordered_kinds = list(_BUNDLE_FILE_NAMES.keys())
-                    results: Dict[str, int] = {}
+                    results: dict[str, int] = {}
                     total_steps = len(ordered_kinds)
                     for index, kind in enumerate(ordered_kinds, start=1):
                         member = bundle_members[kind]
@@ -2821,7 +2821,7 @@ async def import_dataset_bundle(
     archive_bytes = await file.read()
     try:
         with zipfile.ZipFile(io.BytesIO(archive_bytes)) as zipf:
-            bundle_members: Dict[str, str] = {}
+            bundle_members: dict[str, str] = {}
             for member in zipf.namelist():
                 base_name = Path(member).name.lower()
                 for kind, expected_name in _BUNDLE_FILE_NAMES.items():
@@ -2840,7 +2840,7 @@ async def import_dataset_bundle(
 
             await reset_local_demo_data(current_user=current_user, db=db)
 
-            results: Dict[str, int] = {}
+            results: dict[str, int] = {}
             for kind, member in bundle_members.items():
                 with zipf.open(member) as handle:
                     content = handle.read().decode("utf-8-sig")

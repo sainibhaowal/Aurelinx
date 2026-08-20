@@ -1,28 +1,31 @@
-import pytest
-import hmac
 import hashlib
+import hmac
 import json
-from datetime import datetime, timedelta
-import sqlalchemy
 import os
+from datetime import datetime, timedelta
+
+import pytest
+import sqlalchemy
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:5432/aurelinx_db?options=-csearch_path%3Dtest,public",
+    "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:55433/aurelinx_db?options=-csearch_path%3Dtest,public",
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["ALLOWED_HOSTS"] = "*"
 os.environ.setdefault("ENVIRONMENT", "development")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine as create_engine_fn
+from sqlmodel import Session as SQLSession
 
-from app.main import app  # noqa: E402
-from app.models import database as db  # noqa: E402
-from app.models.database import SQLModel, get_session  # noqa: E402
-from sqlalchemy import create_engine as create_engine_fn  # noqa: E402
-from sqlmodel import Session as SQLSession  # noqa: E402
-
-from app.models.database import IntegrationApiKeyTable  # noqa: E402
+from app.main import app
+from app.models import database as db
+from app.models.database import (
+    IntegrationApiKeyTable,
+    SQLModel,
+    get_session,
+)
 
 
 @pytest.fixture()

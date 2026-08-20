@@ -11,11 +11,14 @@ export function getApiBaseUrl() {
   const pageHost = window.location.hostname;
   let configuredUrl = null;
   try {
-    configuredUrl = configured ? new URL(configured, window.location.origin) : null;
+    configuredUrl = configured
+      ? new URL(configured, window.location.origin)
+      : null;
   } catch {
     return "";
   }
-  const configuredIsLocal = configuredUrl && LOCAL_HOSTS.has(configuredUrl.hostname);
+  const configuredIsLocal =
+    configuredUrl && LOCAL_HOSTS.has(configuredUrl.hostname);
   const pageIsLocal = LOCAL_HOSTS.has(pageHost);
 
   // If a production page was built with the development localhost default,

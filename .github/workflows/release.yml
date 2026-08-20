@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_BACKEND: ${{ github.repository_owner }}/aurelinx-backend
+      IMAGE_FRONTEND: ${{ github.repository_owner }}/aurelinx-frontend
+    outputs:
+      version: ${{ steps.vars.outputs.VERSION }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: vars
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./infra/backend.Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:${{ steps.vars.outputs.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./client
+          file: ./infra/frontend.Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:${{ steps.vars.outputs.VERSION }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    # Required secrets (configure in repo Settings → Secrets → Actions):
+    #   VPS_HOST        - IP or hostname of the VPS
+    #   VPS_USER        - SSH user with docker rights (e.g. deploy)
+    #   VPS_SSH_KEY     - Private SSH key (no passphrase) for VPS_USER
+    #   VPS_DEPLOY_DIR  - Absolute path on VPS where docker-compose.yml lives (e.g. /opt/aurelinx)
+    steps:
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Deploy to VPS
+        env:
+          VERSION: ${{ needs.build-and-push.outputs.version }}
+          GHCR_OWNER: ${{ github.repository_owner }}
+          DEPLOY_DIR: ${{ secrets.VPS_DEPLOY_DIR }}
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} <<'EOF'
+            set -euo pipefail
+            cd "$DEPLOY_DIR"
+
+            # Write a tiny env file that only contains the image coordinates
+            cat > .env.deploy <<ENVEOF
+GHCR_OWNER=$GHCR_OWNER
+VERSION=$VERSION
+ENVEOF
+
+            # Pull the new images and recreate containers
+            docker compose --env-file .env.production --env-file .env.deploy pull
+            docker compose --env-file .env.production --env-file .env.deploy up -d --remove-orphans
+
+            # Quick health‑check (adjust port/host if needed)
+            sleep 5
+            curl -fsS http://localhost:5100/health | jq -e '.version=="'$VERSION'"' && echo "✅ Deployed $VERSION"
+          EOF

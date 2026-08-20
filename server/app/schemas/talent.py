@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional
-from uuid import UUID, uuid4
 from datetime import datetime
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, EmailStr, Field
 
 
 class Skill(BaseModel):
@@ -22,10 +22,10 @@ class TalentBase(BaseModel):
     email: EmailStr
     department: str
     role: str
-    skills: List[Skill]
-    experience: List[Experience]
+    skills: list[Skill]
+    experience: list[Experience]
     sentiment_score: float = Field(default=0.0, ge=-1.0, le=1.0)
-    salary_expectation: Optional[int] = None
+    salary_expectation: int | None = None
 
 
 class Candidate(TalentBase):
@@ -43,6 +43,6 @@ class JobDescription(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     title: str
     department: str
-    required_skills: List[Skill]
+    required_skills: list[Skill]
     budget_range: str
     description: str

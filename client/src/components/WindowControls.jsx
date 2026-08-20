@@ -2,14 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Minus, Square, X, Monitor, ChevronDown } from "lucide-react";
+import { Minus, Square, X, Monitor } from "lucide-react";
 
 let getCurrentWindow = null;
 let LogicalSize = null;
 let LogicalPosition = null;
 
 // Dynamically import Tauri APIs if available at import time
-if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
+if (
+  typeof window !== "undefined" &&
+  (window.__TAURI_INTERNALS__ || window.__TAURI__)
+) {
   import("@tauri-apps/api/window")
     .then((mod) => {
       getCurrentWindow = mod.getCurrentWindow;
@@ -29,7 +32,7 @@ const getTauriApi = () => {
       return {
         getCurrentWindow: window.__TAURI__.window.getCurrentWindow,
         LogicalSize: window.__TAURI__.window.LogicalSize,
-        LogicalPosition: window.__TAURI__.window.LogicalPosition
+        LogicalPosition: window.__TAURI__.window.LogicalPosition,
       };
     }
   }
@@ -37,7 +40,7 @@ const getTauriApi = () => {
   return {
     getCurrentWindow,
     LogicalSize,
-    LogicalPosition
+    LogicalPosition,
   };
 };
 
@@ -57,8 +60,10 @@ const WindowControls = () => {
         window.location.search.includes("tauri=true") ||
         sessionStorage.getItem("isTauri") === "true"
       );
-      const isPreview = window.location.search.includes("preview-controls") || localStorage.getItem("PREVIEW_WINDOW_CONTROLS") === "true";
-      
+      const isPreview =
+        window.location.search.includes("preview-controls") ||
+        localStorage.getItem("PREVIEW_WINDOW_CONTROLS") === "true";
+
       if (isTauriEnv || isPreview) {
         setIsTauri(true);
         if (isTauriEnv) {
@@ -75,7 +80,10 @@ const WindowControls = () => {
               LogicalSize = mod.LogicalSize;
               LogicalPosition = mod.LogicalPosition;
             } catch (err) {
-              console.warn("Failed to load Tauri window APIs dynamically:", err);
+              console.warn(
+                "Failed to load Tauri window APIs dynamically:",
+                err,
+              );
             }
           }
         };
@@ -90,19 +98,21 @@ const WindowControls = () => {
               const win = apis.getCurrentWindow();
               const max = await win.isMaximized();
               setIsMaximized(max);
-            } catch (e) {
+            } catch (err) {
+              void err;
               // Ignore API failures on non-Tauri preview environments
             }
           }
         };
-        
+
         const interval = setInterval(checkMaximized, 1000);
         return () => clearInterval(interval);
       }
     }
   }, []);
 
-  if (!isTauri || (typeof window !== "undefined" && window !== window.parent)) return null;
+  if (!isTauri || (typeof window !== "undefined" && window !== window.parent))
+    return null;
 
   const handleMinimize = async (toTray = false) => {
     const apis = getTauriApi();
@@ -150,14 +160,15 @@ const WindowControls = () => {
 
   const handleSnap = async (zone) => {
     const apis = getTauriApi();
-    if (!apis.getCurrentWindow || !apis.LogicalSize || !apis.LogicalPosition) return;
+    if (!apis.getCurrentWindow || !apis.LogicalSize || !apis.LogicalPosition)
+      return;
     try {
       const win = apis.getCurrentWindow();
-      
+
       if (await win.isMaximized()) {
         await win.unmaximize();
       }
-      
+
       const monitor = await win.currentMonitor();
       if (!monitor) return;
 
@@ -179,13 +190,17 @@ const WindowControls = () => {
         await win.setPosition(new apis.LogicalPosition(logicalX, logicalY));
       } else if (zone === "right") {
         await win.setSize(new apis.LogicalSize(logicalW / 2, adjustedH));
-        await win.setPosition(new apis.LogicalPosition(logicalX + logicalW / 2, logicalY));
+        await win.setPosition(
+          new apis.LogicalPosition(logicalX + logicalW / 2, logicalY),
+        );
       } else if (zone === "top") {
         await win.setSize(new apis.LogicalSize(logicalW, adjustedH / 2));
         await win.setPosition(new apis.LogicalPosition(logicalX, logicalY));
       } else if (zone === "bottom") {
         await win.setSize(new apis.LogicalSize(logicalW, adjustedH / 2));
-        await win.setPosition(new apis.LogicalPosition(logicalX, logicalY + adjustedH / 2));
+        await win.setPosition(
+          new apis.LogicalPosition(logicalX, logicalY + adjustedH / 2),
+        );
       }
       setActiveMenu(null);
     } catch (err) {
@@ -210,11 +225,11 @@ const WindowControls = () => {
   return (
     <div className="fixed top-0 left-0 right-0 w-full h-10 flex items-center justify-between px-4 bg-[#0a0f1d] border-b border-white/5 select-none z-[99999]">
       {/* Draggable region spanning the title bar except the buttons area */}
-      <div 
-        data-tauri-drag-region 
+      <div
+        data-tauri-drag-region
         className="absolute inset-0 right-36 h-full cursor-grab active:cursor-grabbing z-0"
       />
-      
+
       {/* App branding on the left */}
       <div className="flex items-center gap-2 relative z-10 pointer-events-none">
         <span className="text-xs font-extrabold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent tracking-widest uppercase">
@@ -305,7 +320,9 @@ const WindowControls = () => {
                       <div className="w-1/2 bg-emerald-500/20 border-r border-slate-800" />
                       <div className="w-1/2" />
                     </div>
-                    <span className="text-[6px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Left Half</span>
+                    <span className="text-[6px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">
+                      Left Half
+                    </span>
                   </button>
 
                   <button
@@ -316,7 +333,9 @@ const WindowControls = () => {
                       <div className="w-1/2" />
                       <div className="w-1/2 bg-emerald-500/20 border-l border-slate-800" />
                     </div>
-                    <span className="text-[6px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Right Half</span>
+                    <span className="text-[6px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">
+                      Right Half
+                    </span>
                   </button>
                 </div>
                 <div className="border-t border-white/5 pt-1.5">
@@ -324,7 +343,9 @@ const WindowControls = () => {
                     onClick={handleMaximizeToggle}
                     className="w-full text-left px-1.5 py-1 text-[8px] font-bold uppercase tracking-wider text-slate-300 hover:text-white hover:bg-white/5 rounded transition-colors flex items-center justify-between"
                   >
-                    <span>{isMaximized ? "Restore Size" : "Full Maximize"}</span>
+                    <span>
+                      {isMaximized ? "Restore Size" : "Full Maximize"}
+                    </span>
                     <Monitor size={8} className="text-emerald-400" />
                   </button>
                 </div>

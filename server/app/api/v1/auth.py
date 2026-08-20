@@ -2,39 +2,39 @@
 Authentication endpoints - Login, Register, Token refresh
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import RedirectResponse
-import httpx
 import secrets
-from app.core.config import settings
-from sqlmodel import Session as SQLSession, SQLModel, select
-from datetime import datetime, timedelta
+from datetime import timedelta
 from uuid import UUID
 
-from app.schemas.schemas import (
-    LoginRequest,
-    LoginResponse,
-    RegisterRequest,
-    UserOut,
-    DeleteAccountRequest,
-    ResetWorkspaceRequest,
-)
-from app.models.database import UserTable, get_session
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
+from sqlmodel import Session as SQLSession
+from sqlmodel import SQLModel, select
+
+from app.core.config import settings
+from app.core.logging_config import get_logger
 from app.core.security import (
-    hash_password,
-    verify_password,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    TokenData,
     create_access_token,
     get_current_user,
     get_current_user_strict,
-    TokenData,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
+    hash_password,
+    verify_password,
 )
-from app.core.logging_config import get_logger
+from app.models.database import UserTable, get_session
+from app.schemas.schemas import (
+    DeleteAccountRequest,
+    LoginRequest,
+    LoginResponse,
+    RegisterRequest,
+    ResetWorkspaceRequest,
+    UserOut,
+)
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = get_logger(__name__)
-
-
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -242,25 +242,25 @@ async def reset_workspace_data(
 
 # ============ OAUTH ENDPOINTS ============
 
+
 @router.get("/google/login")
 async def google_login(
     request: Request,
 ):
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise HTTPException(
-            status_code=400,
-            detail="Google OAuth is not configured on this server."
+            status_code=400, detail="Google OAuth is not configured on this server."
         )
-    
+
     # Construct redirect URI
     base = str(request.base_url).rstrip("/")
     if "averqel.com" in base or settings.ENVIRONMENT == "production":
         redirect_uri = "https://aurelinx.averqel.com/api/v1/auth/google/callback"
     else:
         redirect_uri = f"{base}/api/v1/auth/google/callback"
-        
+
     state = "google"
-    
+
     google_auth_url = (
         "https://accounts.google.com/o/oauth2/v2/auth"
         f"?response_type=code"
@@ -276,19 +276,19 @@ async def google_login(
 async def google_callback(
     request: Request,
     code: str,
-    state: str = None,
-    session: SQLSession = Depends(get_session)
+    state: str | None = None,
+    session: SQLSession = Depends(get_session),
 ):
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise HTTPException(status_code=400, detail="Google OAuth not configured")
-        
+
     # Construct redirect URI
     base = str(request.base_url).rstrip("/")
     if "averqel.com" in base or settings.ENVIRONMENT == "production":
         redirect_uri = "https://aurelinx.averqel.com/api/v1/auth/google/callback"
     else:
         redirect_uri = f"{base}/api/v1/auth/google/callback"
-        
+
     # Exchange code for token
     async with httpx.AsyncClient() as client:
         token_res = await client.post(
@@ -299,34 +299,40 @@ async def google_callback(
                 "client_secret": settings.GOOGLE_CLIENT_SECRET,
                 "redirect_uri": redirect_uri,
                 "grant_type": "authorization_code",
-            }
+            },
         )
         if token_res.status_code != 200:
             logger.error(f"Google token exchange failed: {token_res.text}")
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/app?error=google_auth_failed")
-            
+            return RedirectResponse(
+                url=f"{settings.FRONTEND_URL}/app?error=google_auth_failed"
+            )
+
         token_data = token_res.json()
         access_token = token_data.get("access_token")
-        
+
         # Get user info
         user_info_res = await client.get(
             "https://www.googleapis.com/oauth2/v3/userinfo",
-            headers={"Authorization": f"Bearer {access_token}"}
+            headers={"Authorization": f"Bearer {access_token}"},
         )
         if user_info_res.status_code != 200:
             logger.error(f"Google userinfo failed: {user_info_res.text}")
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/app?error=google_userinfo_failed")
-            
+            return RedirectResponse(
+                url=f"{settings.FRONTEND_URL}/app?error=google_userinfo_failed"
+            )
+
         user_info = user_info_res.json()
         email = user_info.get("email")
         name = user_info.get("name") or email.split("@")[0]
-        
+
         if not email:
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/app?error=no_email_returned")
-            
+            return RedirectResponse(
+                url=f"{settings.FRONTEND_URL}/app?error=no_email_returned"
+            )
+
         # Check if user exists
         user = session.exec(select(UserTable).where(UserTable.email == email)).first()
-        
+
         if not user:
             # Create user
             random_pw = secrets.token_urlsafe(16)
@@ -340,14 +346,16 @@ async def google_callback(
             session.add(user)
             session.commit()
             session.refresh(user)
-            
+
         # Log them in! Create JWT access token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         jwt_token = create_access_token(
-            data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin}, expires_delta=access_token_expires
+            data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
+            expires_delta=access_token_expires,
         )
-        
+
         import urllib.parse
+
         encoded_user = urllib.parse.quote(user.email)
         encoded_name = urllib.parse.quote(user.full_name)
         return RedirectResponse(
@@ -361,19 +369,18 @@ async def github_login(
 ):
     if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
         raise HTTPException(
-            status_code=400,
-            detail="GitHub OAuth is not configured on this server."
+            status_code=400, detail="GitHub OAuth is not configured on this server."
         )
-    
+
     # Construct redirect URI
     base = str(request.base_url).rstrip("/")
     if "averqel.com" in base or settings.ENVIRONMENT == "production":
         redirect_uri = "https://aurelinx.averqel.com/api/v1/auth/github/callback"
     else:
         redirect_uri = f"{base}/api/v1/auth/github/callback"
-        
+
     state = "github"
-    
+
     github_auth_url = (
         "https://github.com/login/oauth/authorize"
         f"?client_id={settings.GITHUB_CLIENT_ID}"
@@ -388,19 +395,19 @@ async def github_login(
 async def github_callback(
     request: Request,
     code: str,
-    state: str = None,
-    session: SQLSession = Depends(get_session)
+    state: str | None = None,
+    session: SQLSession = Depends(get_session),
 ):
     if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
         raise HTTPException(status_code=400, detail="GitHub OAuth not configured")
-        
+
     # Construct redirect URI
     base = str(request.base_url).rstrip("/")
     if "averqel.com" in base or settings.ENVIRONMENT == "production":
         redirect_uri = "https://aurelinx.averqel.com/api/v1/auth/github/callback"
     else:
         redirect_uri = f"{base}/api/v1/auth/github/callback"
-        
+
     # Exchange code for token
     async with httpx.AsyncClient() as client:
         token_res = await client.post(
@@ -411,33 +418,43 @@ async def github_callback(
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "redirect_uri": redirect_uri,
             },
-            headers={"Accept": "application/json"}
+            headers={"Accept": "application/json"},
         )
         if token_res.status_code != 200:
             logger.error(f"GitHub token exchange failed: {token_res.text}")
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/app?error=github_auth_failed")
-            
+            return RedirectResponse(
+                url=f"{settings.FRONTEND_URL}/app?error=github_auth_failed"
+            )
+
         token_data = token_res.json()
         access_token = token_data.get("access_token")
-        
+
         # Get user info
         user_info_res = await client.get(
             "https://api.github.com/user",
-            headers={"Authorization": f"Bearer {access_token}", "User-Agent": "Aurelinx"}
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "User-Agent": "Aurelinx",
+            },
         )
         if user_info_res.status_code != 200:
             logger.error(f"GitHub userinfo failed: {user_info_res.text}")
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/app?error=github_userinfo_failed")
-            
+            return RedirectResponse(
+                url=f"{settings.FRONTEND_URL}/app?error=github_userinfo_failed"
+            )
+
         user_info = user_info_res.json()
         email = user_info.get("email")
         name = user_info.get("name") or user_info.get("login") or "GitHub User"
-        
+
         # If email is null, fetch email list
         if not email:
             emails_res = await client.get(
                 "https://api.github.com/user/emails",
-                headers={"Authorization": f"Bearer {access_token}", "User-Agent": "Aurelinx"}
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "User-Agent": "Aurelinx",
+                },
             )
             if emails_res.status_code == 200:
                 emails_list = emails_res.json()
@@ -447,13 +464,15 @@ async def github_callback(
                         break
                 if not email and emails_list:
                     email = emails_list[0].get("email")
-                    
+
         if not email:
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/app?error=no_email_returned")
-            
+            return RedirectResponse(
+                url=f"{settings.FRONTEND_URL}/app?error=no_email_returned"
+            )
+
         # Check if user exists
         user = session.exec(select(UserTable).where(UserTable.email == email)).first()
-        
+
         if not user:
             # Create user
             random_pw = secrets.token_urlsafe(16)
@@ -467,14 +486,16 @@ async def github_callback(
             session.add(user)
             session.commit()
             session.refresh(user)
-            
+
         # Log them in! Create JWT access token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         jwt_token = create_access_token(
-            data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin}, expires_delta=access_token_expires
+            data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
+            expires_delta=access_token_expires,
         )
-        
+
         import urllib.parse
+
         encoded_user = urllib.parse.quote(user.email)
         encoded_name = urllib.parse.quote(user.full_name)
         return RedirectResponse(
