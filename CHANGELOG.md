@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.8](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.7...v1.1.8) (2026-08-20)
+
+
+### Bug Fixes
+
+* add missing steps key in deploy job ([374a30c](https://github.com/sainibhaowal/Aurelinx/commit/374a30c4d2504db638f724e5f945a16fd6882e11))
+
 ### [1.1.7](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.6...v1.1.7) (2026-08-20)
 
 
