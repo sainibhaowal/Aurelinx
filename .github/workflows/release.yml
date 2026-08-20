@@ -98,7 +98,7 @@ jobs:
             docker compose --env-file .env.production --env-file .env.deploy pull
             docker compose --env-file .env.production --env-file .env.deploy up -d --remove-orphans
 
-            # Quick health‑check (adjust port/host if needed)
+            # Quick health-check (adjust port/host if needed)
             sleep 5
-            curl -fsS http://localhost:5100/health | jq -e '.version=="'$VERSION'"' && echo "✅ Deployed $VERSION"
-          EOF
+            curl -fsS http://localhost:5100/health | jq -e '.version=="'$VERSION'"' && echo "Deployed $VERSION"
+EOF
