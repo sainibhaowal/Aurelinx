@@ -86,10 +86,13 @@ jobs:
           VERSION: ${{ needs.build-and-push.outputs.version }}
           GHCR_OWNER: ${{ github.repository_owner }}
           DEPLOY_DIR: ${{ secrets.VPS_DEPLOY_DIR }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ssh -o StrictHostKeyChecking=no "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "
             set -euo pipefail
             cd \"${DEPLOY_DIR}\"
+            # Login to GHCR on the VPS
+            echo \"${GH_TOKEN}\" | docker login ghcr.io -u \"${GHCR_OWNER}\" --password-stdin
             printf 'GHCR_OWNER=%s\nVERSION=%s\n' \"${GHCR_OWNER}\" \"${VERSION}\" > .env.deploy
             docker compose --env-file .env.production --env-file .env.deploy pull
             docker compose --env-file .env.production --env-file .env.deploy up -d --remove-orphans
