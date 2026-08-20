@@ -87,12 +87,12 @@ jobs:
           GHCR_OWNER: ${{ github.repository_owner }}
           DEPLOY_DIR: ${{ secrets.VPS_DEPLOY_DIR }}
         run: |
-          ssh -o StrictHostKeyChecking=no "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
+          ssh -o StrictHostKeyChecking=no "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "
             set -euo pipefail
-            cd "$DEPLOY_DIR"
-            printf "GHCR_OWNER=%s\nVERSION=%s\n" "$GHCR_OWNER" "$VERSION" > .env.deploy
+            cd \"${DEPLOY_DIR}\"
+            printf 'GHCR_OWNER=%s\nVERSION=%s\n' \"${GHCR_OWNER}\" \"${VERSION}\" > .env.deploy
             docker compose --env-file .env.production --env-file .env.deploy pull
             docker compose --env-file .env.production --env-file .env.deploy up -d --remove-orphans
             sleep 5
-            curl -fsS http://localhost:5100/health | jq -e ".version==\"$VERSION\"" && echo "Deployed $VERSION"
-          '
+            curl -fsS http://localhost:5100/health | jq -e \".version==\\\"${VERSION}\\\"\" && echo \"Deployed ${VERSION}\"
+          "
