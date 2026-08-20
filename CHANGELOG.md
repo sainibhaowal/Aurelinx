@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.2](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.1...v1.1.2) (2026-08-20)
+
+
+### Bug Fixes
+
+* fix workflow heredoc indentation ([cca2708](https://github.com/sainibhaowal/Aurelinx/commit/cca2708c8e8589dfe0ce52e810ba9af65881e2b8))
+* fix workflow heredoc syntax ([a253df1](https://github.com/sainibhaowal/Aurelinx/commit/a253df11e08f9f1c96629214942d684ce238659c))
+* replace heredoc with single-quoted ssh command to fix YAML syntax ([b02d8ba](https://github.com/sainibhaowal/Aurelinx/commit/b02d8ba2a5a43864e57d19aee92b207983c1f751))
+
 ### [1.1.1](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.0...v1.1.1) (2026-08-20)
 
 ## [1.1.0](https://github.com/sainibhaowal/Aurelinx/compare/v4.4.92...v1.1.0) (2026-08-20)
