@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.7](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.6...v1.1.7) (2026-08-20)
+
+
+### Bug Fixes
+
+* fix workflow YAML indentation for deploy step ([9d81e42](https://github.com/sainibhaowal/Aurelinx/commit/9d81e423adc3b6005763df1b13ef17aadaf096da))
+
 ### [1.1.6](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.5...v1.1.6) (2026-08-20)
 
 
