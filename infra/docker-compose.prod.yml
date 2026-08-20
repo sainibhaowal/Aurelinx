@@ -52,7 +52,7 @@ services:
       retries: 10
 
   api:
-    image: ${GHCR_OWNER:-your-org}/aurelinx-backend:${VERSION:-latest}
+    image: ghcr.io/${GHCR_OWNER:-your-org}/aurelinx-backend:${VERSION:-latest}
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -82,7 +82,7 @@ services:
       retries: 10
 
   worker:
-    image: ${GHCR_OWNER:-your-org}/aurelinx-backend:${VERSION:-latest}
+    image: ghcr.io/${GHCR_OWNER:-your-org}/aurelinx-backend:${VERSION:-latest}
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -100,7 +100,7 @@ services:
     command: [ "sh", "-lc", "PYTHONPATH=/app python scripts/retry_worker.py" ]
 
   scheduler:
-    image: ${GHCR_OWNER:-your-org}/aurelinx-backend:${VERSION:-latest}
+    image: ghcr.io/${GHCR_OWNER:-your-org}/aurelinx-backend:${VERSION:-latest}
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -119,7 +119,7 @@ services:
     command: [ "sh", "-lc", "PYTHONPATH=/app python scripts/retry_scheduler.py" ]
 
   web:
-    image: ${GHCR_OWNER:-your-org}/aurelinx-frontend:${VERSION:-latest}
+    image: ghcr.io/${GHCR_OWNER:-your-org}/aurelinx-frontend:${VERSION:-latest}
     restart: unless-stopped
     env_file:
       - ./.env.production
