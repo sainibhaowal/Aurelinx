@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.5](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.4...v1.1.5) (2026-08-20)
+
+
+### Bug Fixes
+
+* add GHCR login on VPS before pulling images ([1b8a5fa](https://github.com/sainibhaowal/Aurelinx/commit/1b8a5fab953e560bd29fc19e7f5f514b5ead8218))
+
 ### [1.1.4](https://github.com/sainibhaowal/Aurelinx/compare/v1.1.3...v1.1.4) (2026-08-20)
 
 
