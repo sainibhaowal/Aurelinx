@@ -156,7 +156,7 @@ services:
       - "${CADDY_HTTP_PORT}:80"
       - "${CADDY_HTTPS_PORT}:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./Caddyfile.local:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
     environment:

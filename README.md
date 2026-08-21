@@ -186,7 +186,7 @@ Trigger it by pushing a tag that matches `desktop-v*` or by running the workflow
 
 ## Configuration Notes
 
-Review `server/.env.example` and `infra/.env.production.example` before running locally or deploying. The application is built to read environment-driven configuration for database connectivity, origins, security, and external integrations.
+Review `infra/.env.local` (local Docker development) and `infra/.env.production.example` (production) before running locally or deploying. The application is built to read environment-driven configuration for database connectivity, origins, security, and external integrations.
 
 ## API Surface
 

@@ -59,9 +59,7 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str | None = None
 
     # Configuration
-    model_config = SettingsConfigDict(
-        env_file=".env", case_sensitive=True, extra="allow"
-    )
+    model_config = SettingsConfigDict(case_sensitive=True, extra="allow")
 
     def __init__(self, **data):
         super().__init__(**data)
