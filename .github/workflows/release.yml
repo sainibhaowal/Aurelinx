@@ -122,7 +122,10 @@ jobs:
             echo \"${GHCR_PAT}\" | docker login ghcr.io -u \"${GHCR_OWNER}\" --password-stdin
             printf 'GHCR_OWNER=%s\nVERSION=%s\n' \"${GHCR_OWNER}\" \"${VERSION}\" > .env.deploy
             docker compose --env-file .env.production --env-file .env.deploy pull
-            docker compose --env-file .env.production --env-file .env.deploy up -d --remove-orphans
+            docker compose --env-file .env.production --env-file .env.deploy up -d --remove-orphans --wait
             sleep 5
             curl -fsS http://localhost:5100/health | jq -e \".version==\\\"${VERSION}\\\"\" && echo \"Deployed ${VERSION}\"
+            # Remove old unused images (keeps volumes/DB data intact)
+            docker image prune -af
+            docker builder prune -af
           "

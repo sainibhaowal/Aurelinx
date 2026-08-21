@@ -1,128 +1,116 @@
-# Aurelinx Frontend - Next.js
+# Aurelinx Frontend — Web Client
 
-Modern React frontend built with Next.js, TypeScript, Tailwind CSS, and Framer Motion.
+The official web frontend of the **Aurelinx Executive Talent Intelligence Platform** — a modern, responsive single-page application for executive talent analytics, workforce intelligence, AI chat, and reporting.
 
-## Tech Stack
+Built with **Next.js 15**, **React 19**, **Tailwind CSS 4**, and **Framer Motion**.
 
-- **Framework**: Next.js 15.x
-- **UI Library**: React 19.x
-- **Styling**: Tailwind CSS 4.x + PostCSS
-- **Animations**: Framer Motion
-- **PDF Generation**: jsPDF + jsPDF AutoTable
-- **Markdown Rendering**: react-markdown with GFM support
-- **Icons**: Lucide React
-- **Deployment**: Vercel
+---
 
-## Getting Started
+## Tech stack
+
+| Layer              | Technology                            |
+| ------------------ | ------------------------------------- |
+| Framework          | Next.js 15 (App Router)               |
+| UI                 | React 19 + JSX                        |
+| Styling            | Tailwind CSS 4 + PostCSS              |
+| Animations         | Framer Motion 12                      |
+| Markdown rendering | react-markdown + remark-gfm           |
+| PDF export         | jsPDF + jsPDF AutoTable               |
+| Spreadsheet export | xlsx                                  |
+| Icons              | Lucide React                          |
+| Tests              | Vitest                                |
+| Linting            | ESLint                                |
+| Runtime            | Node.js (standalone build via Docker) |
+
+---
+
+## Getting started
 
 ### Prerequisites
 
-- Node.js 18.x or later
-- npm or yarn
+- Node.js 18+ (20 recommended)
+- npm or pnpm
 
-### Installation
-
-1. Clone the repository
-2. Install dependencies:
+### Install & run (development)
 
 ```bash
+cd client
 npm install
+npm run dev        # Next.js dev server on http://localhost:3001
 ```
 
-3. Create `.env.local` from the example:
-
-```bash
-cp .env.local.example .env.local
-```
-
-4. Update environment variables in `.env.local` as needed
-
-### Development
-
-Run the development server:
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) to view the application.
-
-### Building for Production
-
-Build the application:
+### Build & start (production mode)
 
 ```bash
 npm run build
+npm start          # http://localhost:3000
 ```
 
-Start the production server:
+### Tests & lint
 
 ```bash
-npm start
+npm test           # Vitest (single run)
+npm run test:watch # Vitest (watch mode)
+npm run lint       # ESLint
 ```
 
-### Linting
+---
 
-Run ESLint:
-
-```bash
-npm run lint
-```
-
-## Project Structure
+## Project structure
 
 ```
 client/
-├── app/                      # Next.js App Router
-│   ├── layout.jsx           # Root layout with metadata
-│   └── page.jsx             # Home page
-├── src/                      # Source files
-│   ├── components/          # Reusable React components
-│   ├── services/            # API services
-│   ├── contexts/            # React contexts
-│   ├── utils/               # Utility functions
-│   ├── styles/              # Global & component styles
-│   ├── assets/              # Images, fonts, etc.
-│   ├── App.jsx              # Main App component
-│   ├── index.css            # Global styles
-│   └── App.css              # App-specific styles
-├── public/                   # Static files
-├── next.config.js           # Next.js configuration
-├── jsconfig.json            # JavaScript path aliases
-├── tailwind.config.js       # Tailwind CSS configuration
-└── postcss.config.js        # PostCSS configuration
+├── app/                  # Next.js App Router
+│   ├── layout.jsx        # Root layout & metadata
+│   └── page.jsx          # Entry page
+├── src/
+│   ├── App.jsx           # Main application component
+│   ├── components/       # Reusable UI components
+│   ├── contexts/         # React context providers (auth, state, etc.)
+│   ├── services/         # API client services (REST calls to the backend)
+│   ├── utils/            # Helper utilities
+│   ├── styles/           # Global styles (index.css, App.css)
+│   ├── assets/           # Static assets (images, fonts)
+│   └── __tests__/        # Vitest test suites
+├── public/               # Public static files
+├── next.config.js        # Next.js configuration
+├── tailwind.config.js    # Tailwind configuration
+├── postcss.config.js     # PostCSS configuration
+└── package.json
 ```
 
-## Key Features
+---
 
-- Server-side rendering (SSR) with Next.js
-- Static generation for optimized performance
-- Responsive design with Tailwind CSS
-- Smooth animations and transitions
-- PDF export functionality
-- Markdown content rendering
-- Environment-based configuration
+## Key features
 
-## Environment Variables
+- **Executive talent intelligence UI** — dashboards, attrition/retention analytics, organizational insights
+- **AI-powered chat** — markdown-rendered assistant conversations over enterprise data
+- **Reporting & export** — PDF generation (jsPDF) and spreadsheet export (xlsx)
+- **Animated, responsive UI** — Framer Motion transitions, mobile-friendly layout
+- **Context-based state management** — React contexts with persistence
 
-See `.env.local.example` for available configuration options:
+---
 
-- `NEXT_PUBLIC_API_URL` - Backend API endpoint
+## Environment variables
 
-## Deployment
+| Variable              | Purpose                                                  | Example                        |
+| --------------------- | -------------------------------------------------------- | ------------------------------ |
+| `NEXT_PUBLIC_API_URL` | Base URL of the backend API (baked in **at build time**) | `https://aurelinx.averqel.com` |
 
-The application is configured for deployment on Vercel. See `vercel.json` for Vercel-specific configuration.
+> For local development, point it at the locally running API, e.g. `http://localhost:5100`.
 
-### Deploy to Vercel
+---
 
-```bash
-npm install -g vercel
-vercel
-```
+## Docker / production
 
-## Additional Resources
+The frontend is containerized via `infra/frontend.Dockerfile` (Next.js standalone output) and published to **GHCR** as `ghcr.io/sainibhaowal/aurelinx-frontend`. It is deployed automatically by the GitHub Actions release pipeline (see the root [`README.md`](../README.md) and [`Docs/vps_deployment_guide.md`](../Docs/vps_deployment_guide.md)).
 
-- [Next.js Documentation](https://nextjs.org/docs)
-- [React Documentation](https://react.dev)
-- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
-- [Framer Motion Documentation](https://www.framer.com/motion)
+In production, `NEXT_PUBLIC_API_URL` is supplied as a build argument by the pipeline; the Caddy gateway routes `/api/*` to the backend on the same domain, so no separate API hostname is required.
+
+---
+
+## Related
+
+- Backend: [`server/`](../server/README.md)
+- Desktop shell: [`desktop/`](../desktop/README.md)
+- Infrastructure & deployment: [`infra/`](../infra/README.md)
