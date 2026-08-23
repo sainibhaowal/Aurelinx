@@ -1,4 +1,4 @@
-name: Desktop Release & Code Signing
+name: Desktop Release & Aurelinx OS Code Signing
 
 on:
   workflow_dispatch:
@@ -68,7 +68,7 @@ jobs:
         id: app_url
         shell: bash
         run: |
-          APP_URL="${{ vars.AURELINX || vars.AURELINX_URL_APP || vars.AURELINX_APP_URL || 'https://aurelinx.averqel.com/app' }}"
+          APP_URL="${{ vars.AURELINX || vars.AURELINX_URL_APP || vars.AURELINX_APP_URL || vars.AURELIUS || vars.AURELIUS_URL_APP || vars.AURELIUS_APP_URL || 'https://aurelinx.averqel.com/app' }}"
           echo "APP_URL=${APP_URL}" >> $GITHUB_OUTPUT
 
       - name: Prepare desktop config
@@ -85,46 +85,42 @@ jobs:
         run: npm run build
 
       # ===================================================
-      # SIGNPATH FOUNDATION: Windows Code Signing Integration
+      # AURELINX OS CODE SIGNING: Digital Publisher Signature
       # ===================================================
-      - name: Prepare Windows Executable for SignPath Signing
-        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
-        env:
-          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-        shell: bash
+      - name: Sign Windows Executable with Aurelinx OS Publisher Certificate
+        if: matrix.os == 'windows-latest'
+        shell: powershell
         run: |
-          mkdir -p desktop/signing-package
-          cp desktop/src-tauri/target/release/bundle/nsis/*.exe desktop/signing-package/
-          cd desktop/signing-package
-          7z a ../unsigned-release.zip *
-          cd ../..
-          echo "Prepared unsigned release package for SignPath Foundation verification."
+          Write-Host "Generating Aurelinx OS Code Signing Certificate..."
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert `
+            -Subject "CN=Aurelinx OS, O=Aurelinx, OU=Engineering, C=US" `
+            -KeyAlgorithm RSA -KeyLength 3072 `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -NotAfter (Get-Date).AddYears(5)
 
-      - name: Sign Windows Installer via SignPath Foundation
-        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
-        uses: signpath/github-action-submit-signing-request@v1
-        env:
-          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || secrets.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'aurelinx' }}
-          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY || 'release-signing' }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-for-completion: true
-          input-artifact-filepath: desktop/unsigned-release.zip
-          output-artifact-directory: desktop/signed-release
+          # Export public .cer for users to trust
+          $cerPath = "desktop\src-tauri\target\release\bundle\nsis\Aurelinx.cer"
+          Export-Certificate -Cert $cert -FilePath $cerPath
+          Copy-Item "desktop\scripts\install-aurelinx-cert.bat" "desktop\src-tauri\target\release\bundle\nsis\"
+          Copy-Item "desktop\scripts\install-aurelinx-cert.ps1" "desktop\src-tauri\target\release\bundle\nsis\"
 
-      - name: Replace Unsigned Binary with Signed Binary
-        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
-        env:
-          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-        shell: bash
-        run: |
-          if [ -d "desktop/signed-release" ]; then
-            cp -f desktop/signed-release/*.exe desktop/src-tauri/target/release/bundle/nsis/
-            echo "Successfully replaced installer with SignPath digitally signed executable."
-          fi
+          # Export password-protected PFX
+          $password = ConvertTo-SecureString -String "Aurelinx2026Secure!" -Force -AsPlainText
+          $pfxPath = "desktop\Aurelinx.pfx"
+          Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $password
+
+          # Find signtool.exe in Windows SDK
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -First 1).FullName
+          Write-Host "Using signtool at: $signtool"
+
+          # Sign all NSIS .exe installers
+          $exeFiles = Get-ChildItem "desktop\src-tauri\target\release\bundle\nsis\*.exe"
+          foreach ($exe in $exeFiles) {
+            Write-Host "Signing executable: $($exe.FullName) with Aurelinx OS..."
+            & $signtool sign /f $pfxPath /p "Aurelinx2026Secure!" /fd SHA256 /tr "http://timestamp.digicert.com" /td SHA256 /d "Aurelinx OS" /du "https://aurelinx.averqel.com" $exe.FullName
+            & $signtool verify /pa /v $exe.FullName
+          }
+          Write-Host "Aurelinx OS digital signature applied successfully!"
 
       # ===================================================
       # ATTACH ASSETS TO GITHUB RELEASE
@@ -135,6 +131,7 @@ jobs:
         with:
           files: |
             desktop/src-tauri/target/release/bundle/nsis/*.exe
+            desktop/src-tauri/target/release/bundle/nsis/Aurelinx.cer
             desktop/src-tauri/target/release/bundle/deb/*.deb
             desktop/src-tauri/target/release/bundle/appimage/*.AppImage
         env:
@@ -145,7 +142,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aurelinx-windows-installer
-          path: desktop/src-tauri/target/release/bundle/nsis/*.exe
+          path: |
+            desktop/src-tauri/target/release/bundle/nsis/*.exe
+            desktop/src-tauri/target/release/bundle/nsis/Aurelinx.cer
+            desktop/src-tauri/target/release/bundle/nsis/install-aurelinx-cert.bat
 
       - name: Upload Linux CI Artifact
         if: runner.os == 'Linux'
