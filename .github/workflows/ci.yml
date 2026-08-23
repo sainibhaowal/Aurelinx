@@ -226,6 +226,20 @@ jobs:
   backend-tests:
     name: ⚡ Backend - Pytest 17 Integration Tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aurelinx
+          POSTGRES_PASSWORD: AurelinxPg_2026!ChangeMe
+          POSTGRES_DB: aurelinx_db
+        ports:
+          - 55433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: ./server
@@ -245,11 +259,12 @@ jobs:
       - name: Run Full Pytest Suite
         run: pytest -v --tb=short
         env:
-          ALLOW_SQLITE: "1"
-          DATABASE_URL: "sqlite:///:memory:"
-          ENVIRONMENT: "test"
+          TEST_DATABASE_URL: "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:55433/aurelinx_db?options=-csearch_path%3Dtest,public"
+          DATABASE_URL: "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:55433/aurelinx_db"
+          ENVIRONMENT: "development"
           SECRET_KEY: "test-secret-key-at-least-32-characters-long"
-          OPENAI_API_KEY: "test-dummy-key"
+          ALLOWED_HOSTS: "*"
+          ALLOW_SQLITE: "0"
 
   # ==========================================
   # PARALLEL RUNNER 9: Docker Backend Compilation
