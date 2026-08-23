@@ -333,9 +333,9 @@ We follow [SemVer](https://semver.org/): `MAJOR.MINOR.PATCH`
 ## Community & Support
 
 - **Questions**: [GitHub Discussions](https://github.com/ravindersingh/Aurelinx/discussions)
-- **Bugs**: [Issue Tracker](https://github.com/ravindersingh/Aurelinx/issues)
-- **Security**: `security@aurelinx.com` (see [SECURITY.md](SECURITY.md))
-- **Enterprise**: `enterprise@aurelinx.com`
+- **GitHub Issues**: [github.com/sainibhaowal/Aurelinx/issues](https://github.com/sainibhaowal/Aurelinx/issues)
+- **Email**: `rav.singh039@gmail.com`
+- **Security**: `rav.singh039@gmail.com` (see [SECURITY.md](SECURITY.md))
 
 ---
 

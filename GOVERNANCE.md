@@ -18,7 +18,7 @@
 - License changes, governance amendments, project transfer
 - Maintainer appointments/removals
 
-**Contact**: `ravinder.singh@aurelinx.com` | GitHub: `@ravindersingh`
+**Contact**: `rav.singh039@gmail.com` | GitHub: `@sainibhaowal`
 
 ### Maintainers (Core Team)
 Trusted contributors with **write access** to `ravindersingh/Aurelinx`. Current maintainers listed in [MAINTAINERS.md](MAINTAINERS.md).
@@ -140,7 +140,7 @@ See [SECURITY.md](SECURITY.md) — coordinated disclosure, 48h acknowledgment.
 - Database schema changes affecting PII
 
 ### Security Maintainers
-Designated subset of maintainers with `security@aurelinx.com` access.
+Designated maintainers reachable at `rav.singh039@gmail.com`.
 
 ---
 
