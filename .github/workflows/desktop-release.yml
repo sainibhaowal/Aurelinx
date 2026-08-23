@@ -1,4 +1,4 @@
-name: Desktop Release & Binaries
+name: Desktop Release & Code Signing
 
 on:
   workflow_dispatch:
@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: write
+  actions: read
+  id-token: write
 
 jobs:
   build-desktop:
@@ -27,7 +29,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Node.js
@@ -82,6 +84,51 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build
 
+      # ===================================================
+      # SIGNPATH FOUNDATION: Windows Code Signing Integration
+      # ===================================================
+      - name: Prepare Windows Executable for SignPath Signing
+        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        shell: bash
+        run: |
+          mkdir -p desktop/signing-package
+          cp desktop/src-tauri/target/release/bundle/nsis/*.exe desktop/signing-package/
+          cd desktop/signing-package
+          7z a ../unsigned-release.zip *
+          cd ../..
+          echo "Prepared unsigned release package for SignPath Foundation verification."
+
+      - name: Sign Windows Installer via SignPath Foundation
+        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'aurelinx' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY || 'release-signing' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-for-completion: true
+          input-artifact-filepath: desktop/unsigned-release.zip
+          output-artifact-directory: desktop/signed-release
+
+      - name: Replace Unsigned Binary with Signed Binary
+        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        shell: bash
+        run: |
+          if [ -d "desktop/signed-release" ]; then
+            cp -f desktop/signed-release/*.exe desktop/src-tauri/target/release/bundle/nsis/
+            echo "Successfully replaced installer with SignPath digitally signed executable."
+          fi
+
+      # ===================================================
+      # ATTACH ASSETS TO GITHUB RELEASE
+      # ===================================================
       - name: Upload Release Binaries to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2

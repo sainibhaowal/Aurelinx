@@ -24,7 +24,7 @@
     "vite"
   ],
   "author": "Google DeepMind pair-programmer",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "devDependencies": {
     "standard-version": "^9.5.0"
   }
