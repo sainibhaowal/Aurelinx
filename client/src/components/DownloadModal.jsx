@@ -82,10 +82,10 @@ export const DownloadModal = ({ isOpen, onClose }) => {
           file: release.windows.fileName,
           url: release.windows.url,
           format: ".exe (x64)",
-          desc: "Signed installer with desktop shortcuts and auto-updater",
+          desc: "Publisher: Aurelinx OS - Signed installer with desktop shortcuts",
         },
       ],
-      installCmd: `${release.windows.fileName} /S`,
+      installCmd: `${release.windows.fileName}`,
     },
     {
       id: "macos",
