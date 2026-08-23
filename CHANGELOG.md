@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.3.2](https://github.com/sainibhaowal/Aurelinx/compare/v1.3.1...v1.3.2) (2026-08-23)
+
+
+### Bug Fixes
+
+* **ui:** trigger direct in-browser file download on button click ([f742e54](https://github.com/sainibhaowal/Aurelinx/commit/f742e54d4a1348012c5164d49e8a57d0fe7e8606))
+
 ### [1.3.1](https://github.com/sainibhaowal/Aurelinx/compare/v1.3.0...v1.3.1) (2026-08-23)
 
 ## [1.3.0](https://github.com/sainibhaowal/Aurelinx/compare/v1.2.0...v1.3.0) (2026-08-23)
