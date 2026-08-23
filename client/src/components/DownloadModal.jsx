@@ -82,7 +82,7 @@ export const DownloadModal = ({ isOpen, onClose }) => {
           file: release.windows.fileName,
           url: release.windows.url,
           format: ".exe (x64)",
-          desc: "Publisher: Aurelinx OS - Signed installer with desktop shortcuts",
+          desc: "Native desktop setup with automatic updates and system tray",
         },
       ],
       installCmd: `${release.windows.fileName}`,
