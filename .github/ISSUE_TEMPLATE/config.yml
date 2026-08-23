@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 General Discussion
+    url: https://github.com/yourusername/Aurelinx/discussions
+    about: Questions, ideas, and general conversation
+  - name: 🔒 Security Vulnerability
+    url: mailto:security@aurelinx.com
+    about: Report security issues privately
+  - name: 💼 Enterprise Inquiry
+    url: mailto:enterprise@aurelinx.com
+    about: Commercial support and partnerships

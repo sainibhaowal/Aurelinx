@@ -1,3 +1,18 @@
+
+# Copyright 2026 Ravinder Singh
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Aurelinx Intelligence Chat endpoints
 Persistent sessions, messages, uploads, and tool-enabled agent responses.
@@ -90,8 +105,12 @@ from app.workflows.events import (
 router = APIRouter(prefix="/chat", tags=["chat"])
 logger = get_logger(__name__)
 
-UPLOAD_ROOT = Path(os.getenv("CHAT_UPLOAD_ROOT", "/app/data/chat")).resolve()
-UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+try:
+    UPLOAD_ROOT = Path(os.getenv("CHAT_UPLOAD_ROOT", "/app/data/chat")).resolve()
+    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+except (PermissionError, OSError):
+    UPLOAD_ROOT = Path(os.getenv("CHAT_UPLOAD_ROOT", "./data/chat")).resolve()
+    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 def _json_dumps(payload: dict) -> str:

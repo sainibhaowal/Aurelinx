@@ -1,7 +1,20 @@
-import React from "react";
-import { motion } from "framer-motion";
+// Copyright 2026 Ravinder Singh
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-const AurelinxLogo = ({ size = 24, collapsed = false }) => {
+import { APP_VERSION } from "../config/version";
+
+const AurelinxLogo = ({ size = 24, collapsed = false, showVersion = true }) => {
   return (
     <div
       className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}
@@ -21,13 +34,24 @@ const AurelinxLogo = ({ size = 24, collapsed = false }) => {
       </motion.div>
 
       {!collapsed && (
-        <motion.span
-          initial={{ opacity: 0, x: -8 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="text-2xl font-extrabold tracking-tight text-cyan-300"
-        >
-          Aurelinx
-        </motion.span>
+        <div className="flex items-center gap-2">
+          <motion.span
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="text-2xl font-extrabold tracking-tight text-cyan-300"
+          >
+            Aurelinx
+          </motion.span>
+          {showVersion && (
+            <motion.span
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="rounded-md border border-emerald-400/30 bg-emerald-950/40 px-1.5 py-0.5 text-[10px] font-mono font-bold tracking-wider text-emerald-300"
+            >
+              v{APP_VERSION}
+            </motion.span>
+          )}
+        </div>
       )}
     </div>
   );

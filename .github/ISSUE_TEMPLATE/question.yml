@@ -1,0 +1,28 @@
+---
+name: Question
+about: Ask a question about the project
+title: '[QUESTION] '
+labels: ['question', 'needs-triage']
+assignees: ''
+---
+
+## Question
+Clear and specific question.
+
+## Context
+Why are you asking? What are you trying to achieve?
+
+## What You've Tried
+- Documentation checked: [Yes/No]
+- Search terms used:
+- Related issues/discussions:
+
+## Environment (if relevant)
+- **OS**: 
+- **Deployment**: [Local / Docker / Kubernetes / Other]
+- **Version**: 
+
+## Checklist
+- [ ] I have read the README and documentation
+- [ ] I have searched existing issues and discussions
+- [ ] This is not a bug report or feature request

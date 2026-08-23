@@ -1,6 +1,18 @@
-name: Release
+name: Semantic Release & Image Build
 
 on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type (auto, patch, minor, major)'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
   push:
     tags:
       - 'v*'
@@ -10,19 +22,76 @@ permissions:
   packages: write
 
 jobs:
-  build-and-push:
+  version-and-tag:
+    name: Generate Semantic Version & Tag
     runs-on: ubuntu-latest
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_BACKEND: ${{ github.repository_owner }}/aurelinx-backend
-      IMAGE_FRONTEND: ${{ github.repository_owner }}/aurelinx-frontend
+    if: github.event_name == 'workflow_dispatch'
     outputs:
-      version: ${{ steps.vars.outputs.VERSION }}
+      new_tag: ${{ steps.bump.outputs.tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Configure Git User
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install Release Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Bump Version
+        id: bump
+        run: |
+          if [ "${{ github.event.inputs.release_type }}" = "auto" ]; then
+            npx standard-version
+          else
+            npx standard-version --release-as ${{ github.event.inputs.release_type }}
+          fi
+          NEW_TAG=$(git describe --tags --abbrev=0)
+          echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
+          git push --follow-tags origin ${{ github.ref_name }}
+
+  build-and-publish:
+    name: Build, Smoke-Test & Publish Images
+    runs-on: ubuntu-latest
+    needs: [version-and-tag]
+    if: always() && (github.event_name == 'push' || needs.version-and-tag.result == 'success')
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_BACKEND: ${{ github.repository_owner }}/aurelinx-backend
+      IMAGE_FRONTEND: ${{ github.repository_owner }}/aurelinx-frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Target Version
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ needs.version-and-tag.outputs.new_tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          CLEAN_VERSION="${TAG#v}"
+          echo "TAG=${TAG}" >> $GITHUB_OUTPUT
+          echo "VERSION=${CLEAN_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -34,11 +103,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version from tag
-        id: vars
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Build and push Backend image
+      - name: 1. Build & Push Backend Container Image
         uses: docker/build-push-action@v5
         with:
           context: ./server
@@ -50,7 +115,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and push Frontend image
+      - name: 2. Build & Push Frontend Container Image
         uses: docker/build-push-action@v5
         with:
           context: ./client
@@ -60,72 +125,60 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:${{ steps.vars.outputs.VERSION }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:latest
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL || 'https://aurelinx.averqel.com' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Generate professional release notes
+      - name: 3. Verify Container Image Health (Smoke Test)
+        run: |
+          echo "==> Pulling and testing built backend image..."
+          docker run --rm -d --name test-api -p 5000:5000 \
+            -e ALLOW_SQLITE=1 \
+            -e DATABASE_URL="sqlite:///:memory:" \
+            -e SECRET_KEY="test-secret-key-at-least-32-characters-long" \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:${{ steps.vars.outputs.VERSION }}
+          
+          sleep 4
+          if curl -fsS http://localhost:5000/health; then
+            echo "✓ Backend container image passed live health check!"
+          else
+            echo "✗ Backend container health check failed!"
+            docker logs test-api
+            docker stop test-api || true
+            exit 1
+          fi
+          docker stop test-api || true
+
+      - name: 4. Generate Release Notes
         id: release_notes
         run: |
-          VERSION="${GITHUB_REF#refs/tags/v}"
-          PREV_TAG=$(git tag --sort=-version:refname | sed -n 2p)
-          echo "### What's Changed" > NOTES.md
+          VERSION="${{ steps.vars.outputs.VERSION }}"
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^v${VERSION}$" | head -n 1 || true)
+          echo "### What's Changed in v${VERSION}" > NOTES.md
           if [ -n "$PREV_TAG" ]; then
             git log "$PREV_TAG"..HEAD --pretty=format:"- %s (%h)" --grep="^feat" >> NOTES.md || true
+          else
+            git log -n 15 --pretty=format:"- %s (%h)" --grep="^feat" >> NOTES.md || true
           fi
           echo "" >> NOTES.md
-          echo "### Bug Fixes & Improvements" >> NOTES.md
+          echo "### Bug Fixes & Refactoring" >> NOTES.md
           if [ -n "$PREV_TAG" ]; then
             git log "$PREV_TAG"..HEAD --pretty=format:"- %s (%h)" --grep="^fix\|^chore\|^refactor\|^ci\|^docs" >> NOTES.md || true
+          else
+            git log -n 15 --pretty=format:"- %s (%h)" --grep="^fix\|^chore\|^refactor\|^ci\|^docs" >> NOTES.md || true
           fi
           echo "" >> NOTES.md
           echo "---" >> NOTES.md
-          echo "**Images:**" >> NOTES.md
-          echo "- \`ghcr.io/sainibhaowal/aurelinx-backend:$VERSION\`" >> NOTES.md
-          echo "- \`ghcr.io/sainibhaowal/aurelinx-frontend:$VERSION\`" >> NOTES.md
-          echo "**Deployment:** Automatically deployed to production (aurelinx.averqel.com)." >> NOTES.md
+          echo "**Container Images:**" >> NOTES.md
+          echo "- \`ghcr.io/${{ github.repository_owner }}/aurelinx-backend:${VERSION}\`" >> NOTES.md
+          echo "- \`ghcr.io/${{ github.repository_owner }}/aurelinx-frontend:${VERSION}\`" >> NOTES.md
 
-      - name: Create GitHub Release
+      - name: 5. Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Aurelinx v${{ steps.vars.outputs.VERSION }}
+          tag_name: ${{ steps.vars.outputs.TAG }}
+          name: Aurelinx ${{ steps.vars.outputs.TAG }}
           body_path: NOTES.md
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    # Required secrets (configure in repo Settings → Secrets → Actions):
-    #   VPS_HOST        - IP or hostname of the VPS
-    #   VPS_USER        - SSH user with docker rights (e.g. deploy)
-    #   VPS_SSH_KEY     - Private SSH key (no passphrase) for VPS_USER
-    #   VPS_DEPLOY_DIR  - Absolute path on VPS where docker-compose.yml lives (e.g. /opt/aurelinx)
-    steps:
-      - name: Install SSH key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
-
-      - name: Deploy to VPS
-        env:
-          VERSION: ${{ needs.build-and-push.outputs.version }}
-          GHCR_OWNER: ${{ github.repository_owner }}
-          DEPLOY_DIR: ${{ secrets.VPS_DEPLOY_DIR }}
-          GHCR_PAT: ${{ secrets.GHCR_PAT }}
-        run: |
-          ssh -o StrictHostKeyChecking=no "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "
-            set -euo pipefail
-            cd \"${DEPLOY_DIR}\"
-            # Login to GHCR on the VPS using the PAT (read:packages) secret
-            echo \"${GHCR_PAT}\" | docker login ghcr.io -u \"${GHCR_OWNER}\" --password-stdin
-            printf 'GHCR_OWNER=%s\nVERSION=%s\n' \"${GHCR_OWNER}\" \"${VERSION}\" > .env.deploy
-            docker compose --env-file .env.production --env-file .env.deploy pull
-            docker compose --env-file .env.production --env-file .env.deploy up -d --remove-orphans --wait
-            sleep 5
-            curl -fsS http://localhost:5100/health | jq -e \".version==\\\"${VERSION}\\\"\" && echo \"Deployed ${VERSION}\"
-            # Remove old unused images (keeps volumes/DB data intact)
-            docker image prune -af
-            docker builder prune -af
-          "
