@@ -46,15 +46,25 @@ if DATABASE_URL.startswith("sqlite") and not ALLOW_SQLITE:
         "SQLite is disabled. Set DATABASE_URL to PostgreSQL and use ALLOW_SQLITE only for explicit tests."
     )
 
-engine = create_engine(
-    DATABASE_URL,
-    echo=os.getenv("DEBUG", "False").lower() == "true",
-    poolclass=QueuePool,
-    pool_size=20,
-    max_overflow=40,
-    pool_pre_ping=True,
-    connect_args={"connect_timeout": 10},
-)
+if DATABASE_URL.startswith("sqlite"):
+    from sqlalchemy.pool import StaticPool
+
+    engine = create_engine(
+        DATABASE_URL,
+        echo=os.getenv("DEBUG", "False").lower() == "true",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        echo=os.getenv("DEBUG", "False").lower() == "true",
+        poolclass=QueuePool,
+        pool_size=20,
+        max_overflow=40,
+        pool_pre_ping=True,
+        connect_args={"connect_timeout": 10},
+    )
 
 
 # ============ USER & AUTHENTICATION ============
