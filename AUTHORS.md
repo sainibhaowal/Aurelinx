@@ -87,12 +87,11 @@ If you create a derivative work:
 
 ---
 
-## Contact
+## Project Contact
 
-- **Project Lead**: Ravinder Singh — `ravinder.singh@aurelinx.com`
-- **General**: `maintainers@aurelinx.com`
-- **Security**: `security@aurelinx.com`
-- **Enterprise**: `enterprise@aurelinx.com`
+- **Lead Creator & Maintainer**: Ravinder Singh (rav.singh039@gmail.com)
+- **GitHub**: https://github.com/sainibhaowal/Aurelinx
+- **Issues & Discussions**: https://github.com/sainibhaowal/Aurelinx/issues
 
 ---
 

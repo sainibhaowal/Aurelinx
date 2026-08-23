@@ -3605,7 +3605,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink href="mailto:support@aurelinx.com">
+                    <FooterLink href="mailto:rav.singh039@gmail.com">
                       Support
                     </FooterLink>
                   </li>
@@ -3631,8 +3631,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     <FooterLink onClick={onEnterWorkspace}>Blog</FooterLink>
                   </li>
                   <li>
-                    <FooterLink href="mailto:sales@aurelinx.com">
-                      Contact Sales
+                    <FooterLink href="mailto:rav.singh039@gmail.com">
+                      Contact
                     </FooterLink>
                   </li>
                   <li>
