@@ -30,10 +30,10 @@ jobs:
         with:
           version: 9
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
           cache-dependency-path: client/pnpm-lock.yaml
 
@@ -61,10 +61,10 @@ jobs:
         with:
           version: 9
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
           cache-dependency-path: client/pnpm-lock.yaml
 
@@ -92,10 +92,10 @@ jobs:
         with:
           version: 9
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
           cache-dependency-path: client/pnpm-lock.yaml
 
@@ -123,10 +123,10 @@ jobs:
         with:
           version: 9
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
           cache-dependency-path: client/pnpm-lock.yaml
 
@@ -154,10 +154,10 @@ jobs:
         with:
           version: 9
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
           cache-dependency-path: client/pnpm-lock.yaml
 
@@ -186,6 +186,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
 
       - name: Install Ruff
         run: pip install ruff
@@ -279,13 +283,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Backend Image Dry-Run
+      - name: Dry-Run Build Backend Container
         uses: docker/build-push-action@v5
         with:
           context: ./server
           file: ./infra/backend.Dockerfile
           push: false
-          tags: aurelinx-backend:ci-test
+          tags: aurelinx-backend:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -302,35 +306,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Frontend Image Dry-Run
+      - name: Dry-Run Build Frontend Container
         uses: docker/build-push-action@v5
         with:
           context: ./client
           file: ./infra/frontend.Dockerfile
           push: false
-          tags: aurelinx-frontend:ci-test
+          tags: aurelinx-frontend:test
           build-args: |
             NEXT_PUBLIC_API_URL=http://localhost:5100
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  # ==========================================
-  # FINAL GATE: All Runners Completed
-  # ==========================================
-  all-checks-passed:
-    name: 🏁 All CI Checks Passed (Merge Ready)
-    runs-on: ubuntu-latest
-    needs:
-      - frontend-typecheck
-      - frontend-lint
-      - frontend-format
-      - frontend-tests
-      - frontend-build
-      - backend-lint
-      - backend-typecheck
-      - backend-tests
-      - docker-backend
-      - docker-frontend
-    steps:
-      - name: Verification Confirmation
-        run: echo "✓ All 10 parallel CI verification runners passed successfully. Ready to merge!"
