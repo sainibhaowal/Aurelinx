@@ -234,8 +234,7 @@ export const DownloadModal = ({ isOpen, onClose }) => {
 
                 <a
                   href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  download={item.file}
                   className="flex shrink-0 items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-400 px-4 py-2.5 text-xs font-bold text-slate-950 transition-all hover:opacity-90 active:scale-95 shadow-md shadow-emerald-500/20"
                 >
                   <Download className="h-4 w-4" /> Download
