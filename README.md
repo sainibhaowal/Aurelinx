@@ -222,3 +222,13 @@ That combination gives Aurelinx a credible enterprise footprint and a strong fou
 ## Brand Asset
 
 The logo used in this README is sourced from [client/public/aurelinx-logo-final-clean-transparent.png](client/public/aurelinx-logo-final-clean-transparent.png).
+
+## Author & Maintainer
+
+**Ravinder Singh**
+- GitHub: [@sainibhaowal](https://github.com/sainibhaowal)
+- Contact: rav.singh039@gmail.com
+
+## License
+
+This project is licensed under the **Apache License, Version 2.0**. See the [LICENSE](LICENSE) file for details.

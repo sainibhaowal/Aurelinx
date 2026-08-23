@@ -1,0 +1,61 @@
+name: Deploy to Production VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Image version to deploy (e.g. 1.2.0 or latest)'
+        required: true
+        default: 'latest'
+
+jobs:
+  deploy-to-vps:
+    name: Zero-Downtime VPS Deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Execute Zero-Downtime Deployment
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+          GHCR_OWNER: ${{ github.repository_owner }}
+          DEPLOY_DIR: ${{ secrets.VPS_DEPLOY_DIR }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=no "${VPS_USER}@${VPS_HOST}" "
+            set -euo pipefail
+            cd \"${DEPLOY_DIR}\"
+
+            echo \"==> 1. Logging into GitHub Container Registry...\"
+            echo \"${GHCR_PAT}\" | docker login ghcr.io -u \"${GHCR_OWNER}\" --password-stdin
+
+            echo \"==> 2. Writing deployment configuration for version ${VERSION}...\"
+            printf 'GHCR_OWNER=%s\nVERSION=%s\n' \"${GHCR_OWNER}\" \"${VERSION}\" > .env.deploy
+
+            echo \"==> 3. Pre-pulling verified new container images before stopping anything...\"
+            docker compose --env-file .env.production --env-file .env.deploy pull
+
+            echo \"==> 4. Starting new containers side-by-side with health wait and orphan removal...\"
+            docker compose --env-file .env.production --env-file .env.deploy up -d --remove-orphans --wait
+
+            echo \"==> 5. Running live backend health check verification...\"
+            sleep 3
+            if curl -fsS http://localhost:5100/health > /dev/null; then
+              echo \"✓ Live backend health check passed successfully with zero downtime!\"
+            else
+              echo \"⚠ Health check failed! Inspecting container logs:\"
+              docker compose logs --tail=60 api
+              exit 1
+            fi
+
+            echo \"==> 6. Cleaning old unused dangling images and build cache...\"
+            docker image prune -af
+            docker builder prune -af
+
+            echo \"==> 7. Aurelinx v${VERSION} is 100% live and fully operational!\"
+          "

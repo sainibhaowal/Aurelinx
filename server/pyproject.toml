@@ -1,3 +1,12 @@
+[project]
+name = "aurelinx-backend"
+version = "1.2.0"
+description = "Aurelinx Autonomous Management Intelligence Platform Backend"
+authors = [{ name = "Ravinder Singh", email = "rav.singh039@gmail.com" }]
+license = { text = "Apache-2.0" }
+readme = "README.md"
+requires-python = ">=3.11"
+
 [tool.ruff]
 line-length = 88
 target-version = "py312"

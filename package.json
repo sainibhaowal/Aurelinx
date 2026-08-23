@@ -7,12 +7,14 @@
     "dev": "node start-all.js",
     "dev:down": "docker compose -f docker-compose.dev.yml down",
     "release": "standard-version && git push --follow-tags",
-    "typecheck": "pnpm --prefix client tsc --noEmit",
-    "lint": "pnpm --prefix client eslint .",
-    "lint:fix": "pnpm --prefix client eslint . --fix",
-    "format:check": "pnpm --prefix client prettier --check .",
-    "format": "pnpm --prefix client prettier --write .",
-    "test": "pnpm --prefix client vitest run"
+    "typecheck": "pnpm -C client exec tsc --noEmit",
+    "lint": "pnpm -C client run lint",
+    "lint:fix": "pnpm -C client run lint -- --fix",
+    "format:check": "pnpm -C client exec prettier --check .",
+    "format": "pnpm -C client exec prettier --write .",
+    "test:client": "pnpm -C client run test",
+    "test:server": "cd server && ALLOW_SQLITE=1 DATABASE_URL=\"sqlite:///:memory:\" pytest",
+    "test": "pnpm -C client run test && cd server && ALLOW_SQLITE=1 DATABASE_URL=\"sqlite:///:memory:\" pytest"
   },
   "keywords": [
     "talent",
@@ -21,8 +23,8 @@
     "fastapi",
     "vite"
   ],
-  "author": "Google DeepMind pair-programmer",
-  "license": "MIT",
+  "author": "Ravinder Singh <rav.singh039@gmail.com> (https://github.com/sainibhaowal)",
+  "license": "Apache-2.0",
   "devDependencies": {
     "standard-version": "^9.5.0"
   }

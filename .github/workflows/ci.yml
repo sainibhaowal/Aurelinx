@@ -1,0 +1,336 @@
+name: Continuous Integration (Ultra-Fast Parallel Runners)
+
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ==========================================
+  # PARALLEL RUNNER 1: Frontend Typecheck
+  # ==========================================
+  frontend-typecheck:
+    name: ⚡ Frontend - TypeScript Typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./client
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: client/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run TypeScript Check
+        run: pnpm exec tsc --noEmit
+
+  # ==========================================
+  # PARALLEL RUNNER 2: Frontend ESLint
+  # ==========================================
+  frontend-lint:
+    name: ⚡ Frontend - ESLint Analysis
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./client
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: client/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: pnpm run lint
+
+  # ==========================================
+  # PARALLEL RUNNER 3: Frontend Prettier Format
+  # ==========================================
+  frontend-format:
+    name: ⚡ Frontend - Prettier Code Style
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./client
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: client/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Prettier Check
+        run: pnpm exec prettier --check .
+
+  # ==========================================
+  # PARALLEL RUNNER 4: Frontend Unit Tests
+  # ==========================================
+  frontend-tests:
+    name: ⚡ Frontend - Vitest Unit & Integration
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./client
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: client/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Vitest Suite
+        run: pnpm run test
+
+  # ==========================================
+  # PARALLEL RUNNER 5: Next.js Production Build
+  # ==========================================
+  frontend-build:
+    name: ⚡ Frontend - Next.js Production Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./client
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: client/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile Next.js App
+        run: pnpm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:5100
+
+  # ==========================================
+  # PARALLEL RUNNER 6: Backend Ruff Linting
+  # ==========================================
+  backend-lint:
+    name: ⚡ Backend - Ruff Standards & Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Run Ruff Lint Check
+        run: ruff check .
+
+  # ==========================================
+  # PARALLEL RUNNER 7: Backend Mypy Typing
+  # ==========================================
+  backend-typecheck:
+    name: ⚡ Backend - Mypy Static Typing
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Dependencies & Mypy
+        run: |
+          pip install -r requirements.txt
+          pip install mypy
+
+      - name: Run Mypy Type Check
+        run: mypy --config-file mypy.ini app
+
+  # ==========================================
+  # PARALLEL RUNNER 8: Backend Pytest Integration
+  # ==========================================
+  backend-tests:
+    name: ⚡ Backend - Pytest 17 Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aurelinx
+          POSTGRES_PASSWORD: AurelinxPg_2026!ChangeMe
+          POSTGRES_DB: aurelinx_db
+        ports:
+          - 55433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: ./server
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Test Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Full Pytest Suite
+        run: pytest -v --tb=short
+        env:
+          TEST_DATABASE_URL: "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:55433/aurelinx_db?options=-csearch_path%3Dtest,public"
+          DATABASE_URL: "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:55433/aurelinx_db"
+          ENVIRONMENT: "development"
+          SECRET_KEY: "test-secret-key-at-least-32-characters-long"
+          ALLOWED_HOSTS: "*"
+          ALLOW_SQLITE: "0"
+
+  # ==========================================
+  # PARALLEL RUNNER 9: Docker Backend Compilation
+  # ==========================================
+  docker-backend:
+    name: ⚡ Docker - Backend Image Compilation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Image Dry-Run
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./infra/backend.Dockerfile
+          push: false
+          tags: aurelinx-backend:ci-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==========================================
+  # PARALLEL RUNNER 10: Docker Frontend Compilation
+  # ==========================================
+  docker-frontend:
+    name: ⚡ Docker - Frontend Image Compilation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Frontend Image Dry-Run
+        uses: docker/build-push-action@v5
+        with:
+          context: ./client
+          file: ./infra/frontend.Dockerfile
+          push: false
+          tags: aurelinx-frontend:ci-test
+          build-args: |
+            NEXT_PUBLIC_API_URL=http://localhost:5100
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==========================================
+  # FINAL GATE: All Runners Completed
+  # ==========================================
+  all-checks-passed:
+    name: 🏁 All CI Checks Passed (Merge Ready)
+    runs-on: ubuntu-latest
+    needs:
+      - frontend-typecheck
+      - frontend-lint
+      - frontend-format
+      - frontend-tests
+      - frontend-build
+      - backend-lint
+      - backend-typecheck
+      - backend-tests
+      - docker-backend
+      - docker-frontend
+    steps:
+      - name: Verification Confirmation
+        run: echo "✓ All 10 parallel CI verification runners passed successfully. Ready to merge!"
