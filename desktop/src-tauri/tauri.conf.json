@@ -28,6 +28,11 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "Ravinder Singh",
+    "copyright": "Copyright 2026 Ravinder Singh. All rights reserved.",
+    "category": "Business",
+    "shortDescription": "Autonomous HR intelligence and workforce analytics management platform",
+    "longDescription": "Aurelinx unifies live workforce analytics, AI agent governance, and automated risk parameters into a high-precision executive control panel.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,6 +40,13 @@
       "icons/icon.png",
       "icons/icon.ico",
       "icons/icon.icns"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "languages": ["English"],
+        "displayLanguageSelector": false
+      }
+    }
   }
 }
