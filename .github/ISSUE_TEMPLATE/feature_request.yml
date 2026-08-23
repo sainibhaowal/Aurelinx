@@ -1,0 +1,37 @@
+---
+name: Feature Request
+about: Suggest an idea for this project
+title: '[FEAT] '
+labels: ['enhancement', 'needs-triage']
+assignees: ''
+---
+
+## Problem Statement
+Clear description of the problem this feature would solve.
+
+## Proposed Solution
+Description of what you'd like to happen.
+
+## Alternatives Considered
+Other solutions or features you've considered.
+
+## Use Cases
+Specific scenarios where this would be valuable:
+1. As a [role], I want to [action], so that [benefit]
+2. ...
+
+## Implementation Ideas
+Technical approach, API design, or references to similar implementations.
+
+## Impact
+- **Users affected**: [All / Specific role / Enterprise only]
+- **Breaking changes**: [Yes / No / Unknown]
+- **Migration needed**: [Yes / No]
+
+## Additional Context
+Screenshots, mockups, links to related issues, or research.
+
+## Checklist
+- [ ] I have searched existing issues and discussions
+- [ ] This aligns with project vision (see ROADMAP.md)
+- [ ] I'm willing to contribute implementation

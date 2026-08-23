@@ -1,0 +1,89 @@
+# GitAttributes for Aurelinx
+# https://git-scm.com/docs/gitattributes
+
+# Auto-detect text files
+* text=auto
+
+# Line endings
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.rs text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.dockerfile text eol=lf
+Dockerfile* text eol=lf
+
+# Windows batch files
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files - don't diff
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.whl binary
+*.so binary
+*.dll binary
+*.dylib binary
+*.exe binary
+*.class binary
+*.pyc binary
+*.pyo binary
+*.pyd binary
+
+# Lock files - treat as text for diffing
+package-lock.json text
+pnpm-lock.yaml text
+yarn.lock text
+Cargo.lock text
+requirements.txt text
+poetry.lock text
+
+# Diffable binary formats
+*.docx diff=docx
+*.pptx diff=pptx
+*.xlsx diff=xlsx
+
+# Linguist overrides
+# Mark generated/minified files as vendored
+*node_modules/** linguist-vendored
+*dist/** linguist-vendored
+*build/** linguist-vendored
+*.min.js linguist-vendored
+*.min.css linguist-vendored
+
+# Mark documentation
+*.md linguist-documentation
+*.rst linguist-documentation
+*.txt linguist-documentation
+
+# Language overrides
+*.sql linguist-language=SQL
+*.graphql linguist-language=GraphQL
+*.proto linguist-language=Protobuf
