@@ -90,8 +90,12 @@ from app.workflows.events import (
 router = APIRouter(prefix="/chat", tags=["chat"])
 logger = get_logger(__name__)
 
-UPLOAD_ROOT = Path(os.getenv("CHAT_UPLOAD_ROOT", "/app/data/chat")).resolve()
-UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+try:
+    UPLOAD_ROOT = Path(os.getenv("CHAT_UPLOAD_ROOT", "/app/data/chat")).resolve()
+    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+except (PermissionError, OSError):
+    UPLOAD_ROOT = Path(os.getenv("CHAT_UPLOAD_ROOT", "./data/chat")).resolve()
+    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 def _json_dumps(payload: dict) -> str:
