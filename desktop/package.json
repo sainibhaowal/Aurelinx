@@ -2,6 +2,7 @@
   "name": "aurelinx-desktop",
   "private": true,
   "version": "1.2.0",
+  "author": "Ravinder Singh <rav.singh039@gmail.com> (https://github.com/sainibhaowal)",
   "description": "Aurelinx desktop shell for GitHub release builds",
   "scripts": {
     "tauri": "tauri",

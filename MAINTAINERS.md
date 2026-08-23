@@ -4,7 +4,7 @@
 
 | Name | GitHub | Areas | Since |
 |------|--------|-------|-------|
-| Ravinder Singh | [@ravindersingh](https://github.com/ravindersingh) | All (BDFL) | 2026 |
+| Ravinder Singh | [@sainibhaowal](https://github.com/sainibhaowal) | All (Lead Creator & Maintainer) | 2026 |
 
 ## Emeritus Maintainers
 
@@ -29,6 +29,6 @@ See [GOVERNANCE.md](GOVERNANCE.md#adding-maintainers) for criteria and process.
 
 ## Contact
 
-- **General**: maintainers@aurelinx.com
-- **Security**: security@aurelinx.com (see SECURITY.md)
-- **BDFL**: ravinder.singh@aurelinx.com
+- **Lead Maintainer**: rav.singh039@gmail.com
+- **GitHub**: [@sainibhaowal](https://github.com/sainibhaowal)
+- **Security**: rav.singh039@gmail.com (see SECURITY.md)

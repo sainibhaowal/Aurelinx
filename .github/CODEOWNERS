@@ -1,0 +1,101 @@
+# Aurelinx Code Owners
+# These owners will be automatically requested for review when matching files change.
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners (review everything)
+* @ravindersingh
+
+# Backend (FastAPI, Python)
+/server/ @ravindersingh
+
+# Backend - Core
+/server/app/core/ @ravindersingh
+/server/app/main.py @ravindersingh
+
+# Backend - API
+/server/app/api/ @ravindersingh
+
+# Backend - Models & Schemas
+/server/app/models/ @ravindersingh
+/server/app/schemas/ @ravindersingh
+
+# Backend - Services (Business Logic)
+/server/app/services/ @ravindersingh
+
+# Backend - Agents (Chat Agent, Tools)
+/server/app/agents/ @ravindersingh
+
+# Backend - Workers & Tasks
+/server/app/workers/ @ravindersingh
+/server/worker/ @ravindersingh
+
+# Backend - Database Migrations
+/server/alembic/ @ravindersingh
+
+# Backend - Scripts
+/server/scripts/ @ravindersingh
+
+# Backend - Tests
+/server/tests/ @ravindersingh
+
+# Frontend (Next.js, React, TypeScript)
+/client/ @ravindersingh
+
+# Frontend - Components
+/client/src/components/ @ravindersingh
+
+# Frontend - Pages & Routes
+/client/src/app/ @ravindersingh
+
+# Frontend - Services & API
+/client/src/services/ @ravindersingh
+
+# Frontend - Hooks & Contexts
+/client/src/hooks/ @ravindersingh
+/client/src/contexts/ @ravindersingh
+
+# Frontend - Tests
+/client/src/__tests__/ @ravindersingh
+/client/tests/ @ravindersingh
+
+# Desktop (Tauri, Rust)
+/desktop/ @ravindersingh
+
+# Desktop - Rust Backend
+/desktop/src-tauri/src/ @ravindersingh
+
+# Desktop - Frontend Shell
+/desktop/src/ @ravindersingh
+
+# Infrastructure & DevOps
+/infra/ @ravindersingh
+/.github/workflows/ @ravindersingh
+/Makefile @ravindersingh
+/docker-compose*.yml @ravindersingh
+
+# Documentation
+/*.md @ravindersingh
+/docs/ @ravindersingh
+
+# Configuration
+/.env.example @ravindersingh
+/server/.env.example @ravindersingh
+/client/.env.example @ravindersingh
+/infra/.env.example @ravindersingh
+
+# Root Config
+/package.json @ravindersingh
+/pyproject.toml @ravindersingh
+/server/pyproject.toml @ravindersingh
+/server/requirements.txt @ravindersingh
+/desktop/src-tauri/Cargo.toml @ravindersingh
+
+# Security & Governance
+/SECURITY.md @ravindersingh
+/CODE_OF_CONDUCT.md @ravindersingh
+/GOVERNANCE.md @ravindersingh
+/CONTRIBUTING.md @ravindersingh
+
+# Architecture Decisions
+/docs/adr/ @ravindersingh
+/ARCHITECTURE.md @ravindersingh

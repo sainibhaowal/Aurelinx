@@ -12,10 +12,9 @@
 - **Discord**: Real-time chat (link in repo description)
 - **Stack Overflow**: Tag `aurelinx`
 
-### Professional Support
-- **Email**: support@aurelinx.com
-- **Response SLA**: 2 business days (business hours UTC)
-- **Enterprise**: Custom SLAs available
+### Direct Contact
+- **Email**: rav.singh039@gmail.com
+- **GitHub Discussions & Issues**: https://github.com/sainibhaowal/Aurelinx/issues
 
 ## Issue Triage
 
@@ -78,4 +77,4 @@ For enterprise customers:
 - On-premise deployment assistance
 - Security audit assistance
 
-Contact: enterprise@aurelinx.com
+Contact: rav.singh039@gmail.com

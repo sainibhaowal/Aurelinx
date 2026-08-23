@@ -23,7 +23,7 @@
     "fastapi",
     "vite"
   ],
-  "author": "Google DeepMind pair-programmer",
+  "author": "Ravinder Singh <rav.singh039@gmail.com> (https://github.com/sainibhaowal)",
   "license": "Apache-2.0",
   "devDependencies": {
     "standard-version": "^9.5.0"

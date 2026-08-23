@@ -1,0 +1,115 @@
+Apache License 2.0 - Notice File for Aurelinx
+================================================
+
+This product includes software developed by the Aurelinx Project
+(https://github.com/ravindersingh/Aurelinx).
+
+Copyright 2026 Ravinder Singh
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+---
+
+Third-Party Software Acknowledgments
+------------------------------------
+
+This product bundles or depends on the following third-party software.
+Each component retains its original license.
+
+### Backend (Python)
+
+| Package | License | Purpose |
+|---------|---------|---------|
+| FastAPI | MIT | Web framework |
+| Uvicorn | BSD-3-Clause | ASGI server |
+| SQLAlchemy | MIT | ORM |
+| SQLModel | MIT | Type-safe SQLAlchemy models |
+| Alembic | MIT | Database migrations |
+| Pydantic | MIT | Data validation |
+| python-jose | MIT | JWT handling |
+| passlib | BSD-3-Clause | Password hashing |
+| argon2-cffi | MIT | Argon2 password hashing |
+| python-multipart | MIT | Form data parsing |
+| python-dotenv | BSD-3-Clause | Environment variables |
+| Celery | BSD-3-Clause | Distributed task queue |
+| Redis-py | MIT | Redis client |
+| Qdrant-client | Apache-2.0 | Vector database client |
+| httpx | BSD-3-Clause | HTTP client |
+| tenacity | Apache-2.0 | Retry logic |
+| structlog | Apache-2.0 | Structured logging |
+| prometheus-client | Apache-2.0 | Metrics |
+| opentelemetry-api | Apache-2.0 | Distributed tracing |
+| pytest | MIT | Testing |
+| ruff | MIT | Linting/formatting |
+| mypy | MIT | Type checking |
+| bandit | Apache-2.0 | Security linting |
+
+### Frontend (JavaScript/TypeScript)
+
+| Package | License | Purpose |
+|---------|---------|---------|
+| Next.js | MIT | React framework |
+| React | MIT | UI library |
+| TypeScript | Apache-2.0 | Type system |
+| Tailwind CSS | MIT | Utility-first CSS |
+| Framer Motion | MIT | Animations |
+| Lucide React | ISC | Icons |
+| SWR | MIT | Data fetching |
+| Zod | MIT | Schema validation |
+| React Hook Form | MIT | Forms |
+| date-fns | MIT | Date utilities |
+| recharts | MIT | Charts |
+| jsPDF | MIT | PDF generation |
+| xlsx | Apache-2.0 | Excel export |
+| ESLint | MIT | Linting |
+| Prettier | MIT | Formatting |
+| Jest | MIT | Testing |
+| Playwright | Apache-2.0 | E2E testing |
+
+### Desktop (Rust)
+
+| Package | License | Purpose |
+|---------|---------|---------|
+| Tauri | MIT / Apache-2.0 | Desktop framework |
+| serde | MIT / Apache-2.0 | Serialization |
+| tokio | MIT | Async runtime |
+| reqwest | MIT / Apache-2.0 | HTTP client |
+| tauri-plugin-store | MIT / Apache-2.0 | Persistent storage |
+| tauri-plugin-opener | MIT / Apache-2.0 | URL opening |
+| keyring | MIT / Apache-2.0 | OS credential storage |
+
+### Infrastructure
+
+| Component | License | Purpose |
+|-----------|---------|---------|
+| PostgreSQL | PostgreSQL License | Database |
+| Redis | BSD-3-Clause | Cache/Queue |
+| Qdrant | Apache-2.0 | Vector search |
+| nginx | BSD-2-Clause | Reverse proxy |
+| Docker | Apache-2.0 | Containerization |
+
+---
+
+Trademark Notice
+----------------
+
+"Aurelinx" and the Aurelinx logo are trademarks of Ravinder Singh.
+Use of these trademarks requires written permission.
+
+---
+
+Contact
+-------
+
+Project: https://github.com/ravindersingh/Aurelinx
+Email: legal@aurelinx.com
