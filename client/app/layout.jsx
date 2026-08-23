@@ -4,6 +4,11 @@ import "../src/App.css";
 export const metadata = {
   title: "Aurelinx | Management Intelligence",
   description: "Enterprise HR Intelligence Platform",
+  icons: {
+    icon: "/icons/aurelinx-logo-only.png",
+    shortcut: "/icons/aurelinx-logo-only.png",
+    apple: "/icons/aurelinx-logo-only.png",
+  },
 };
 
 export const viewport = {

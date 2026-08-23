@@ -23,10 +23,13 @@ import {
   Zap,
   CheckCircle2,
   Gauge,
+  Download,
 } from "lucide-react";
 import { healthAPI } from "../services/apiClient";
 import NeonParticlesWave from "./NeonParticlesWave";
 import { UserManualModal } from "./UserManual";
+import { DownloadModal } from "./DownloadModal";
+import { APP_VERSION } from "../config/version";
 
 /* ─────────────────────────────────────────
    CONSTANTS
@@ -1107,6 +1110,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
   const [activePillar, setActivePillar] = useState(0);
   const [activeModule, setActiveModule] = useState(0);
   const [manualOpen, setManualOpen] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const simSectionRef = useRef(null);
 
@@ -1379,8 +1383,13 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 />
               </div>
               <div>
-                <div className="text-xs font-black tracking-[0.28em] text-white">
-                  AURELINX
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-black tracking-[0.28em] text-white">
+                    AURELINX
+                  </span>
+                  <span className="rounded border border-emerald-400/30 bg-emerald-950/60 px-1 py-0.2 font-mono text-[9px] font-bold text-emerald-300">
+                    v{APP_VERSION}
+                  </span>
                 </div>
                 <div
                   className="text-[9px] font-bold uppercase tracking-[0.22em]"
@@ -1415,10 +1424,23 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             </nav>
 
             {/* Right actions */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              {/* Desktop Download Quick Button */}
+              <button
+                type="button"
+                onClick={() => setDownloadOpen(true)}
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300 transition-all hover:bg-emerald-950/40 active:scale-95 border border-emerald-400/20"
+                style={{
+                  background: "rgba(52,211,153,0.06)",
+                }}
+              >
+                <Download className="h-3 w-3 text-emerald-400" />
+                <span>Download App</span>
+              </button>
+
               {/* SRE ping (REAL) */}
               <div
-                className="hidden sm:flex items-center gap-2 rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest"
+                className="hidden md:flex items-center gap-2 rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest"
                 style={{
                   background: "rgba(255,255,255,0.03)",
                   border: "1px solid rgba(255,255,255,0.07)",
@@ -1552,8 +1574,30 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               </button>
               <button
                 type="button"
+                onClick={() => setDownloadOpen(true)}
+                className="inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold transition-all active:scale-[0.98]"
+                style={{
+                  background: "rgba(52,211,153,0.08)",
+                  border: "1px solid rgba(52,211,153,0.25)",
+                  color: "#6ee7b7",
+                  backdropFilter: "blur(8px)",
+                  boxShadow: "0 4px 20px -4px rgba(52,211,153,0.15)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(52,211,153,0.16)";
+                  e.currentTarget.style.borderColor = "rgba(52,211,153,0.45)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(52,211,153,0.08)";
+                  e.currentTarget.style.borderColor = "rgba(52,211,153,0.25)";
+                }}
+              >
+                <Download className="h-4 w-4 text-emerald-400" /> Download App
+              </button>
+              <button
+                type="button"
                 onClick={onOpenEnterprise}
-                className="inline-flex h-11 items-center gap-2 rounded-xl px-6 text-sm font-semibold transition-all active:scale-[0.98]"
+                className="inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold transition-all active:scale-[0.98]"
                 style={{
                   background: "rgba(255,255,255,0.04)",
                   border: "1px solid rgba(255,255,255,0.12)",
@@ -3664,6 +3708,12 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           isOpen={manualOpen}
           onClose={() => setManualOpen(false)}
           defaultTab="overview"
+        />
+
+        {/* Desktop App Download Modal */}
+        <DownloadModal
+          isOpen={downloadOpen}
+          onClose={() => setDownloadOpen(false)}
         />
       </div>
     </div>
