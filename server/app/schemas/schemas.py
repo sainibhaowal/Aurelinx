@@ -76,7 +76,51 @@ class UserOut(BaseModel):
     full_name: str
     is_active: bool
     is_admin: bool
+    is_verified: bool = False
     created_at: datetime
+
+
+class RegisterResponse(BaseModel):
+    """Response after registration requiring email verification"""
+
+    user_id: UUID
+    email: str
+    full_name: str
+    message: str
+    expires_in: int = 30
+    demo_code: str | None = None
+    token: str | None = None
+
+
+class EmailVerifyRequest(BaseModel):
+    """Request to verify email with 6-digit code or token"""
+
+    email: EmailStr
+    code: str = Field(..., min_length=4, max_length=64)
+
+
+class ResendVerificationRequest(BaseModel):
+    """Request to resend a new 30-second verification challenge"""
+
+    email: EmailStr
+    purpose: str = "register"
+
+
+class VerifyLoginRequest(BaseModel):
+    """Request to complete login verification challenge"""
+
+    email: EmailStr
+    code: str = Field(..., min_length=4, max_length=64)
+
+
+class LoginVerificationChallenge(BaseModel):
+    """Response when login requires email 2-step verification"""
+
+    requires_verification: bool = True
+    email: str
+    expires_in: int = 30
+    message: str
+    demo_code: str | None = None
 
 
 class DeleteAccountRequest(BaseModel):

@@ -547,8 +547,32 @@ export const authAPI = {
       }),
     }),
 
+  verifyEmail: (email, code) =>
+    request(`${API_V1}/auth/verify-email`, {
+      method: "POST",
+      body: JSON.stringify({ email, code }),
+    }),
+
+  resendVerification: (email, purpose = "register") =>
+    request(`${API_V1}/auth/resend-verification`, {
+      method: "POST",
+      body: JSON.stringify({ email, purpose }),
+    }),
+
   login: (email, password) =>
     request(`${API_V1}/auth/login`, {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+
+  verifyLogin: (email, code) =>
+    request(`${API_V1}/auth/verify-login`, {
+      method: "POST",
+      body: JSON.stringify({ email, code }),
+    }),
+
+  loginDirect: (email, password) =>
+    request(`${API_V1}/auth/login-direct`, {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),

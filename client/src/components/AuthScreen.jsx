@@ -12,9 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  Mail,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 import AurelinxLogo from "./AurelinxLogo";
 import { useAuth } from "../contexts/AuthContext";
 import { API_BASE_URL } from "../services/apiBase";
@@ -46,13 +54,22 @@ const getPasswordStrength = (password) => {
 };
 
 const FEATURES = [
-  "Email-based account identity",
-  "Password strength enforcement",
-  "Instant workspace access",
+  "30-Second verified company email identity",
+  "Zero-trust 2-factor authentication on login",
+  "Instant autonomous workspace & intelligence access",
 ];
 
 const AuthScreen = () => {
-  const { login, register, loading, savedCreds } = useAuth();
+  const {
+    login,
+    register,
+    verifyEmail,
+    resendVerification,
+    verifyLogin,
+    loading,
+    savedCreds,
+  } = useAuth();
+
   const [mode, setModeState] = useState(() => {
     if (typeof window === "undefined") return "register";
     return window.location.pathname.startsWith("/login") ? "login" : "register";
@@ -60,6 +77,9 @@ const AuthScreen = () => {
 
   const setMode = (newMode) => {
     setModeState(newMode);
+    setVerificationStep("idle");
+    setVerificationCode("");
+    setVerificationStatus("idle");
     if (typeof window !== "undefined") {
       const targetPath = newMode === "login" ? "/login" : "/signup";
       if (window.location.pathname !== targetPath) {
@@ -73,21 +93,45 @@ const AuthScreen = () => {
   const [registerError, setRegisterError] = useState("");
   const [loginError, setLoginError] = useState("");
   const [showEmailSuggestion, setShowEmailSuggestion] = useState(false);
-  const [showPasswordSuggestion, setShowPasswordSuggestion] = useState(false);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [authError, setAuthError] = useState("");
 
-  const postToParent = (message) => {
-    if (typeof window === "undefined" || window === window.parent) return;
-    const allowedOrigins = [
-      "tauri://localhost",
-      "https://tauri.localhost",
-      "http://localhost:3100",
-    ];
-    allowedOrigins.forEach((origin) => {
-      window.parent.postMessage(message, origin);
-    });
+  // ── Verification State Management ──
+  // verificationStep: 'idle' | 'register_verify' | 'login_verify'
+  const [verificationStep, setVerificationStep] = useState("idle");
+  // verificationStatus: 'idle' | 'counting' | 'expired' | 'verified'
+  const [verificationStatus, setVerificationStatus] = useState("idle");
+  const [countdown, setCountdown] = useState(30);
+  const [activeEmail, setActiveEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [demoCode, setDemoCode] = useState("");
+  const [verifyError, setVerifyError] = useState("");
+  const [isSubmittingCode, setIsSubmittingCode] = useState(false);
+
+  const countdownTimerRef = useRef(null);
+
+  // Start 30s countdown timer
+  const startCountdown = (initialSeconds = 30) => {
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    setCountdown(initialSeconds);
+    setVerificationStatus("counting");
+    setVerifyError("");
+
+    countdownTimerRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownTimerRef.current);
+          setVerificationStatus("expired");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
+
+  useEffect(() => {
+    return () => {
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    };
+  }, []);
 
   // Prefill saved credentials from Tauri parent shell if available
   useEffect(() => {
@@ -96,7 +140,7 @@ const AuthScreen = () => {
     }
   }, [savedCreds]);
 
-  // Handle OAuth callback parameters on mount
+  // Handle OAuth callback parameters on mount (Google only)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -122,7 +166,6 @@ const AuthScreen = () => {
             }),
           );
         }
-        // Redirect to main app dashboard
         window.location.href = "/app";
       }
     }
@@ -150,6 +193,7 @@ const AuthScreen = () => {
 
   const switchToLogin = (email = "") => {
     setMode("login");
+    setVerificationStep("idle");
     setLoginForm((prev) => ({
       ...prev,
       email: email || prev.email,
@@ -157,6 +201,7 @@ const AuthScreen = () => {
     }));
   };
 
+  // ── 1. Handle Registration Submit ──
   const handleRegister = async (event) => {
     event.preventDefault();
     const firstName = registerForm.firstName.trim();
@@ -180,19 +225,93 @@ const AuthScreen = () => {
       return;
     }
 
-    setRegisterForm(initialRegisterState);
-    switchToLogin(email);
+    // Enter 30-Second Verification Screen
+    setActiveEmail(email);
+    setDemoCode(result.user?.demo_code || "");
+    setVerificationStep("register_verify");
+    startCountdown(result.user?.expires_in || 30);
   };
 
+  // ── 2. Handle Direct Sign In Submit ──
   const handleLogin = async (event) => {
     event.preventDefault();
-    if (!loginForm.email.trim() || !loginForm.password) {
+    const email = loginForm.email.trim();
+    const password = loginForm.password;
+
+    if (!email || !password) {
       setLoginError("Enter your email and password.");
       return;
     }
-    const result = await login(loginForm.email.trim(), loginForm.password);
+
+    const result = await login(email, password);
     if (!result.success) {
       setLoginError(result.error?.message || "Login failed.");
+      return;
+    }
+
+    // Direct Login Successful -> Redirect to app
+    window.location.href = "/app";
+  };
+
+  // ── 3. Handle 30s Verification Code Confirmation ──
+  const handleConfirmVerification = async (codeToSubmit = verificationCode) => {
+    const code = (codeToSubmit || verificationCode).trim();
+    if (!code || code.length < 4) {
+      setVerifyError("Enter the 6-digit verification code.");
+      return;
+    }
+
+    setIsSubmittingCode(true);
+    setVerifyError("");
+
+    if (verificationStep === "register_verify") {
+      const res = await verifyEmail(activeEmail, code);
+      setIsSubmittingCode(false);
+
+      if (!res.success) {
+        setVerifyError(res.error?.message || "Invalid or expired code.");
+        return;
+      }
+
+      // Success: Turn indicator green and redirect to Sign In
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      setVerificationStatus("verified");
+
+      setTimeout(() => {
+        setRegisterForm(initialRegisterState);
+        switchToLogin(activeEmail);
+      }, 1400);
+    } else if (verificationStep === "login_verify") {
+      const res = await verifyLogin(activeEmail, code, loginForm.password);
+      setIsSubmittingCode(false);
+
+      if (!res.success) {
+        setVerifyError(res.error?.message || "Invalid or expired code.");
+        return;
+      }
+
+      // Success: Turn indicator green and enter app
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      setVerificationStatus("verified");
+
+      setTimeout(() => {
+        window.location.href = "/app";
+      }, 900);
+    }
+  };
+
+  // ── 4. Handle Resend Verification Link ──
+  const handleResend = async () => {
+    setVerifyError("");
+    setVerificationCode("");
+    const purpose = verificationStep === "login_verify" ? "login" : "register";
+    const res = await resendVerification(activeEmail, purpose);
+
+    if (res.success) {
+      setDemoCode(res.data?.demo_code || "");
+      startCountdown(res.data?.expires_in || 30);
+    } else {
+      setVerifyError(res.error?.message || "Failed to resend code. Try again.");
     }
   };
 
@@ -237,7 +356,7 @@ const AuthScreen = () => {
         {/* Main copy */}
         <div className="flex-1 flex flex-col justify-center">
           <motion.div
-            key={mode}
+            key={mode + verificationStep}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
@@ -246,18 +365,33 @@ const AuthScreen = () => {
               className="text-[11px] uppercase tracking-[0.3em] font-semibold mb-7"
               style={{ color: "rgba(110,231,183,0.55)" }}
             >
-              {mode === "register" ? "01 — Create Account" : "02 — Sign In"}
+              {verificationStep !== "idle"
+                ? "Security Verification (30s)"
+                : mode === "register"
+                  ? "01 — Create Account"
+                  : "02 — Sign In"}
             </p>
 
             <h1 className="text-[3.2rem] font-bold leading-[1.08] tracking-tight text-white mb-7">
-              Intelligence begins
-              <br />
-              with <span style={{ color: "#6ee7b7" }}>access.</span>
+              {verificationStep !== "idle" ? (
+                <>
+                  Verified with
+                  <br />
+                  <span style={{ color: "#6ee7b7" }}>confidence.</span>
+                </>
+              ) : (
+                <>
+                  Intelligence begins
+                  <br />
+                  with <span style={{ color: "#6ee7b7" }}>access.</span>
+                </>
+              )}
             </h1>
 
             <p className="text-slate-400 text-[15px] leading-7 max-w-sm">
-              Register once, then sign in to your workforce analytics platform —
-              talent data, AI insights, and enterprise connectors unified.
+              {verificationStep !== "idle"
+                ? "Every employee account is guarded by time-sensitive 30-second cryptographic verification for zero-trust enterprise security."
+                : "Register with your verified company email to access talent data, sentiment pulse, AI insights, and autonomous management."}
             </p>
           </motion.div>
 
@@ -287,7 +421,11 @@ const AuthScreen = () => {
           style={{ fontSize: "11rem", color: "rgba(255,255,255,0.025)" }}
           aria-hidden="true"
         >
-          {mode === "register" ? "01" : "02"}
+          {verificationStep !== "idle"
+            ? "30"
+            : mode === "register"
+              ? "01"
+              : "02"}
         </div>
       </aside>
 
@@ -314,27 +452,197 @@ const AuthScreen = () => {
               backdropFilter: "blur(12px)",
             }}
           >
-            {/* Underline tabs */}
-            <div
-              className="flex gap-6 mb-4 sm:mb-8"
-              style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
-            >
-              <TabBtn
-                active={mode === "register"}
-                onClick={() => setMode("register")}
+            {/* Underline tabs (only when not in verification view) */}
+            {verificationStep === "idle" && (
+              <div
+                className="flex gap-6 mb-4 sm:mb-8"
+                style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
               >
-                Register
-              </TabBtn>
-              <TabBtn
-                active={mode === "login"}
-                onClick={() => setMode("login")}
-              >
-                Sign In
-              </TabBtn>
-            </div>
+                <TabBtn
+                  active={mode === "register"}
+                  onClick={() => setMode("register")}
+                >
+                  Register
+                </TabBtn>
+                <TabBtn
+                  active={mode === "login"}
+                  onClick={() => setMode("login")}
+                >
+                  Sign In
+                </TabBtn>
+              </div>
+            )}
 
             <AnimatePresence mode="wait">
-              {mode === "register" ? (
+              {/* ── 30-SECOND VERIFICATION SCREEN (REGISTER & LOGIN) ── */}
+              {verificationStep !== "idle" ? (
+                <motion.div
+                  key="verify-screen"
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-4"
+                >
+                  <div className="text-center pb-2">
+                    <div className="mx-auto w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3 shadow-lg shadow-emerald-500/10">
+                      <Mail size={22} />
+                    </div>
+                    <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                      {verificationStep === "register_verify"
+                        ? "Verify your email"
+                        : "2-Step Security Verification"}
+                    </h2>
+                    <p className="text-slate-400 text-xs sm:text-sm mt-1">
+                      Sent to{" "}
+                      <span className="text-white font-medium">
+                        {activeEmail}
+                      </span>
+                    </p>
+                  </div>
+
+                  {/* 30-Second Indicator Button */}
+                  <div className="pt-1 pb-2">
+                    <div
+                      className={`relative w-full rounded-2xl p-4 transition-all duration-500 text-center font-bold text-xs sm:text-sm shadow-xl flex items-center justify-between gap-3 ${
+                        verificationStatus === "verified"
+                          ? "bg-gradient-to-r from-emerald-500 via-teal-400 to-green-400 text-slate-950 shadow-emerald-500/40"
+                          : verificationStatus === "expired"
+                            ? "bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white shadow-red-500/30"
+                            : "bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 text-white shadow-orange-500/30 animate-pulse"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {verificationStatus === "verified" ? (
+                          <CheckCircle2 size={20} className="text-slate-950" />
+                        ) : verificationStatus === "expired" ? (
+                          <AlertCircle size={20} />
+                        ) : (
+                          <Clock size={20} className="animate-spin" />
+                        )}
+                        <span>
+                          {verificationStatus === "verified"
+                            ? "Verification Done! Account Created"
+                            : verificationStatus === "expired"
+                              ? "Verification expired (30s limit)"
+                              : `Awaiting email verification (${countdown}s)...`}
+                        </span>
+                      </div>
+
+                      {verificationStatus === "counting" && (
+                        <span className="font-mono text-sm px-2 py-0.5 rounded-lg bg-black/30 border border-white/20">
+                          {countdown}s
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 6-Digit Code Input */}
+                  <div>
+                    <label
+                      className="block text-[9px] sm:text-[10px] uppercase font-semibold mb-1 sm:mb-1.5"
+                      style={{
+                        letterSpacing: "0.2em",
+                        color: "rgba(148,163,184,0.5)",
+                      }}
+                    >
+                      6-Digit Confirmation Code
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={verificationCode}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, "");
+                          setVerificationCode(val);
+                          if (val.length === 6) {
+                            handleConfirmVerification(val);
+                          }
+                        }}
+                        placeholder="123456"
+                        className="w-full font-mono text-center tracking-[0.4em] text-lg sm:text-xl py-3 px-4 rounded-xl outline-none transition-colors"
+                        style={{
+                          background: "rgba(7,17,31,0.96)",
+                          border: "1px solid rgba(110,231,183,0.2)",
+                          color: "#6ee7b7",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Dev / Demo Quick Verify Helper */}
+                  {demoCode && (
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 flex items-center justify-between text-xs text-slate-300">
+                      <div className="flex items-center gap-2">
+                        <Sparkles
+                          size={14}
+                          className="text-emerald-400 shrink-0"
+                        />
+                        <span>
+                          Simulated code:{" "}
+                          <strong className="font-mono text-emerald-300">
+                            {demoCode}
+                          </strong>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVerificationCode(demoCode);
+                          handleConfirmVerification(demoCode);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold transition-all cursor-pointer"
+                      >
+                        Auto-Verify
+                      </button>
+                    </div>
+                  )}
+
+                  {verifyError && <StatusMsg tone="error" text={verifyError} />}
+
+                  {/* Confirm or Resend Action Buttons */}
+                  <div className="space-y-2 pt-1">
+                    {verificationStatus === "expired" ? (
+                      <button
+                        type="button"
+                        onClick={handleResend}
+                        className="w-full h-11 rounded-xl font-bold text-xs sm:text-sm tracking-wide bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-slate-950 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-500/20"
+                      >
+                        <RefreshCw size={16} />
+                        Send New Verification Link (30s)
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={
+                          isSubmittingCode || verificationStatus === "verified"
+                        }
+                        onClick={() => handleConfirmVerification()}
+                        className="w-full h-11 rounded-xl font-bold text-xs sm:text-sm tracking-wide bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg shadow-emerald-500/20"
+                      >
+                        {isSubmittingCode
+                          ? "Verifying..."
+                          : "Confirm Verification"}
+                        <ArrowRight size={15} />
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (countdownTimerRef.current)
+                          clearInterval(countdownTimerRef.current);
+                        setVerificationStep("idle");
+                      }}
+                      className="w-full text-center text-xs text-slate-500 hover:text-slate-300 py-1.5 transition-colors cursor-pointer"
+                    >
+                      ← Back to edit credentials
+                    </button>
+                  </div>
+                </motion.div>
+              ) : mode === "register" ? (
+                /* ── REGISTER FORM ── */
                 <motion.form
                   key="register"
                   initial={{ opacity: 0, x: -14 }}
@@ -349,7 +657,7 @@ const AuthScreen = () => {
                       Create your account
                     </h2>
                     <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
-                      After signup you'll be directed to sign in.
+                      Verify company email in 30 seconds to sign in.
                     </p>
                   </div>
 
@@ -369,7 +677,7 @@ const AuthScreen = () => {
                   </div>
 
                   <LineField
-                    label="Email"
+                    label="Company Email"
                     type="email"
                     value={registerForm.email}
                     onChange={(v) => updateRegisterField("email", v)}
@@ -432,14 +740,16 @@ const AuthScreen = () => {
                   )}
 
                   <SubmitBtn loading={loading} accent="cyan">
-                    {loading ? "Registering..." : "Create account"}
+                    {loading
+                      ? "Sending verification..."
+                      : "Create account & Verify Email"}
                   </SubmitBtn>
 
                   <p className="text-xs sm:text-sm text-slate-500 text-center">
                     Already have an account?{" "}
                     <button
                       type="button"
-                      className="font-semibold transition-colors"
+                      className="font-semibold transition-colors cursor-pointer"
                       style={{ color: "#6ee7b7" }}
                       onClick={() => switchToLogin(registerForm.email)}
                     >
@@ -447,7 +757,7 @@ const AuthScreen = () => {
                     </button>
                   </p>
 
-                  {/* ── Social Login Row ── */}
+                  {/* ── Social Login Row (Google only, No GitHub) ── */}
                   <div className="relative my-3 sm:my-5 flex items-center justify-center">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-slate-700/50" />
@@ -457,11 +767,11 @@ const AuthScreen = () => {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+                  <div>
                     <button
                       type="button"
                       onClick={() => handleOAuth("google")}
-                      className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 text-slate-200 text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer"
+                      className="w-full flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 text-slate-200 text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer"
                     >
                       <svg
                         className="h-4 w-4"
@@ -485,25 +795,12 @@ const AuthScreen = () => {
                           fill="#EA4335"
                         />
                       </svg>
-                      Google
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleOAuth("github")}
-                      className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 text-slate-200 text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
-                      </svg>
-                      GitHub
+                      Google Workspace
                     </button>
                   </div>
                 </motion.form>
               ) : (
+                /* ── LOGIN FORM ── */
                 <motion.form
                   key="login"
                   initial={{ opacity: 0, x: 14 }}
@@ -565,142 +862,42 @@ const AuthScreen = () => {
                     type="password"
                     value={loginForm.password}
                     onChange={(v) => updateLoginField("password", v)}
-                    onFocus={() => {
-                      if (
-                        loginForm.email.trim() === savedCreds?.email &&
-                        !loginForm.password
-                      ) {
-                        setShowPasswordSuggestion(true);
-                      }
-                    }}
-                    onBlur={() =>
-                      setTimeout(() => setShowPasswordSuggestion(false), 200)
-                    }
                     placeholder="••••••••"
-                  >
-                    {showPasswordSuggestion && savedCreds?.password && (
-                      <div className="absolute left-0 right-0 mt-1.5 bg-[#091524] border border-[#6ee7b7]/20 rounded-2xl p-1.5 shadow-2xl z-50 animate-fade-in backdrop-blur-md">
-                        <button
-                          type="button"
-                          disabled={isAuthenticating}
-                          className="w-full text-left px-4 py-3 hover:bg-[#6ee7b7]/10 rounded-xl transition-all duration-150 flex items-center gap-3 cursor-pointer disabled:opacity-50"
-                          onClick={async () => {
-                            setIsAuthenticating(true);
-                            setAuthError("");
-
-                            const isEmbedded =
-                              typeof window !== "undefined" &&
-                              window !== window.parent;
-                            if (!isEmbedded) {
-                              setAuthError(
-                                "OS authentication is only supported in desktop shell.",
-                              );
-                              setIsAuthenticating(false);
-                              setShowPasswordSuggestion(false);
-                              return;
-                            }
-
-                            const handleAuthResult = (event) => {
-                              const data = event.data;
-                              if (!data || typeof data !== "object") return;
-
-                              if (data.type === "AURELINX_AUTH_USER_RESULT") {
-                                window.removeEventListener(
-                                  "message",
-                                  handleAuthResult,
-                                );
-                                setIsAuthenticating(false);
-                                if (data.success) {
-                                  setLoginForm((prev) => ({
-                                    ...prev,
-                                    password: savedCreds.password,
-                                  }));
-                                  setLoginError("");
-                                  setAuthError("");
-                                } else {
-                                  setAuthError(
-                                    data.error ||
-                                      "OS authentication failed or cancelled.",
-                                  );
-                                }
-                                setShowPasswordSuggestion(false);
-                              }
-                            };
-
-                            window.addEventListener(
-                              "message",
-                              handleAuthResult,
-                            );
-
-                            // Send message to parent shell to prompt OS authentication
-                            postToParent({ type: "AURELINX_AUTH_USER" });
-
-                            // Timeout fallback after 60s
-                            setTimeout(() => {
-                              window.removeEventListener(
-                                "message",
-                                handleAuthResult,
-                              );
-                              setIsAuthenticating(false);
-                            }, 60000);
-                          }}
-                        >
-                          <span className="text-base">🔑</span>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs text-slate-400 font-semibold tracking-wider uppercase">
-                              Autofill Protection
-                            </div>
-                            <div className="text-sm font-semibold text-slate-200">
-                              {isAuthenticating
-                                ? "Awaiting system verification..."
-                                : "Use saved password (Verify via OS)"}
-                            </div>
-                          </div>
-                        </button>
-                      </div>
-                    )}
-                  </LineField>
-
-                  {authError && (
-                    <div className="text-xs text-red-400 mt-1 font-semibold flex items-center gap-1.5 animate-pulse">
-                      <AlertCircle size={12} />
-                      {authError}
-                    </div>
-                  )}
+                  />
 
                   {loginError && <StatusMsg tone="error" text={loginError} />}
 
-                  <SubmitBtn loading={loading} accent="cyan">
-                    {loading ? "Signing in..." : "Sign in to Workspace"}
+                  <SubmitBtn loading={loading} accent="emerald">
+                    {loading ? "Signing in..." : "Sign In to Workspace"}
                   </SubmitBtn>
 
-                  <p className="text-sm text-slate-500 text-center">
+                  <p className="text-xs sm:text-sm text-slate-500 text-center">
                     New to Aurelinx?{" "}
                     <button
                       type="button"
-                      className="font-semibold transition-colors"
+                      className="font-semibold transition-colors cursor-pointer"
                       style={{ color: "#6ee7b7" }}
                       onClick={() => setMode("register")}
                     >
-                      Create an account
+                      Register company account
                     </button>
                   </p>
 
-                  {/* ── Social Login Row ── */}
-                  <div className="relative my-6 flex items-center justify-center">
+                  {/* ── Social Login Row (Google only, No GitHub) ── */}
+                  <div className="relative my-3 sm:my-5 flex items-center justify-center">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-slate-700/50" />
                     </div>
-                    <span className="relative px-3 text-xs text-slate-500 uppercase bg-[#04100b] bg-opacity-0 backdrop-blur-sm">
+                    <span className="relative px-3 text-[10px] sm:text-xs text-slate-500 uppercase bg-[#04100b] bg-opacity-0 backdrop-blur-sm">
                       Or continue with
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div>
                     <button
                       type="button"
                       onClick={() => handleOAuth("google")}
-                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 text-slate-200 text-sm font-semibold transition-all duration-200 cursor-pointer"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 text-slate-200 text-sm font-semibold transition-all duration-200 cursor-pointer"
                     >
                       <svg
                         className="h-4 w-4"
@@ -724,21 +921,7 @@ const AuthScreen = () => {
                           fill="#EA4335"
                         />
                       </svg>
-                      Google
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleOAuth("github")}
-                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 text-slate-200 text-sm font-semibold transition-all duration-200 cursor-pointer"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
-                      </svg>
-                      GitHub
+                      Google Workspace
                     </button>
                   </div>
                 </motion.form>
