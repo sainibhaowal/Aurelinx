@@ -28,11 +28,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { API_BASE_URL } from "../services/apiBase";
 
 const initialRegisterState = {
-  firstName: "",
-  lastName: "",
   email: "",
   password: "",
-  confirmPassword: "",
 };
 
 const initialLoginState = {
@@ -54,8 +51,8 @@ const getPasswordStrength = (password) => {
 };
 
 const FEATURES = [
-  "30-Second verified company email identity",
-  "Zero-trust 2-factor authentication on login",
+  "Automatic company identity extraction from email",
+  "30-Second one-time email verification challenge",
   "Instant autonomous workspace & intelligence access",
 ];
 
@@ -201,25 +198,22 @@ const AuthScreen = () => {
     }));
   };
 
-  // ── 1. Handle Registration Submit ──
+  // ── 1. Handle Simple Email + Password Registration ──
   const handleRegister = async (event) => {
     event.preventDefault();
-    const firstName = registerForm.firstName.trim();
-    const lastName = registerForm.lastName.trim();
     const email = registerForm.email.trim();
     const password = registerForm.password;
-    const confirmPassword = registerForm.confirmPassword;
 
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
-      setRegisterError("Complete all fields before continuing.");
+    if (!email || !password) {
+      setRegisterError("Enter your company email and a password.");
       return;
     }
-    if (password !== confirmPassword) {
-      setRegisterError("Passwords do not match.");
+    if (password.length < 8) {
+      setRegisterError("Password must be at least 8 characters long.");
       return;
     }
 
-    const result = await register(email, `${firstName} ${lastName}`, password);
+    const result = await register(email, password);
     if (!result.success) {
       setRegisterError(result.error?.message || "Registration failed.");
       return;
@@ -657,23 +651,9 @@ const AuthScreen = () => {
                       Create your account
                     </h2>
                     <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
-                      Verify company email in 30 seconds to sign in.
+                      Enter email & password. Profile details are
+                      auto-configured.
                     </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 sm:gap-5">
-                    <LineField
-                      label="First Name"
-                      value={registerForm.firstName}
-                      onChange={(v) => updateRegisterField("firstName", v)}
-                      placeholder="Alice"
-                    />
-                    <LineField
-                      label="Last Name"
-                      value={registerForm.lastName}
-                      onChange={(v) => updateRegisterField("lastName", v)}
-                      placeholder="Smith"
-                    />
                   </div>
 
                   <LineField
@@ -689,7 +669,7 @@ const AuthScreen = () => {
                     type="password"
                     value={registerForm.password}
                     onChange={(v) => updateRegisterField("password", v)}
-                    placeholder="Create a strong password"
+                    placeholder="Create a strong password (min 8 chars)"
                   />
 
                   {/* Password strength meter */}
@@ -726,14 +706,6 @@ const AuthScreen = () => {
                       </div>
                     </motion.div>
                   )}
-
-                  <LineField
-                    label="Confirm Password"
-                    type="password"
-                    value={registerForm.confirmPassword}
-                    onChange={(v) => updateRegisterField("confirmPassword", v)}
-                    placeholder="Repeat your password"
-                  />
 
                   {registerError && (
                     <StatusMsg tone="error" text={registerError} />

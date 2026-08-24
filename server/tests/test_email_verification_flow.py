@@ -49,18 +49,18 @@ def client():
 
 
 def test_one_time_email_verification_and_direct_signin(client):
-    email = "director.ops@aurelinx.com"
+    email = "marcus.vance@aurelinx.com"
     password = "SecurePassword123!"
-    full_name = "Marcus Vance"
 
-    # Step 1: Register Account (Issues 30s challenge)
+    # Step 1: Register Account with only Email + Password (auto-derives name)
     reg_resp = client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": password, "full_name": full_name},
+        json={"email": email, "password": password},
     )
     assert reg_resp.status_code == 201
     reg_data = reg_resp.json()
     assert reg_data["email"] == email
+    assert reg_data["full_name"] == "Marcus Vance"
     assert reg_data["expires_in"] == 30
     assert "demo_code" in reg_data
     code = reg_data["demo_code"]
