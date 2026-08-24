@@ -75,7 +75,7 @@ services:
     volumes:
       - ../server:/app            # hot‑reload source
       - chat_uploads:/app/data/chat
-    command: ["sh","-c","alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload"]
+    command: ["sh","-c","python -c \"import time, socket; [time.sleep(1) for _ in range(30) if socket.socket().connect_ex(('postgres', 5432)) != 0]\"; alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload"]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5000/health || exit 1"]
       interval: 10s
