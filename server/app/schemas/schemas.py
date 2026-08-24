@@ -54,7 +54,7 @@ class RegisterRequest(BaseModel):
     """User registration request"""
 
     email: EmailStr
-    full_name: str = Field(..., min_length=1, max_length=100)
+    full_name: str | None = Field(default=None, max_length=100)
     password: str = Field(
         ..., min_length=8, max_length=100, description="Must be at least 8 characters"
     )

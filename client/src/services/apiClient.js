@@ -537,13 +537,13 @@ function uploadRequest(url, formData, onProgress = null) {
  * Authentication API
  */
 export const authAPI = {
-  register: (email, fullName, password) =>
+  register: (email, password, fullName = null) =>
     request(`${API_V1}/auth/register`, {
       method: "POST",
       body: JSON.stringify({
         email,
-        full_name: fullName,
         password,
+        ...(fullName ? { full_name: fullName } : {}),
       }),
     }),
 

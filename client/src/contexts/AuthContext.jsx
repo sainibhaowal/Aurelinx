@@ -216,12 +216,12 @@ export const AuthProvider = ({ children }) => {
     [resolveWithTimeout],
   );
 
-  const register = useCallback(async (email, fullName, password) => {
+  const register = useCallback(async (email, password, fullName = null) => {
     setLoading(true);
     setError(null);
 
     try {
-      const userData = await authAPI.register(email, fullName, password);
+      const userData = await authAPI.register(email, password, fullName);
       if (userData) {
         localStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(userData));
       }

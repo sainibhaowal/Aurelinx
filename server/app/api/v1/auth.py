@@ -80,6 +80,15 @@ async def register(
         select(UserTable).where(UserTable.email == request.email)
     ).first()
 
+    # Auto-derive user name from email metadata if not provided
+    name = request.full_name
+    if not name or not name.strip():
+        user_prefix = request.email.split("@")[0]
+        cleaned_parts = [
+            p.capitalize() for p in user_prefix.replace(".", " ").replace("_", " ").replace("-", " ").split() if p
+        ]
+        name = " ".join(cleaned_parts) if cleaned_parts else user_prefix.capitalize()
+
     if existing_user:
         if existing_user.is_verified:
             logger.warning(
@@ -91,14 +100,14 @@ async def register(
             )
         else:
             # Update password and re-issue verification for pending user
-            existing_user.full_name = request.full_name
+            existing_user.full_name = name
             existing_user.hashed_password = hash_password(request.password)
             user = existing_user
     else:
         # Create new unverified user
         user = UserTable(
             email=request.email,
-            full_name=request.full_name,
+            full_name=name,
             hashed_password=hash_password(request.password),
             is_active=True,
             is_verified=False,
