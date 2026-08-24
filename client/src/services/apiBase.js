@@ -31,13 +31,16 @@ export function getApiBaseUrl() {
   } catch {
     return "";
   }
-  const configuredIsLocal =
-    configuredUrl && LOCAL_HOSTS.has(configuredUrl.hostname);
-  const pageIsLocal = LOCAL_HOSTS.has(pageHost);
-
-  // If a production page was built with the development localhost default,
-  // use the same-origin /api proxy instead of calling the user's own machine.
-  if (configuredIsLocal && !pageIsLocal) return "";
+  // In browser, if accessing web app via localhost or standard proxy,
+  // use relative same-origin /api path to avoid cross-port CORS issues.
+  if (typeof window !== "undefined") {
+    // Tauri desktop shell check
+    if (window.__TAURI_INTERNALS__ || window.__TAURI__) {
+      return configured || "http://localhost:5100";
+    }
+    // Web browser: use same-origin proxy
+    return "";
+  }
   return configured;
 }
 
