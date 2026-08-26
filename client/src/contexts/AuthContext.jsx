@@ -216,12 +216,12 @@ export const AuthProvider = ({ children }) => {
     [resolveWithTimeout],
   );
 
-  const register = useCallback(async (email, fullName, password) => {
+  const register = useCallback(async (email, password, fullName = null) => {
     setLoading(true);
     setError(null);
 
     try {
-      const userData = await authAPI.register(email, fullName, password);
+      const userData = await authAPI.register(email, password, fullName);
       if (userData) {
         localStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(userData));
       }
@@ -239,6 +239,84 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const verifyEmail = useCallback(async (email, code) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await authAPI.verifyEmail(email, code);
+      return { success: true, data: res };
+    } catch (err) {
+      const error = new APIError(
+        err.error_code || "VERIFY_FAILED",
+        err.message || "Email verification failed.",
+        err.status,
+      );
+      setError(error);
+      return { success: false, error };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const resendVerification = useCallback(
+    async (email, purpose = "register") => {
+      setError(null);
+      try {
+        const res = await authAPI.resendVerification(email, purpose);
+        return { success: true, data: res };
+      } catch (err) {
+        const error = new APIError(
+          err.error_code || "RESEND_FAILED",
+          err.message || "Failed to resend verification.",
+          err.status,
+        );
+        setError(error);
+        return { success: false, error };
+      }
+    },
+    [],
+  );
+
+  const verifyLogin = useCallback(
+    async (email, code, savedPassword = null) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await authAPI.verifyLogin(email, code);
+        localStorage.setItem("auth_token", response.access_token);
+        setToken(response.access_token);
+
+        const userData = await resolveWithTimeout(authAPI.getCurrentUser());
+        setUser(userData);
+        localStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(userData));
+
+        if (isEmbeddedIframe) {
+          postToParent({
+            type: "AURELINX_SAVE_CREDS",
+            token: response.access_token,
+            user: userData,
+            savedCreds: savedPassword
+              ? { email, password: savedPassword }
+              : null,
+          });
+        }
+
+        return { success: true, user: userData };
+      } catch (err) {
+        const error = new APIError(
+          err.error_code || "LOGIN_VERIFY_FAILED",
+          err.message || "Login verification failed.",
+          err.status,
+        );
+        setError(error);
+        return { success: false, error };
+      } finally {
+        setLoading(false);
+      }
+    },
+    [resolveWithTimeout, isEmbeddedIframe],
+  );
+
   const logout = useCallback(() => {
     localStorage.removeItem("auth_token");
     localStorage.removeItem(AUTH_USER_CACHE_KEY);
@@ -250,7 +328,7 @@ export const AuthProvider = ({ children }) => {
         type: "AURELINX_CLEAR_CREDS",
       });
     }
-  }, []);
+  }, [isEmbeddedIframe]);
 
   const value = {
     user,
@@ -259,6 +337,9 @@ export const AuthProvider = ({ children }) => {
     error,
     login,
     register,
+    verifyEmail,
+    resendVerification,
+    verifyLogin,
     logout,
     savedCreds,
     isAuthenticated: !!user && !!token,

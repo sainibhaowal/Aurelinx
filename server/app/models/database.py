@@ -81,8 +81,28 @@ class UserTable(SQLModel, table=True):
     hashed_password: str
     is_active: bool = Field(default=True, index=True)
     is_admin: bool = Field(default=False)
+    is_verified: bool = Field(default=False, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ============ EMAIL VERIFICATION TOKENS ============
+class EmailVerificationTable(SQLModel, table=True):
+    """Email verification tokens and 30-second OTP challenge codes"""
+
+    __tablename__ = "email_verifications"
+
+    id: UUID = Field(
+        default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
+    )
+    user_id: UUID = Field(index=True)
+    email: str = Field(index=True)
+    code: str = Field(index=True)  # 6-digit verification code
+    token: str = Field(unique=True, index=True)  # URL verification token
+    purpose: str = Field(default="register", index=True)  # register or login
+    is_used: bool = Field(default=False, index=True)
+    expires_at: datetime = Field(index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 # ============ REGISTRATION CODES (ADMIN IDs) ============

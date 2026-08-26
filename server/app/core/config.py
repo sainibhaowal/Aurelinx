@@ -15,7 +15,10 @@
 
 import os
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -58,6 +61,19 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
 
+    # Email verification delivery. Keep this disabled by default locally: the
+    # client exposes the simulated code in development instead.
+    SMTP_ENABLED: bool = False
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 1025
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_TLS: bool = False
+    SMTP_FROM: str = "noreply@aurelinx.local"
+    SMTP_FROM_NAME: str = "Aurelinx"
+    SMTP_TIMEOUT_SECONDS: int = 15
+    EMAIL_VERIFICATION_EXPIRE_SECONDS: int = 600
+
     # LLM Providers
     OPENAI_API_KEY: str | None = None
     CLAUDE_API_KEY: str | None = None
@@ -95,6 +111,8 @@ class Settings(BaseSettings):
             os.getenv("REQUIRE_HTTPS", self.REQUIRE_HTTPS)
         )
         self.DEBUG = self._parse_bool(os.getenv("DEBUG", self.DEBUG))
+        self.SMTP_ENABLED = self._parse_bool(os.getenv("SMTP_ENABLED", self.SMTP_ENABLED))
+        self.SMTP_TLS = self._parse_bool(os.getenv("SMTP_TLS", self.SMTP_TLS))
         self.ALLOWED_ORIGINS = self._parse_allowed_origins(
             os.getenv("ALLOWED_ORIGINS"),
             self.ALLOWED_ORIGINS,
