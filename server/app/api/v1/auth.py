@@ -67,10 +67,12 @@ def _is_demo_environment() -> bool:
     return settings.ENVIRONMENT.lower() in {"development", "test"}
 
 
-async def _send_verification_email(email: str, code: str, expires_in: int) -> None:
+async def _send_verification_email(
+    email: str, code: str, token: str, expires_in: int
+) -> None:
     """Avoid blocking the API worker while the SMTP relay is contacted."""
     try:
-        await asyncio.to_thread(send_verification_email, email, code, expires_in)
+        await asyncio.to_thread(send_verification_email, email, code, token, expires_in)
     except EmailDeliveryError:
         logger.exception("Verification email delivery failed for %s", email)
         # If a relay is configured, never hide a delivery failure behind the
@@ -167,7 +169,7 @@ async def register(
     session.commit()
 
     logger.info("Verification code created for %s", user.email)
-    await _send_verification_email(user.email, code, expires_in)
+    await _send_verification_email(user.email, code, token, expires_in)
 
     return RegisterResponse(
         user_id=user.id,
@@ -288,7 +290,7 @@ async def resend_verification(
     session.commit()
 
     logger.info("Verification code reissued for %s", user.email)
-    await _send_verification_email(user.email, code, expires_in)
+    await _send_verification_email(user.email, code, token, expires_in)
 
     return {
         "success": True,
