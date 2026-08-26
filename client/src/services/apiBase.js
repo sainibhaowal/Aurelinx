@@ -16,21 +16,10 @@
  * Resolve the browser API origin without allowing a stale localhost build
  * value to break a deployment served through a reverse proxy.
  */
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-
 export function getApiBaseUrl() {
   const configured = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
   if (typeof window === "undefined") return configured;
 
-  const pageHost = window.location.hostname;
-  let configuredUrl = null;
-  try {
-    configuredUrl = configured
-      ? new URL(configured, window.location.origin)
-      : null;
-  } catch {
-    return "";
-  }
   // In browser, if accessing web app via localhost or standard proxy,
   // use relative same-origin /api path to avoid cross-port CORS issues.
   if (typeof window !== "undefined") {

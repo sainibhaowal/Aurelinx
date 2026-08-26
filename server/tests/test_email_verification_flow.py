@@ -13,11 +13,13 @@
 # limitations under the License.
 
 import os
-from fastapi.testclient import TestClient
+
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel, Session as SQLSession
+from sqlmodel import Session as SQLSession
+from sqlmodel import SQLModel
 
 os.environ["ALLOWED_HOSTS"] = "*"
 os.environ["ENVIRONMENT"] = "test"
@@ -26,7 +28,7 @@ os.environ["SECRET_KEY"] = "test-secret-key-at-least-32-characters-long"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 from app.main import app
-from app.models.database import UserTable, EmailVerificationTable, get_session
+from app.models.database import get_session
 
 
 @pytest.fixture()
