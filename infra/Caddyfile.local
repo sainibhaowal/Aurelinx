@@ -1,15 +1,15 @@
-http://localhost:3100 {
+:80, :3100, http://localhost:3100 {
     # Route API calls and health checks to the FastAPI backend
     handle /api/* {
-        reverse_proxy localhost:5100
+        reverse_proxy api:5000
     }
 
     handle /health {
-        reverse_proxy localhost:5100
+        reverse_proxy api:5000
     }
 
     # Route everything else to the Next.js frontend
     handle {
-        reverse_proxy localhost:3000
+        reverse_proxy web:3000
     }
 }

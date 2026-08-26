@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { motion } from "framer-motion";
 import { APP_VERSION } from "../config/version";
 
 const AurelinxLogo = ({ size = 24, collapsed = false, showVersion = true }) => {

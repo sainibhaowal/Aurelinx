@@ -34,6 +34,23 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "",
   },
+  async rewrites() {
+    const backendHost =
+      process.env.INTERNAL_API_URL ||
+      (process.env.HOSTNAME === "0.0.0.0"
+        ? "http://api:5000"
+        : "http://localhost:5100");
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${backendHost}/api/:path*`,
+      },
+      {
+        source: "/health",
+        destination: `${backendHost}/health`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

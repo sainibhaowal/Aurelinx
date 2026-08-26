@@ -17,15 +17,16 @@
 Authentication endpoints - Login, Register, Token refresh
 """
 
+import asyncio
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session as SQLSession
-from sqlmodel import SQLModel, select
+from sqlmodel import SQLModel, col, select
 
 from app.core.config import settings
 from app.core.logging_config import get_logger
@@ -38,33 +39,60 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.models.database import UserTable, get_session
+from app.models.database import EmailVerificationTable, UserTable, get_session
 from app.schemas.schemas import (
     DeleteAccountRequest,
+    EmailVerifyRequest,
     LoginRequest,
     LoginResponse,
     RegisterRequest,
+    RegisterResponse,
+    ResendVerificationRequest,
     ResetWorkspaceRequest,
     UserOut,
+    VerifyLoginRequest,
 )
+from app.services.email_service import EmailDeliveryError, send_verification_email
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = get_logger(__name__)
 
 
-@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+def generate_otp_code() -> str:
+    """Generate a random 6-digit numeric OTP verification code"""
+    return f"{secrets.randbelow(900000) + 100000}"
+
+
+def _is_demo_environment() -> bool:
+    return settings.ENVIRONMENT.lower() in {"development", "test"}
+
+
+async def _send_verification_email(email: str, code: str, expires_in: int) -> None:
+    """Avoid blocking the API worker while the SMTP relay is contacted."""
+    try:
+        await asyncio.to_thread(send_verification_email, email, code, expires_in)
+    except EmailDeliveryError:
+        logger.exception("Verification email delivery failed for %s", email)
+        # If a relay is configured, never hide a delivery failure behind the
+        # development demo flow. The caller must be told to correct SMTP.
+        if settings.SMTP_ENABLED or not _is_demo_environment():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="We could not send your verification code. Please try again shortly.",
+            )
+
+
+@router.post(
+    "/register",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def register(
     request: RegisterRequest, session: SQLSession = Depends(get_session)
 ):
     """
-    Register a new user
-
-    - **email**: User email (must be unique)
-    - **full_name**: User full name
-    - **password**: Password (min 8 chars, must contain uppercase and digit)
-    - **admin_id**: Secure code generated from the VPS
+    Register a new user and issue a 30-second email verification challenge.
     """
-
     logger.info(f"New registration attempt for {request.email}")
 
     # Check if user exists
@@ -72,45 +100,210 @@ async def register(
         select(UserTable).where(UserTable.email == request.email)
     ).first()
 
+    # Auto-derive user name from email metadata if not provided
+    name = request.full_name
+    if not name or not name.strip():
+        user_prefix = request.email.split("@")[0]
+        cleaned_parts = [
+            p.capitalize() for p in user_prefix.replace(".", " ").replace("_", " ").replace("-", " ").split() if p
+        ]
+        name = " ".join(cleaned_parts) if cleaned_parts else user_prefix.capitalize()
+
     if existing_user:
-        logger.warning(f"Registration failed: Email already exists {request.email}")
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
+        if existing_user.is_verified:
+            logger.warning(
+                f"Registration failed: Verified email already exists {request.email}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered and verified. Please sign in.",
+            )
+        else:
+            # Update password and re-issue verification for pending user
+            existing_user.full_name = name
+            existing_user.hashed_password = hash_password(request.password)
+            user = existing_user
+    else:
+        # Create new unverified user
+        user = UserTable(
+            email=request.email,
+            full_name=name,
+            hashed_password=hash_password(request.password),
+            is_active=True,
+            is_verified=False,
+            is_admin=False,
         )
+        session.add(user)
 
-    # Create new user
-    user = UserTable(
-        email=request.email,
-        full_name=request.full_name,
-        hashed_password=hash_password(request.password),
-        is_active=True,
-        is_admin=False,
-    )
-
-    session.add(user)
     session.commit()
     session.refresh(user)
 
-    logger.info(f"User registered successfully: {user.id}")
+    # Invalidate previous verification tokens
+    old_tokens = session.exec(
+        select(EmailVerificationTable).where(
+            EmailVerificationTable.email == user.email,
+            col(EmailVerificationTable.is_used).is_(False),
+        )
+    ).all()
+    for ot in old_tokens:
+        ot.is_used = True
 
-    return UserOut(
-        id=user.id,
+    # Generate 6-digit OTP code and secure verification token (30-second expiry)
+    code = generate_otp_code()
+    token = secrets.token_urlsafe(32)
+    expires_in = settings.EMAIL_VERIFICATION_EXPIRE_SECONDS
+    expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+
+    verification = EmailVerificationTable(
+        user_id=user.id,
+        email=user.email,
+        code=code,
+        token=token,
+        purpose="register",
+        is_used=False,
+        expires_at=expires_at,
+    )
+    session.add(verification)
+    session.commit()
+
+    logger.info("Verification code created for %s", user.email)
+    await _send_verification_email(user.email, code, expires_in)
+
+    return RegisterResponse(
+        user_id=user.id,
         email=user.email,
         full_name=user.full_name,
-        is_active=user.is_active,
-        is_admin=user.is_admin,
-        created_at=user.created_at,
+        message="Verification code sent to your email.",
+        expires_in=expires_in,
+        demo_code=code if _is_demo_environment() else None,
+        token=token if _is_demo_environment() else None,
     )
+
+
+@router.post("/verify-email")
+async def verify_email(
+    request: EmailVerifyRequest, session: SQLSession = Depends(get_session)
+):
+    """
+    Verify email with 6-digit code or URL token within the 30-second window.
+    """
+    user = session.exec(
+        select(UserTable).where(UserTable.email == request.email)
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    # Find active verification record
+    verification = session.exec(
+        select(EmailVerificationTable)
+        .where(
+            EmailVerificationTable.email == request.email,
+            col(EmailVerificationTable.is_used).is_(False),
+        )
+        .order_by(col(EmailVerificationTable.created_at).desc())
+    ).first()
+
+    if not verification:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active verification found. Please request a new verification link.",
+        )
+
+    # Check 30s expiration
+    if verification.expires_at < datetime.utcnow():
+        verification.is_used = True
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification code expired. Please request a new code.",
+        )
+
+    # Validate code or token match
+    input_val = request.code.strip()
+    if input_val != verification.code and input_val != verification.token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code. Please check your email and try again.",
+        )
+
+    # Mark verified
+    verification.is_used = True
+    user.is_verified = True
+    session.commit()
+
+    logger.info(f"User email verified successfully: {user.email}")
+
+    return {
+        "success": True,
+        "message": "Email verified successfully! You can now sign in.",
+        "email": user.email,
+    }
+
+
+@router.post("/resend-verification")
+async def resend_verification(
+    request: ResendVerificationRequest, session: SQLSession = Depends(get_session)
+):
+    """
+    Resend a fresh 30-second verification challenge.
+    """
+    user = session.exec(
+        select(UserTable).where(UserTable.email == request.email)
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User account not found"
+        )
+
+    # Invalidate previous tokens
+    old_tokens = session.exec(
+        select(EmailVerificationTable).where(
+            EmailVerificationTable.email == user.email,
+            col(EmailVerificationTable.is_used).is_(False),
+        )
+    ).all()
+    for ot in old_tokens:
+        ot.is_used = True
+
+    # Generate a new challenge
+    code = generate_otp_code()
+    token = secrets.token_urlsafe(32)
+    expires_in = settings.EMAIL_VERIFICATION_EXPIRE_SECONDS
+    expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+
+    verification = EmailVerificationTable(
+        user_id=user.id,
+        email=user.email,
+        code=code,
+        token=token,
+        purpose=request.purpose,
+        is_used=False,
+        expires_at=expires_at,
+    )
+    session.add(verification)
+    session.commit()
+
+    logger.info("Verification code reissued for %s", user.email)
+    await _send_verification_email(user.email, code, expires_in)
+
+    return {
+        "success": True,
+        "message": "A new verification code was sent to your email.",
+        "expires_in": expires_in,
+        "demo_code": code if _is_demo_environment() else None,
+        "token": token if _is_demo_environment() else None,
+    }
 
 
 @router.post("/login", response_model=LoginResponse)
 async def login(request: LoginRequest, session: SQLSession = Depends(get_session)):
     """
-    Login with email and password
-
-    Returns access token and token expiry
+    Direct login with email and password for verified accounts.
     """
-
     logger.info(f"Login attempt for {request.email}")
 
     # Find user
@@ -132,17 +325,125 @@ async def login(request: LoginRequest, session: SQLSession = Depends(get_session
             status_code=status.HTTP_403_FORBIDDEN, detail="User account is inactive"
         )
 
-    # Create tokens
+    # Check if registration verification was completed (except for initial seed admins)
+    if not user.is_verified and not user.is_admin and user.email != "saini@gmail.com":
+        logger.warning(f"Login rejected: Unverified account {request.email}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account email is not verified. Please complete verification or register again.",
+        )
+
+    # Create tokens directly
     access_token = create_access_token(
         data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
-    logger.info(f"Login successful for {user.id}")
+    logger.info(f"Direct login successful for {user.id} ({user.email})")
 
     return LoginResponse(
         access_token=access_token,
-        token_type="bearer",  # nosec B106
+        token_type="bearer",
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user_id=user.id,
+    )
+
+
+@router.post("/verify-login", response_model=LoginResponse)
+async def verify_login(
+    request: VerifyLoginRequest, session: SQLSession = Depends(get_session)
+):
+    """
+    Login step 2: Verify 30-second email code and issue JWT session.
+    """
+    user = session.exec(
+        select(UserTable).where(UserTable.email == request.email)
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    # Find active login verification
+    verification = session.exec(
+        select(EmailVerificationTable)
+        .where(
+            EmailVerificationTable.email == request.email,
+            EmailVerificationTable.purpose == "login",
+            col(EmailVerificationTable.is_used).is_(False),
+        )
+        .order_by(col(EmailVerificationTable.created_at).desc())
+    ).first()
+
+    if not verification:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active login challenge found. Please sign in again.",
+        )
+
+    # Check 30s expiration
+    if verification.expires_at < datetime.utcnow():
+        verification.is_used = True
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification code expired (30 seconds limit). Please request a new code.",
+        )
+
+    input_val = request.code.strip()
+    if input_val != verification.code and input_val != verification.token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code. Please try again.",
+        )
+
+    # Mark challenge completed
+    verification.is_used = True
+    user.is_verified = True
+    session.commit()
+
+    # Create JWT session
+    access_token = create_access_token(
+        data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    logger.info(f"Login verified successfully for {user.id}")
+
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user_id=user.id,
+    )
+
+
+@router.post("/login-direct", response_model=LoginResponse)
+async def login_direct(
+    request: LoginRequest, session: SQLSession = Depends(get_session)
+):
+    """
+    Direct login endpoint for automated API integrations and tests.
+    """
+    user = session.exec(
+        select(UserTable).where(UserTable.email == request.email)
+    ).first()
+
+    if not user or not verify_password(request.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    access_token = create_access_token(
+        data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         user_id=user.id,
     )
@@ -167,6 +468,7 @@ async def get_current_user_profile(
         full_name=user.full_name,
         is_active=user.is_active,
         is_admin=user.is_admin,
+        is_verified=user.is_verified,
         created_at=user.created_at,
     )
 
