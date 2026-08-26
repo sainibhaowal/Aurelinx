@@ -17,6 +17,7 @@
 Authentication endpoints - Login, Register, Token refresh
 """
 
+import asyncio
 import secrets
 from datetime import datetime, timedelta
 from uuid import UUID
@@ -39,6 +40,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.database import EmailVerificationTable, UserTable, get_session
+from app.services.email_service import EmailDeliveryError, send_verification_email
 from app.schemas.schemas import (
     DeleteAccountRequest,
     EmailVerifyRequest,
@@ -60,6 +62,25 @@ logger = get_logger(__name__)
 def generate_otp_code() -> str:
     """Generate a random 6-digit numeric OTP verification code"""
     return f"{secrets.randbelow(900000) + 100000}"
+
+
+def _is_demo_environment() -> bool:
+    return settings.ENVIRONMENT.lower() in {"development", "test"}
+
+
+async def _send_verification_email(email: str, code: str, expires_in: int) -> None:
+    """Avoid blocking the API worker while the SMTP relay is contacted."""
+    try:
+        await asyncio.to_thread(send_verification_email, email, code, expires_in)
+    except EmailDeliveryError:
+        logger.exception("Verification email delivery failed for %s", email)
+        # If a relay is configured, never hide a delivery failure behind the
+        # development demo flow. The caller must be told to correct SMTP.
+        if settings.SMTP_ENABLED or not _is_demo_environment():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="We could not send your verification code. Please try again shortly.",
+            )
 
 
 @router.post(
@@ -131,7 +152,8 @@ async def register(
     # Generate 6-digit OTP code and secure verification token (30-second expiry)
     code = generate_otp_code()
     token = secrets.token_urlsafe(32)
-    expires_at = datetime.utcnow() + timedelta(seconds=30)
+    expires_in = settings.EMAIL_VERIFICATION_EXPIRE_SECONDS
+    expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
 
     verification = EmailVerificationTable(
         user_id=user.id,
@@ -145,18 +167,17 @@ async def register(
     session.add(verification)
     session.commit()
 
-    logger.info(
-        f"Verification code for {user.email}: [{code}] (Expires in 30s: {expires_at.isoformat()})"
-    )
+    logger.info("Verification code created for %s", user.email)
+    await _send_verification_email(user.email, code, expires_in)
 
     return RegisterResponse(
         user_id=user.id,
         email=user.email,
         full_name=user.full_name,
-        message="Verification code sent to your email. You have 30 seconds to verify.",
-        expires_in=30,
-        demo_code=code,
-        token=token,
+        message="Verification code sent to your email.",
+        expires_in=expires_in,
+        demo_code=code if _is_demo_environment() else None,
+        token=token if _is_demo_environment() else None,
     )
 
 
@@ -198,7 +219,7 @@ async def verify_email(
         session.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verification code expired (30 seconds limit). Please request a new code.",
+            detail="Verification code expired. Please request a new code.",
         )
 
     # Validate code or token match
@@ -249,10 +270,11 @@ async def resend_verification(
     for ot in old_tokens:
         ot.is_used = True
 
-    # Generate new 30s challenge
+    # Generate a new challenge
     code = generate_otp_code()
     token = secrets.token_urlsafe(32)
-    expires_at = datetime.utcnow() + timedelta(seconds=30)
+    expires_in = settings.EMAIL_VERIFICATION_EXPIRE_SECONDS
+    expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
 
     verification = EmailVerificationTable(
         user_id=user.id,
@@ -266,16 +288,15 @@ async def resend_verification(
     session.add(verification)
     session.commit()
 
-    logger.info(
-        f"Resent verification code for {user.email}: [{code}] (Expires in 30s)"
-    )
+    logger.info("Verification code reissued for %s", user.email)
+    await _send_verification_email(user.email, code, expires_in)
 
     return {
         "success": True,
-        "message": "New verification code generated (valid for 30s).",
-        "expires_in": 30,
-        "demo_code": code,
-        "token": token,
+        "message": "A new verification code was sent to your email.",
+        "expires_in": expires_in,
+        "demo_code": code if _is_demo_environment() else None,
+        "token": token if _is_demo_environment() else None,
     }
 
 
