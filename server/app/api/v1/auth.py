@@ -26,7 +26,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session as SQLSession
-from sqlmodel import SQLModel, select
+from sqlmodel import SQLModel, col, select
 
 from app.core.config import settings
 from app.core.logging_config import get_logger
@@ -40,13 +40,11 @@ from app.core.security import (
     verify_password,
 )
 from app.models.database import EmailVerificationTable, UserTable, get_session
-from app.services.email_service import EmailDeliveryError, send_verification_email
 from app.schemas.schemas import (
     DeleteAccountRequest,
     EmailVerifyRequest,
     LoginRequest,
     LoginResponse,
-    LoginVerificationChallenge,
     RegisterRequest,
     RegisterResponse,
     ResendVerificationRequest,
@@ -54,6 +52,7 @@ from app.schemas.schemas import (
     UserOut,
     VerifyLoginRequest,
 )
+from app.services.email_service import EmailDeliveryError, send_verification_email
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = get_logger(__name__)
@@ -143,7 +142,7 @@ async def register(
     old_tokens = session.exec(
         select(EmailVerificationTable).where(
             EmailVerificationTable.email == user.email,
-            EmailVerificationTable.is_used == False,
+            col(EmailVerificationTable.is_used).is_(False),
         )
     ).all()
     for ot in old_tokens:
@@ -202,9 +201,9 @@ async def verify_email(
         select(EmailVerificationTable)
         .where(
             EmailVerificationTable.email == request.email,
-            EmailVerificationTable.is_used == False,
+            col(EmailVerificationTable.is_used).is_(False),
         )
-        .order_by(EmailVerificationTable.created_at.desc())
+        .order_by(col(EmailVerificationTable.created_at).desc())
     ).first()
 
     if not verification:
@@ -264,7 +263,7 @@ async def resend_verification(
     old_tokens = session.exec(
         select(EmailVerificationTable).where(
             EmailVerificationTable.email == user.email,
-            EmailVerificationTable.is_used == False,
+            col(EmailVerificationTable.is_used).is_(False),
         )
     ).all()
     for ot in old_tokens:
@@ -372,9 +371,9 @@ async def verify_login(
         .where(
             EmailVerificationTable.email == request.email,
             EmailVerificationTable.purpose == "login",
-            EmailVerificationTable.is_used == False,
+            col(EmailVerificationTable.is_used).is_(False),
         )
-        .order_by(EmailVerificationTable.created_at.desc())
+        .order_by(col(EmailVerificationTable.created_at).desc())
     ).first()
 
     if not verification:
