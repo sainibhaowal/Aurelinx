@@ -61,7 +61,7 @@ def test_one_time_email_verification_and_direct_signin(client):
     reg_data = reg_resp.json()
     assert reg_data["email"] == email
     assert reg_data["full_name"] == "Marcus Vance"
-    assert reg_data["expires_in"] == 30
+    assert reg_data["expires_in"] == 600
     assert "demo_code" in reg_data
     code = reg_data["demo_code"]
 

@@ -105,7 +105,7 @@ const AuthScreen = () => {
 
   const countdownTimerRef = useRef(null);
 
-  // Start 30s countdown timer
+  // Start the server-provided OTP expiry countdown.
   const startCountdown = (initialSeconds = 30) => {
     if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     setCountdown(initialSeconds);
@@ -468,7 +468,7 @@ const AuthScreen = () => {
             )}
 
             <AnimatePresence mode="wait">
-              {/* ── 30-SECOND VERIFICATION SCREEN (REGISTER & LOGIN) ── */}
+              {/* ── EMAIL VERIFICATION SCREEN ── */}
               {verificationStep !== "idle" ? (
                 <motion.div
                   key="verify-screen"
@@ -518,8 +518,8 @@ const AuthScreen = () => {
                           {verificationStatus === "verified"
                             ? "Verification Done! Account Created"
                             : verificationStatus === "expired"
-                              ? "Verification expired (30s limit)"
-                              : `Awaiting email verification (${countdown}s)...`}
+                              ? "Verification expired"
+                              : `Enter the emailed code before it expires (${countdown}s remaining)`}
                         </span>
                       </div>
 
@@ -604,7 +604,7 @@ const AuthScreen = () => {
                         className="w-full h-11 rounded-xl font-bold text-xs sm:text-sm tracking-wide bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-slate-950 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-500/20"
                       >
                         <RefreshCw size={16} />
-                        Send New Verification Link (30s)
+                        Send a New Verification Code
                       </button>
                     ) : (
                       <button
