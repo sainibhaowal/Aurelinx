@@ -102,6 +102,7 @@ const AuthScreen = () => {
   const [demoCode, setDemoCode] = useState("");
   const [verifyError, setVerifyError] = useState("");
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   const countdownTimerRef = useRef(null);
 
@@ -355,6 +356,7 @@ const AuthScreen = () => {
 
   // ── 4. Handle Resend Verification Link ──
   const handleResend = async () => {
+    setIsResending(true);
     setVerifyError("");
     setVerificationCode("");
     const purpose = verificationStep === "login_verify" ? "login" : "register";
@@ -366,6 +368,7 @@ const AuthScreen = () => {
     } else {
       setVerifyError(res.error?.message || "Failed to resend code. Try again.");
     }
+    setIsResending(false);
   };
 
   return (
@@ -547,7 +550,7 @@ const AuthScreen = () => {
                         : "2-Step Security Verification"}
                     </h2>
                     <p className="text-slate-400 text-xs sm:text-sm mt-1">
-                      Sent to{" "}
+                      We sent a verification code and email link to{" "}
                       <span className="text-white font-medium">
                         {activeEmail}
                       </span>
@@ -654,16 +657,24 @@ const AuthScreen = () => {
 
                   {verifyError && <StatusMsg tone="error" text={verifyError} />}
 
+                  <p className="text-center text-xs text-slate-500">
+                    Check your inbox and spam folder. Enter the 6-digit code
+                    below, or use the verification link in the email.
+                  </p>
+
                   {/* Confirm or Resend Action Buttons */}
                   <div className="space-y-2 pt-1">
                     {verificationStatus === "expired" ? (
                       <button
                         type="button"
                         onClick={handleResend}
+                        disabled={isResending}
                         className="w-full h-11 rounded-xl font-bold text-xs sm:text-sm tracking-wide bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-slate-950 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-500/20"
                       >
                         <RefreshCw size={16} />
-                        Send a New Verification Code
+                        {isResending
+                          ? "Sending..."
+                          : "Send a New Verification Code"}
                       </button>
                     ) : (
                       <button
@@ -680,6 +691,21 @@ const AuthScreen = () => {
                         <ArrowRight size={15} />
                       </button>
                     )}
+
+                    {verificationStatus !== "expired" &&
+                      verificationStatus !== "verified" && (
+                        <button
+                          type="button"
+                          onClick={handleResend}
+                          disabled={isResending}
+                          className="w-full py-1.5 text-center text-xs text-emerald-300 transition-colors hover:text-emerald-200 disabled:opacity-50"
+                        >
+                          <RefreshCw size={13} className="mr-1 inline" />
+                          {isResending
+                            ? "Sending a new code..."
+                            : "Didn't receive it? Resend verification email"}
+                        </button>
+                      )}
 
                     <button
                       type="button"
