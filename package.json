@@ -1,6 +1,6 @@
 {
   "name": "aurelinx-platform",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "description": "Executive Talent Intelligence Platform - Unified Workspace",
   "main": "start-all.js",
   "scripts": {
