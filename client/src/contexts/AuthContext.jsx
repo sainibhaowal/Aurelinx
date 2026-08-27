@@ -217,7 +217,6 @@ export const AuthProvider = ({ children }) => {
   );
 
   const register = useCallback(async (email, password, fullName = null) => {
-    setLoading(true);
     setError(null);
 
     try {
@@ -234,13 +233,10 @@ export const AuthProvider = ({ children }) => {
       );
       setError(error);
       return { success: false, error };
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   const verifyEmail = useCallback(async (email, code) => {
-    setLoading(true);
     setError(null);
     try {
       const res = await authAPI.verifyEmail(email, code);
@@ -253,8 +249,6 @@ export const AuthProvider = ({ children }) => {
       );
       setError(error);
       return { success: false, error };
-    } finally {
-      setLoading(false);
     }
   }, []);
 
