@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.4.2](https://github.com/sainibhaowal/Aurelinx/compare/v1.4.1...v1.4.2) (2026-08-27)
+
+
+### Bug Fixes
+
+* **auth:** auto-verify email link token and trigger 30s OTP challenge on unverified login ([9248c44](https://github.com/sainibhaowal/Aurelinx/commit/9248c4468313b880ad09ae0dcf78673caee5b230))
+* remove unused 'res' variables to satisfy ESLint and Prettier in AuthScreen.jsx ([fe8f3f7](https://github.com/sainibhaowal/Aurelinx/commit/fe8f3f7291a36278901d1dbb297d625bbe133493))
+
 ### [1.4.1](https://github.com/sainibhaowal/Aurelinx/compare/v1.4.0...v1.4.1) (2026-08-26)
 
 ## [1.4.0](https://github.com/sainibhaowal/Aurelinx/compare/v1.3.2...v1.4.0) (2026-08-26)
