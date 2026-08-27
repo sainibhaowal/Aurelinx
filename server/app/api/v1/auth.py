@@ -189,24 +189,48 @@ async def verify_email(
     """
     Verify email with 6-digit code or URL token within the 30-second window.
     """
-    user = session.exec(
-        select(UserTable).where(UserTable.email == request.email)
-    ).first()
+    verification = None
+    user = None
+    input_val = request.code.strip()
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
-
-    # Find active verification record
-    verification = session.exec(
-        select(EmailVerificationTable)
-        .where(
-            EmailVerificationTable.email == request.email,
-            col(EmailVerificationTable.is_used).is_(False),
-        )
-        .order_by(col(EmailVerificationTable.created_at).desc())
-    ).first()
+    if request.email:
+        user = session.exec(
+            select(UserTable).where(UserTable.email == request.email)
+        ).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+        verification = session.exec(
+            select(EmailVerificationTable)
+            .where(
+                EmailVerificationTable.email == request.email,
+                col(EmailVerificationTable.is_used).is_(False),
+            )
+            .order_by(col(EmailVerificationTable.created_at).desc())
+        ).first()
+    else:
+        # Lookup by token directly
+        verification = session.exec(
+            select(EmailVerificationTable)
+            .where(
+                EmailVerificationTable.token == input_val,
+                col(EmailVerificationTable.is_used).is_(False),
+            )
+            .order_by(col(EmailVerificationTable.created_at).desc())
+        ).first()
+        if not verification:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired verification link.",
+            )
+        user = session.exec(
+            select(UserTable).where(UserTable.email == verification.email)
+        ).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
 
     if not verification:
         raise HTTPException(
@@ -224,7 +248,6 @@ async def verify_email(
         )
 
     # Validate code or token match
-    input_val = request.code.strip()
     if input_val != verification.code and input_val != verification.token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

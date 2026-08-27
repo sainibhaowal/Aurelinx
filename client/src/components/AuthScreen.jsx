@@ -168,6 +168,46 @@ const AuthScreen = () => {
     }
   }, []);
 
+  // Handle 1-click email verification link parameter (?verify_email=<token>&email=<email>)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const verifyToken = params.get("verify_email");
+      const paramEmail = params.get("email") || "";
+
+      if (verifyToken) {
+        setActiveEmail(paramEmail);
+        setVerificationStep("register_verify");
+        setVerificationStatus("counting");
+        setIsSubmittingCode(true);
+
+        verifyEmail(paramEmail, verifyToken).then((res) => {
+          setIsSubmittingCode(false);
+          if (res.success) {
+            if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+            setVerificationStatus("verified");
+            const verifiedEmail = res.data?.email || paramEmail;
+            if (verifiedEmail) {
+              setLoginForm((prev) => ({ ...prev, email: verifiedEmail }));
+            }
+            setTimeout(() => {
+              setVerificationStep("idle");
+              setMode("login");
+              if (typeof window !== "undefined") {
+                window.history.replaceState({}, "", "/login");
+              }
+            }, 1600);
+          } else {
+            setVerificationStatus("expired");
+            setVerifyError(
+              res.error?.message || "Verification link is invalid or has expired."
+            );
+          }
+        });
+      }
+    }
+  }, [verifyEmail]);
+
   const handleOAuth = (provider) => {
     const apiBase = API_BASE_URL;
     window.location.href = `${apiBase}/api/v1/auth/${provider}/login`;
@@ -239,7 +279,24 @@ const AuthScreen = () => {
 
     const result = await login(email, password);
     if (!result.success) {
-      setLoginError(result.error?.message || "Login failed.");
+      const msg = result.error?.message || "";
+      // If the account is unverified, trigger 30s OTP challenge for verification
+      if (
+        result.error?.status === 403 &&
+        msg.toLowerCase().includes("not verified")
+      ) {
+        setActiveEmail(email);
+        setVerificationStep("login_verify");
+        startCountdown(30);
+        resendVerification(email, "login").then((res) => {
+          if (res.success) {
+            setDemoCode(res.data?.demo_code || "");
+            startCountdown(res.data?.expires_in || 30);
+          }
+        });
+        return;
+      }
+      setLoginError(msg || "Login failed.");
       return;
     }
 
