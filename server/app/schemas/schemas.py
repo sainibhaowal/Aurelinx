@@ -95,7 +95,7 @@ class RegisterResponse(BaseModel):
 class EmailVerifyRequest(BaseModel):
     """Request to verify email with 6-digit code or token"""
 
-    email: EmailStr
+    email: EmailStr | None = None
     code: str = Field(..., min_length=4, max_length=64)
 
 

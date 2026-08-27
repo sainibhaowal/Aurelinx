@@ -20,7 +20,7 @@ def send_verification_email(
 
     minutes = max(1, expires_in // 60)
     frontend_url = settings.FRONTEND_URL.rstrip("/")
-    verify_link = f"{frontend_url}/login?verify_email={quote(token, safe='')}"
+    verify_link = f"{frontend_url}/login?verify_email={quote(token, safe='')}&email={quote(recipient, safe='')}"
     message = EmailMessage()
     message["Subject"] = "Your Aurelinx verification code"
     message["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM}>"
