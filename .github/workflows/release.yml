@@ -34,6 +34,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # The version-and-tag job creates a new release commit. Build that
+          # exact tag rather than the workflow's pre-release SHA.
+          ref: ${{ github.event_name == 'workflow_dispatch' && needs.version-and-tag.outputs.new_tag || github.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install pnpm
@@ -87,6 +90,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Keep desktop artifacts aligned with the released container images.
+          ref: ${{ github.event_name == 'workflow_dispatch' && needs.version-and-tag.outputs.new_tag || github.ref }}
 
       - name: Determine Target Version
         id: vars
