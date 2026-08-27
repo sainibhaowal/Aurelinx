@@ -2,7 +2,7 @@
   "name": "client",
   "private": true,
   "type": "module",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "author": "Ravinder Singh <rav.singh039@gmail.com> (https://github.com/sainibhaowal)",
   "scripts": {
     "dev": "next dev --port 3000",

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.4.3](https://github.com/sainibhaowal/Aurelinx/compare/v1.4.2...v1.4.3) (2026-08-27)
+
+
+### Bug Fixes
+
+* show email verification on auth routes ([d8d4808](https://github.com/sainibhaowal/Aurelinx/commit/d8d4808858bc5edea096929aa2bb3a3fbb0fa234))
+
 ### [1.4.2](https://github.com/sainibhaowal/Aurelinx/compare/v1.4.1...v1.4.2) (2026-08-27)
 
 
