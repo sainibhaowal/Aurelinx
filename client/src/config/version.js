@@ -17,7 +17,7 @@
  * Automatically synced with project releases and GitHub asset distribution.
  */
 
-export const APP_VERSION = "1.4.5";
+export const APP_VERSION = "1.4.6";
 export const GITHUB_REPO = "sainibhaowal/Aurelinx";
 export const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO}`;
 export const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases`;
