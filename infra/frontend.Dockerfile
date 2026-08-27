@@ -11,6 +11,7 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
 COPY package.json pnpm-lock.yaml ./
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     corepack enable \
+    && corepack prepare pnpm@9.15.5 --activate \
     && pnpm config set store-dir /pnpm/store \
     && pnpm install --frozen-lockfile
 
