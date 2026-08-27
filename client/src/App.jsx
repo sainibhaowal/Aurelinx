@@ -89,6 +89,9 @@ const isAppPath = (pathname = "") =>
   pathname.startsWith("/app?") ||
   pathname.startsWith("/app#");
 
+const isAuthPath = (pathname = "") =>
+  pathname === "/login" || pathname === "/signup";
+
 const getTabFromPathname = (pathname = "") => {
   if (!isAppPath(pathname)) return null;
   const parts = pathname.split("/").filter(Boolean);
@@ -123,7 +126,8 @@ const App = () => {
   const defaultWorkspaceTab = "dashboard";
   const [route, setRoute] = useState(() => {
     if (typeof window === "undefined") return "landing";
-    return isAppPath(window.location.pathname) ? "app" : "landing";
+    if (isAppPath(window.location.pathname)) return "app";
+    return isAuthPath(window.location.pathname) ? "auth" : "landing";
   });
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window === "undefined") return defaultWorkspaceTab;
@@ -203,7 +207,7 @@ const App = () => {
     }
     const finalPath = isApp && targetTab ? getPathnameForTab(targetTab) : path;
     window.history.pushState({ tab: targetTab }, "", finalPath);
-    setRoute(isApp ? "app" : "landing");
+    setRoute(isApp ? "app" : isAuthPath(finalPath) ? "auth" : "landing");
     if (targetTab) setActiveTab(targetTab);
   };
 
@@ -451,7 +455,7 @@ const App = () => {
       if (typeof window === "undefined") return;
       const path = window.location.pathname;
       const isApp = isAppPath(path);
-      setRoute(isApp ? "app" : "landing");
+      setRoute(isApp ? "app" : isAuthPath(path) ? "auth" : "landing");
       if (isApp) {
         const tabFromUrl = getTabFromPathname(path);
         if (tabFromUrl) {
@@ -488,7 +492,9 @@ const App = () => {
   };
 
   let content;
-  if (route !== "app") {
+  if (route === "auth") {
+    content = <AuthScreen />;
+  } else if (route !== "app") {
     content = (
       <Suspense fallback={<LoadingScreen label="Loading landing page" />}>
         <LandingPage
