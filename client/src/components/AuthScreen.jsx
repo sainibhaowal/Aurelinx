@@ -30,7 +30,7 @@ export default function AuthScreen({ onLoginSuccess }) {
             email: qs.verify_email,
             code: qs.verify_token,
           };
-          const res = await axios.post(
+          await axios.post(
             `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100"}/api/v1/auth/verify-email`,
             payload
           );
@@ -87,7 +87,7 @@ export default function AuthScreen({ onLoginSuccess }) {
     setLoading(true);
     setMessage("");
     try {
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100"}/api/v1/auth/verify-email`, {
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5100"}/api/v1/auth/verify-email`, {
         email,
         code: otp,
       });
