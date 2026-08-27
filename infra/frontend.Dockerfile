@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
@@ -7,8 +8,12 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
     npm_config_fund=false \
     npm_config_audit=false
 
-COPY package*.json ./
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+COPY package.json pnpm-lock.yaml ./
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    corepack enable \
+    && corepack prepare pnpm@9.15.5 --activate \
+    && pnpm config set store-dir /pnpm/store \
+    && pnpm install --frozen-lockfile
 
 COPY . ./
 

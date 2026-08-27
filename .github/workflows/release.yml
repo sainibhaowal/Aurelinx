@@ -34,9 +34,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # The version-and-tag job creates a new release commit. Build that
-          # exact tag rather than the workflow's pre-release SHA.
-          ref: ${{ github.event_name == 'workflow_dispatch' && needs.version-and-tag.outputs.new_tag || github.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install pnpm
@@ -116,7 +113,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 1. Build & Push Backend Container Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./server
           file: ./infra/backend.Dockerfile
@@ -128,7 +125,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: 2. Build & Push Frontend Container Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./client
           file: ./infra/frontend.Dockerfile
@@ -208,14 +205,36 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Attach installers built from the exact semantic-release tag.
+          ref: ${{ github.event_name == 'workflow_dispatch' && needs.version-and-tag.outputs.new_tag || github.ref }}
 
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore desktop build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            desktop/src-tauri/target
+          key: ${{ runner.os }}-desktop-tauri-${{ hashFiles('desktop/package-lock.json', 'desktop/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-desktop-tauri-
+
+      - name: Restore Linux package cache
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-desktop-apt-v1
 
       - name: Install Linux desktop dependencies
         if: runner.os == 'Linux'
