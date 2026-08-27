@@ -184,7 +184,8 @@ const AuthScreen = () => {
         verifyEmail(paramEmail, verifyToken).then((res) => {
           setIsSubmittingCode(false);
           if (res.success) {
-            if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+            if (countdownTimerRef.current)
+              clearInterval(countdownTimerRef.current);
             setVerificationStatus("verified");
             const verifiedEmail = res.data?.email || paramEmail;
             if (verifiedEmail) {
@@ -200,7 +201,8 @@ const AuthScreen = () => {
           } else {
             setVerificationStatus("expired");
             setVerifyError(
-              res.error?.message || "Verification link is invalid or has expired."
+              res.error?.message ||
+                "Verification link is invalid or has expired.",
             );
           }
         });
