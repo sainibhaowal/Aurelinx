@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.4.4](https://github.com/sainibhaowal/Aurelinx/compare/v1.4.3...v1.4.4) (2026-08-27)
+
+
+### Bug Fixes
+
+* build release images from semantic tag ([b8b6f44](https://github.com/sainibhaowal/Aurelinx/commit/b8b6f4499f7ce3afd558c612bbce52c49be1431b))
+
 ### [1.4.3](https://github.com/sainibhaowal/Aurelinx/compare/v1.4.2...v1.4.3) (2026-08-27)
 
 
