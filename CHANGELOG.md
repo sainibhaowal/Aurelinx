@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.1](https://github.com/sainibhaowal/Aurelinx/compare/v0.1.0...v0.1.1) (2026-09-07)
+
+
+### Bug Fixes
+
+* **auth:** resolve mypy type errors and format AuthScreen with prettier ([619e5a1](https://github.com/sainibhaowal/Aurelinx/commit/619e5a17725320ab1b2635256f893eb23d91f00a))
+
 ### [1.4.6](https://github.com/sainibhaowal/Aurelinx/compare/v1.4.5...v1.4.6) (2026-08-27)
 
 
