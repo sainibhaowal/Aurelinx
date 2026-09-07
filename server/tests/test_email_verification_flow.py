@@ -102,3 +102,51 @@ def test_one_time_email_verification_and_direct_signin(client):
     me_data = me_resp.json()
     assert me_data["email"] == email
     assert me_data["is_verified"] is True
+
+
+def test_email_link_approves_the_initiating_device_session(client):
+    email = "cross.device@aurelinx.com"
+    password = "SecurePassword123!"
+
+    # Device A begins registration and keeps this secret in its browser only.
+    registration = client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "password": password},
+    )
+    assert registration.status_code == 201
+    session_token = registration.json()["session_token"]
+    assert len(session_token) >= 32
+
+    # Before email approval, Device A cannot create a session.
+    pending = client.post(
+        "/api/v1/auth/verification-session",
+        json={"session_token": session_token},
+    )
+    assert pending.status_code == 200
+    assert pending.json() == {"status": "pending"}
+
+    # Device B opens the email link. It approves the challenge but receives no
+    # login token itself.
+    approval = client.post(
+        "/api/v1/auth/verify-email",
+        json={"email": email, "code": registration.json()["demo_code"]},
+    )
+    assert approval.status_code == 200
+    assert "access_token" not in approval.json()
+
+    # Device A observes approval and claims its own one-time app session.
+    claim = client.post(
+        "/api/v1/auth/verification-session",
+        json={"session_token": session_token},
+    )
+    assert claim.status_code == 200
+    auth_data = claim.json()
+    assert auth_data["status"] == "approved"
+    assert auth_data["access_token"]
+
+    # A copied/replayed session secret cannot create a second session.
+    replay = client.post(
+        "/api/v1/auth/verification-session",
+        json={"session_token": session_token},
+    )
+    assert replay.status_code == 409

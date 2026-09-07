@@ -90,6 +90,7 @@ class RegisterResponse(BaseModel):
     expires_in: int = 30
     demo_code: str | None = None
     token: str | None = None
+    session_token: str
 
 
 class EmailVerifyRequest(BaseModel):
@@ -111,6 +112,12 @@ class VerifyLoginRequest(BaseModel):
 
     email: EmailStr
     code: str = Field(..., min_length=4, max_length=64)
+
+
+class VerificationSessionRequest(BaseModel):
+    """Proof held by the browser that started an email approval flow."""
+
+    session_token: str = Field(..., min_length=32, max_length=128)
 
 
 class LoginVerificationChallenge(BaseModel):

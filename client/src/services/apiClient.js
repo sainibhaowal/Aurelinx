@@ -571,6 +571,12 @@ export const authAPI = {
       body: JSON.stringify({ email, code }),
     }),
 
+  claimVerificationSession: (sessionToken) =>
+    request(`${API_V1}/auth/verification-session`, {
+      method: "POST",
+      body: JSON.stringify({ session_token: sessionToken }),
+    }),
+
   loginDirect: (email, password) =>
     request(`${API_V1}/auth/login-direct`, {
       method: "POST",
