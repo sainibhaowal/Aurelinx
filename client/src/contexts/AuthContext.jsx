@@ -311,6 +311,42 @@ export const AuthProvider = ({ children }) => {
     [resolveWithTimeout, isEmbeddedIframe],
   );
 
+  const claimVerificationSession = useCallback(
+    async (sessionToken) => {
+      setError(null);
+      try {
+        const response = await authAPI.claimVerificationSession(sessionToken);
+        if (response.status === "pending") {
+          return { success: true, status: "pending" };
+        }
+
+        localStorage.setItem("auth_token", response.access_token);
+        setToken(response.access_token);
+        const userData = await resolveWithTimeout(authAPI.getCurrentUser());
+        setUser(userData);
+        localStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(userData));
+
+        if (isEmbeddedIframe) {
+          postToParent({
+            type: "AURELINX_SAVE_CREDS",
+            token: response.access_token,
+            user: userData,
+          });
+        }
+        return { success: true, status: "approved", user: userData };
+      } catch (err) {
+        const error = new APIError(
+          err.error_code || "VERIFICATION_SESSION_FAILED",
+          err.message || "Unable to complete email verification.",
+          err.status,
+        );
+        setError(error);
+        return { success: false, error };
+      }
+    },
+    [resolveWithTimeout, isEmbeddedIframe],
+  );
+
   const logout = useCallback(() => {
     localStorage.removeItem("auth_token");
     localStorage.removeItem(AUTH_USER_CACHE_KEY);
@@ -334,6 +370,7 @@ export const AuthProvider = ({ children }) => {
     verifyEmail,
     resendVerification,
     verifyLogin,
+    claimVerificationSession,
     logout,
     savedCreds,
     isAuthenticated: !!user && !!token,
