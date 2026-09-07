@@ -12,7 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
@@ -112,7 +118,9 @@ const AuthScreen = () => {
     if (!verificationSessionToken) return false;
     const result = await claimVerificationSession(verificationSessionToken);
     if (!result.success) {
-      setVerifyError(result.error?.message || "Unable to complete email verification.");
+      setVerifyError(
+        result.error?.message || "Unable to complete email verification.",
+      );
       return false;
     }
     if (result.status !== "approved") return false;
@@ -128,7 +136,11 @@ const AuthScreen = () => {
   // The initiating device waits for the email link or OTP to approve its
   // one-time session. The approval can happen from any other device.
   useEffect(() => {
-    if (!verificationSessionToken || verificationStatus === "verified" || verificationStatus === "expired") {
+    if (
+      !verificationSessionToken ||
+      verificationStatus === "verified" ||
+      verificationStatus === "expired"
+    ) {
       return undefined;
     }
     let active = true;

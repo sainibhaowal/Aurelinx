@@ -158,12 +158,13 @@ async def register(
     expires_in = settings.EMAIL_VERIFICATION_EXPIRE_SECONDS
     expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
 
+    session_token = secrets.token_urlsafe(32)
     verification = EmailVerificationTable(
         user_id=user.id,
         email=user.email,
         code=code,
         token=token,
-        session_token=secrets.token_urlsafe(32),
+        session_token=session_token,
         purpose="register",
         is_used=False,
         expires_at=expires_at,
@@ -182,7 +183,7 @@ async def register(
         expires_in=expires_in,
         demo_code=code if _is_demo_environment() else None,
         token=token if _is_demo_environment() else None,
-        session_token=verification.session_token,
+        session_token=session_token,
     )
 
 
@@ -370,12 +371,13 @@ async def claim_verification_session(
     claim_result = session.execute(
         update(EmailVerificationTable)
         .where(
-            EmailVerificationTable.id == verification.id,
-            EmailVerificationTable.session_claimed_at.is_(None),
+            col(EmailVerificationTable.id) == verification.id,
+            col(EmailVerificationTable.session_claimed_at).is_(None),
         )
         .values(session_claimed_at=claimed_at)
     )
-    if claim_result.rowcount != 1:
+    rowcount = getattr(claim_result, "rowcount", None)
+    if rowcount != 1:
         session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
