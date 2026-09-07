@@ -12,7 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, {
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
@@ -63,6 +69,7 @@ const AuthScreen = () => {
     verifyEmail,
     resendVerification,
     verifyLogin,
+    claimVerificationSession,
     loading,
     savedCreds,
   } = useAuth();
@@ -103,8 +110,51 @@ const AuthScreen = () => {
   const [verifyError, setVerifyError] = useState("");
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [verificationSessionToken, setVerificationSessionToken] = useState("");
 
   const countdownTimerRef = useRef(null);
+
+  const finishApprovedSession = useCallback(async () => {
+    if (!verificationSessionToken) return false;
+    const result = await claimVerificationSession(verificationSessionToken);
+    if (!result.success) {
+      setVerifyError(
+        result.error?.message || "Unable to complete email verification.",
+      );
+      return false;
+    }
+    if (result.status !== "approved") return false;
+
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    setVerificationStatus("verified");
+    window.setTimeout(() => {
+      window.location.href = "/app";
+    }, 900);
+    return true;
+  }, [claimVerificationSession, verificationSessionToken]);
+
+  // The initiating device waits for the email link or OTP to approve its
+  // one-time session. The approval can happen from any other device.
+  useEffect(() => {
+    if (
+      !verificationSessionToken ||
+      verificationStatus === "verified" ||
+      verificationStatus === "expired"
+    ) {
+      return undefined;
+    }
+    let active = true;
+    const checkApproval = async () => {
+      if (!active) return;
+      await finishApprovedSession();
+    };
+    checkApproval();
+    const timer = window.setInterval(checkApproval, 1000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [finishApprovedSession, verificationSessionToken, verificationStatus]);
 
   // Start the server-provided OTP expiry countdown.
   const startCountdown = (initialSeconds = 30) => {
@@ -192,13 +242,12 @@ const AuthScreen = () => {
             if (verifiedEmail) {
               setLoginForm((prev) => ({ ...prev, email: verifiedEmail }));
             }
-            setTimeout(() => {
-              setVerificationStep("idle");
-              setMode("login");
-              if (typeof window !== "undefined") {
-                window.history.replaceState({}, "", "/login");
-              }
-            }, 1600);
+            // This tab may be a phone or a secondary browser. Keep it as a
+            // confirmation screen; the browser that began the flow detects
+            // approval and enters the app on its own.
+            if (typeof window !== "undefined") {
+              window.history.replaceState({}, "", "/login?verified=1");
+            }
           } else {
             setVerificationStatus("expired");
             setVerifyError(
@@ -265,6 +314,7 @@ const AuthScreen = () => {
     // Enter 30-Second Verification Screen
     setActiveEmail(email);
     setDemoCode(result.user?.demo_code || "");
+    setVerificationSessionToken(result.user?.session_token || "");
     setVerificationStep("register_verify");
     startCountdown(result.user?.expires_in || 30);
   };
@@ -294,6 +344,7 @@ const AuthScreen = () => {
         resendVerification(email, "login").then((res) => {
           if (res.success) {
             setDemoCode(res.data?.demo_code || "");
+            setVerificationSessionToken(res.data?.session_token || "");
             startCountdown(res.data?.expires_in || 30);
           }
         });
@@ -327,14 +378,9 @@ const AuthScreen = () => {
         return;
       }
 
-      // Success: Turn indicator green and redirect to Sign In
-      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
-      setVerificationStatus("verified");
-
-      setTimeout(() => {
-        setRegisterForm(initialRegisterState);
-        switchToLogin(activeEmail);
-      }, 1400);
+      // The current device can claim its approved session immediately. The
+      // same path is also used when the link was opened on another device.
+      await finishApprovedSession();
     } else if (verificationStep === "login_verify") {
       const res = await verifyLogin(activeEmail, code, loginForm.password);
       setIsSubmittingCode(false);
@@ -364,6 +410,7 @@ const AuthScreen = () => {
 
     if (res.success) {
       setDemoCode(res.data?.demo_code || "");
+      setVerificationSessionToken(res.data?.session_token || "");
       startCountdown(res.data?.expires_in || 30);
     } else {
       setVerifyError(res.error?.message || "Failed to resend code. Try again.");

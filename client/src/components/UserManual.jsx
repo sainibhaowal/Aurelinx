@@ -37,6 +37,7 @@ import {
   Cpu,
   Brain,
   Zap,
+  BriefcaseBusiness,
 } from "lucide-react";
 
 export const UserManualModal = ({

@@ -17,7 +17,7 @@
  */
 module.exports.readVersion = function (contents) {
   const match = contents.match(/export const APP_VERSION = ["']([^"']+)["']/);
-  return match ? match[1] : "1.2.0";
+  return match ? match[1] : "0.1.0";
 };
 
 module.exports.writeVersion = function (contents, version) {
