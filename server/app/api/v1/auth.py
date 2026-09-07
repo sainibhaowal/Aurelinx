@@ -25,6 +25,7 @@ from uuid import UUID
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
+from sqlalchemy import update
 from sqlmodel import Session as SQLSession
 from sqlmodel import SQLModel, col, select
 
@@ -50,6 +51,7 @@ from app.schemas.schemas import (
     ResendVerificationRequest,
     ResetWorkspaceRequest,
     UserOut,
+    VerificationSessionRequest,
     VerifyLoginRequest,
 )
 from app.services.email_service import EmailDeliveryError, send_verification_email
@@ -161,6 +163,7 @@ async def register(
         email=user.email,
         code=code,
         token=token,
+        session_token=secrets.token_urlsafe(32),
         purpose="register",
         is_used=False,
         expires_at=expires_at,
@@ -179,6 +182,7 @@ async def register(
         expires_in=expires_in,
         demo_code=code if _is_demo_environment() else None,
         token=token if _is_demo_environment() else None,
+        session_token=verification.session_token,
     )
 
 
@@ -254,8 +258,10 @@ async def verify_email(
             detail="Invalid verification code. Please check your email and try again.",
         )
 
-    # Mark verified
+    # Mark the email challenge approved. The browser that started this flow
+    # exchanges its separate session token for a login session.
     verification.is_used = True
+    verification.approved_at = datetime.utcnow()
     user.is_verified = True
     session.commit()
 
@@ -263,7 +269,7 @@ async def verify_email(
 
     return {
         "success": True,
-        "message": "Email verified successfully! You can now sign in.",
+        "message": "Email verified successfully. Return to the device where you started.",
         "email": user.email,
     }
 
@@ -305,6 +311,7 @@ async def resend_verification(
         email=user.email,
         code=code,
         token=token,
+        session_token=secrets.token_urlsafe(32),
         purpose=request.purpose,
         is_used=False,
         expires_at=expires_at,
@@ -321,6 +328,70 @@ async def resend_verification(
         "expires_in": expires_in,
         "demo_code": code if _is_demo_environment() else None,
         "token": token if _is_demo_environment() else None,
+        "session_token": verification.session_token,
+    }
+
+
+@router.post("/verification-session")
+async def claim_verification_session(
+    request: VerificationSessionRequest,
+    session: SQLSession = Depends(get_session),
+):
+    """Claim an approved email verification on the browser that initiated it."""
+    verification = session.exec(
+        select(EmailVerificationTable).where(
+            EmailVerificationTable.session_token == request.session_token
+        )
+    ).first()
+    if not verification:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification session.")
+
+    if verification.expires_at < datetime.utcnow():
+        if not verification.is_used:
+            verification.is_used = True
+            session.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Verification session expired. Please request a new code.")
+
+    if verification.approved_at is None:
+        return {"status": "pending"}
+
+    if verification.session_claimed_at is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This verification session has already been used.")
+
+    user = session.exec(
+        select(UserTable).where(UserTable.id == verification.user_id)
+    ).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is unavailable.")
+
+    # Claim atomically so a duplicated browser tab, or a copied session secret,
+    # cannot race this request and obtain a second access token.
+    claimed_at = datetime.utcnow()
+    claim_result = session.execute(
+        update(EmailVerificationTable)
+        .where(
+            EmailVerificationTable.id == verification.id,
+            EmailVerificationTable.session_claimed_at.is_(None),
+        )
+        .values(session_claimed_at=claimed_at)
+    )
+    if claim_result.rowcount != 1:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This verification session has already been used.",
+        )
+    session.commit()
+    access_token = create_access_token(
+        data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+    return {
+        "status": "approved",
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "user_id": user.id,
     }
 
 

@@ -88,7 +88,7 @@ class UserTable(SQLModel, table=True):
 
 # ============ EMAIL VERIFICATION TOKENS ============
 class EmailVerificationTable(SQLModel, table=True):
-    """Email verification tokens and 30-second OTP challenge codes"""
+    """Email verification challenges, approval state, and one-time session claims."""
 
     __tablename__ = "email_verifications"
 
@@ -99,8 +99,14 @@ class EmailVerificationTable(SQLModel, table=True):
     email: str = Field(index=True)
     code: str = Field(index=True)  # 6-digit verification code
     token: str = Field(unique=True, index=True)  # URL verification token
+    # Held only by the browser that initiated the flow.  It is distinct from
+    # the email-link token so an email click can approve, but cannot take over,
+    # the initiating browser session.
+    session_token: str | None = Field(default=None, unique=True, index=True)
     purpose: str = Field(default="register", index=True)  # register or login
     is_used: bool = Field(default=False, index=True)
+    approved_at: datetime | None = Field(default=None)
+    session_claimed_at: datetime | None = Field(default=None)
     expires_at: datetime = Field(index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
