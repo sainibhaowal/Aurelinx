@@ -63,8 +63,9 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://:AurelinxRedis_2026!ChangeMe@redis:6379/0}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       PYTHONPATH: /app
+      IN_PROCESS_SCHEDULER: "false"
       CHAT_UPLOAD_ROOT: ${CHAT_UPLOAD_ROOT:-/app/data/chat}
-      VERSION: ${VERSION:-1.0.0}
+      VERSION: ${VERSION:-0.1.0}
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,12 +94,13 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@postgres:5432/aurelinx_db?options=-csearch_path%3Dapp,public}
       REDIS_URL: ${REDIS_URL:-redis://:AurelinxRedis_2026!ChangeMe@redis:6379/0}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      VERSION: ${VERSION:-0.1.0}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: [ "sh", "-lc", "PYTHONPATH=/app python scripts/retry_worker.py" ]
+    command: [ "sh", "-lc", "PYTHONPATH=/app rq worker integrations --url \"$REDIS_URL\"" ]
 
   scheduler:
     image: ghcr.io/${GHCR_OWNER:-your-org}/aurelinx-backend:${VERSION:-latest}
@@ -111,13 +113,14 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@postgres:5432/aurelinx_db?options=-csearch_path%3Dapp,public}
       REDIS_URL: ${REDIS_URL:-redis://:AurelinxRedis_2026!ChangeMe@redis:6379/0}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      VERSION: ${VERSION:-0.1.0}
       PYTHONPATH: /app
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: [ "sh", "-lc", "PYTHONPATH=/app python scripts/retry_scheduler.py" ]
+    command: [ "sh", "-lc", "PYTHONPATH=/app python scripts/connector_scheduler.py" ]
 
   web:
     image: ghcr.io/${GHCR_OWNER:-your-org}/aurelinx-frontend:${VERSION:-latest}

@@ -89,7 +89,7 @@ async def poll_loop():
                     session.query(IntegrationWebhookEventTable)
                     .filter(
                         IntegrationWebhookEventTable.status != "success",
-                        IntegrationWebhookEventTable.next_retry_at is not None,
+                        IntegrationWebhookEventTable.next_retry_at.is_not(None),
                         IntegrationWebhookEventTable.next_retry_at <= now,
                         IntegrationWebhookEventTable.attempts < MAX_ATTEMPTS,
                     )

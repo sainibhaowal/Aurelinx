@@ -45,6 +45,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
   const [filter, setFilter] = useState("");
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [selectedProfileLoading, setSelectedProfileLoading] = useState(false);
+  const [selectedEvidence, setSelectedEvidence] = useState([]);
   const [workforceTotal, setWorkforceTotal] = useState(null);
   const [candidateTotal, setCandidateTotal] = useState(null);
   const [atRiskTotal, setAtRiskTotal] = useState(null);
@@ -64,6 +65,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
   const [isStale, setIsStale] = useState(false);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [departmentFilter, setDepartmentFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
   const [riskFilter, setRiskFilter] = useState("all");
   const [sentimentBand, setSentimentBand] = useState("all");
   const [employeeDepartments, setEmployeeDepartments] = useState([]);
@@ -566,11 +568,16 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
 
     setProfileError("");
     setSelectedProfileLoading(true);
+    setSelectedEvidence([]);
     try {
       const record = isCandidateRecord(person)
         ? await candidatesAPI.get(person.id)
         : await employeesAPI.get(person.id);
       setSelectedProfile(record);
+      if (!isCandidateRecord(person)) {
+        const evidence = await employeesAPI.integrationEvidence(person.id);
+        setSelectedEvidence(evidence?.evidence || []);
+      }
     } catch (err) {
       console.error(err);
       setProfileError("This profile could not be loaded. Please try again.");
@@ -600,6 +607,8 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
       );
     const departmentMatches =
       !departmentFilter || person.department === departmentFilter;
+    const sourceMatches =
+      !sourceFilter || (person.source_providers || []).includes(sourceFilter);
     const riskMatches = riskFilter !== "at_risk" || Boolean(person.is_at_risk);
     const score = Number(person.sentiment_score);
     const sentimentMatches =
@@ -612,6 +621,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
     return (
       textMatches &&
       departmentMatches &&
+      sourceMatches &&
       riskMatches &&
       (Number.isNaN(score) ? sentimentBand === "all" : sentimentMatches)
     );
@@ -820,6 +830,19 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                     </option>
                   ))}
               </PremiumSelect>
+              <label className="min-w-[190px] flex-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                Live source
+                <PremiumSelect
+                  value={sourceFilter}
+                  onChange={(e) => setSourceFilter(e.target.value)}
+                  className="mt-2 h-10 w-full"
+                >
+                  <option value="">All sources</option>
+                  {[...new Set(employees.flatMap((row) => row.source_providers || []))].sort().map((source) => (
+                    <option key={source} value={source}>{source}</option>
+                  ))}
+                </PremiumSelect>
+              </label>
             </label>
             <label className="min-w-[160px] flex-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
               Risk status
@@ -846,6 +869,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
               </PremiumSelect>
             </label>
             {(departmentFilter ||
+              sourceFilter ||
               riskFilter !== "all" ||
               sentimentBand !== "all" ||
               filter) && (
@@ -1533,6 +1557,30 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                 )}
               </div>
             </div>
+
+            {!selectedProfileIsCandidate && (
+              <div className="mb-8 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.03] p-4 space-y-3 text-xs">
+                <div className="font-semibold uppercase tracking-[0.16em] text-cyan-200">
+                  Live integration evidence
+                </div>
+                {selectedEvidence.length ? (
+                  <div className="max-h-56 space-y-2 overflow-y-auto">
+                    {selectedEvidence.map((item, index) => (
+                      <div key={`${item.provider}-${item.external_id}-${index}`} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-wider">
+                          <span className="font-bold text-cyan-200">{item.provider} · {item.source_type}</span>
+                          <time className="text-slate-500">{new Date(item.observed_at).toLocaleString()}</time>
+                        </div>
+                        <div className="mt-1 text-slate-400">External ID: <span className="text-slate-200">{item.external_id || "not reported"}</span></div>
+                        {Object.keys(item.summary || {}).length > 0 && <pre className="mt-2 max-h-20 overflow-auto whitespace-pre-wrap text-[10px] text-slate-500">{JSON.stringify(item.summary, null, 2)}</pre>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-slate-500">No provider evidence is attached to this profile yet.</span>
+                )}
+              </div>
+            )}
 
             {/* Footer Action */}
             <div className="flex justify-between items-center pt-4 border-t border-white/10 font-mono text-[10px] text-slate-500">

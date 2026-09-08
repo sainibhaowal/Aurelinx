@@ -18,6 +18,7 @@ Main FastAPI application
 Production-grade setup with middleware, exception handling, and security
 """
 
+import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -68,8 +69,11 @@ async def lifespan(app: FastAPI):
         raise
 
     try:
-        lean_enterprise.start_scheduler()
-        logger.info("Lean enterprise scheduler started")
+        if os.getenv("IN_PROCESS_SCHEDULER", "true").lower() == "true":
+            lean_enterprise.start_scheduler()
+            logger.info("Lean enterprise scheduler started")
+        else:
+            logger.info("In-process scheduler disabled; durable connector scheduler is external")
     except Exception as e:
         logger.warning(f"Could not start lean enterprise scheduler: {e}")
 
@@ -88,7 +92,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Aurelinx Intelligence API",
     description="Production-grade HR Intelligence Platform with Agentic AI",
-    version="1.0.0",
+    version=settings.VERSION,
     docs_url="/api/v1/docs",
     redoc_url="/api/v1/redoc",
     openapi_url="/api/v1/openapi.json",

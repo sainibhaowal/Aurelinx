@@ -66,6 +66,7 @@ from app.models.database import (
     ProcurementArtifactTable,
     QuarantineEventTable,
     RawEventTable,
+    IntegrationEvidenceTable,
     ReleaseGateTable,
     SkillTable,
     engine,
@@ -91,6 +92,7 @@ from app.schemas.schemas import (
     ReleaseGateOut,
 )
 from app.services.connectors.factory import get_connector
+from app.services.connectors.secrets import open_credentials, seal_credentials
 
 router = APIRouter(prefix="/lean", tags=["lean-enterprise"])
 _SCHEDULER_TASK: asyncio.Task | None = None
@@ -154,6 +156,39 @@ def _validate_payload(payload: dict[str, Any], required_fields: list[str]) -> li
         if field not in payload or payload[field] in [None, ""]:
             missing.append(field)
     return missing
+
+
+def _apply_connector_mappings(
+    db: Session, connection_id: UUID, tenant_id: str, payload: dict[str, Any]
+) -> dict[str, Any]:
+    """Apply registered deterministic transforms to a source row."""
+    mappings = db.exec(
+        select(ConnectorFieldMappingTable)
+        .where(ConnectorFieldMappingTable.connection_id == connection_id)
+        .where(ConnectorFieldMappingTable.tenant_id == tenant_id)
+    ).all()
+    if not mappings:
+        return payload
+    mapped = dict(payload)
+    for mapping in mappings:
+        if mapping.source_field not in payload:
+            continue
+        value = payload[mapping.source_field]
+        rule = (mapping.transform_rule or "").strip().lower()
+        if rule == "trim" and isinstance(value, str):
+            value = value.strip()
+        elif rule == "lower" and isinstance(value, str):
+            value = value.lower()
+        elif rule == "upper" and isinstance(value, str):
+            value = value.upper()
+        elif rule == "to_float":
+            value = float(value)
+        elif rule == "to_bool":
+            value = str(value).strip().lower() in {"1", "true", "yes", "y"}
+        elif rule == "iso_date" and value:
+            value = datetime.fromisoformat(str(value).replace("Z", "+00:00")).isoformat()
+        mapped[mapping.canonical_field] = value
+    return mapped
 
 
 def _build_quality_score(
@@ -1418,12 +1453,12 @@ def _run_connection_sync(
         .where(DataContractTable.status == "active")
         .order_by(DataContractTable.updated_at.desc())
     ).first()
-    if not contract:
+    if not contract and conn.source_type in {"hris", "ats"}:
         raise HTTPException(
             status_code=422,
             detail=f"No active contract for {conn.provider}/{conn.source_type}",
         )
-    required_fields = _load_required_fields(contract)
+    required_fields = _load_required_fields(contract) if contract else []
 
     job = ConnectorSyncJobTable(
         tenant_id=tenant_id,
@@ -1443,8 +1478,19 @@ def _run_connection_sync(
     silver = 0
     quarantined = 0
     try:
-        records = connector.fetch_records({"connection": conn, "session": db})
+        encrypted = open_credentials(conn.encrypted_secret_ref)
+        options = encrypted.pop("__options", {}) if encrypted else {}
+        records = connector.fetch_records(
+            {
+                "connection": conn,
+                "session": db,
+                "base_url": conn.base_url,
+                "credentials": encrypted,
+                "options": options,
+            }
+        )
         for rec in records:
+            rec = _apply_connector_mappings(db, conn.id, tenant_id, rec)
             db.add(
                 RawEventTable(
                     tenant_id=tenant_id,
@@ -1454,6 +1500,22 @@ def _run_connection_sync(
                     payload=json.dumps(rec, default=str),
                 )
             )
+            evidence_email = str(rec.get("email") or rec.get("employee_email") or "").strip().lower()
+            if evidence_email:
+                db.add(
+                    IntegrationEvidenceTable(
+                        tenant_id=tenant_id,
+                        employee_email=evidence_email,
+                        provider=conn.provider,
+                        source_type=conn.source_type,
+                        external_id=str(rec.get("external_id") or "") or None,
+                        evidence_type="provider_record",
+                        summary=json.dumps(
+                            {key: rec.get(key) for key in ("issue_key", "summary", "channel_id", "message_count", "text") if rec.get(key) is not None},
+                            default=str,
+                        ),
+                    )
+                )
             bronze += 1
             missing = _validate_payload(rec, required_fields)
             if missing:
@@ -1471,6 +1533,9 @@ def _run_connection_sync(
                 continue
 
             if conn.source_type == "hris":
+                # Keep the existing Directory/Dashboard read model aligned
+                # with the governed canonical HRIS layer.
+                _upsert_employee_like(db, tenant_id, rec)
                 existing = db.exec(
                     select(CanonicalEmployeeTable)
                     .where(CanonicalEmployeeTable.tenant_id == tenant_id)
@@ -3096,6 +3161,16 @@ async def scheduler_loop():
                         conn.sync_retry_count += 1
                         conn.last_sync_status = "failed"
                         conn.last_sync_summary = str(exc)[:240]
+                        # Exponential retry backoff, capped at one day. The
+                        # scheduler remains live while avoiding a hot retry loop.
+                        retry_minutes = min(
+                            1440, max(5, 5 * (2 ** min(conn.sync_retry_count - 1, 8)))
+                        )
+                        conn.next_sync_at = datetime.utcnow() + timedelta(
+                            minutes=retry_minutes
+                        )
+                        if conn.sync_retry_count >= 8:
+                            conn.status = "error"
                         conn.updated_at = datetime.utcnow()
                         db.add(conn)
                         db.commit()

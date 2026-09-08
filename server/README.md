@@ -89,7 +89,9 @@ API docs: http://localhost:5000/docs
 ## Background workers
 
 - **`worker`** — Redis RQ worker executing queued tasks (`worker/tasks.py`).
-- **`scheduler`** — lean periodic scheduler for recurring jobs.
+- **`scheduler`** — durable Redis/RQ scheduler for recurring connector syncs and
+  webhook retries. In production, the API's in-process scheduler is disabled
+  so multiple API replicas cannot duplicate scheduled work.
 - Both are separate containers sharing the backend image (see [`infra/README.md`](../infra/README.md)).
 
 ---

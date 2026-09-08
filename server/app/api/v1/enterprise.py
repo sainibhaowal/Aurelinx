@@ -20,17 +20,20 @@ Enterprise HR intelligence endpoints:
 - Integration connector registry
 """
 
-import asyncio
 import json
 from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from app.core.data_policy import filter_real_records
-from app.core.security import TokenData, get_current_user, get_tenant_id
+from app.core.security import (
+    TokenData,
+    get_current_admin_user_strict,
+    get_current_user,
+    get_tenant_id,
+)
 from app.models.database import (
     AuditLogTable,
     EmployeeTable,
@@ -39,6 +42,8 @@ from app.models.database import (
     InterventionTable,
     get_session,
 )
+from app.services.connectors.factory import get_connector
+from app.services.connectors.secrets import open_credentials, seal_credentials
 from app.schemas.schemas import (
     AttritionDriverOut,
     AttritionExplainOut,
@@ -57,7 +62,6 @@ from app.schemas.schemas import (
 )
 
 router = APIRouter(prefix="/enterprise", tags=["enterprise"])
-_SYNC_STATE: dict[str, dict] = {}
 
 
 def _audit(
@@ -321,7 +325,10 @@ async def create_intervention(
         target_employee_id=payload.target_employee_id,
         target_department=payload.target_department,
         priority=payload.priority,
-        status=payload.status,
+        # A connection cannot become active until a live provider verification
+        # succeeds. This prevents an unverified credential from entering the
+        # scheduler even when a client submits status=active.
+        status="draft",
         owner_name=payload.owner_name,
         due_date=payload.due_date,
         expected_impact=payload.expected_impact,
@@ -539,7 +546,7 @@ def _to_connection_out(item: IntegrationConnectionTable) -> IntegrationConnectio
         status=item.status,
         base_url=item.base_url,
         auth_type=item.auth_type,
-        encrypted_secret_ref=item.encrypted_secret_ref,
+        encrypted_secret_ref=("configured" if item.encrypted_secret_ref else None),
         sync_interval_minutes=item.sync_interval_minutes,
         next_sync_at=item.next_sync_at,
         sync_retry_count=item.sync_retry_count,
@@ -572,10 +579,13 @@ async def list_connections(
 )
 async def create_connection(
     payload: IntegrationConnectionCreate,
-    current_user: TokenData = Depends(get_current_user),
+    current_user: TokenData = Depends(get_current_admin_user_strict),
     tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
+    credentials = payload.credentials or {}
+    if payload.options:
+        credentials = {**credentials, "__options": payload.options}
     row = IntegrationConnectionTable(
         tenant_id=tenant_id,
         name=payload.name,
@@ -584,7 +594,7 @@ async def create_connection(
         status=payload.status,
         base_url=payload.base_url,
         auth_type=payload.auth_type,
-        encrypted_secret_ref=payload.encrypted_secret_ref,
+        encrypted_secret_ref=(seal_credentials(credentials) if credentials else payload.encrypted_secret_ref),
         sync_interval_minutes=payload.sync_interval_minutes or 60,
         next_sync_at=datetime.utcnow(),
     )
@@ -607,14 +617,22 @@ async def create_connection(
 async def update_connection(
     connection_id: UUID,
     payload: IntegrationConnectionUpdate,
-    current_user: TokenData = Depends(get_current_user),
+    current_user: TokenData = Depends(get_current_admin_user_strict),
     tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
     row = db.get(IntegrationConnectionTable, connection_id)
     if not row or row.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Connection not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    credentials = updates.pop("credentials", None)
+    options = updates.pop("options", None)
+    updates.pop("encrypted_secret_ref", None)
+    if credentials is not None:
+        if options:
+            credentials = {**credentials, "__options": options}
+        row.encrypted_secret_ref = seal_credentials(credentials)
+    for field, value in updates.items():
         setattr(row, field, value)
     row.updated_at = datetime.utcnow()
     db.add(row)
@@ -632,26 +650,70 @@ async def update_connection(
     return _to_connection_out(row)
 
 
-async def _run_sync_job(connection_id: UUID):
-    phases = [
-        ("auth", 10, "Authenticating connector"),
-        ("extract", 35, "Extracting source payload"),
-        ("normalize", 60, "Normalizing canonical records"),
-        ("quality", 82, "Running quality checks"),
-        ("upsert", 95, "Applying upserts"),
-        ("complete", 100, "Sync completed"),
-    ]
-    key = str(connection_id)
-    for phase, progress, message in phases:
-        _SYNC_STATE[key] = {
-            "connection_id": key,
-            "status": "running" if phase != "complete" else "completed",
-            "phase": phase,
-            "progress": progress,
-            "message": message,
-            "updated_at": datetime.utcnow().isoformat(),
-        }
-        await asyncio.sleep(1.0)
+def _connector_request_config(row: IntegrationConnectionTable) -> dict:
+    credentials = open_credentials(row.encrypted_secret_ref)
+    options = credentials.pop("__options", {}) if credentials else {}
+    return {"base_url": row.base_url, "credentials": credentials, "options": options}
+
+
+@router.post("/connections/{connection_id}/verify")
+async def verify_connection(
+    connection_id: UUID,
+    current_user: TokenData = Depends(get_current_admin_user_strict),
+    tenant_id: str = Depends(get_tenant_id),
+    db: Session = Depends(get_session),
+):
+    row = db.get(IntegrationConnectionTable, connection_id)
+    if not row or row.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    connector = get_connector(row.provider)
+    if connector is None:
+        raise HTTPException(status_code=422, detail=f"No connector adapter configured for provider {row.provider}")
+    try:
+        result = connector.verify(_connector_request_config(row))
+        row.status = "active"
+        row.last_sync_status = "verified"
+        row.last_sync_summary = "Connection verified"
+        db.add(row)
+        _audit(db, current_user, "VERIFY_CONNECTION", "integration_connection", row.id, {"provider": row.provider})
+        db.commit()
+        return result
+    except Exception as exc:
+        row.status = "error"
+        row.last_sync_status = "failed"
+        row.last_sync_summary = str(exc)[:240]
+        db.add(row)
+        db.commit()
+        raise HTTPException(status_code=502, detail=f"Provider verification failed: {str(exc)[:240]}") from exc
+
+
+@router.get("/connections/{connection_id}/discover")
+async def discover_connection(
+    connection_id: UUID,
+    current_user: TokenData = Depends(get_current_admin_user_strict),
+    tenant_id: str = Depends(get_tenant_id),
+    db: Session = Depends(get_session),
+):
+    row = db.get(IntegrationConnectionTable, connection_id)
+    if not row or row.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    connector = get_connector(row.provider)
+    if connector is None:
+        raise HTTPException(status_code=422, detail=f"No connector adapter configured for provider {row.provider}")
+    try:
+        result = connector.discover(_connector_request_config(row))
+        _audit(
+            db,
+            current_user,
+            "DISCOVER_CONNECTION_METADATA",
+            "integration_connection",
+            row.id,
+            {"provider": row.provider, "keys": list(result.keys())},
+        )
+        db.commit()
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Provider discovery failed: {str(exc)[:240]}") from exc
 
 
 @router.post(
@@ -659,44 +721,37 @@ async def _run_sync_job(connection_id: UUID):
 )
 async def trigger_connection_sync(
     connection_id: UUID,
-    current_user: TokenData = Depends(get_current_user),
+    current_user: TokenData = Depends(get_current_admin_user_strict),
+    tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
     row = db.get(IntegrationConnectionTable, connection_id)
-    if not row:
+    if not row or row.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Connection not found")
-    row.status = "active"
-    row.last_sync_status = "running"
-    row.last_sync_summary = "Sync started"
-    row.last_sync_at = datetime.utcnow()
-    row.updated_at = datetime.utcnow()
-    db.add(row)
-    db.commit()
+    # Keep the legacy endpoint useful for existing clients, but execute the
+    # same real connector pipeline as the current /lean endpoint. There is no
+    # simulated progress state: the response reflects committed sync results.
+    from app.api.v1.lean_enterprise import _run_connection_sync
+
+    result = _run_connection_sync(connection_id, tenant_id, db)
     _audit(
         db,
         current_user,
         "TRIGGER_CONNECTION_SYNC",
         "integration_connection",
         row.id,
-        {"connection_id": str(connection_id)},
+        result,
     )
     db.commit()
-    key = str(connection_id)
-    _SYNC_STATE[key] = {
-        "connection_id": key,
-        "status": "running",
-        "phase": "queued",
-        "progress": 1,
-        "message": "Sync queued",
-        "updated_at": datetime.utcnow().isoformat(),
-    }
-    asyncio.create_task(_run_sync_job(connection_id))
     return ConnectionSyncStatusOut(
         connection_id=connection_id,
-        status="running",
-        phase="queued",
-        progress=1,
-        message="Sync queued",
+        status="completed",
+        phase="committed",
+        progress=100,
+        message=(
+            f"Sync committed: bronze={result['bronze_events']}, "
+            f"silver={result['silver_upserts']}, quarantined={result['quarantined']}"
+        ),
         updated_at=datetime.utcnow(),
     )
 
@@ -706,59 +761,46 @@ async def trigger_connection_sync(
 )
 async def get_sync_status(
     connection_id: UUID,
-    current_user: TokenData = Depends(get_current_user),
+    current_user: TokenData = Depends(get_current_admin_user_strict),
+    tenant_id: str = Depends(get_tenant_id),
+    db: Session = Depends(get_session),
 ):
-    key = str(connection_id)
-    state = _SYNC_STATE.get(key)
-    if not state:
-        return ConnectionSyncStatusOut(
-            connection_id=connection_id,
-            status="idle",
-            phase="idle",
-            progress=0,
-            message="No sync in progress",
-            updated_at=datetime.utcnow(),
-        )
+    row = db.get(IntegrationConnectionTable, connection_id)
+    if not row or row.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    state = row.last_sync_status or "idle"
+    status_value = "completed" if state in {"success", "verified"} else state
     return ConnectionSyncStatusOut(
         connection_id=connection_id,
-        status=state["status"],
-        phase=state["phase"],
-        progress=state["progress"],
-        message=state["message"],
-        updated_at=datetime.fromisoformat(state["updated_at"]),
+        status=status_value,
+        phase="committed" if status_value == "completed" else "provider",
+        progress=100 if status_value == "completed" else 0,
+        message=row.last_sync_summary or "No sync has completed",
+        updated_at=row.updated_at,
     )
 
 
 @router.get("/connections/{connection_id}/sync/stream")
 async def sync_status_stream(
     connection_id: UUID,
-    current_user: TokenData = Depends(get_current_user),
+    current_user: TokenData = Depends(get_current_admin_user_strict),
+    tenant_id: str = Depends(get_tenant_id),
+    db: Session = Depends(get_session),
 ):
-    key = str(connection_id)
-
+    row = db.get(IntegrationConnectionTable, connection_id)
+    if not row or row.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Connection not found")
     async def event_generator():
-        while True:
-            state = _SYNC_STATE.get(
-                key,
-                {
-                    "status": "idle",
-                    "phase": "idle",
-                    "progress": 0,
-                    "message": "No sync in progress",
-                    "updated_at": datetime.utcnow().isoformat(),
-                },
-            )
-            yield f"event: sync\ndata: {_json(state)}\n\n"
-            if state.get("status") == "completed":
-                break
-            await asyncio.sleep(1.0)
+        state = {
+            "connection_id": str(connection_id),
+            "status": "completed" if row.last_sync_status == "success" else (row.last_sync_status or "idle"),
+            "phase": "committed" if row.last_sync_status == "success" else "provider",
+            "progress": 100 if row.last_sync_status == "success" else 0,
+            "message": row.last_sync_summary or "No sync has completed",
+            "updated_at": row.updated_at.isoformat(),
+        }
+        yield f"event: sync\ndata: {_json(state)}\n\n"
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+    from fastapi.responses import StreamingResponse
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

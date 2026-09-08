@@ -647,6 +647,9 @@ export const employeesAPI = {
 
   get: (employeeId) => request(`${API_V1}/employees/${employeeId}`),
 
+  integrationEvidence: (employeeId) =>
+    request(`${API_V1}/employees/${employeeId}/integration-evidence`),
+
   create: (data) =>
     request(`${API_V1}/employees`, {
       method: "POST",
@@ -850,6 +853,14 @@ export const enterpriseAPI = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+
+  verifyConnection: (id) =>
+    request(`${API_V1}/enterprise/connections/${id}/verify`, {
+      method: "POST",
+    }),
+
+  discoverConnection: (id) =>
+    request(`${API_V1}/enterprise/connections/${id}/discover`),
 
   triggerConnectionSync: (id) =>
     request(`${API_V1}/enterprise/connections/${id}/sync`, {

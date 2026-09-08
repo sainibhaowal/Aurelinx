@@ -564,6 +564,23 @@ class RawEventTable(SQLModel, table=True):
     ingested_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
+class IntegrationEvidenceTable(SQLModel, table=True):
+    """Tenant-scoped source evidence attached to a normalized person."""
+
+    __tablename__ = "integration_evidence"
+
+    id: UUID = Field(default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True))
+    tenant_id: str = Field(default="default", index=True)
+    employee_email: str = Field(index=True)
+    provider: str = Field(index=True)
+    source_type: str = Field(index=True)
+    external_id: str | None = Field(default=None, index=True)
+    evidence_type: str = Field(index=True)
+    summary: str = Field(default="")
+    observed_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    raw_event_id: UUID | None = Field(default=None, index=True)
+
+
 class QuarantineEventTable(SQLModel, table=True):
     """Failed contract payloads."""
 

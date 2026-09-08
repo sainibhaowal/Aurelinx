@@ -86,6 +86,22 @@ const TalentCard = ({ talent, onOpenProfile }) => {
             {talent.email || "Verified profile"}
           </div>
 
+          {talent.source_providers?.length > 0 && (
+            <div
+              className="mt-2 flex flex-wrap gap-1"
+              title="Live source systems"
+            >
+              {talent.source_providers.map((source) => (
+                <span
+                  key={source}
+                  className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-cyan-200"
+                >
+                  {source}
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* Skill Tag Pills */}
           <div className="flex flex-wrap gap-1.5 my-2.5">
             {talent.skills?.slice(0, 3).map((skill, i) => (

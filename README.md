@@ -199,6 +199,10 @@ The backend exposes standard API documentation and health endpoints:
 
 The versioned API includes route groups for authentication, employees, candidates, analysis, chat, enterprise operations, integrations, and intelligence workflows.
 
+### Release version source of truth
+
+Semantic releases update the root, frontend, desktop, backend package, backend runtime fallback, and frontend release metadata through [`.versionrc.json`](.versionrc.json). Container images and every production service receive the same clean semantic version through `VERSION`; the API reports it from `/health`, `/`, and OpenAPI, while the frontend manual and shell use the same `APP_VERSION`. Do not hard-code release numbers in UI or API components.
+
 ## Why Aurelinx Feels Commercial
 
 The project is structured like a real product, not a prototype:
