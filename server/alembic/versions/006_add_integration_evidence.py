@@ -19,6 +19,11 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Some existing installations run the compatibility create_all() hook
+    # before Alembic. Treat an already-created table as satisfied so rollout
+    # does not fail with DuplicateTable.
+    if "integration_evidence" in set(sa.inspect(op.get_bind()).get_table_names()):
+        return
     op.create_table(
         "integration_evidence",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
