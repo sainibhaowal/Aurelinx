@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.2](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.1...v0.2.2) (2026-09-08)
+
+
+### Bug Fixes
+
+* correct VPS deployment shell guard ([cdb3eca](https://github.com/sainibhaowal/Aurelinx/commit/cdb3eca7e8144fcb147bba1be6c4ae8ae6a973fc))
+* make evidence migration idempotent ([d6fa25d](https://github.com/sainibhaowal/Aurelinx/commit/d6fa25df18c2252b6e72984d0fd4655cc93326b4))
+* print deployment startup diagnostics ([50989f9](https://github.com/sainibhaowal/Aurelinx/commit/50989f95d72a895059bc2fc341da771ed579b9f0))
+
 ### [0.2.1](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.0...v0.2.1) (2026-09-08)
 
 
