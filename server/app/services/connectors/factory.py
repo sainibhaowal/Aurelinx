@@ -14,9 +14,13 @@
 # limitations under the License.
 
 from app.services.connectors.greenhouse import GreenhouseConnector
+from app.services.connectors.jira import JiraConnector
+from app.services.connectors.slack import SlackConnector
 from app.services.connectors.workday import WorkdayConnector
 
 CONNECTOR_MAP = {
+    "jira": JiraConnector,
+    "slack": SlackConnector,
     "workday": WorkdayConnector,
     "greenhouse": GreenhouseConnector,
 }

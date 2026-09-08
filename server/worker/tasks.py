@@ -18,12 +18,25 @@
 import json
 import logging
 from datetime import datetime, timedelta
+from uuid import UUID
 
 import httpx
 
 from app.models.database import IntegrationWebhookEventTable, get_session
 
 logger = logging.getLogger("worker.tasks")
+
+
+def sync_connection_by_id(connection_id: str, tenant_id: str):
+    """RQ entrypoint for a durable, tenant-scoped connector sync."""
+    from app.api.v1.lean_enterprise import _run_connection_sync
+    from app.models.database import engine
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        result = _run_connection_sync(UUID(connection_id), tenant_id, session)
+        logger.info("Connector sync completed: %s", result)
+        return result
 
 
 def deliver_event_by_id(event_id: str):

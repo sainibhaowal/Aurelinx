@@ -41,7 +41,7 @@ def enqueue_due_events():
             session.query(IntegrationWebhookEventTable)
             .filter(
                 IntegrationWebhookEventTable.status != "success",
-                IntegrationWebhookEventTable.next_retry_at is not None,
+                IntegrationWebhookEventTable.next_retry_at.is_not(None),
                 IntegrationWebhookEventTable.next_retry_at <= now,
             )
             .order_by(IntegrationWebhookEventTable.next_retry_at)

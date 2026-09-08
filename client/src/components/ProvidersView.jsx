@@ -462,37 +462,16 @@ const ProvidersView = () => {
     }
   };
 
-  const handleSimulateIngest = async (type) => {
+  const handleTestIngest = async (type) => {
     setSimulatingWebhook(type);
     try {
       const apiBase = API_BASE_URL;
-      const authHeaders = getAuthHeaders();
       let tokenToUse =
         generatedKey || (tokens.length > 0 ? tokens[0].api_key : null);
 
-      if (!tokenToUse && authHeaders.Authorization) {
-        try {
-          const genResp = await fetch(
-            `${apiBase}/api/v1/integrations/token?name=Demo-Simulator-Key`,
-            {
-              method: "POST",
-              headers: authHeaders,
-            },
-          );
-          if (genResp.ok) {
-            const genData = await genResp.json();
-            tokenToUse = genData.api_key;
-            setGeneratedKey(genData.api_key);
-            await fetchTokens();
-          }
-        } catch (e) {
-          console.error("Auto-generate token error:", e);
-        }
-      }
-
       if (!tokenToUse) {
         showToast(
-          "No integration token available. Click 'Generate Token' on the API Key Registry tab.",
+          "Generate a token first and keep the one-time secret available for this signed test.",
           "error",
         );
         setSimulatingWebhook(null);
@@ -552,19 +531,19 @@ const ProvidersView = () => {
       if (response.ok) {
         await response.json();
         showToast(
-          `Simulated ${type.toUpperCase()} Ingestion Event Succeeded!`,
+          `Signed ${type.toUpperCase()} test event accepted by Aurelinx.`,
           "success",
         );
       } else {
         const errData = await response.json();
         showToast(
-          `Simulation failed: ${errData.detail || errData.message || "check parameters"}`,
+          `Signed test failed: ${errData.detail || errData.message || "check parameters"}`,
           "error",
         );
       }
     } catch (err) {
       console.error(err);
-      showToast("Simulation connection failed", "error");
+      showToast("Signed test request failed", "error");
     } finally {
       setSimulatingWebhook(null);
     }
@@ -1144,7 +1123,7 @@ const ProvidersView = () => {
 
                         <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[9px] font-mono font-bold tracking-wider uppercase shrink-0">
                           <ShieldCheck size={11} />
-                          <span>Zero-Knowledge API Key Security Active</span>
+                          <span>Provider credentials are masked in the interface</span>
                         </div>
                       </div>
 
@@ -1520,10 +1499,9 @@ const ProvidersView = () => {
                                       <strong className="text-slate-200 block mb-0.5">
                                         Instant Key Revocation
                                       </strong>
-                                      Revoking a credential terminates ingestion
-                                      access across Jira, Slack, and Workday
-                                      middleware routers within 250
-                                      milliseconds.
+                                      Revoking a credential blocks the token on
+                                      the next ingestion request across Jira,
+                                      Slack, and Workday endpoints.
                                     </div>
                                   </div>
                                   <div className="flex items-start gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
@@ -1760,10 +1738,11 @@ const ProvidersView = () => {
                                     Jira Ticket &amp; Assignee sync
                                   </h4>
                                   <p className="text-[10px] text-slate-400 leading-relaxed">
-                                    Captures pull request reviews and task
-                                    activities between developers, dynamically
-                                    building ONA spring-physics link weights in
-                                    real-time.
+                                    Accepts signed Jira collaboration events
+                                    containing a reporter and assignee. A
+                                    successful event is recorded for ONA
+                                    processing; this endpoint does not pull Jira
+                                    data by itself.
                                   </p>
                                 </div>
                                 <div className="space-y-2 mt-auto">
@@ -1787,7 +1766,7 @@ const ProvidersView = () => {
                                     </button>
                                     <button
                                       onClick={() =>
-                                        handleSimulateIngest("jira")
+                                        handleTestIngest("jira")
                                       }
                                       disabled={simulatingWebhook === "jira"}
                                       className="flex-1 h-9 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
@@ -1800,7 +1779,7 @@ const ProvidersView = () => {
                                       ) : (
                                         <Play size={11} />
                                       )}
-                                      Simulate Event
+                                      Send Signed Test Event
                                     </button>
                                   </div>
                                 </div>
@@ -1821,10 +1800,10 @@ const ProvidersView = () => {
                                     Slack channel Sentiment score
                                   </h4>
                                   <p className="text-[10px] text-slate-400 leading-relaxed">
-                                    Ingests message sentiments, dynamically
-                                    shifting employee hazard ratios, survival
-                                    timelines, and risk indicators automatically
-                                    in-memory.
+                                    Accepts a signed employee sentiment event.
+                                    A successful event updates the employee
+                                    sentiment/risk fields used by later
+                                    analytics and attrition calculations.
                                   </p>
                                 </div>
                                 <div className="space-y-2 mt-auto">
@@ -1848,7 +1827,7 @@ const ProvidersView = () => {
                                     </button>
                                     <button
                                       onClick={() =>
-                                        handleSimulateIngest("slack")
+                                        handleTestIngest("slack")
                                       }
                                       disabled={simulatingWebhook === "slack"}
                                       className="flex-1 h-9 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
@@ -1861,7 +1840,7 @@ const ProvidersView = () => {
                                       ) : (
                                         <Play size={11} />
                                       )}
-                                      Simulate Event
+                                      Send Signed Test Event
                                     </button>
                                   </div>
                                 </div>
@@ -1882,10 +1861,11 @@ const ProvidersView = () => {
                                     Workday automated Directory Sync
                                   </h4>
                                   <p className="text-[10px] text-slate-400 leading-relaxed">
-                                    Connects directly to employee directories.
-                                    Promotes, hires, or updates developers and
-                                    skill matrices transactionally with zero
-                                    manual clicks.
+                                    Accepts signed hire, update, and promotion
+                                    payloads from an HRIS. It updates the
+                                    directory after the source system sends the
+                                    event; it is not an outbound Workday API
+                                    client.
                                   </p>
                                 </div>
                                 <div className="space-y-2 mt-auto">
@@ -1909,7 +1889,7 @@ const ProvidersView = () => {
                                     </button>
                                     <button
                                       onClick={() =>
-                                        handleSimulateIngest("workday")
+                                        handleTestIngest("workday")
                                       }
                                       disabled={simulatingWebhook === "workday"}
                                       className="flex-1 h-9 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
@@ -1922,7 +1902,7 @@ const ProvidersView = () => {
                                       ) : (
                                         <Play size={11} />
                                       )}
-                                      Simulate Event
+                                      Send Signed Test Event
                                     </button>
                                   </div>
                                 </div>
@@ -2077,7 +2057,15 @@ const ProvidersView = () => {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const curlCmd = `curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\\n  -H "Content-Type: application/json" \\\n  -H "X-API-Key: ${generatedKey || "aur_your_secure_ingestion_api_token"}" \\\n  -d '{\n    "action": "sync",\n    "employee_email": "${employeeEmail}",\n    "metrics": { "sentiment_score": 0.85, "message_count": 142 }\n  }'`;
+                                    const curlCmd = `$ API_KEY="${generatedKey || "aur_your_secure_ingestion_api_token"}"
+$ BODY='{"action":"sync","employee_email":"${employeeEmail}"}'
+$ SIGNATURE=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$API_KEY" | awk '{print $2}')
+$ curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: $API_KEY" \\
+  -H "X-Signature: sha256=$SIGNATURE" \\
+  -H "Idempotency-Key: evt_$(date +%s)" \\
+  -d "$BODY"`;
                                     navigator.clipboard.writeText(curlCmd);
                                     showToast(
                                       "cURL command copied!",
@@ -2090,10 +2078,15 @@ const ProvidersView = () => {
                                 </button>
                               </div>
                               <div className="p-3.5 bg-black/60 text-emerald-400 select-all border-b border-white/5 whitespace-pre overflow-x-auto">
-                                {`$ curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\
+                                {`$ API_KEY="${generatedKey || "aur_your_secure_ingestion_api_token"}"
+$ BODY='{"action":"sync","employee_email":"${employeeEmail}"}'
+$ SIGNATURE=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$API_KEY" | awk '{print $2}')
+$ curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: ${generatedKey || "aur_your_secure_ingestion_api_token"}" \\
-  -d '{"action": "sync", "employee_email": "${employeeEmail}"}'`}
+  -H "X-API-Key: $API_KEY" \\
+  -H "X-Signature: sha256=$SIGNATURE" \\
+  -H "Idempotency-Key: evt_$(date +%s)" \\
+  -d "$BODY"`}
                               </div>
 
                               {/* Native JS Fetch Example */}
@@ -2104,7 +2097,19 @@ const ProvidersView = () => {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const snippet = `// Direct REST Ingestion (Standard HTTP Fetch)\nconst response = await fetch("${API_BASE_URL}/api/v1/integrations/jira", {\n  method: "POST",\n  headers: {\n    "Content-Type": "application/json",\n    "X-API-Key": "${generatedKey || "aur_your_secure_ingestion_api_token"}",\n    "Idempotency-Key": "evt_" + Date.now()\n  },\n  body: JSON.stringify({\n    action: "sync",\n    employee_email: "${employeeEmail}",\n    metrics: { sentiment_score: 0.85, message_count: 142 }\n  })\n});\nconst result = await response.json();\nconsole.log("Ingestion Status:", result);`;
+                                    const snippet = `// Direct REST Ingestion (Standard HTTP Fetch)
+const apiKey = "${generatedKey || "aur_your_secure_ingestion_api_token"}";
+const body = JSON.stringify({ action: "sync", employee_email: "${employeeEmail}", metrics: { sentiment_score: 0.85, message_count: 142 } });
+const signingKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(apiKey), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+const digest = await crypto.subtle.sign("HMAC", signingKey, new TextEncoder().encode(body));
+const signature = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+const response = await fetch("${API_BASE_URL}/api/v1/integrations/jira", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "X-API-Key": apiKey, "X-Signature": "sha256=" + signature, "Idempotency-Key": "evt_" + Date.now() },
+  body
+});
+const result = await response.json();
+console.log("Ingestion Status:", result);`;
                                     navigator.clipboard.writeText(snippet);
                                     showToast(
                                       "Fetch snippet copied!",
@@ -2118,18 +2123,20 @@ const ProvidersView = () => {
                               </div>
                               <div className="p-4 bg-slate-950/80 overflow-x-auto whitespace-pre leading-relaxed select-all text-slate-300">
                                 {`// Native REST API Integration (Zero External SDK Dependencies)
+const apiKey = "${generatedKey || "aur_your_secure_ingestion_api_token"}";
+const body = JSON.stringify({ action: "sync", employee_email: "${employeeEmail}", metrics: { sentiment_score: 0.85, message_count: 142 } });
+const signingKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(apiKey), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+const digest = await crypto.subtle.sign("HMAC", signingKey, new TextEncoder().encode(body));
+const signature = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 const response = await fetch("${API_BASE_URL}/api/v1/integrations/jira", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "X-API-Key": "${generatedKey || "aur_your_secure_ingestion_api_token"}",
+    "X-API-Key": apiKey,
+    "X-Signature": "sha256=" + signature,
     "Idempotency-Key": "evt_" + Date.now()
   },
-  body: JSON.stringify({
-    action: "sync",
-    employee_email: "${employeeEmail}",
-    metrics: { sentiment_score: 0.85, message_count: 142 }
-  })
+  body
 });
 const result = await response.json();
 console.log("Ingestion Status:", result);`}
@@ -2262,7 +2269,9 @@ console.log("Ingestion Status:", result);`}
                                 size={11}
                                 className="text-cyan-300 shrink-0"
                               />
-                              The backend stores only encrypted secret material.
+                              Provider settings are saved locally in this browser;
+                              use a trusted device and never share this browser
+                              profile.
                             </div>
                           </div>
                         ) : (

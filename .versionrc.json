@@ -19,6 +19,14 @@
     {
       "filename": "client/src/config/version.js",
       "updater": "scripts/version-updater.js"
+    },
+    {
+      "filename": "server/pyproject.toml",
+      "updater": "scripts/python-version-updater.js"
+    },
+    {
+      "filename": "server/app/core/config.py",
+      "updater": "scripts/runtime-version-updater.js"
     }
   ],
   "packageFiles": [

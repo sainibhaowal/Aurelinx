@@ -30,6 +30,8 @@ from app.core.logging_config import get_logger
 from app.core.security import TokenData, get_current_user
 from app.models.database import (
     AuditLogTable,
+    CanonicalEmployeeTable,
+    IntegrationEvidenceTable,
     EmployeeTable,
     ExperienceTable,
     SkillTable,
@@ -46,6 +48,40 @@ from app.schemas.schemas import (
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 logger = get_logger(__name__)
+
+
+@router.get("/{employee_id}/integration-evidence")
+async def employee_integration_evidence(
+    employee_id: UUID,
+    current_user: TokenData = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Return safe, tenant-scoped provider evidence for one employee."""
+    employee = session.get(EmployeeTable, employee_id)
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    rows = session.exec(
+        select(IntegrationEvidenceTable)
+        .where(IntegrationEvidenceTable.tenant_id == str(getattr(current_user, "tenant_id", None) or "default"))
+        .where(IntegrationEvidenceTable.employee_email == employee.email)
+        .order_by(IntegrationEvidenceTable.observed_at.desc())
+        .limit(100)
+    ).all()
+    return {
+        "employee_id": str(employee.id),
+        "email": employee.email,
+        "evidence": [
+            {
+                "provider": row.provider,
+                "source_type": row.source_type,
+                "external_id": row.external_id,
+                "evidence_type": row.evidence_type,
+                "summary": json.loads(row.summary or "{}"),
+                "observed_at": row.observed_at,
+            }
+            for row in rows
+        ],
+    }
 
 
 def _employee_quality(
@@ -105,13 +141,23 @@ def _employee_quality(
                     "created_at": row.created_at.isoformat(),
                 }
             )
+    canonical = session.exec(
+        select(CanonicalEmployeeTable)
+        .where(CanonicalEmployeeTable.email == emp.email)
+        .order_by(CanonicalEmployeeTable.updated_at.desc())
+    ).all()
+    providers = sorted({row.provider for row in canonical if row.provider})
+    source_types = ["hris"] if providers else []
     return {
-        "source_type": "database_record",
-        "source_version": "directory-v1",
+        "source_type": ", ".join(source_types) if source_types else "database_record",
+        "source_version": ", ".join(providers) if providers else "directory-v1",
         "validation_status": "review" if missing or duplicate_warnings else "valid",
         "missing_fields": missing,
         "duplicate_warnings": duplicate_warnings,
         "audit_history": audit_history,
+        "source_providers": providers,
+        "source_types": source_types,
+        "source_updated_at": canonical[0].updated_at if canonical else None,
     }
 
 
@@ -212,8 +258,26 @@ async def list_employees(
     query = query.order_by(EmployeeTable.id).offset(skip).limit(limit)
     employees = filter_real_records(session.exec(query).all())
 
-    # Return lightweight response (no N+1 queries for skills/experiences)
-    return employees
+    emails = [row.email for row in employees if row.email]
+    provenance = {}
+    if emails:
+        for row in session.exec(
+            select(CanonicalEmployeeTable).where(CanonicalEmployeeTable.email.in_(emails))
+        ).all():
+            item = provenance.setdefault(row.email, {"providers": set(), "types": set(), "updated": None})
+            item["providers"].add(row.provider)
+            item["types"].add("hris")
+            if item["updated"] is None or row.updated_at > item["updated"]:
+                item["updated"] = row.updated_at
+    return [
+        {
+            **row.model_dump(),
+            "source_providers": sorted(provenance.get(row.email, {}).get("providers", set())),
+            "source_types": sorted(provenance.get(row.email, {}).get("types", set())),
+            "source_updated_at": provenance.get(row.email, {}).get("updated"),
+        }
+        for row in employees
+    ]
 
 
 @router.post("", response_model=EmployeeOut, status_code=status.HTTP_201_CREATED)

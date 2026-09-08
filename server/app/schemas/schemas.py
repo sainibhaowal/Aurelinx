@@ -19,6 +19,7 @@ Ensures type safety and automatic documentation
 """
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -236,6 +237,9 @@ class EmployeeOut(BaseModel):
     missing_fields: list[str] = []
     duplicate_warnings: list[str] = []
     audit_history: list[dict] = []
+    source_providers: list[str] = []
+    source_types: list[str] = []
+    source_updated_at: datetime | None = None
 
 
 class EmployeeListOut(BaseModel):
@@ -253,6 +257,9 @@ class EmployeeListOut(BaseModel):
     join_date: datetime | None = None
     created_at: datetime
     updated_at: datetime
+    source_providers: list[str] = []
+    source_types: list[str] = []
+    source_updated_at: datetime | None = None
 
 
 # ============ CANDIDATE SCHEMAS ============
@@ -640,6 +647,8 @@ class IntegrationConnectionCreate(BaseModel):
     base_url: str | None = None
     auth_type: str = Field(default="api_key", pattern="^(api_key|oauth2|basic)$")
     encrypted_secret_ref: str | None = None
+    credentials: dict[str, Any] | None = None
+    options: dict[str, Any] | None = None
     sync_interval_minutes: int | None = Field(default=60, ge=5, le=10080)
 
 
@@ -653,6 +662,8 @@ class IntegrationConnectionUpdate(BaseModel):
     base_url: str | None = None
     auth_type: str | None = Field(default=None, pattern="^(api_key|oauth2|basic)$")
     encrypted_secret_ref: str | None = None
+    credentials: dict[str, Any] | None = None
+    options: dict[str, Any] | None = None
     sync_interval_minutes: int | None = Field(default=None, ge=5, le=10080)
     last_sync_status: str | None = None
     last_sync_summary: str | None = None
