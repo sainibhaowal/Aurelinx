@@ -42,7 +42,7 @@ jobs:
 
             echo \"==> 4. Starting new containers side-by-side with health wait and orphan removal...\"
             if ! docker compose --env-file .env.production --env-file .env.deploy up -d --remove-orphans --wait; then
-              echo "==> Deployment startup failed; collecting API/worker/scheduler diagnostics..."
+              echo DEPLOYMENT_STARTUP_FAILED
               docker compose --env-file .env.production --env-file .env.deploy ps || true
               docker compose --env-file .env.production --env-file .env.deploy logs --tail=120 api worker scheduler || true
               exit 1
