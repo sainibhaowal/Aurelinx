@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.5](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.4...v0.2.5) (2026-09-10)
+
+
+### Bug Fixes
+
+* normalize saved OpenCode provider endpoints ([ff285fd](https://github.com/sainibhaowal/Aurelinx/commit/ff285fd4b4767b4eef3dbd4826b024fcd57d865f))
+
 ### [0.2.4](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.3...v0.2.4) (2026-09-10)
 
 
