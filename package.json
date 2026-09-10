@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node start-all.js",
     "dev:down": "docker compose -f docker-compose.dev.yml down",
-    "release": "standard-version && git push --follow-tags",
+    "release": "node scripts/reconcile-release-version.js && standard-version && npm run verify:release && git push --follow-tags",
+    "verify:release": "node scripts/verify-release-metadata.js",
     "typecheck": "pnpm -C client exec tsc --noEmit",
     "lint": "pnpm -C client run lint",
     "lint:fix": "pnpm -C client run lint -- --fix",

@@ -748,7 +748,7 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
                           )}
                           Thinking
                         </span>
-                        <span className="font-mono">
+                        <span className="font-mono" aria-label="reasoning character count">
                           {step.result_summary?.characters || 0} chars
                         </span>
                       </div>

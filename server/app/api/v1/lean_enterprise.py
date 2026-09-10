@@ -2680,7 +2680,9 @@ def _run_import_job(job_id: str, runner):
     threading.Thread(target=_target, daemon=True).start()
 
 
-def _bundle_job_runner(file_name: str, archive_bytes: bytes, current_user: TokenData):
+def _bundle_job_runner(
+    file_name: str, archive_bytes: bytes, current_user: TokenData, tenant_id: str
+):
     def _runner(job_id: str):
         with Session(engine) as db:
             _update_import_job(
@@ -2731,7 +2733,7 @@ def _bundle_job_runner(file_name: str, archive_bytes: bytes, current_user: Token
                             content = handle.read().decode("utf-8-sig")
                         reader = csv.DictReader(content.splitlines())
                         rows = [_normalize_header_map(row) for row in reader]
-                        results[kind] = _import_rows_for_kind(db, "default", kind, rows)
+                        results[kind] = _import_rows_for_kind(db, tenant_id, kind, rows)
                         db.commit()
 
                     _update_import_job(
@@ -2773,7 +2775,11 @@ def _demo_job_runner(current_user: TokenData):
 
 
 def _csv_job_runner(
-    kind: str, file_name: str, csv_bytes: bytes, current_user: TokenData
+    kind: str,
+    file_name: str,
+    csv_bytes: bytes,
+    current_user: TokenData,
+    tenant_id: str,
 ):
     def _runner(job_id: str):
         with Session(engine) as db:
@@ -2792,7 +2798,7 @@ def _csv_job_runner(
                 progress=45,
                 message=f"Importing {kind.replace('_', ' ')} rows...",
             )
-            imported = _import_rows_for_kind(db, "default", kind, rows)
+            imported = _import_rows_for_kind(db, tenant_id, kind, rows)
             db.commit()
             _update_import_job(
                 job_id, phase="auditing", progress=90, message="Writing audit trail..."
@@ -2845,13 +2851,16 @@ async def import_csv_bundle(
 async def import_csv_bundle_async(
     kind: str = Form(...),
     file: UploadFile = File(...),
-    current_user: TokenData = Depends(get_current_user_strict),
+    current_user: TokenData = Depends(get_current_user),
+    tenant_id: str = Depends(get_tenant_id),
 ):
     csv_bytes = await file.read()
     job_id = _create_import_job("csv", file.filename or f"{kind}.csv")
     _run_import_job(
         job_id,
-        _csv_job_runner(kind, file.filename or f"{kind}.csv", csv_bytes, current_user),
+        _csv_job_runner(
+            kind, file.filename or f"{kind}.csv", csv_bytes, current_user, tenant_id
+        ),
     )
     return {"job_id": job_id, "status": "queued"}
 
@@ -2946,7 +2955,8 @@ async def import_dataset_bundle(
 @router.post("/import/bundle/async")
 async def import_dataset_bundle_async(
     file: UploadFile = File(...),
-    current_user: TokenData = Depends(get_current_user_strict),
+    current_user: TokenData = Depends(get_current_user),
+    tenant_id: str = Depends(get_tenant_id),
 ):
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(
@@ -2956,7 +2966,7 @@ async def import_dataset_bundle_async(
     archive_bytes = await file.read()
     job_id = _create_import_job("bundle", file.filename)
     _run_import_job(
-        job_id, _bundle_job_runner(file.filename, archive_bytes, current_user)
+        job_id, _bundle_job_runner(file.filename, archive_bytes, current_user, tenant_id)
     )
     return {"job_id": job_id, "status": "queued"}
 
