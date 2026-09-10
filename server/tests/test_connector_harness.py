@@ -8,9 +8,9 @@ boundaries without contacting Jira, Slack, or Workday.
 import httpx
 
 from app.services.connectors.jira import JiraConnector
+from app.services.connectors.secrets import open_credentials, seal_credentials
 from app.services.connectors.slack import SlackConnector
 from app.services.connectors.workday import WorkdayConnector
-from app.services.connectors.secrets import open_credentials, seal_credentials
 
 
 class FakeClient:

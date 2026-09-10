@@ -713,49 +713,176 @@ export const UserManualModal = ({
 
             {/* Deletion Warning */}
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Agents, tools, and decision policy</h3>
+              <h3 className="text-sm font-bold text-white">
+                Agents, tools, and decision policy
+              </h3>
               <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
-                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-cyan-200">Controller agent</strong><p className="mt-1 leading-relaxed">Classifies the request, selects one or more allowed tools, validates the tool result, and asks the answer model to respond from verified context. Private model reasoning is never exposed as the answer.</p></div>
-                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-cyan-200">Retrieval tools</strong><p className="mt-1 leading-relaxed"><code>search</code> finds text matches; <code>read</code> returns one safe record; <code>analyse</code> computes structured statistics and formulas; <code>observe</code> detects patterns, symptoms, and anomalies.</p></div>
-                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-amber-200">Execution tools</strong><p className="mt-1 leading-relaxed"><code>modify</code> updates one identified record and verifies it; <code>write</code> creates a supported record; <code>delete</code> only prepares an exact approval specification and never deletes automatically.</p></div>
-                <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-rose-200">Role policy</strong><p className="mt-1 leading-relaxed">Members may search, read, analyse, and observe. Administrators may modify or write. Deletion remains human-approved for both roles, with the exact action, requester, hash, expiry, and decision recorded.</p></div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                  <strong className="block text-cyan-200">
+                    Controller agent
+                  </strong>
+                  <p className="mt-1 leading-relaxed">
+                    Classifies the request, selects one or more allowed tools,
+                    validates the tool result, and asks the answer model to
+                    respond from verified context. Private model reasoning is
+                    never exposed as the answer.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                  <strong className="block text-cyan-200">
+                    Retrieval tools
+                  </strong>
+                  <p className="mt-1 leading-relaxed">
+                    <code>search</code> finds text matches; <code>read</code>{" "}
+                    returns one safe record; <code>analyse</code> computes
+                    structured statistics and formulas; <code>observe</code>{" "}
+                    detects patterns, symptoms, and anomalies.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                  <strong className="block text-amber-200">
+                    Execution tools
+                  </strong>
+                  <p className="mt-1 leading-relaxed">
+                    <code>modify</code> updates one identified record and
+                    verifies it; <code>write</code> creates a supported record;{" "}
+                    <code>delete</code> only prepares an exact approval
+                    specification and never deletes automatically.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                  <strong className="block text-rose-200">Role policy</strong>
+                  <p className="mt-1 leading-relaxed">
+                    Members may search, read, analyse, and observe.
+                    Administrators may modify or write. Deletion remains
+                    human-approved for both roles, with the exact action,
+                    requester, hash, expiry, and decision recorded.
+                  </p>
+                </div>
               </div>
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Database entities and safe field policy</h3>
-              <p className="text-xs leading-relaxed text-slate-300">The workflow engine uses a registered entity map rather than arbitrary SQL. Supported entities include employees, candidates, skills, experiences, chat messages, attachments, integrations, policies, interventions, workflow runs, audit records, model registry entries, data contracts, scenarios, webhooks, API keys, and integration logs.</p>
+              <h3 className="text-sm font-bold text-white">
+                Database entities and safe field policy
+              </h3>
+              <p className="text-xs leading-relaxed text-slate-300">
+                The workflow engine uses a registered entity map rather than
+                arbitrary SQL. Supported entities include employees, candidates,
+                skills, experiences, chat messages, attachments, integrations,
+                policies, interventions, workflow runs, audit records, model
+                registry entries, data contracts, scenarios, webhooks, API keys,
+                and integration logs.
+              </p>
               <div className="rounded-lg border border-white/10 bg-slate-950/60 p-3 text-xs text-slate-300 leading-relaxed">
-                <strong className="text-white">Identifiers:</strong> employees/candidates use email, full name, or ID; skills use name or ID; integrations/policies/interventions/models use their registered name or ID; experiences, messages, attachments, workflows, audits, contracts, scenarios, webhooks, keys, and logs use exact IDs where required.
-                <br /><strong className="text-white">Protected fields:</strong> attachment file paths, integration/API secrets, audit details/IP addresses, webhook payloads/headers, model contract requirements, and integration-log details are never returned to the answer model or user.
+                <strong className="text-white">Identifiers:</strong>{" "}
+                employees/candidates use email, full name, or ID; skills use
+                name or ID; integrations/policies/interventions/models use their
+                registered name or ID; experiences, messages, attachments,
+                workflows, audits, contracts, scenarios, webhooks, keys, and
+                logs use exact IDs where required.
+                <br />
+                <strong className="text-white">Protected fields:</strong>{" "}
+                attachment file paths, integration/API secrets, audit details/IP
+                addresses, webhook payloads/headers, model contract
+                requirements, and integration-log details are never returned to
+                the answer model or user.
               </div>
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Analysis formulas and evidence rules</h3>
+              <h3 className="text-sm font-bold text-white">
+                Analysis formulas and evidence rules
+              </h3>
               <ul className="list-disc pl-4 space-y-1.5 text-xs text-slate-300 leading-relaxed">
-                <li><strong className="text-white">At-risk percentage:</strong> flagged employees ÷ scoped employees × 100.</li>
-                <li><strong className="text-white">Average sentiment:</strong> arithmetic mean of stored employee sentiment scores in the requested scope.</li>
-                <li><strong className="text-white">Department risk concentration:</strong> at-risk employees in a department ÷ total employees in that department × 100.</li>
-                <li><strong className="text-white">Search versus analysis:</strong> search returns matching records and cannot calculate statistics; analysis returns verified counts, current values, and computed formulas; observe adds pattern and anomaly interpretation.</li>
-                <li>Tool results are bounded, redacted, and passed to the answer model as live context. The model must not invent missing records, counts, approvals, or completed mutations.</li>
+                <li>
+                  <strong className="text-white">At-risk percentage:</strong>{" "}
+                  flagged employees ÷ scoped employees × 100.
+                </li>
+                <li>
+                  <strong className="text-white">Average sentiment:</strong>{" "}
+                  arithmetic mean of stored employee sentiment scores in the
+                  requested scope.
+                </li>
+                <li>
+                  <strong className="text-white">
+                    Department risk concentration:
+                  </strong>{" "}
+                  at-risk employees in a department ÷ total employees in that
+                  department × 100.
+                </li>
+                <li>
+                  <strong className="text-white">
+                    Search versus analysis:
+                  </strong>{" "}
+                  search returns matching records and cannot calculate
+                  statistics; analysis returns verified counts, current values,
+                  and computed formulas; observe adds pattern and anomaly
+                  interpretation.
+                </li>
+                <li>
+                  Tool results are bounded, redacted, and passed to the answer
+                  model as live context. The model must not invent missing
+                  records, counts, approvals, or completed mutations.
+                </li>
               </ul>
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Sessions, attachments, and user controls</h3>
+              <h3 className="text-sm font-bold text-white">
+                Sessions, attachments, and user controls
+              </h3>
               <ul className="list-disc pl-4 space-y-1.5 text-xs text-slate-300 leading-relaxed">
-                <li>Create, select, rename, clear, and delete workflow sessions from the right-side Workflow Sessions drawer. Clear removes messages/attachments for the selected session; delete removes the session after confirmation.</li>
-                <li>Attach TXT/MD/LOG/JSON, PDF, DOCX, image, or CSV files. Each attachment displays pending, parsed, failed, or unsupported status and can be removed before sending.</li>
-                <li>Send with Enter, use Shift+Enter for a new line, stop an active stream with the stop button, copy messages, edit a user request to regenerate, regenerate an assistant answer, and submit thumbs-up/down feedback.</li>
-                <li>Export the transcript as PDF, Excel, or Markdown. Excel includes tool, record, approval, and error summary counts; exports are local artifacts and should be handled as sensitive data.</li>
+                <li>
+                  Create, select, rename, clear, and delete workflow sessions
+                  from the right-side Workflow Sessions drawer. Clear removes
+                  messages/attachments for the selected session; delete removes
+                  the session after confirmation.
+                </li>
+                <li>
+                  Attach TXT/MD/LOG/JSON, PDF, DOCX, image, or CSV files. Each
+                  attachment displays pending, parsed, failed, or unsupported
+                  status and can be removed before sending.
+                </li>
+                <li>
+                  Send with Enter, use Shift+Enter for a new line, stop an
+                  active stream with the stop button, copy messages, edit a user
+                  request to regenerate, regenerate an assistant answer, and
+                  submit thumbs-up/down feedback.
+                </li>
+                <li>
+                  Export the transcript as PDF, Excel, or Markdown. Excel
+                  includes tool, record, approval, and error summary counts;
+                  exports are local artifacts and should be handled as sensitive
+                  data.
+                </li>
               </ul>
             </div>
 
             <div className="space-y-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed">
-              <h3 className="text-sm font-bold text-amber-200">End-to-end mutation and approval lifecycle</h3>
+              <h3 className="text-sm font-bold text-amber-200">
+                End-to-end mutation and approval lifecycle
+              </h3>
               <ol className="list-decimal pl-4 space-y-1.5">
-                <li>User submits a natural-language request.</li><li>Controller classifies intent and selects a tool.</li><li>Policy gate checks role, entity, exact identifier, allowed fields, and destructive keywords.</li><li>Read operations return redacted context; modify/write operations commit and verify the record.</li><li>Delete operations create a pending approval with an exact payload hash and expiry; an authorized human approves or rejects it.</li><li>Workflow events, tool calls/results, status, duration, errors, and final response are persisted and shown as safe telemetry.</li>
+                <li>User submits a natural-language request.</li>
+                <li>Controller classifies intent and selects a tool.</li>
+                <li>
+                  Policy gate checks role, entity, exact identifier, allowed
+                  fields, and destructive keywords.
+                </li>
+                <li>
+                  Read operations return redacted context; modify/write
+                  operations commit and verify the record.
+                </li>
+                <li>
+                  Delete operations create a pending approval with an exact
+                  payload hash and expiry; an authorized human approves or
+                  rejects it.
+                </li>
+                <li>
+                  Workflow events, tool calls/results, status, duration, errors,
+                  and final response are persisted and shown as safe telemetry.
+                </li>
               </ol>
             </div>
 
@@ -983,67 +1110,192 @@ export const UserManualModal = ({
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">End-to-end operating guide</h3>
+              <h3 className="text-sm font-bold text-white">
+                End-to-end operating guide
+              </h3>
               <ol className="list-decimal pl-4 space-y-2 text-xs text-slate-300 leading-relaxed">
-                <li><strong className="text-white">Configure a provider:</strong> choose the active provider and model in Providers & Webhooks. Local LM Studio uses its configured endpoint; hosted providers require the appropriate key and endpoint.</li>
-                <li><strong className="text-white">Describe the need:</strong> enter a natural-language role, skills, seniority, or department request, then select <strong>Scout Talent</strong>. The request is sent to the protected analysis API.</li>
-                <li><strong className="text-white">Wait for completion:</strong> the pipeline reports prepare request, search full pool, rank evidence, generate explanation, and return result cards. The displayed elapsed time and searched/returned counts come from the server response.</li>
-                <li><strong className="text-white">Review the brief:</strong> read the returned explanation and candidate cards. The explanation is provider-generated assistance, not a hiring decision or proof of suitability.</li>
-                <li><strong className="text-white">Refine results:</strong> filter the returned set by department, role, and minimum stored match score. The filters act on returned results; they do not trigger a new database search.</li>
-                <li><strong className="text-white">Take review notes:</strong> shortlist candidates, select up to three for comparison, assign New/Review/Shortlisted/Rejected status, and save a local review note.</li>
-                <li><strong className="text-white">Open evidence:</strong> select a result card to load the full candidate profile, including application date, match index, sentiment, compensation expectation, skills, and experience. Close the dossier when finished.</li>
-                <li><strong className="text-white">Export or continue:</strong> export the shortlist when one exists; otherwise export the filtered results as PDF, Excel, or Markdown. Continue governed recruiting review outside the automated ranking.</li>
+                <li>
+                  <strong className="text-white">Configure a provider:</strong>{" "}
+                  choose the active provider and model in Providers & Webhooks.
+                  Local LM Studio uses its configured endpoint; hosted providers
+                  require the appropriate key and endpoint.
+                </li>
+                <li>
+                  <strong className="text-white">Describe the need:</strong>{" "}
+                  enter a natural-language role, skills, seniority, or
+                  department request, then select <strong>Scout Talent</strong>.
+                  The request is sent to the protected analysis API.
+                </li>
+                <li>
+                  <strong className="text-white">Wait for completion:</strong>{" "}
+                  the pipeline reports prepare request, search full pool, rank
+                  evidence, generate explanation, and return result cards. The
+                  displayed elapsed time and searched/returned counts come from
+                  the server response.
+                </li>
+                <li>
+                  <strong className="text-white">Review the brief:</strong> read
+                  the returned explanation and candidate cards. The explanation
+                  is provider-generated assistance, not a hiring decision or
+                  proof of suitability.
+                </li>
+                <li>
+                  <strong className="text-white">Refine results:</strong> filter
+                  the returned set by department, role, and minimum stored match
+                  score. The filters act on returned results; they do not
+                  trigger a new database search.
+                </li>
+                <li>
+                  <strong className="text-white">Take review notes:</strong>{" "}
+                  shortlist candidates, select up to three for comparison,
+                  assign New/Review/Shortlisted/Rejected status, and save a
+                  local review note.
+                </li>
+                <li>
+                  <strong className="text-white">Open evidence:</strong> select
+                  a result card to load the full candidate profile, including
+                  application date, match index, sentiment, compensation
+                  expectation, skills, and experience. Close the dossier when
+                  finished.
+                </li>
+                <li>
+                  <strong className="text-white">Export or continue:</strong>{" "}
+                  export the shortlist when one exists; otherwise export the
+                  filtered results as PDF, Excel, or Markdown. Continue governed
+                  recruiting review outside the automated ranking.
+                </li>
               </ol>
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Search history and local workspace state</h3>
+              <h3 className="text-sm font-bold text-white">
+                Search history and local workspace state
+              </h3>
               <ul className="list-disc pl-4 space-y-1.5 text-xs text-slate-300 leading-relaxed">
-                <li>Completed searches are saved locally on the current device, with the latest ten queries retained. Selecting a history item restores its query, result cards, and generated brief; it does not re-run the server search.</li>
-                <li>Shortlist, candidate status, and review notes are also stored locally and are not an HRIS write, shared workflow record, or hiring decision.</li>
-                <li>“Returned” is the number of cards returned by the analysis response. “Visible” is the number remaining after local filters. Duplicate email and incomplete-profile counts are data-quality warnings for the visible set.</li>
+                <li>
+                  Completed searches are saved locally on the current device,
+                  with the latest ten queries retained. Selecting a history item
+                  restores its query, result cards, and generated brief; it does
+                  not re-run the server search.
+                </li>
+                <li>
+                  Shortlist, candidate status, and review notes are also stored
+                  locally and are not an HRIS write, shared workflow record, or
+                  hiring decision.
+                </li>
+                <li>
+                  “Returned” is the number of cards returned by the analysis
+                  response. “Visible” is the number remaining after local
+                  filters. Duplicate email and incomplete-profile counts are
+                  data-quality warnings for the visible set.
+                </li>
               </ul>
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Filters, comparison, and exports</h3>
+              <h3 className="text-sm font-bold text-white">
+                Filters, comparison, and exports
+              </h3>
               <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
                 <div className="rounded-lg border border-white/5 bg-white/5 p-3">
-                  <strong className="block text-cyan-200">Returned-result filters</strong>
-                  <p className="mt-1 leading-relaxed">Department and role lists are built from the returned cards. The score slider uses a 0–1 stored match-score scale and keeps candidates at or above the selected threshold.</p>
+                  <strong className="block text-cyan-200">
+                    Returned-result filters
+                  </strong>
+                  <p className="mt-1 leading-relaxed">
+                    Department and role lists are built from the returned cards.
+                    The score slider uses a 0–1 stored match-score scale and
+                    keeps candidates at or above the selected threshold.
+                  </p>
                 </div>
                 <div className="rounded-lg border border-white/5 bg-white/5 p-3">
                   <strong className="block text-cyan-200">Comparison</strong>
-                  <p className="mt-1 leading-relaxed">Compare up to three candidates at once using match score, sentiment, role, and department. Clear removes the comparison selection without deleting the result.</p>
+                  <p className="mt-1 leading-relaxed">
+                    Compare up to three candidates at once using match score,
+                    sentiment, role, and department. Clear removes the
+                    comparison selection without deleting the result.
+                  </p>
                 </div>
                 <div className="rounded-lg border border-white/5 bg-white/5 p-3">
                   <strong className="block text-cyan-200">Shortlist</strong>
-                  <p className="mt-1 leading-relaxed">Shortlist toggles a candidate in local device storage. If the shortlist is non-empty, exports use it; otherwise exports use the currently filtered result set.</p>
+                  <p className="mt-1 leading-relaxed">
+                    Shortlist toggles a candidate in local device storage. If
+                    the shortlist is non-empty, exports use it; otherwise
+                    exports use the currently filtered result set.
+                  </p>
                 </div>
                 <div className="rounded-lg border border-white/5 bg-white/5 p-3">
-                  <strong className="block text-cyan-200">Export boundary</strong>
-                  <p className="mt-1 leading-relaxed">Exports contain candidate records selected by the rule above. They do not export the full database, hidden results, provider secrets, or a guarantee of hiring quality.</p>
+                  <strong className="block text-cyan-200">
+                    Export boundary
+                  </strong>
+                  <p className="mt-1 leading-relaxed">
+                    Exports contain candidate records selected by the rule
+                    above. They do not export the full database, hidden results,
+                    provider secrets, or a guarantee of hiring quality.
+                  </p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-3 rounded-xl border border-blue-400/20 bg-blue-400/[0.03] p-4">
-              <h3 className="text-sm font-bold text-blue-200">Candidate dossier and interpretation</h3>
+              <h3 className="text-sm font-bold text-blue-200">
+                Candidate dossier and interpretation
+              </h3>
               <ul className="list-disc pl-4 space-y-1.5 text-xs text-slate-300 leading-relaxed">
-                <li>The dossier loads on selection, not for every card. It shows the candidate identity, contact, application date, match index, morale sentiment, external status, compensation expectation, five-segment skills, and chronological experience.</li>
-                <li>Match index is the stored candidate match score rendered as a percentage. The ranking score used by the server is separate from that displayed stored score.</li>
-                <li>Missing skills or experience are displayed as unavailable records; they are not silently invented. Compensation shown when absent is an illustrative DEMO value and must not be treated as authoritative.</li>
-                <li>Candidate sentiment is contextual metadata, not an interview result or psychological assessment. Use structured interviews, validated job criteria, and authorized human review for decisions.</li>
+                <li>
+                  The dossier loads on selection, not for every card. It shows
+                  the candidate identity, contact, application date, match
+                  index, morale sentiment, external status, compensation
+                  expectation, five-segment skills, and chronological
+                  experience.
+                </li>
+                <li>
+                  Match index is the stored candidate match score rendered as a
+                  percentage. The ranking score used by the server is separate
+                  from that displayed stored score.
+                </li>
+                <li>
+                  Missing skills or experience are displayed as unavailable
+                  records; they are not silently invented. Compensation shown
+                  when absent is an illustrative DEMO value and must not be
+                  treated as authoritative.
+                </li>
+                <li>
+                  Candidate sentiment is contextual metadata, not an interview
+                  result or psychological assessment. Use structured interviews,
+                  validated job criteria, and authorized human review for
+                  decisions.
+                </li>
               </ul>
             </div>
 
             <div className="space-y-3 rounded-xl border border-rose-400/20 bg-rose-400/[0.04] p-4">
-              <h3 className="text-sm font-bold text-rose-200">Loading, provider errors, and safety</h3>
+              <h3 className="text-sm font-bold text-rose-200">
+                Loading, provider errors, and safety
+              </h3>
               <ul className="list-disc pl-4 space-y-1.5 text-xs text-slate-300 leading-relaxed">
-                <li>While running, the button is disabled and the pipeline shows its active stage. Do not submit duplicate searches during the active request.</li>
-                <li>An analysis failure means the provider, endpoint, model, authentication, or backend request needs attention. Check Providers & Webhooks and the local LM Studio service when applicable, then retry.</li>
-                <li>A profile-load failure affects only the selected dossier; it does not prove the candidate is missing from the search result.</li>
-                <li>Do not use ranking, sentiment, compensation, demographic proxies, or AI explanations as the sole basis for hiring, rejection, promotion, or compensation. Review evidence, apply consistent job-related criteria, document the human decision, and follow applicable policy.</li>
+                <li>
+                  While running, the button is disabled and the pipeline shows
+                  its active stage. Do not submit duplicate searches during the
+                  active request.
+                </li>
+                <li>
+                  An analysis failure means the provider, endpoint, model,
+                  authentication, or backend request needs attention. Check
+                  Providers & Webhooks and the local LM Studio service when
+                  applicable, then retry.
+                </li>
+                <li>
+                  A profile-load failure affects only the selected dossier; it
+                  does not prove the candidate is missing from the search
+                  result.
+                </li>
+                <li>
+                  Do not use ranking, sentiment, compensation, demographic
+                  proxies, or AI explanations as the sole basis for hiring,
+                  rejection, promotion, or compensation. Review evidence, apply
+                  consistent job-related criteria, document the human decision,
+                  and follow applicable policy.
+                </li>
               </ul>
             </div>
           </div>
@@ -1066,51 +1318,141 @@ export const UserManualModal = ({
             </div>
 
             <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.04] p-4 text-xs leading-relaxed text-slate-300">
-              <strong className="text-emerald-200">Scope and data boundary:</strong>{" "}
+              <strong className="text-emerald-200">
+                Scope and data boundary:
+              </strong>{" "}
               the page reads employee sentiment, retention probability,
               department, and policy-risk fields. Candidate count is shown as
               separate context and never enters employee morale or risk totals.
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">End-to-end page flow</h3>
+              <h3 className="text-sm font-bold text-white">
+                End-to-end page flow
+              </h3>
               <div className="grid gap-3 md:grid-cols-4 text-xs text-slate-300">
                 {[
-                  ["1. Authenticate", "Sign in and open the protected sentiment stream."],
-                  ["2. Receive snapshot", "The live SSE stream supplies current employee metrics and a timestamp."],
-                  ["3. Derive evidence", "The page calculates priority, department concentration, and threshold matches."],
-                  ["4. Review action", "Inspect evidence, export the visible scope, and use authorized HR workflows."],
+                  [
+                    "1. Authenticate",
+                    "Sign in and open the protected sentiment stream.",
+                  ],
+                  [
+                    "2. Receive snapshot",
+                    "The live SSE stream supplies current employee metrics and a timestamp.",
+                  ],
+                  [
+                    "3. Derive evidence",
+                    "The page calculates priority, department concentration, and threshold matches.",
+                  ],
+                  [
+                    "4. Review action",
+                    "Inspect evidence, export the visible scope, and use authorized HR workflows.",
+                  ],
                 ].map(([title, description]) => (
-                  <div key={title} className="rounded-lg border border-emerald-500/20 bg-slate-950/50 p-3">
+                  <div
+                    key={title}
+                    className="rounded-lg border border-emerald-500/20 bg-slate-950/50 p-3"
+                  >
                     <strong className="block text-emerald-200">{title}</strong>
-                    <p className="mt-1 leading-relaxed text-slate-400">{description}</p>
+                    <p className="mt-1 leading-relaxed text-slate-400">
+                      {description}
+                    </p>
                   </div>
                 ))}
               </div>
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Controls and displayed sections</h3>
+              <h3 className="text-sm font-bold text-white">
+                Controls and displayed sections
+              </h3>
               <ul className="list-disc space-y-2 pl-4 text-xs leading-relaxed text-slate-300">
-                <li><strong className="text-white">Connection status:</strong> “Live stream connected” confirms updates are arriving; “disconnected” means current values are not being refreshed.</li>
-                <li><strong className="text-white">Department:</strong> recalculates the aggregate report for one employee department and updates the evidence context.</li>
-                <li><strong className="text-white">At-risk only:</strong> filters the low-sentiment and low-retention evidence lists only; it must not change the headline denominator.</li>
-                <li><strong className="text-white">System Status:</strong> shows employees reviewed, average sentiment, and stored at-risk count.</li>
-                <li><strong className="text-white">Intervention Priority:</strong> maps the at-risk percentage to Level 1 (&lt;10%), Level 2 (10–&lt;20%), or Level 3 (≥20%).</li>
-                <li><strong className="text-white">Derived Workforce Metrics:</strong> shows current score, velocity versus the prior snapshot, and coverage. Coverage is record volume, not statistical confidence.</li>
-                <li><strong className="text-white">Department concentration:</strong> shows each department’s at-risk count, total, at-risk share, and average sentiment.</li>
-                <li><strong className="text-white">Evidence lists:</strong> low sentiment means <code>sentiment_score &lt; 0.45</code>; low retention means <code>retention_prob &lt; 0.55</code>. Lists are scrollable and show every loaded match.</li>
-                <li><strong className="text-white">Snapshot history:</strong> bars show captured sentiment snapshots; hover or focus a bar to read timestamp, sentiment, and at-risk percentage.</li>
-                <li><strong className="text-white">Exports:</strong> PDF, Excel, and Markdown export the currently visible employee scope. Buttons are disabled when that scope has no rows.</li>
+                <li>
+                  <strong className="text-white">Connection status:</strong>{" "}
+                  “Live stream connected” confirms updates are arriving;
+                  “disconnected” means current values are not being refreshed.
+                </li>
+                <li>
+                  <strong className="text-white">Department:</strong>{" "}
+                  recalculates the aggregate report for one employee department
+                  and updates the evidence context.
+                </li>
+                <li>
+                  <strong className="text-white">At-risk only:</strong> filters
+                  the low-sentiment and low-retention evidence lists only; it
+                  must not change the headline denominator.
+                </li>
+                <li>
+                  <strong className="text-white">System Status:</strong> shows
+                  employees reviewed, average sentiment, and stored at-risk
+                  count.
+                </li>
+                <li>
+                  <strong className="text-white">Intervention Priority:</strong>{" "}
+                  maps the at-risk percentage to Level 1 (&lt;10%), Level 2
+                  (10–&lt;20%), or Level 3 (≥20%).
+                </li>
+                <li>
+                  <strong className="text-white">
+                    Derived Workforce Metrics:
+                  </strong>{" "}
+                  shows current score, velocity versus the prior snapshot, and
+                  coverage. Coverage is record volume, not statistical
+                  confidence.
+                </li>
+                <li>
+                  <strong className="text-white">
+                    Department concentration:
+                  </strong>{" "}
+                  shows each department’s at-risk count, total, at-risk share,
+                  and average sentiment.
+                </li>
+                <li>
+                  <strong className="text-white">Evidence lists:</strong> low
+                  sentiment means <code>sentiment_score &lt; 0.45</code>; low
+                  retention means <code>retention_prob &lt; 0.55</code>. Lists
+                  are scrollable and show every loaded match.
+                </li>
+                <li>
+                  <strong className="text-white">Snapshot history:</strong> bars
+                  show captured sentiment snapshots; hover or focus a bar to
+                  read timestamp, sentiment, and at-risk percentage.
+                </li>
+                <li>
+                  <strong className="text-white">Exports:</strong> PDF, Excel,
+                  and Markdown export the currently visible employee scope.
+                  Buttons are disabled when that scope has no rows.
+                </li>
               </ul>
             </div>
 
             <div className="space-y-3 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.03] p-4 text-xs leading-relaxed text-slate-300">
-              <h3 className="text-sm font-bold text-cyan-200">Interpretation, freshness, and failure handling</h3>
-              <p>Sentiment is a normalized review signal, not a diagnosis. Retention probability is probability-like and not a guaranteed outcome. Derived indicators support respectful evidence review and must not be used alone for employment decisions.</p>
-              <p>The header timestamp is the latest snapshot time. Stream updates append deduplicated points and retain the latest 24 points in the browser’s sentiment trend cache; this is an operational view, not a complete historical warehouse.</p>
-              <p>If authentication fails, sign in again. If the stream disconnects or the context request fails, treat the page as unconfirmed, check connectivity, and reload. Never interpret missing data as zero.</p>
-              <p>Use manager/HR review and the governed intervention workflow for follow-up. Viewing, filtering, or exporting does not modify employee records.</p>
+              <h3 className="text-sm font-bold text-cyan-200">
+                Interpretation, freshness, and failure handling
+              </h3>
+              <p>
+                Sentiment is a normalized review signal, not a diagnosis.
+                Retention probability is probability-like and not a guaranteed
+                outcome. Derived indicators support respectful evidence review
+                and must not be used alone for employment decisions.
+              </p>
+              <p>
+                The header timestamp is the latest snapshot time. Stream updates
+                append deduplicated points and retain the latest 24 points in
+                the browser’s sentiment trend cache; this is an operational
+                view, not a complete historical warehouse.
+              </p>
+              <p>
+                If authentication fails, sign in again. If the stream
+                disconnects or the context request fails, treat the page as
+                unconfirmed, check connectivity, and reload. Never interpret
+                missing data as zero.
+              </p>
+              <p>
+                Use manager/HR review and the governed intervention workflow for
+                follow-up. Viewing, filtering, or exporting does not modify
+                employee records.
+              </p>
             </div>
           </div>
         );
@@ -1497,9 +1839,9 @@ export const UserManualModal = ({
                   </strong>
                   <p className="text-slate-300 leading-relaxed text-[11px]">
                     Employees whose stored <code>is_at_risk</code> flag is true.
-                    This status is separate from the low-retention evidence rule;
-                    the dashboard does not silently rewrite the stored flag while
-                    it is being viewed.
+                    This status is separate from the low-retention evidence
+                    rule; the dashboard does not silently rewrite the stored
+                    flag while it is being viewed.
                   </p>
                 </div>
 
@@ -1639,12 +1981,12 @@ export const UserManualModal = ({
                   shown inline.
                 </li>
                 <li>
-                    <strong className="text-slate-100">History:</strong> the
-                    page requests up to 24 tenant-scoped analytics snapshots. If
-                    backend history is unavailable or does not contain varying
-                    points, the page can render an operational fallback derived
-                    from the currently loaded records; this is not a complete
-                    historical warehouse.
+                  <strong className="text-slate-100">History:</strong> the page
+                  requests up to 24 tenant-scoped analytics snapshots. If
+                  backend history is unavailable or does not contain varying
+                  points, the page can render an operational fallback derived
+                  from the currently loaded records; this is not a complete
+                  historical warehouse.
                 </li>
                 <li>
                   <strong className="text-slate-100">
@@ -3257,11 +3599,12 @@ export const UserManualModal = ({
               <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4 text-left text-xs text-slate-300 leading-relaxed">
                 <p>
                   Use the five workbench tabs in this order when moving from a
-                  talent question to an accountable decision: <strong>Semantic
-                  Skills Graph</strong> for capability fit, <strong>Optimal Team
-                  Assembly</strong> for constrained staffing, <strong>Survival /
-                  Attrition</strong> for retention signals, <strong>Network
-                  Analysis (ONA)</strong> for collaboration structure, and
+                  talent question to an accountable decision:{" "}
+                  <strong>Semantic Skills Graph</strong> for capability fit,{" "}
+                  <strong>Optimal Team Assembly</strong> for constrained
+                  staffing, <strong>Survival / Attrition</strong> for retention
+                  signals, <strong>Network Analysis (ONA)</strong> for
+                  collaboration structure, and
                   <strong> Markov Career Path</strong> for role-transition
                   scenarios. Results are decision support; they do not change
                   employee records or automatically trigger HR actions.
@@ -3269,56 +3612,202 @@ export const UserManualModal = ({
 
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
-                    <strong className="text-emerald-300 block">Shared data contract</strong>
-                    <p>Employee profiles, roles, departments, compensation, join dates, skills, skill levels, experience records, sentiment, and explicit risk flags are read within the signed-in tenant scope. The engine filters invalid or synthetic records according to the server data-quality rules.</p>
-                    <p>Interactive calls are authenticated and use the Intelligence API: <code className="text-cyan-300">POST /skill-match</code>, <code className="text-cyan-300">POST /team-optimize</code>, <code className="text-cyan-300">GET /attrition-hazard</code>, <code className="text-cyan-300">GET /ona?limit=120</code>, and <code className="text-cyan-300">GET /career-path/&lt;employee_id&gt;</code>.</p>
+                    <strong className="text-emerald-300 block">
+                      Shared data contract
+                    </strong>
+                    <p>
+                      Employee profiles, roles, departments, compensation, join
+                      dates, skills, skill levels, experience records,
+                      sentiment, and explicit risk flags are read within the
+                      signed-in tenant scope. The engine filters invalid or
+                      synthetic records according to the server data-quality
+                      rules.
+                    </p>
+                    <p>
+                      Interactive calls are authenticated and use the
+                      Intelligence API:{" "}
+                      <code className="text-cyan-300">POST /skill-match</code>,{" "}
+                      <code className="text-cyan-300">POST /team-optimize</code>
+                      ,{" "}
+                      <code className="text-cyan-300">
+                        GET /attrition-hazard
+                      </code>
+                      ,{" "}
+                      <code className="text-cyan-300">GET /ona?limit=120</code>,
+                      and{" "}
+                      <code className="text-cyan-300">
+                        GET /career-path/&lt;employee_id&gt;
+                      </code>
+                      .
+                    </p>
                   </div>
                   <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
-                    <strong className="text-amber-300 block">Interpretation and safety</strong>
-                    <p>“Probability,” “risk,” “influence,” “bridge,” “coverage,” and “optimal” are model outputs, not facts or employment recommendations. Review the source records, sample size, model status, validation status, and confidence before acting.</p>
-                    <p>The current optimization and Markov responses identify themselves as <code className="text-amber-300">synthetic_calibration_only</code>; career transitions are not validated on observed career transitions. Never use a score as the sole basis for hiring, promotion, compensation, discipline, or termination.</p>
+                    <strong className="text-amber-300 block">
+                      Interpretation and safety
+                    </strong>
+                    <p>
+                      “Probability,” “risk,” “influence,” “bridge,” “coverage,”
+                      and “optimal” are model outputs, not facts or employment
+                      recommendations. Review the source records, sample size,
+                      model status, validation status, and confidence before
+                      acting.
+                    </p>
+                    <p>
+                      The current optimization and Markov responses identify
+                      themselves as{" "}
+                      <code className="text-amber-300">
+                        synthetic_calibration_only
+                      </code>
+                      ; career transitions are not validated on observed career
+                      transitions. Never use a score as the sole basis for
+                      hiring, promotion, compensation, discipline, or
+                      termination.
+                    </p>
                   </div>
                 </div>
 
                 <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
-                  <strong className="text-indigo-300 block">Complete operator workflow</strong>
+                  <strong className="text-indigo-300 block">
+                    Complete operator workflow
+                  </strong>
                   <ol className="list-decimal pl-5 space-y-1 text-[11px]">
-                    <li>Confirm tenant, permissions, data freshness, and that the population is large and representative enough for the question.</li>
-                    <li>Define the question and inputs. Record target skill names and L1–L5 minimums, team budget and size, the employee profile, or the network scope.</li>
-                    <li>Run the relevant tab and inspect both the visual result and its underlying evidence: match details, cost sources, covariates, graph metrics, transition gaps, timestamps, and model metadata.</li>
-                    <li>Use the AI explanation panel only as a plain-language explanation of the displayed result; verify it against the source cards and formulas.</li>
-                    <li>Save or export the result through the authorized workflow, attach assumptions and a human owner, and route any high-impact action to the Reviews Queue and applicable policy gate.</li>
-                    <li>Monitor the decision outcome. Re-run after source data, integrations, skills, compensation, or model versions change; do not compare scores from different populations without documenting the change.</li>
+                    <li>
+                      Confirm tenant, permissions, data freshness, and that the
+                      population is large and representative enough for the
+                      question.
+                    </li>
+                    <li>
+                      Define the question and inputs. Record target skill names
+                      and L1–L5 minimums, team budget and size, the employee
+                      profile, or the network scope.
+                    </li>
+                    <li>
+                      Run the relevant tab and inspect both the visual result
+                      and its underlying evidence: match details, cost sources,
+                      covariates, graph metrics, transition gaps, timestamps,
+                      and model metadata.
+                    </li>
+                    <li>
+                      Use the AI explanation panel only as a plain-language
+                      explanation of the displayed result; verify it against the
+                      source cards and formulas.
+                    </li>
+                    <li>
+                      Save or export the result through the authorized workflow,
+                      attach assumptions and a human owner, and route any
+                      high-impact action to the Reviews Queue and applicable
+                      policy gate.
+                    </li>
+                    <li>
+                      Monitor the decision outcome. Re-run after source data,
+                      integrations, skills, compensation, or model versions
+                      change; do not compare scores from different populations
+                      without documenting the change.
+                    </li>
                   </ol>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
-                    <strong className="text-cyan-300 block">Tab-by-tab controls and outputs</strong>
+                    <strong className="text-cyan-300 block">
+                      Tab-by-tab controls and outputs
+                    </strong>
                     <ul className="list-disc pl-4 space-y-1 text-[11px]">
-                      <li><strong>Skills:</strong> add/remove target nodes, choose L1–L5, run matching, select a person, inspect semantic paths, confidence, status, and training gaps.</li>
-                      <li><strong>Team:</strong> add/remove required skills, set budget and maximum roster size, run the solver, inspect annealing temperature/energy history, coverage, cost, salary-source ratio, and selected roster.</li>
-                      <li><strong>Attrition:</strong> search and sort the registry by hazard, name, tenure, or percentile; select a profile; adjust morale, salary increase, and assigned-skill load in the what-if sandbox; inspect survival, hazard, confidence band, and driver waterfall.</li>
-                      <li><strong>ONA:</strong> search, filter by department, select a node, change coloring by department/PageRank/betweenness/silo, inspect neighbors and graph metrics, then explain the observed topology.</li>
-                      <li><strong>Career:</strong> select an employee, load the three-year horizon, inspect role possibilities and transition probabilities, then review each missing skill and its semantic difficulty.</li>
+                      <li>
+                        <strong>Skills:</strong> add/remove target nodes, choose
+                        L1–L5, run matching, select a person, inspect semantic
+                        paths, confidence, status, and training gaps.
+                      </li>
+                      <li>
+                        <strong>Team:</strong> add/remove required skills, set
+                        budget and maximum roster size, run the solver, inspect
+                        annealing temperature/energy history, coverage, cost,
+                        salary-source ratio, and selected roster.
+                      </li>
+                      <li>
+                        <strong>Attrition:</strong> search and sort the registry
+                        by hazard, name, tenure, or percentile; select a
+                        profile; adjust morale, salary increase, and
+                        assigned-skill load in the what-if sandbox; inspect
+                        survival, hazard, confidence band, and driver waterfall.
+                      </li>
+                      <li>
+                        <strong>ONA:</strong> search, filter by department,
+                        select a node, change coloring by
+                        department/PageRank/betweenness/silo, inspect neighbors
+                        and graph metrics, then explain the observed topology.
+                      </li>
+                      <li>
+                        <strong>Career:</strong> select an employee, load the
+                        three-year horizon, inspect role possibilities and
+                        transition probabilities, then review each missing skill
+                        and its semantic difficulty.
+                      </li>
                     </ul>
                   </div>
                   <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
-                    <strong className="text-pink-300 block">Failure, empty-state, and recovery rules</strong>
+                    <strong className="text-pink-300 block">
+                      Failure, empty-state, and recovery rules
+                    </strong>
                     <ul className="list-disc pl-4 space-y-1 text-[11px]">
-                      <li>Loading means the request is still running; do not interpret a blank chart as zero risk or zero connectivity.</li>
-                      <li>Empty employee, skill, experience, or integration data produces an empty result or fallback fields. Fix the source data and re-run.</li>
-                      <li>Skill-match and team optimization require at least one target skill; team optimization also requires enough employees for the requested roster size.</li>
-                      <li>Missing salary is explicitly labeled as a role estimate. A recorded salary is preferred and the result exposes <code className="text-cyan-300">salary_source</code> and <code className="text-cyan-300">salary_record_ratio</code>.</li>
-                      <li>Authentication, authorization, API, or network errors are operational failures. Retry only after checking access and connectivity; never substitute a stale result without labeling it.</li>
+                      <li>
+                        Loading means the request is still running; do not
+                        interpret a blank chart as zero risk or zero
+                        connectivity.
+                      </li>
+                      <li>
+                        Empty employee, skill, experience, or integration data
+                        produces an empty result or fallback fields. Fix the
+                        source data and re-run.
+                      </li>
+                      <li>
+                        Skill-match and team optimization require at least one
+                        target skill; team optimization also requires enough
+                        employees for the requested roster size.
+                      </li>
+                      <li>
+                        Missing salary is explicitly labeled as a role estimate.
+                        A recorded salary is preferred and the result exposes{" "}
+                        <code className="text-cyan-300">salary_source</code> and{" "}
+                        <code className="text-cyan-300">
+                          salary_record_ratio
+                        </code>
+                        .
+                      </li>
+                      <li>
+                        Authentication, authorization, API, or network errors
+                        are operational failures. Retry only after checking
+                        access and connectivity; never substitute a stale result
+                        without labeling it.
+                      </li>
                     </ul>
                   </div>
                 </div>
 
                 <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
-                  <strong className="text-rose-300 block">Audit, privacy, and governance checklist</strong>
-                  <p>For every consequential use, retain the question, tenant and population scope, source timestamp, filters, exact inputs, model version, seed where supplied, returned evidence, explanation, reviewer, decision, and outcome. Team scenarios return a deterministic tenant/input-derived seed when one is not supplied and are persisted as forecast scenarios. ONA uses up to the requested employee limit and successful Jira integration logs; it is not a complete communication census. Attrition and career paths expose model limitations so HR must combine them with documented human review.</p>
-                  <p>Restrict access to least privilege, avoid exposing unnecessary names or compensation, honor retention/deletion policy, and use approved intervention, compliance, audit, and disaster-recovery procedures for any downstream action. The Intelligence Center is read/compute oriented; write actions belong in governed workflows.</p>
+                  <strong className="text-rose-300 block">
+                    Audit, privacy, and governance checklist
+                  </strong>
+                  <p>
+                    For every consequential use, retain the question, tenant and
+                    population scope, source timestamp, filters, exact inputs,
+                    model version, seed where supplied, returned evidence,
+                    explanation, reviewer, decision, and outcome. Team scenarios
+                    return a deterministic tenant/input-derived seed when one is
+                    not supplied and are persisted as forecast scenarios. ONA
+                    uses up to the requested employee limit and successful Jira
+                    integration logs; it is not a complete communication census.
+                    Attrition and career paths expose model limitations so HR
+                    must combine them with documented human review.
+                  </p>
+                  <p>
+                    Restrict access to least privilege, avoid exposing
+                    unnecessary names or compensation, honor retention/deletion
+                    policy, and use approved intervention, compliance, audit,
+                    and disaster-recovery procedures for any downstream action.
+                    The Intelligence Center is read/compute oriented; write
+                    actions belong in governed workflows.
+                  </p>
                 </div>
               </div>
             </div>
@@ -4268,14 +4757,98 @@ export const UserManualModal = ({
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
-              <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-cyan-200">System Integrations</strong><p className="mt-1 leading-relaxed">Register a supported connector with its base URL and credentials. Use connection verification to authenticate against the real provider, metadata discovery to inspect available projects/channels/fields, and Pipeline Sync to retrieve source records. Credentials are encrypted server-side and never returned in connection responses. The pipeline result reports bronze events, canonical upserts, and quarantined rows. HRIS records are also mirrored into the existing Directory/Dashboard read model by normalized email, so users see the same live workforce record across surfaces instead of a separate unorganized copy. Each profile exposes source provider, source type, last source update, external ID, validation status, and duplicate warnings. In production, recurring syncs and webhook retries are enqueued through Redis/RQ and run by the dedicated worker; the API process does not own the schedule.</p></div>
-              <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-purple-200">Schema &amp; Mappings</strong><p className="mt-1 leading-relaxed">Choose a connection, map each source column to a canonical field, optionally apply a transform rule, and mark the mapping required. Lean data contracts define source/provider/status expectations and enforce ingestion shape.</p></div>
-              <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-emerald-200">Local Dataset Hub</strong><p className="mt-1 leading-relaxed">Upload CSV schemas individually or import a CSV/ZIP dataset bundle. Review validation progress, accepted records, and rejected records before treating the import as available operational data.</p></div>
-              <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-amber-200">Pipeline Logs &amp; Quarantine</strong><p className="mt-1 leading-relaxed">Logs show ingestion status, counts, timestamps, and errors. Invalid or contract-breaking events are quarantined for review; an empty quarantine queue means no currently listed validation alerts, not that every historical event was perfect.</p></div>
+              <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                <strong className="block text-cyan-200">
+                  System Integrations
+                </strong>
+                <p className="mt-1 leading-relaxed">
+                  Register a supported connector with its base URL and
+                  credentials. Use connection verification to authenticate
+                  against the real provider, metadata discovery to inspect
+                  available projects/channels/fields, and Pipeline Sync to
+                  retrieve source records. Credentials are encrypted server-side
+                  and never returned in connection responses. The pipeline
+                  result reports bronze events, canonical upserts, and
+                  quarantined rows. HRIS records are also mirrored into the
+                  existing Directory/Dashboard read model by normalized email,
+                  so users see the same live workforce record across surfaces
+                  instead of a separate unorganized copy. Each profile exposes
+                  source provider, source type, last source update, external ID,
+                  validation status, and duplicate warnings. In production,
+                  recurring syncs and webhook retries are enqueued through
+                  Redis/RQ and run by the dedicated worker; the API process does
+                  not own the schedule.
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                <strong className="block text-purple-200">
+                  Schema &amp; Mappings
+                </strong>
+                <p className="mt-1 leading-relaxed">
+                  Choose a connection, map each source column to a canonical
+                  field, optionally apply a transform rule, and mark the mapping
+                  required. Lean data contracts define source/provider/status
+                  expectations and enforce ingestion shape.
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                <strong className="block text-emerald-200">
+                  Local Dataset Hub
+                </strong>
+                <p className="mt-1 leading-relaxed">
+                  Upload CSV schemas individually or import a CSV/ZIP dataset
+                  bundle. Review validation progress, accepted records, and
+                  rejected records before treating the import as available
+                  operational data.
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                <strong className="block text-amber-200">
+                  Pipeline Logs &amp; Quarantine
+                </strong>
+                <p className="mt-1 leading-relaxed">
+                  Logs show ingestion status, counts, timestamps, and errors.
+                  Invalid or contract-breaking events are quarantined for
+                  review; an empty quarantine queue means no currently listed
+                  validation alerts, not that every historical event was
+                  perfect.
+                </p>
+              </div>
             </div>
-            <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed"><strong className="text-cyan-200">Operational sequence:</strong> select provider → enter server-held credentials → verify connection → discover metadata → define contract and mappings → run real Pipeline Sync → inspect source counts/logs → resolve or retain quarantine → verify canonical records → refresh downstream analytics. For Workday, use the exact versioned workers endpoint from the Workday REST API Explorer; for Slack, select channels the installed OAuth bot can access; for Jira, grant Browse Projects/issue-read access. Never bypass schema validation by editing source data directly. The Directory source badges identify the systems contributing to a normalized profile; source records remain traceable in Data Ops and are never silently treated as identical when their email or external identity does not match.</div>
-            <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed"><strong className="text-emerald-200">Cross-source evidence:</strong> Workday is the authoritative identity source. Jira activity and Slack activity are supporting evidence and are attached only when a verified normalized work email matches an employee. Open an employee profile to review provider, source type, external ID, observed time, and the safe evidence summary. Unmatched records remain in Data Ops for review; they are not guessed into a profile.</div>
-            <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed"><strong className="text-amber-200">Production migration:</strong> apply the Alembic migration before enabling live evidence collection: <code>cd server &amp;&amp; alembic upgrade head</code>. The evidence table is <code>integration_evidence</code>; it is tenant-scoped and does not store provider secrets.</div>
+            <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed">
+              <strong className="text-cyan-200">Operational sequence:</strong>{" "}
+              select provider → enter server-held credentials → verify
+              connection → discover metadata → define contract and mappings →
+              run real Pipeline Sync → inspect source counts/logs → resolve or
+              retain quarantine → verify canonical records → refresh downstream
+              analytics. For Workday, use the exact versioned workers endpoint
+              from the Workday REST API Explorer; for Slack, select channels the
+              installed OAuth bot can access; for Jira, grant Browse
+              Projects/issue-read access. Never bypass schema validation by
+              editing source data directly. The Directory source badges identify
+              the systems contributing to a normalized profile; source records
+              remain traceable in Data Ops and are never silently treated as
+              identical when their email or external identity does not match.
+            </div>
+            <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed">
+              <strong className="text-emerald-200">
+                Cross-source evidence:
+              </strong>{" "}
+              Workday is the authoritative identity source. Jira activity and
+              Slack activity are supporting evidence and are attached only when
+              a verified normalized work email matches an employee. Open an
+              employee profile to review provider, source type, external ID,
+              observed time, and the safe evidence summary. Unmatched records
+              remain in Data Ops for review; they are not guessed into a
+              profile.
+            </div>
+            <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed">
+              <strong className="text-amber-200">Production migration:</strong>{" "}
+              apply the Alembic migration before enabling live evidence
+              collection: <code>cd server &amp;&amp; alembic upgrade head</code>
+              . The evidence table is <code>integration_evidence</code>; it is
+              tenant-scoped and does not store provider secrets.
+            </div>
           </div>
         );
 
@@ -4296,12 +4869,54 @@ export const UserManualModal = ({
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
-              <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-emerald-200">Model Registry &amp; Cards</strong><p className="mt-1 leading-relaxed">Review model name, version, lifecycle status, owner, purpose, data scope, metrics, calibration, limitations, and approval state before promotion.</p></div>
-              <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-amber-200">Drift Monitoring</strong><p className="mt-1 leading-relaxed">Inspect feature, prediction, and data-quality drift snapshots. Drift is a monitoring signal requiring investigation; it is not proof that a model is wrong or fair.</p></div>
-              <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-rose-200">Fairness &amp; Bias Audit</strong><p className="mt-1 leading-relaxed">Review demographic-group performance gaps, coverage, sample sizes, and flagged disparities. Treat small or incomplete cohorts as limitations and require documented human review.</p></div>
-              <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-cyan-200">MLOps Deployment Center</strong><p className="mt-1 leading-relaxed">Train and score only through the governed deployment flow. Confirm model card, evaluation, fairness, drift, approval, rollback, and monitoring readiness before release.</p></div>
+              <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                <strong className="block text-emerald-200">
+                  Model Registry &amp; Cards
+                </strong>
+                <p className="mt-1 leading-relaxed">
+                  Review model name, version, lifecycle status, owner, purpose,
+                  data scope, metrics, calibration, limitations, and approval
+                  state before promotion.
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                <strong className="block text-amber-200">
+                  Drift Monitoring
+                </strong>
+                <p className="mt-1 leading-relaxed">
+                  Inspect feature, prediction, and data-quality drift snapshots.
+                  Drift is a monitoring signal requiring investigation; it is
+                  not proof that a model is wrong or fair.
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                <strong className="block text-rose-200">
+                  Fairness &amp; Bias Audit
+                </strong>
+                <p className="mt-1 leading-relaxed">
+                  Review demographic-group performance gaps, coverage, sample
+                  sizes, and flagged disparities. Treat small or incomplete
+                  cohorts as limitations and require documented human review.
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                <strong className="block text-cyan-200">
+                  MLOps Deployment Center
+                </strong>
+                <p className="mt-1 leading-relaxed">
+                  Train and score only through the governed deployment flow.
+                  Confirm model card, evaluation, fairness, drift, approval,
+                  rollback, and monitoring readiness before release.
+                </p>
+              </div>
             </div>
-            <div className="rounded-xl border border-rose-400/20 bg-rose-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed"><strong className="text-rose-200">Release gate:</strong> data contract valid → model version registered → evaluation and calibration reviewed → fairness gaps assessed → drift baseline recorded → approval captured → deployment monitored → rollback path tested. No metric alone authorizes production use.</div>
+            <div className="rounded-xl border border-rose-400/20 bg-rose-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed">
+              <strong className="text-rose-200">Release gate:</strong> data
+              contract valid → model version registered → evaluation and
+              calibration reviewed → fairness gaps assessed → drift baseline
+              recorded → approval captured → deployment monitored → rollback
+              path tested. No metric alone authorizes production use.
+            </div>
           </div>
         );
 
@@ -4317,17 +4932,62 @@ export const UserManualModal = ({
                 Audit Logs Sub-Manual
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                Governance policies and contracts, executive briefings, immutable
-                audit telemetry, disaster recovery, and SRE runbooks.
+                Governance policies and contracts, executive briefings,
+                immutable audit telemetry, disaster recovery, and SRE runbooks.
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
-              <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-cyan-200">Executive Briefings &amp; Audit Logs</strong><p className="mt-1 leading-relaxed">Refresh the CHRO/CFO packet to review workforce, risk ratio, top department, actions, policies, runbooks, artifacts, and risk drivers. Audit logs show action, resource type, and timestamp; sensitive details remain protected.</p></div>
-              <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-purple-200">Governance Policies &amp; Contracts</strong><p className="mt-1 leading-relaxed">Create and review policy records and data contracts governing source, region, required shape, retention, and approval expectations. Policy changes require authorized ownership and an auditable reason.</p></div>
-              <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-rose-200">DR &amp; SRE Runbooks</strong><p className="mt-1 leading-relaxed">Create a recovery runbook with target, recovery objective, owner, and steps. Drill it, record the result and timestamp, and use failures as remediation work rather than declaring recovery readiness.</p></div>
-              <div className="rounded-lg border border-white/5 bg-white/5 p-3"><strong className="block text-amber-200">Tenant isolation &amp; retention</strong><p className="mt-1 leading-relaxed">Operational records, workflow events, approvals, packets, and audit views are tenant/user scoped. Follow least privilege, retention, backup, incident, and access-review policies.</p></div>
+              <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                <strong className="block text-cyan-200">
+                  Executive Briefings &amp; Audit Logs
+                </strong>
+                <p className="mt-1 leading-relaxed">
+                  Refresh the CHRO/CFO packet to review workforce, risk ratio,
+                  top department, actions, policies, runbooks, artifacts, and
+                  risk drivers. Audit logs show action, resource type, and
+                  timestamp; sensitive details remain protected.
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                <strong className="block text-purple-200">
+                  Governance Policies &amp; Contracts
+                </strong>
+                <p className="mt-1 leading-relaxed">
+                  Create and review policy records and data contracts governing
+                  source, region, required shape, retention, and approval
+                  expectations. Policy changes require authorized ownership and
+                  an auditable reason.
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                <strong className="block text-rose-200">
+                  DR &amp; SRE Runbooks
+                </strong>
+                <p className="mt-1 leading-relaxed">
+                  Create a recovery runbook with target, recovery objective,
+                  owner, and steps. Drill it, record the result and timestamp,
+                  and use failures as remediation work rather than declaring
+                  recovery readiness.
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+                <strong className="block text-amber-200">
+                  Tenant isolation &amp; retention
+                </strong>
+                <p className="mt-1 leading-relaxed">
+                  Operational records, workflow events, approvals, packets, and
+                  audit views are tenant/user scoped. Follow least privilege,
+                  retention, backup, incident, and access-review policies.
+                </p>
+              </div>
             </div>
-            <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed"><strong className="text-amber-200">Evidence chain:</strong> source event → validated contract/mapping → pipeline log or quarantine → model/analytics output → governed decision → approval/action → audit event → briefing or recovery evidence. If a link is missing, mark the outcome unconfirmed and investigate.</div>
+            <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed">
+              <strong className="text-amber-200">Evidence chain:</strong> source
+              event → validated contract/mapping → pipeline log or quarantine →
+              model/analytics output → governed decision → approval/action →
+              audit event → briefing or recovery evidence. If a link is missing,
+              mark the outcome unconfirmed and investigate.
+            </div>
           </div>
         );
 
@@ -4343,8 +5003,8 @@ export const UserManualModal = ({
                 Configure inbound event delivery from external HRIS and
                 communication suites. The current connector surface receives
                 signed events; it does not log in to or pull data from vendor
-                APIs automatically. Secure delivery uses token headers and
-                HMAC payload signatures.
+                APIs automatically. Secure delivery uses token headers and HMAC
+                payload signatures.
               </p>
             </div>
 
@@ -4411,99 +5071,262 @@ export const UserManualModal = ({
                   on webhook requests.
                 </li>
                 <li>
-                  Include <code className="text-cyan-300">X-Signature</code>{" "}
-                  as <code className="text-cyan-300">sha256=&lt;hex&gt;</code>,
-                  where the hex value is the SHA-256 HMAC of the exact body using
-                  the API key as secret. All three webhook endpoints require
-                  this signature.
+                  Include <code className="text-cyan-300">X-Signature</code> as{" "}
+                  <code className="text-cyan-300">sha256=&lt;hex&gt;</code>,
+                  where the hex value is the SHA-256 HMAC of the exact body
+                  using the API key as secret. All three webhook endpoints
+                  require this signature.
                 </li>
               </ol>
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">AI / LLM Provider Setup</h3>
+              <h3 className="text-sm font-bold text-white">
+                AI / LLM Provider Setup
+              </h3>
               <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
                 <div className="p-4 rounded-xl bg-slate-950/60 border border-white/10 space-y-2">
-                  <strong className="text-cyan-200 block">Supported provider families</strong>
-                  <p>Choose from Anthropic, OpenAI-Compatible, Google, Groq, LM Studio, Ollama, OpenAI API, or OpenCode Zen. Hosted providers normally require a secret; LM Studio and Ollama use local loopback runtimes and do not require an API key.</p>
-                  <p>Use <strong>Navigator</strong> to review configured runtimes. Only one linked model is marked active for the workspace at a time.</p>
+                  <strong className="text-cyan-200 block">
+                    Supported provider families
+                  </strong>
+                  <p>
+                    Choose from Anthropic, OpenAI-Compatible, Google, Groq, LM
+                    Studio, Ollama, OpenAI API, or OpenCode Zen. Hosted
+                    providers normally require a secret; LM Studio and Ollama
+                    use local loopback runtimes and do not require an API key.
+                  </p>
+                  <p>
+                    Use <strong>Navigator</strong> to review configured
+                    runtimes. Only one linked model is marked active for the
+                    workspace at a time.
+                  </p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-950/60 border border-white/10 space-y-2">
-                  <strong className="text-emerald-200 block">Connection lifecycle</strong>
+                  <strong className="text-emerald-200 block">
+                    Connection lifecycle
+                  </strong>
                   <ol className="list-decimal pl-4 space-y-1">
-                    <li>Open Settings → AI Providers and select a family with <strong>+</strong>.</li>
-                    <li>Confirm authentication protocol and runtime/base URL.</li>
-                    <li>Enter the secret when required; local runtimes use their loopback URL.</li>
-                    <li>Refresh model discovery, search the returned models, and select one.</li>
-                    <li>Run Test Ping, confirm the response, then Link/activate the connection.</li>
+                    <li>
+                      Open Settings → AI Providers and select a family with{" "}
+                      <strong>+</strong>.
+                    </li>
+                    <li>
+                      Confirm authentication protocol and runtime/base URL.
+                    </li>
+                    <li>
+                      Enter the secret when required; local runtimes use their
+                      loopback URL.
+                    </li>
+                    <li>
+                      Refresh model discovery, search the returned models, and
+                      select one.
+                    </li>
+                    <li>
+                      Run Test Ping, confirm the response, then Link/activate
+                      the connection.
+                    </li>
                   </ol>
                 </div>
               </div>
               <div className="p-4 rounded-xl bg-black/40 border border-white/5 text-xs text-slate-300 space-y-2">
-                <strong className="text-indigo-200 block">Models, keys, and failure states</strong>
-                <p>Model discovery is requested from the configured endpoint when the URL/token changes or when Refresh Discovery is selected. If live discovery fails, the interface may show predefined model options; treat those as selectable defaults, not proof that the remote model is reachable.</p>
-                <p>Test Ping is the connectivity check. “Connected” means the check succeeded; “Offline” or an error means verify URL, model name, credentials, network access, local service availability, and provider limits. Never paste secrets into chat, screenshots, logs, or webhook payloads. Rotate any exposed key.</p>
+                <strong className="text-indigo-200 block">
+                  Models, keys, and failure states
+                </strong>
+                <p>
+                  Model discovery is requested from the configured endpoint when
+                  the URL/token changes or when Refresh Discovery is selected.
+                  If live discovery fails, the interface may show predefined
+                  model options; treat those as selectable defaults, not proof
+                  that the remote model is reachable.
+                </p>
+                <p>
+                  Test Ping is the connectivity check. “Connected” means the
+                  check succeeded; “Offline” or an error means verify URL, model
+                  name, credentials, network access, local service availability,
+                  and provider limits. Never paste secrets into chat,
+                  screenshots, logs, or webhook payloads. Rotate any exposed
+                  key.
+                </p>
               </div>
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Webhook delivery, idempotency, and monitoring</h3>
+              <h3 className="text-sm font-bold text-white">
+                Webhook delivery, idempotency, and monitoring
+              </h3>
               <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
                 <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-2">
-                  <strong className="text-amber-200 block">API key registry</strong>
-                  <p>In the Integrations console, create a named ingestion token, copy the generated secret immediately, and store it in the source system’s secret manager. Tokens can be listed, rotated, or revoked by authorized administrators. A revoked or expired token must not be reused.</p>
-                  <p>Use <code className="text-cyan-300">X-API-Key</code> for authentication and <code className="text-cyan-300">X-Signature</code> for the SHA-256 HMAC of the exact request body using the API token as the secret.</p>
+                  <strong className="text-amber-200 block">
+                    API key registry
+                  </strong>
+                  <p>
+                    In the Integrations console, create a named ingestion token,
+                    copy the generated secret immediately, and store it in the
+                    source system’s secret manager. Tokens can be listed,
+                    rotated, or revoked by authorized administrators. A revoked
+                    or expired token must not be reused.
+                  </p>
+                  <p>
+                    Use <code className="text-cyan-300">X-API-Key</code> for
+                    authentication and{" "}
+                    <code className="text-cyan-300">X-Signature</code> for the
+                    SHA-256 HMAC of the exact request body using the API token
+                    as the secret.
+                  </p>
                 </div>
                 <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-2">
-                  <strong className="text-pink-200 block">Delivery lifecycle</strong>
-              <p>Send the JSON payload to the selected endpoint. The service authenticates and validates it, records the webhook event, applies the source-specific update, and marks success or failure. Include an <code className="text-cyan-300">Idempotency-Key</code> so retries do not create duplicate effects. The HMAC signature must be calculated from the exact body bytes sent; changing whitespace or field order after signing can invalidate it.</p>
-                  <p>Review Integration Logs for processing status and Webhook Events for delivery history, endpoint, timestamps, and error details. Retry transient failures with the same idempotency key; fix authentication or schema errors before retrying.</p>
+                  <strong className="text-pink-200 block">
+                    Delivery lifecycle
+                  </strong>
+                  <p>
+                    Send the JSON payload to the selected endpoint. The service
+                    authenticates and validates it, records the webhook event,
+                    applies the source-specific update, and marks success or
+                    failure. Include an{" "}
+                    <code className="text-cyan-300">Idempotency-Key</code> so
+                    retries do not create duplicate effects. The HMAC signature
+                    must be calculated from the exact body bytes sent; changing
+                    whitespace or field order after signing can invalidate it.
+                  </p>
+                  <p>
+                    Review Integration Logs for processing status and Webhook
+                    Events for delivery history, endpoint, timestamps, and error
+                    details. Retry transient failures with the same idempotency
+                    key; fix authentication or schema errors before retrying.
+                  </p>
                 </div>
               </div>
               <div className="p-4 rounded-xl bg-slate-950/60 border border-white/10 text-xs text-slate-300 space-y-2">
-                <strong className="text-cyan-200 block">Source-specific behavior</strong>
+                <strong className="text-cyan-200 block">
+                  Source-specific behavior
+                </strong>
                 <ul className="list-disc pl-4 space-y-1">
-                  <li><strong>Slack:</strong> accepts activity/sentiment signals such as employee email, sentiment score, and message count; successful processing updates the corresponding workforce signal.</li>
-                  <li><strong>Jira:</strong> records project collaboration activity; successful logs can contribute to the Intelligence Center ONA network when employee emails are present in the event details.</li>
-                  <li><strong>Workday:</strong> sends an <code className="text-cyan-300">employee</code> object with a required email plus optional full name, department, role, and skills; <code className="text-cyan-300">action: hire</code> creates a new record and other actions update an existing or newly initialized profile. Validate identifiers and mappings before using refreshed records in analytics.</li>
+                  <li>
+                    <strong>Slack:</strong> accepts activity/sentiment signals
+                    such as employee email, sentiment score, and message count;
+                    successful processing updates the corresponding workforce
+                    signal.
+                  </li>
+                  <li>
+                    <strong>Jira:</strong> records project collaboration
+                    activity; successful logs can contribute to the Intelligence
+                    Center ONA network when employee emails are present in the
+                    event details.
+                  </li>
+                  <li>
+                    <strong>Workday:</strong> sends an{" "}
+                    <code className="text-cyan-300">employee</code> object with
+                    a required email plus optional full name, department, role,
+                    and skills;{" "}
+                    <code className="text-cyan-300">action: hire</code> creates
+                    a new record and other actions update an existing or newly
+                    initialized profile. Validate identifiers and mappings
+                    before using refreshed records in analytics.
+                  </li>
                 </ul>
               </div>
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Integration Harness &amp; End-to-End Proof</h3>
+              <h3 className="text-sm font-bold text-white">
+                Integration Harness &amp; End-to-End Proof
+              </h3>
               <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
                 <div className="p-4 rounded-xl bg-emerald-400/[0.04] border border-emerald-400/20 space-y-2">
-                  <strong className="text-emerald-200 block">What the automated harness proves</strong>
+                  <strong className="text-emerald-200 block">
+                    What the automated harness proves
+                  </strong>
                   <ul className="list-disc pl-4 space-y-1">
-                    <li>Provider authentication request shapes and credential boundaries.</li>
-                    <li>Jira page traversal, Slack cursor traversal, and Workday offset traversal.</li>
-                    <li>Canonical normalization, retry handling, and encrypted-secret non-leakage.</li>
-                    <li>Worker entrypoint and durable scheduler wiring are import-tested without vendor calls.</li>
+                    <li>
+                      Provider authentication request shapes and credential
+                      boundaries.
+                    </li>
+                    <li>
+                      Jira page traversal, Slack cursor traversal, and Workday
+                      offset traversal.
+                    </li>
+                    <li>
+                      Canonical normalization, retry handling, and
+                      encrypted-secret non-leakage.
+                    </li>
+                    <li>
+                      Worker entrypoint and durable scheduler wiring are
+                      import-tested without vendor calls.
+                    </li>
                   </ul>
                 </div>
                 <div className="p-4 rounded-xl bg-cyan-400/[0.04] border border-cyan-400/20 space-y-2">
-                  <strong className="text-cyan-200 block">How administrators prove a live tenant</strong>
+                  <strong className="text-cyan-200 block">
+                    How administrators prove a live tenant
+                  </strong>
                   <ol className="list-decimal pl-4 space-y-1">
-                    <li>Run the offline connector harness in CI: <code>cd server &amp;&amp; PYTHONPATH=. pytest -q tests/test_connector_harness.py</code>.</li>
-                    <li>Start PostgreSQL, Redis, Qdrant, API, worker, and connector scheduler.</li>
-                    <li>Create the connection as an administrator, then run Verify Connection.</li>
-                    <li>Run Discover Metadata and compare returned fields/projects/channels to vendor access.</li>
-                    <li>Define the contract and mappings, run Pipeline Sync, and reconcile bronze, canonical, and quarantine counts.</li>
-                    <li>Confirm the audit event, sync job, retry behavior, and downstream dashboard refresh.</li>
+                    <li>
+                      Run the offline connector harness in CI:{" "}
+                      <code>
+                        cd server &amp;&amp; PYTHONPATH=. pytest -q
+                        tests/test_connector_harness.py
+                      </code>
+                      .
+                    </li>
+                    <li>
+                      Start PostgreSQL, Redis, Qdrant, API, worker, and
+                      connector scheduler.
+                    </li>
+                    <li>
+                      Create the connection as an administrator, then run Verify
+                      Connection.
+                    </li>
+                    <li>
+                      Run Discover Metadata and compare returned
+                      fields/projects/channels to vendor access.
+                    </li>
+                    <li>
+                      Define the contract and mappings, run Pipeline Sync, and
+                      reconcile bronze, canonical, and quarantine counts.
+                    </li>
+                    <li>
+                      Confirm the audit event, sync job, retry behavior, and
+                      downstream dashboard refresh.
+                    </li>
                   </ol>
                 </div>
               </div>
               <div className="p-4 rounded-xl border border-amber-400/20 bg-amber-400/[0.04] text-xs text-slate-300 leading-relaxed">
-                <strong className="text-amber-200">Harness boundary:</strong> automated tests never use real company data or credentials. The live-tenant runbook is the final acceptance test and must use a least-privilege service account, a limited test project/channel/worker population, and a documented rollback/credential-revocation procedure.
+                <strong className="text-amber-200">Harness boundary:</strong>{" "}
+                automated tests never use real company data or credentials. The
+                live-tenant runbook is the final acceptance test and must use a
+                least-privilege service account, a limited test
+                project/channel/worker population, and a documented
+                rollback/credential-revocation procedure.
               </div>
             </div>
 
             <div className="p-4 rounded-xl border border-rose-400/20 bg-rose-400/[0.04] text-xs text-slate-300 leading-relaxed space-y-2">
-              <strong className="text-rose-200 block">Public-facing trust and privacy guidance</strong>
-              <p>Providers and integrations may process workforce, candidate, sentiment, compensation, or collaboration data. Obtain the required organizational consent and legal basis, minimize fields, restrict tenant/admin access, configure retention, and explain automated processing to affected users where required.</p>
-              <p>Provider configuration is currently saved in the browser&apos;s local storage for this workspace UI; it is not a server-side secret vault. Use a trusted device, do not share browser profiles, avoid screenshots, and remove or rotate keys when access changes. Integration API tokens are different: the server stores only their hash and shows the raw token once.</p>
-              <p>A successful webhook or connected model does not mean the resulting data is accurate. Check source freshness, schema mapping, duplicate handling, logs, quarantine, model governance, and audit evidence before relying on downstream dashboards or decisions.</p>
+              <strong className="text-rose-200 block">
+                Public-facing trust and privacy guidance
+              </strong>
+              <p>
+                Providers and integrations may process workforce, candidate,
+                sentiment, compensation, or collaboration data. Obtain the
+                required organizational consent and legal basis, minimize
+                fields, restrict tenant/admin access, configure retention, and
+                explain automated processing to affected users where required.
+              </p>
+              <p>
+                Provider configuration is currently saved in the browser&apos;s
+                local storage for this workspace UI; it is not a server-side
+                secret vault. Use a trusted device, do not share browser
+                profiles, avoid screenshots, and remove or rotate keys when
+                access changes. Integration API tokens are different: the server
+                stores only their hash and shows the raw token once.
+              </p>
+              <p>
+                A successful webhook or connected model does not mean the
+                resulting data is accurate. Check source freshness, schema
+                mapping, duplicate handling, logs, quarantine, model governance,
+                and audit evidence before relying on downstream dashboards or
+                decisions.
+              </p>
             </div>
           </div>
         );
@@ -4517,66 +5340,143 @@ export const UserManualModal = ({
                 System Controls
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                Workspace Settings is the account and system-control surface.
-                It contains the signed-in profile, AI provider configuration,
+                Workspace Settings is the account and system-control surface. It
+                contains the signed-in profile, AI provider configuration,
                 logout, the full in-app data reset, and permanent account
                 deletion.
               </p>
             </div>
 
             <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed">
-              <strong className="text-emerald-200">Before using a destructive control:</strong>{" "}
+              <strong className="text-emerald-200">
+                Before using a destructive control:
+              </strong>{" "}
               verify the active account and workspace, export or back up any
-              required data, confirm the intended scope, and ensure you have
-              the authority to perform the action. Reset and deletion are not
-              ordinary navigation actions and should be treated as
-              irreversible without a verified backup.
+              required data, confirm the intended scope, and ensure you have the
+              authority to perform the action. Reset and deletion are not
+              ordinary navigation actions and should be treated as irreversible
+              without a verified backup.
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 text-xs text-slate-300">
               <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-2">
                 <strong className="text-white block">Profile tab</strong>
-                <p>Shows the signed-in full name, email, role (Administrator or Standard User), and account creation time. These are displayed account values; this screen does not provide an edit-profile workflow.</p>
-                <p>The profile notice distinguishes workspace data from login identity: resetting application data preserves login accounts, while account deletion removes the signed-in account and logs out.</p>
+                <p>
+                  Shows the signed-in full name, email, role (Administrator or
+                  Standard User), and account creation time. These are displayed
+                  account values; this screen does not provide an edit-profile
+                  workflow.
+                </p>
+                <p>
+                  The profile notice distinguishes workspace data from login
+                  identity: resetting application data preserves login accounts,
+                  while account deletion removes the signed-in account and logs
+                  out.
+                </p>
               </div>
               <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-2">
-                <strong className="text-cyan-200 block">AI Providers tab</strong>
-                <p>Open <strong>AI Providers</strong> to manage the local provider inventory and model assignment. Provider credentials, endpoint/base URL, selected model, provider category, connection test, model discovery, and active-provider selection are handled there.</p>
-                <p>Use the provider-specific setup and the Providers &amp; Webhooks chapter for connection details. Keep keys private, use approved endpoints, test before activation, and confirm which provider/model downstream AI features will use.</p>
+                <strong className="text-cyan-200 block">
+                  AI Providers tab
+                </strong>
+                <p>
+                  Open <strong>AI Providers</strong> to manage the local
+                  provider inventory and model assignment. Provider credentials,
+                  endpoint/base URL, selected model, provider category,
+                  connection test, model discovery, and active-provider
+                  selection are handled there.
+                </p>
+                <p>
+                  Use the provider-specific setup and the Providers &amp;
+                  Webhooks chapter for connection details. Keep keys private,
+                  use approved endpoints, test before activation, and confirm
+                  which provider/model downstream AI features will use.
+                </p>
               </div>
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">Account and workspace actions</h3>
+              <h3 className="text-sm font-bold text-white">
+                Account and workspace actions
+              </h3>
               <div className="grid gap-3 md:grid-cols-3 text-xs text-slate-300">
                 <div className="p-4 bg-slate-950/60 rounded-xl border border-white/10 space-y-2">
                   <strong className="text-slate-200 block">Logout</strong>
-                  <p>Select <strong>Logout now</strong> to end the current session and return to the login screen. It does not reset workspace records or delete the account.</p>
+                  <p>
+                    Select <strong>Logout now</strong> to end the current
+                    session and return to the login screen. It does not reset
+                    workspace records or delete the account.
+                  </p>
                 </div>
                 <div className="p-4 bg-amber-400/[0.05] rounded-xl border border-amber-400/20 space-y-2">
-                  <strong className="text-amber-200 block">Reset application data</strong>
-                  <p>Type <code className="text-amber-300">RESET</code> exactly, then select the reset button. This clears in-app employee, candidate, chat, analytics, connector, and application records while preserving login accounts.</p>
-                  <p>On success, workspace caches are cleared while the authentication token, signed-in user, and tenant identifier are preserved. A server error leaves the action unsuccessful and displays an error message.</p>
+                  <strong className="text-amber-200 block">
+                    Reset application data
+                  </strong>
+                  <p>
+                    Type <code className="text-amber-300">RESET</code> exactly,
+                    then select the reset button. This clears in-app employee,
+                    candidate, chat, analytics, connector, and application
+                    records while preserving login accounts.
+                  </p>
+                  <p>
+                    On success, workspace caches are cleared while the
+                    authentication token, signed-in user, and tenant identifier
+                    are preserved. A server error leaves the action unsuccessful
+                    and displays an error message.
+                  </p>
                 </div>
                 <div className="p-4 bg-rose-400/[0.05] rounded-xl border border-rose-400/20 space-y-2">
-                  <strong className="text-rose-200 block">Delete account</strong>
-                  <p>Type <code className="text-rose-300">DELETE</code> exactly, then select the permanent deletion button. The API removes the currently authenticated account; success immediately calls logout.</p>
-                  <p>If deletion fails, the account is not treated as deleted and the error is shown for retry or administrator support.</p>
+                  <strong className="text-rose-200 block">
+                    Delete account
+                  </strong>
+                  <p>
+                    Type <code className="text-rose-300">DELETE</code> exactly,
+                    then select the permanent deletion button. The API removes
+                    the currently authenticated account; success immediately
+                    calls logout.
+                  </p>
+                  <p>
+                    If deletion fails, the account is not treated as deleted and
+                    the error is shown for retry or administrator support.
+                  </p>
                 </div>
               </div>
             </div>
 
             <div className="p-4 rounded-xl border border-white/10 bg-slate-950/60 text-xs text-slate-300 leading-relaxed space-y-2">
-              <strong className="text-indigo-200 block">End-to-end recovery and governance checklist</strong>
+              <strong className="text-indigo-200 block">
+                End-to-end recovery and governance checklist
+              </strong>
               <ol className="list-decimal pl-5 space-y-1">
-                <li>Confirm identity, tenant, role, and the intended action.</li>
-                <li>Export required records and preserve audit evidence before reset or deletion.</li>
-                <li>For provider changes, rotate exposed credentials, test the endpoint, and record the selected model and owner.</li>
-                <li>For reset, enter RESET and wait for the success response; refresh dependent screens and verify expected empty-state behavior.</li>
-                <li>For deletion, enter DELETE only after retention, legal hold, backup, and administrator requirements are satisfied.</li>
-                <li>Record the operator, timestamp, reason, scope, result, and any recovery action in the approved audit process.</li>
+                <li>
+                  Confirm identity, tenant, role, and the intended action.
+                </li>
+                <li>
+                  Export required records and preserve audit evidence before
+                  reset or deletion.
+                </li>
+                <li>
+                  For provider changes, rotate exposed credentials, test the
+                  endpoint, and record the selected model and owner.
+                </li>
+                <li>
+                  For reset, enter RESET and wait for the success response;
+                  refresh dependent screens and verify expected empty-state
+                  behavior.
+                </li>
+                <li>
+                  For deletion, enter DELETE only after retention, legal hold,
+                  backup, and administrator requirements are satisfied.
+                </li>
+                <li>
+                  Record the operator, timestamp, reason, scope, result, and any
+                  recovery action in the approved audit process.
+                </li>
               </ol>
-              <p className="text-amber-200">Do not use reset or account deletion as a troubleshooting shortcut. Contact an administrator when scope, ownership, backup status, or recovery requirements are unclear.</p>
+              <p className="text-amber-200">
+                Do not use reset or account deletion as a troubleshooting
+                shortcut. Contact an administrator when scope, ownership, backup
+                status, or recovery requirements are unclear.
+              </p>
             </div>
           </div>
         );
@@ -4716,7 +5616,9 @@ export const UserManualModal = ({
                     <option value="workflows">Workflow Chat & Agents</option>
                     <option value="scout">Talent Scout Matchmaker</option>
                     <optgroup label="Analytics & Sentiment">
-                      <option value="analytics">Organizational Analytics</option>
+                      <option value="analytics">
+                        Organizational Analytics
+                      </option>
                       <option value="sentiment">Sentiment Intelligence</option>
                     </optgroup>
                     <option value="directory">Talent Directory</option>

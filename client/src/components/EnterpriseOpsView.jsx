@@ -492,19 +492,34 @@ const EnterpriseOpsView = () => {
       return;
     }
     if (provider !== "slack" && !connForm.base_url.trim()) {
-      setConnectionFormError(`${setup.label} requires its company API base URL.`);
+      setConnectionFormError(
+        `${setup.label} requires its company API base URL.`,
+      );
       return;
     }
-    if (provider === "jira" && (!connForm.account_email.trim() || !connForm.api_token.trim())) {
-      setConnectionFormError("Jira requires the Atlassian account email and API token.");
+    if (
+      provider === "jira" &&
+      (!connForm.account_email.trim() || !connForm.api_token.trim())
+    ) {
+      setConnectionFormError(
+        "Jira requires the Atlassian account email and API token.",
+      );
       return;
     }
     if (provider === "slack" && !connForm.bot_token.trim()) {
       setConnectionFormError("Slack requires an OAuth bot token.");
       return;
     }
-    if (provider === "workday" && !connForm.access_token?.trim() && (!connForm.client_id.trim() || !connForm.client_secret.trim() || !connForm.token_url.trim())) {
-      setConnectionFormError("Workday requires an access token, or all three OAuth client fields.");
+    if (
+      provider === "workday" &&
+      !connForm.access_token?.trim() &&
+      (!connForm.client_id.trim() ||
+        !connForm.client_secret.trim() ||
+        !connForm.token_url.trim())
+    ) {
+      setConnectionFormError(
+        "Workday requires an access token, or all three OAuth client fields.",
+      );
       return;
     }
     setConnectionFormError("");
@@ -521,7 +536,10 @@ const EnterpriseOpsView = () => {
     );
     const options = {};
     if (provider === "slack") {
-      options.channel_ids = connForm.slack_channel_ids.split(",").map((value) => value.trim()).filter(Boolean);
+      options.channel_ids = connForm.slack_channel_ids
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
     }
     if (provider === "workday" && connForm.workday_workers_path.trim()) {
       options.workers_path = connForm.workday_workers_path.trim();
@@ -535,12 +553,14 @@ const EnterpriseOpsView = () => {
         provider: connForm.provider.trim().toLowerCase(),
         status: "draft",
         auth_type: connForm.auth_type,
-      credentials,
-      options,
-      base_url: connForm.base_url?.trim() || null,
+        credentials,
+        options,
+        base_url: connForm.base_url?.trim() || null,
       });
     } catch (error) {
-      setConnectionFormError(error?.message || "Connection could not be saved.");
+      setConnectionFormError(
+        error?.message || "Connection could not be saved.",
+      );
       return;
     }
     setConnForm((prev) => ({
@@ -1259,7 +1279,11 @@ const EnterpriseOpsView = () => {
                           <span>Quick connect</span>
                           <span>1 of 4</span>
                         </div>
-                        <p>Choose a provider, enter its credentials, add the connection, then use Verify → Discover → Pipeline Sync on the right.</p>
+                        <p>
+                          Choose a provider, enter its credentials, add the
+                          connection, then use Verify → Discover → Pipeline Sync
+                          on the right.
+                        </p>
                       </div>
                       <div>
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
@@ -1287,7 +1311,9 @@ const EnterpriseOpsView = () => {
                           <option value="workday">Workday</option>
                         </PremiumSelect>
                         {connectionProvider && (
-                          <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">{PROVIDER_SETUP[connectionProvider]?.help}</p>
+                          <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
+                            {PROVIDER_SETUP[connectionProvider]?.help}
+                          </p>
                         )}
                       </div>
                       <div>
@@ -1304,128 +1330,219 @@ const EnterpriseOpsView = () => {
                           }
                         />
                       </div>
-                      {connectionProvider === "jira" && <div>
+                      {connectionProvider === "jira" && (
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                            {connectionProvider === "jira" ? "Jira Account Email" : "Account Email (optional)"}
-                          </label>
-                          <input
-                            type="email"
-                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
-                            placeholder="admin@company.com"
-                            value={connForm.account_email}
-                            onChange={(e) => setConnForm((p) => ({ ...p, account_email: e.target.value }))}
-                          />
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                              {connectionProvider === "jira"
+                                ? "Jira Account Email"
+                                : "Account Email (optional)"}
+                            </label>
+                            <input
+                              type="email"
+                              className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                              placeholder="admin@company.com"
+                              value={connForm.account_email}
+                              onChange={(e) =>
+                                setConnForm((p) => ({
+                                  ...p,
+                                  account_email: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                              {connectionProvider === "slack"
+                                ? "Slack OAuth Bot Token"
+                                : "API Token (Jira)"}
+                            </label>
+                            <input
+                              type="password"
+                              className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                              placeholder="Stored encrypted on the server"
+                              value={connForm.api_token || connForm.bot_token}
+                              onChange={(e) =>
+                                setConnForm((p) => ({
+                                  ...p,
+                                  api_token:
+                                    p.provider.toLowerCase() === "jira"
+                                      ? e.target.value
+                                      : "",
+                                  bot_token:
+                                    p.provider.toLowerCase() === "slack"
+                                      ? e.target.value
+                                      : "",
+                                }))
+                              }
+                            />
+                          </div>
                         </div>
+                      )}
+                      {connectionProvider === "slack" && (
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                            {connectionProvider === "slack" ? "Slack OAuth Bot Token" : "API Token (Jira)"}
+                            Slack OAuth Bot Token
                           </label>
                           <input
                             type="password"
                             className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
-                            placeholder="Stored encrypted on the server"
-                            value={connForm.api_token || connForm.bot_token}
-                            onChange={(e) => setConnForm((p) => ({ ...p, api_token: p.provider.toLowerCase() === "jira" ? e.target.value : "", bot_token: p.provider.toLowerCase() === "slack" ? e.target.value : "" }))}
+                            placeholder="xoxb-… — encrypted on the server"
+                            value={connForm.bot_token}
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                bot_token: e.target.value,
+                              }))
+                            }
                           />
-                        </div>
-                      </div>}
-                      {connectionProvider === "slack" && <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                          Slack OAuth Bot Token
-                        </label>
-                        <input
-                          type="password"
-                          className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
-                          placeholder="xoxb-… — encrypted on the server"
-                          value={connForm.bot_token}
-                          onChange={(e) => setConnForm((p) => ({ ...p, bot_token: e.target.value }))}
-                        />
-                        <label className="mt-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                          Slack Channel IDs (optional)
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
-                          placeholder="C012ABC, C034XYZ"
-                          value={connForm.slack_channel_ids}
-                          onChange={(e) => setConnForm((p) => ({ ...p, slack_channel_ids: e.target.value }))}
-                        />
-                        <p className="mt-1 text-[10px] text-slate-500">Optional comma-separated IDs. Leave blank to sync every channel the bot can access.</p>
-                      </div>}
-                      {connectionProvider === "workday" && <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                            OAuth Client ID (Workday, optional)
+                          <label className="mt-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                            Slack Channel IDs (optional)
                           </label>
                           <input
                             type="text"
                             className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
-                            value={connForm.client_id}
-                            onChange={(e) => setConnForm((p) => ({ ...p, client_id: e.target.value }))}
+                            placeholder="C012ABC, C034XYZ"
+                            value={connForm.slack_channel_ids}
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                slack_channel_ids: e.target.value,
+                              }))
+                            }
                           />
+                          <p className="mt-1 text-[10px] text-slate-500">
+                            Optional comma-separated IDs. Leave blank to sync
+                            every channel the bot can access.
+                          </p>
                         </div>
+                      )}
+                      {connectionProvider === "workday" && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                              OAuth Client ID (Workday, optional)
+                            </label>
+                            <input
+                              type="text"
+                              className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                              value={connForm.client_id}
+                              onChange={(e) =>
+                                setConnForm((p) => ({
+                                  ...p,
+                                  client_id: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                              OAuth Client Secret (Workday, optional)
+                            </label>
+                            <input
+                              type="password"
+                              className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                              value={connForm.client_secret}
+                              onChange={(e) =>
+                                setConnForm((p) => ({
+                                  ...p,
+                                  client_secret: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {connectionProvider === "workday" && (
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                            OAuth Client Secret (Workday, optional)
+                            Workday Access Token (or use OAuth client fields
+                            below)
                           </label>
                           <input
                             type="password"
                             className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
-                            value={connForm.client_secret}
-                            onChange={(e) => setConnForm((p) => ({ ...p, client_secret: e.target.value }))}
+                            placeholder="Bearer access token — encrypted on the server"
+                            value={connForm.access_token}
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                access_token: e.target.value,
+                              }))
+                            }
                           />
                         </div>
-                      </div>}
-                      {connectionProvider === "workday" && <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                          Workday Access Token (or use OAuth client fields below)
-                        </label>
-                        <input
-                          type="password"
-                          className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
-                          placeholder="Bearer access token — encrypted on the server"
-                          value={connForm.access_token}
-                          onChange={(e) => setConnForm((p) => ({ ...p, access_token: e.target.value }))}
-                        />
-                      </div>}
-                      {connectionProvider === "workday" && <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                          Workday Workers API Path
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
-                          placeholder="/api/staffing/v7/tenant/workers"
-                          value={connForm.workday_workers_path}
-                          onChange={(e) => setConnForm((p) => ({ ...p, workday_workers_path: e.target.value }))}
-                        />
-                        <p className="mt-1 text-[10px] text-slate-500">Copy the production workers path from Workday REST API Explorer, including service version and tenant where required.</p>
-                      </div>}
-                      {connectionProvider === "workday" && <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                          OAuth Token URL (Workday, optional with access token)
-                        </label>
-                        <input
-                          type="url"
-                          className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
-                          placeholder="https://your-tenant.workday.com/ccx/oauth2/token"
-                          value={connForm.token_url}
-                          onChange={(e) => setConnForm((p) => ({ ...p, token_url: e.target.value }))}
-                        />
-                      </div>}
+                      )}
+                      {connectionProvider === "workday" && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                            Workday Workers API Path
+                          </label>
+                          <input
+                            type="text"
+                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                            placeholder="/api/staffing/v7/tenant/workers"
+                            value={connForm.workday_workers_path}
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                workday_workers_path: e.target.value,
+                              }))
+                            }
+                          />
+                          <p className="mt-1 text-[10px] text-slate-500">
+                            Copy the production workers path from Workday REST
+                            API Explorer, including service version and tenant
+                            where required.
+                          </p>
+                        </div>
+                      )}
+                      {connectionProvider === "workday" && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                            OAuth Token URL (Workday, optional with access
+                            token)
+                          </label>
+                          <input
+                            type="url"
+                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                            placeholder="https://your-tenant.workday.com/ccx/oauth2/token"
+                            value={connForm.token_url}
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                token_url: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      )}
                       <div className="flex items-center justify-between rounded-xl border border-white/5 bg-slate-950/30 px-3 py-2 text-[10px] text-slate-400">
-                        <span>Pipeline type: <strong className="text-slate-200">{PROVIDER_SETUP[connectionProvider]?.source_type || "—"}</strong></span>
-                        <span>New connections start as <strong className="text-amber-200">Draft</strong></span>
+                        <span>
+                          Pipeline type:{" "}
+                          <strong className="text-slate-200">
+                            {PROVIDER_SETUP[connectionProvider]?.source_type ||
+                              "—"}
+                          </strong>
+                        </span>
+                        <span>
+                          New connections start as{" "}
+                          <strong className="text-amber-200">Draft</strong>
+                        </span>
                       </div>
                       <div>
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                          {connectionProvider === "slack" ? "Base URL (automatic)" : "Provider API Base URL"}
+                          {connectionProvider === "slack"
+                            ? "Base URL (automatic)"
+                            : "Provider API Base URL"}
                         </label>
                         <input
                           type="text"
                           className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 placeholder:text-slate-600 text-xs focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all outline-none"
-                          placeholder={PROVIDER_SETUP[connectionProvider]?.basePlaceholder || "Select a provider first"}
+                          placeholder={
+                            PROVIDER_SETUP[connectionProvider]
+                              ?.basePlaceholder || "Select a provider first"
+                          }
                           disabled={connectionProvider === "slack"}
                           value={connForm.base_url}
                           onChange={(e) =>
@@ -1442,7 +1559,11 @@ const EnterpriseOpsView = () => {
                       >
                         <Plus size={14} /> Add Connection
                       </button>
-                      {connectionFormError && <div className="rounded-xl border border-rose-400/20 bg-rose-400/[0.06] px-3 py-2 text-[10px] leading-relaxed text-rose-200">{connectionFormError}</div>}
+                      {connectionFormError && (
+                        <div className="rounded-xl border border-rose-400/20 bg-rose-400/[0.06] px-3 py-2 text-[10px] leading-relaxed text-rose-200">
+                          {connectionFormError}
+                        </div>
+                      )}
                     </div>
                   </section>
                 </div>
@@ -1513,11 +1634,20 @@ const EnterpriseOpsView = () => {
                                 className="px-3 h-8 rounded-lg border border-emerald-400/20 hover:bg-emerald-500/10 text-[10px] font-bold uppercase tracking-wider text-emerald-300 inline-flex items-center gap-1.5 transition-all"
                                 onClick={async () => {
                                   try {
-                                    const result = await enterpriseAPI.verifyConnection(c.id);
-                                    setConnectionFeedback((prev) => ({ ...prev, [c.id]: `Verified live provider connection${result?.account || result?.team ? `: ${result.account || result.team}` : ""}.` }));
+                                    const result =
+                                      await enterpriseAPI.verifyConnection(
+                                        c.id,
+                                      );
+                                    setConnectionFeedback((prev) => ({
+                                      ...prev,
+                                      [c.id]: `Verified live provider connection${result?.account || result?.team ? `: ${result.account || result.team}` : ""}.`,
+                                    }));
                                     await loadAll();
                                   } catch (error) {
-                                    setConnectionFeedback((prev) => ({ ...prev, [c.id]: `Verification failed: ${error?.message || "provider error"}` }));
+                                    setConnectionFeedback((prev) => ({
+                                      ...prev,
+                                      [c.id]: `Verification failed: ${error?.message || "provider error"}`,
+                                    }));
                                   }
                                 }}
                               >
@@ -1527,10 +1657,19 @@ const EnterpriseOpsView = () => {
                                 className="px-3 h-8 rounded-lg border border-purple-400/20 hover:bg-purple-500/10 text-[10px] font-bold uppercase tracking-wider text-purple-300 inline-flex items-center gap-1.5 transition-all"
                                 onClick={async () => {
                                   try {
-                                    const metadata = await enterpriseAPI.discoverConnection(c.id);
-                                    setConnectionFeedback((prev) => ({ ...prev, [c.id]: `Metadata discovered: ${Object.keys(metadata || {}).join(", ") || "none"}.` }));
+                                    const metadata =
+                                      await enterpriseAPI.discoverConnection(
+                                        c.id,
+                                      );
+                                    setConnectionFeedback((prev) => ({
+                                      ...prev,
+                                      [c.id]: `Metadata discovered: ${Object.keys(metadata || {}).join(", ") || "none"}.`,
+                                    }));
                                   } catch (error) {
-                                    setConnectionFeedback((prev) => ({ ...prev, [c.id]: `Discovery failed: ${error?.message || "provider error"}` }));
+                                    setConnectionFeedback((prev) => ({
+                                      ...prev,
+                                      [c.id]: `Discovery failed: ${error?.message || "provider error"}`,
+                                    }));
                                   }
                                 }}
                               >
@@ -1571,8 +1710,17 @@ const EnterpriseOpsView = () => {
             {pipelineSubTab === "mappings" && (
               <div className="space-y-6 w-full">
                 <div className="rounded-2xl border border-purple-400/20 bg-purple-400/[0.04] p-4 text-xs text-slate-300">
-                  <div className="font-bold uppercase tracking-wider text-purple-200">Advanced step — schema and mappings</div>
-                  <p className="mt-1 leading-relaxed">First connect and verify a provider in <strong className="text-white">System Integrations</strong>. Select a connection there, then return here only if its discovered fields need translation. Most standard Jira, Slack, and Workday records can proceed without manual mappings.</p>
+                  <div className="font-bold uppercase tracking-wider text-purple-200">
+                    Advanced step — schema and mappings
+                  </div>
+                  <p className="mt-1 leading-relaxed">
+                    First connect and verify a provider in{" "}
+                    <strong className="text-white">System Integrations</strong>.
+                    Select a connection there, then return here only if its
+                    discovered fields need translation. Most standard Jira,
+                    Slack, and Workday records can proceed without manual
+                    mappings.
+                  </p>
                 </div>
                 {/* Top 2-Column Grid: Field Mapping Form & Lean Data Contracts */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">

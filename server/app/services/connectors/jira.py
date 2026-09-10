@@ -34,7 +34,7 @@ class JiraConnector(BaseConnector):
             jql = options.get("jql", "ORDER BY updated DESC")
             page_size = min(100, max(1, int(options.get("page_size", 100))))
             max_records = min(10000, max(page_size, int(options.get("max_records", 1000))))
-            rows = []
+            rows: list[dict] = []
             start_at = 0
             while len(rows) < max_records:
                 response = self.request(client, "GET", "/rest/api/3/search", params={"jql": jql, "startAt": start_at, "maxResults": min(page_size, max_records - len(rows)), "fields": "summary,assignee,reporter,status,project"})

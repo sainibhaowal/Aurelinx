@@ -9,11 +9,11 @@ import time
 from datetime import datetime, timedelta
 
 from redis import Redis
+from retry_scheduler import enqueue_due_events
 from rq import Queue
 from sqlmodel import Session, select
 
 from app.models.database import IntegrationConnectionTable, engine
-from retry_scheduler import enqueue_due_events
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("connector_scheduler")

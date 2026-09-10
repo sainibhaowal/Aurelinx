@@ -29,9 +29,10 @@ logger = logging.getLogger("worker.tasks")
 
 def sync_connection_by_id(connection_id: str, tenant_id: str):
     """RQ entrypoint for a durable, tenant-scoped connector sync."""
+    from sqlmodel import Session
+
     from app.api.v1.lean_enterprise import _run_connection_sync
     from app.models.database import engine
-    from sqlmodel import Session
 
     with Session(engine) as session:
         result = _run_connection_sync(UUID(connection_id), tenant_id, session)
