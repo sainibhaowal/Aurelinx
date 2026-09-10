@@ -45,8 +45,10 @@ from sqlmodel import Session as SQLSession
 
 from app.api.v1.chat import (
     _execute_agent_tool,
+    _opencode_api_mode,
     _perform_approved_delete,
     _prepare_delete_spec,
+    _safe_provider_failure_reply,
 )
 from app.core import config as app_config
 from app.core.security import TokenData, get_current_user, get_tenant_id
@@ -68,6 +70,20 @@ ADMIN = TokenData(user_id=str(uuid4()), email="admin-tools@aurelinx.com", is_adm
 MEMBER = TokenData(
     user_id=str(uuid4()), email="member-tools@aurelinx.com", is_admin=False
 )
+
+
+def test_opencode_uses_the_responses_api_for_gpt_family_models():
+    assert _opencode_api_mode("gpt-5.5") == "responses"
+    assert _opencode_api_mode("grok-4.5") == "responses"
+    assert _opencode_api_mode("deepseek-v4-flash") == "chat_completions"
+
+
+def test_provider_failure_reply_is_clear_and_never_claims_an_answer():
+    reply = _safe_provider_failure_reply({}, "HTTP 400 invalid request")
+    assert reply.startswith("Chat could not generate an answer")
+    assert "No Aurelinx data was changed." in reply
+    assert "Settings → LLM" in reply
+    assert "completed the permitted retrieval" not in reply
 
 
 @pytest.fixture()

@@ -1401,6 +1401,21 @@ def _resolve_api_key(provider: str | None, inline_key: str | None) -> str | None
     }.get((provider or "lmstudio").lower())
 
 
+def _opencode_api_mode(model: str | None) -> str:
+    """Select the documented OpenCode Zen transport for a model.
+
+    Zen is not one uniformly OpenAI-chat-compatible endpoint: its GPT/Grok/Muse
+    models use the Responses API, while several other hosted models use Chat
+    Completions. Sending a GPT model to Chat Completions is rejected with HTTP
+    400, so this decision must be made server-side rather than relying on a
+    browser configuration.
+    """
+    model_id = (model or "gpt-5.5").strip().lower()
+    if model_id.startswith(("gpt-", "grok-", "muse-")):
+        return "responses"
+    return "chat_completions"
+
+
 async def _llm_stream_response(
     provider: str,
     api_key: str,
@@ -1419,6 +1434,7 @@ async def _llm_stream_response(
         "google-gemini": "gemini",
     }.get(provider, provider)
     casual_chat = _is_casual_chat(user_text)
+    opencode_mode: str | None = None
 
     if provider == "lmstudio":
         endpoint = (
@@ -1427,8 +1443,10 @@ async def _llm_stream_response(
         model_name = model or "liquid/lfm2.5-1.2b"
         headers = {"Content-Type": "application/json"}
     elif provider == "opencode":
+        opencode_mode = _opencode_api_mode(model or "gpt-5.5")
+        route = "responses" if opencode_mode == "responses" else "chat/completions"
         endpoint = (
-            f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/chat/completions"
+            f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/{route}"
         )
         model_name = model or "gpt-5.5"
         headers = {"Content-Type": "application/json"}
@@ -1600,7 +1618,21 @@ async def _llm_stream_response(
                 continue
             history_messages.append({"role": role, "content": content[:300]})
 
-    if provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
+    if provider == "opencode" and opencode_mode == "responses":
+        history_text = "\n\n".join(
+            f"{item['role'].title()}: {item['content']}"
+            for item in history_messages[-6:]
+        )
+        payload = {
+            "model": model_name,
+            "instructions": system,
+            "input": "\n\n".join(
+                part for part in [history_text, f"User: {user_content}"] if part
+            ),
+            "max_output_tokens": 1024,
+            "stream": True,
+        }
+    elif provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
         messages = [{"role": "system", "content": system}]
         messages.extend(history_messages[-6:])
         messages.append({"role": "user", "content": user_content})
@@ -1639,7 +1671,22 @@ async def _llm_stream_response(
     ):
         resp.raise_for_status()
 
-        if provider in [
+        if provider == "opencode" and opencode_mode == "responses":
+            async for line in resp.aiter_lines():
+                if not line.startswith("data:"):
+                    continue
+                data_str = line[5:].strip()
+                if data_str == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data_str)
+                    if chunk.get("type") == "response.output_text.delta":
+                        delta = chunk.get("delta", "")
+                        if delta:
+                            yield delta
+                except Exception:
+                    continue
+        elif provider in [
             "openai",
             "lmstudio",
             "groq",
@@ -1757,6 +1804,7 @@ async def _llm_response(
         "google": "gemini",
         "google-gemini": "gemini",
     }.get(provider, provider)
+    opencode_mode: str | None = None
 
     if provider == "lmstudio":
         endpoint = (
@@ -1765,8 +1813,10 @@ async def _llm_response(
         model_name = model or "liquid/lfm2.5-1.2b"
         headers = {"Content-Type": "application/json"}
     elif provider == "opencode":
+        opencode_mode = _opencode_api_mode(model or "gpt-5.5")
+        route = "responses" if opencode_mode == "responses" else "chat/completions"
         endpoint = (
-            f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/chat/completions"
+            f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/{route}"
         )
         model_name = model or "gpt-5.5"
         headers = {"Content-Type": "application/json"}
@@ -1935,7 +1985,20 @@ async def _llm_response(
         # Only keep clean conversational turns (cap at 300 chars per turn to stay token-safe)
         history_messages.append({"role": role, "content": content[:300]})
 
-    if provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
+    if provider == "opencode" and opencode_mode == "responses":
+        history_text = "\n\n".join(
+            f"{item['role'].title()}: {item['content']}"
+            for item in history_messages[-6:]
+        )
+        payload = {
+            "model": model_name,
+            "instructions": system,
+            "input": "\n\n".join(
+                part for part in [history_text, f"User: {user_content}"] if part
+            ),
+            "max_output_tokens": 1024,
+        }
+    elif provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
         messages = [{"role": "system", "content": system}]
         messages.extend(history_messages[-6:])  # last 3 turns max
         messages.append({"role": "user", "content": user_content})
@@ -1969,6 +2032,17 @@ async def _llm_response(
         resp = await client.post(endpoint, json=payload, headers=headers)
         resp.raise_for_status()
         data = resp.json()
+        if provider == "opencode" and opencode_mode == "responses":
+            text = str(data.get("output_text") or "").strip()
+            if not text:
+                text = "\n".join(
+                    str(part.get("text") or "")
+                    for output in data.get("output", [])
+                    if isinstance(output, dict)
+                    for part in output.get("content", [])
+                    if isinstance(part, dict) and part.get("type") == "output_text"
+                ).strip()
+            return _sanitize_llm_response(text, user_text)
         if provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
             return _sanitize_llm_response(
                 data["choices"][0]["message"]["content"], user_text
@@ -3779,13 +3853,22 @@ def _safe_provider_failure_reply(context_payload: dict, error: Any = None) -> st
                 summaries.append(f"{name}: completed")
             else:
                 summaries.append(f"{name}: completed")
-    evidence = "; ".join(summaries) if summaries else "no retrieval tools were required"
     reason = _provider_error_label(error) if error else "no response was returned"
-    detail = _provider_error_detail(error) if error else "Retry the request or check the active provider configuration."
+    detail = (
+        _provider_error_detail(error)
+        if error
+        else "Retry the request or check the active provider configuration."
+    )
+    workflow_note = (
+        f" The completed workflow steps were: {'; '.join(summaries)}."
+        if summaries
+        else ""
+    )
     return (
-        "I completed the permitted retrieval and safety checks, but I could not generate the "
-        f"answer because {reason}. {detail} No unsupported database change was made. "
-        f"Operational results: {evidence}"
+        f"Chat could not generate an answer because of {reason}. {detail} "
+        "No Aurelinx data was changed. In Settings → LLM, refresh model discovery, "
+        "select a discovered model, use Test Connection, then retry."
+        f"{workflow_note}"
     )
 
 
@@ -6315,20 +6398,26 @@ async def ping_provider(req: ProviderPingRequest):
                 "messages": [{"role": "user", "content": "ping"}],
             }
         elif provider == "opencode":
+            opencode_mode = _opencode_api_mode(model or "gpt-5.5")
+            route = "responses" if opencode_mode == "responses" else "chat/completions"
             endpoint = (
-                f"{base_url.rstrip('/')}/chat/completions"
+                f"{base_url.rstrip('/')}/{route}"
                 if base_url
-                else "https://opencode.ai/zen/v1/chat/completions"
+                else f"https://opencode.ai/zen/v1/{route}"
             )
             model_name = model or "gpt-5.5"
             headers = {"Content-Type": "application/json"}
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
-            payload = {
-                "model": model_name,
-                "max_tokens": 1,
-                "messages": [{"role": "user", "content": "ping"}],
-            }
+            payload = (
+                {"model": model_name, "input": "ping", "max_output_tokens": 16}
+                if opencode_mode == "responses"
+                else {
+                    "model": model_name,
+                    "max_tokens": 1,
+                    "messages": [{"role": "user", "content": "ping"}],
+                }
+            )
         elif provider == "openai":
             endpoint = "https://api.openai.com/v1/chat/completions"
             model_name = model or "gpt-4o-mini"
