@@ -45,6 +45,7 @@ import AurelinxLogo from "./components/AurelinxLogo";
 import Toast from "./components/Toast";
 import AuthScreen from "./components/AuthScreen";
 import WindowControls from "./components/WindowControls";
+import { APP_VERSION } from "./config/version";
 import {
   analysisAPI,
   candidatesAPI,
@@ -719,7 +720,9 @@ const App = () => {
               className={`mt-auto pb-2 text-center select-none pointer-events-none`}
             >
               <span className="text-[10px] text-slate-500 font-mono tracking-wider">
-                {isSidebarCollapsed ? "v1.0.0" : "AURELINX v1.0.0"}
+                {isSidebarCollapsed
+                  ? `v${APP_VERSION}`
+                  : `AURELINX v${APP_VERSION}`}
               </span>
             </div>
 
