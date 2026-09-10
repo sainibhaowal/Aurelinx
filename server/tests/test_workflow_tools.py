@@ -49,6 +49,7 @@ from app.api.v1.chat import (
     _prepare_delete_spec,
 )
 from app.core.security import TokenData, get_current_user, get_tenant_id
+from app.core import config as app_config
 from app.main import app
 from app.models import database as db
 from app.models.database import (
@@ -169,6 +170,39 @@ def test_search_groups_records_and_redacts_secrets(client_db):
         "api_key" not in row or row["api_key"] == "[redacted]"
         for row in integration_rows
     )
+
+
+def test_search_no_match_never_browses_unrelated_records(client_db):
+    _seed_employee(client_db["engine"], "old.record@aurelinx.io", "Older Record")
+
+    result = _execute_agent_tool(
+        "search",
+        {"query": "person-who-does-not-exist", "limit": 20},
+        "find person-who-does-not-exist",
+        MEMBER,
+        str(uuid4()),
+        {},
+    )
+
+    assert result["returned"] == 0
+    assert result["groups"] == []
+    assert result["browsed"] is False
+
+
+def test_agent_is_blocked_in_production_without_tenant_safe_sql(client_db, monkeypatch):
+    monkeypatch.setattr(app_config.settings, "ENVIRONMENT", "production")
+
+    result = _execute_agent_tool(
+        "search",
+        {"query": "Older Record"},
+        "find Older Record",
+        MEMBER,
+        str(uuid4()),
+        {},
+    )
+
+    assert result["blocked"] is True
+    assert result["error_code"] == "TENANT_SCOPE_REQUIRED"
 
 
 def test_read_by_email_and_redacts_file_path(client_db):

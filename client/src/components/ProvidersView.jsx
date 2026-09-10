@@ -276,7 +276,7 @@ const ProvidersView = () => {
   const [loadingTokens, setLoadingTokens] = useState(false);
   const [newTokenName, setNewTokenName] = useState("My-Company-Webhook");
   const [generatedKey, setGeneratedKey] = useState("");
-  const [employeeEmail, setEmployeeEmail] = useState("silas.vance@aurelinx.io");
+  const [employeeEmail, setEmployeeEmail] = useState("");
   const [simulatingWebhook, setSimulatingWebhook] = useState(null); // 'slack' | 'jira' | 'workday'
   const [integrationLogs, setIntegrationLogs] = useState([]);
   const [webhookEvents, setWebhookEvents] = useState([]);
@@ -1371,10 +1371,10 @@ const ProvidersView = () => {
                                   </div>
                                   <div>
                                     <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                                      Generate New Webhook API Key
+                                      Generate Inbound Webhook Credential
                                     </h3>
                                     <span className="text-[10px] text-slate-400 font-mono block">
-                                      B2B Middleware Credentials
+                                      For approved provider-to-Aurelinx event delivery
                                     </span>
                                   </div>
                                 </div>
@@ -1395,32 +1395,27 @@ const ProvidersView = () => {
                                   </div>
                                   <div>
                                     <label className="block text-[9px] uppercase tracking-widest text-slate-400 mb-1.5 font-bold font-mono">
-                                      Simulator Employee Target
+                                      Event identity email (optional)
                                     </label>
-                                    <PremiumSelect
+                                    <input
+                                      type="email"
                                       value={employeeEmail}
                                       onChange={(e) =>
                                         setEmployeeEmail(e.target.value)
                                       }
+                                      placeholder="employee@your-company.com"
                                       className="w-full h-10 rounded-xl bg-slate-950/80 border border-white/10 px-3 text-xs outline-none focus:border-cyan-500/40 text-slate-200"
-                                    >
-                                      <option value={employeeEmail}>
-                                        {employeeEmail} (Active Dev)
-                                      </option>
-                                      <option value="silas.vance@aurelinx.io">
-                                        silas.vance@aurelinx.io (Seed lead)
-                                      </option>
-                                      <option value="clara.sutton@aurelinx.io">
-                                        clara.sutton@aurelinx.io (Senior dev)
-                                      </option>
-                                    </PremiumSelect>
+                                    />
+                                    <p className="mt-1.5 text-[9px] leading-relaxed text-slate-500">
+                                      Used only when the inbound event identifies one employee. This does not connect a provider or create a demo employee.
+                                    </p>
                                   </div>
                                   <button
                                     type="button"
                                     onClick={handleGenerateToken}
                                     className="w-full h-10 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-900 text-xs font-black tracking-wide transition-all shadow-md shadow-cyan-950/20 cursor-pointer uppercase inline-flex items-center justify-center gap-2 active:scale-95 mt-1"
                                   >
-                                    <Plus size={14} /> Generate Ingestion Token
+                                    <Plus size={14} /> Generate Webhook Credential
                                   </button>
                                 </div>
 

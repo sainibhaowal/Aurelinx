@@ -47,6 +47,24 @@ htmlcov/
 .env.production
 infra/.env.production
 
+# Provider credentials and private key material (never commit)
+secrets/
+**/secrets/
+*.credentials.json
+provider-credentials*.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Keep the production runbook versioned while other local Docs working files
+# remain ignored by the existing repository policy.
+!Docs/
+Docs/*
+!Docs/Worked/
+Docs/Worked/*
+!Docs/Worked/aurelinx_production_tenant_provider_runbook.md
+
 # Build outputs
 dist/
 build/
@@ -120,6 +138,7 @@ server/*.egg-info/
 # Test coverage reports
 coverage/
 .nyc_output/
+test-results/
 
 # Misc temporary files
 *.pid
@@ -134,3 +153,11 @@ out
 desktop/src-tauri/target/
 desktop/node_modules/
 desktop/dist/
+
+# Versioned production runbook exception. Keep this after the broad Docs rule
+# above so Git's last matching rule does not hide the runbook.
+!Docs/
+Docs/*
+!Docs/Worked/
+Docs/Worked/*
+!Docs/Worked/aurelinx_production_tenant_provider_runbook.md

@@ -26,6 +26,12 @@ permissions:
   contents: write
   packages: write
 
+# One release operation may calculate and publish a version for a branch at a
+# time. This prevents two manual runs from selecting the same next tag.
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   version-and-tag:
     name: Generate Semantic Version & Tag
@@ -61,6 +67,14 @@ jobs:
       - name: Install Release Dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Reconcile Release Metadata
+        run: |
+          git fetch --force --tags origin
+          node scripts/reconcile-release-version.js
+
+      - name: Verify Current Release Metadata
+        run: npm run verify:release
+
       - name: Bump Version
         id: bump
         run: |
@@ -70,6 +84,11 @@ jobs:
             npx standard-version --release-as ${{ github.event.inputs.release_type }}
           fi
           NEW_TAG=$(git describe --tags --abbrev=0)
+          if git ls-remote --exit-code --tags origin "refs/tags/${NEW_TAG}" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing remote release tag: ${NEW_TAG}" >&2
+            exit 1
+          fi
+          npm run verify:release
           CLEAN_VER="${NEW_TAG#v}"
           echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
           echo "clean_version=${CLEAN_VER}" >> $GITHUB_OUTPUT

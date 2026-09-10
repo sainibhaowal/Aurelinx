@@ -2765,12 +2765,13 @@ def _match_records(
     The query is split into real search tokens (stopwords stripped) so a
     natural-language query such as 'show me Olivia Chen' matches any column
     that contains ANY of the tokens (name/email/title/skills), instead of
-    requiring the whole sentence to be a single substring. An empty or fully
-    stopword query browsers recent records instead of returning zero.
+    requiring the whole sentence to be a single substring. Empty or
+    stopword-only queries return no records because unrelated recent records
+    are never valid evidence for a user question.
     """
     tokens = _search_tokens(query)
     if not tokens:
-        return _browse_records(db, spec["model"], limit, offset)
+        return []
     model = spec["model"]
     columns = []
     for col in spec["search_cols"]:
@@ -2813,6 +2814,24 @@ def _records_by_identifier(
     if not conditions:
         return []
     return db.exec(select(model).where(or_(*conditions)).limit(25)).all()
+
+
+def _agent_tenant_guard(current_user: TokenData) -> str | None:
+    """Require verified tenant context before production agent data access.
+
+    Legacy employee/candidate tables are not tenant-keyed yet. Refusing access
+    in production is safer than silently querying all companies' records.
+    """
+    tenant_id = str(getattr(current_user, "tenant_id", "") or "").strip().lower()
+    if getattr(settings, "ENVIRONMENT", "development") == "production":
+        # The dynamic agent currently includes legacy tables without tenant_id
+        # columns. A tenant header alone is not sufficient protection because
+        # it would still allow an unscoped SQL query. Keep the production gate
+        # closed until every agent query is tenant-filtered at the SQL layer.
+        if not tenant_id:
+            return "Agent data access is unavailable until a verified tenant scope is present."
+        return "Agent data access is temporarily blocked until all agent queries enforce tenant scope."
+    return None
 
 
 def _modify_column(entity: str, field: str) -> Any | None:
@@ -3354,6 +3373,14 @@ def _execute_agent_tool(
     mutation_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Execute exactly one supported dynamic tool in an isolated DB session."""
+    tenant_error = _agent_tenant_guard(current_user)
+    if tenant_error:
+        return {
+            "tool": tool_name,
+            "blocked": True,
+            "reason": tenant_error,
+            "error_code": "TENANT_SCOPE_REQUIRED",
+        }
     with Session(engine) as db:
         attachments = db.exec(
             select(ChatAttachmentTable).where(
@@ -3381,18 +3408,7 @@ def _execute_agent_tool(
                 except Exception:
                     matches = []
                 group = {"entity": entity, "matches": _safe_rows(matches)}
-                if not matches:
-                    try:
-                        browse = _match_records(db, spec, "", requested_limit, 0)
-                    except Exception:
-                        browse = []
-                    if browse:
-                        group["browse"] = _safe_rows(browse)
-                        group["browse_note"] = (
-                            f"No records matched the search terms; showing the {len(browse)} "
-                            f"most recent {entity} records as verified context."
-                        )
-                if matches or group.get("browse"):
+                if matches:
                     groups.append(group)
                 if len(groups) >= 5:
                     break
@@ -3400,7 +3416,7 @@ def _execute_agent_tool(
                 "tool": tool_name,
                 "groups": groups,
                 "returned": sum(len(g["matches"]) for g in groups),
-                "browsed": any(g.get("browse") for g in groups),
+                "browsed": False,
             }
 
         if tool_name == "read":
@@ -3704,7 +3720,7 @@ def _provider_error_label(error: Any) -> str:
         "MODEL_RATE_LIMITED": "provider rate limit (HTTP 429)",
         "MODEL_AUTH_FAILED": "provider authentication/authorization failure",
         "MODEL_ENDPOINT_NOT_FOUND": "provider endpoint or model was not found (HTTP 404)",
-        "MODEL_REQUEST_REJECTED": "provider rejected the request (HTTP 400)",
+        "MODEL_REQUEST_REJECTED": "an invalid request was rejected (HTTP 400)",
         "MODEL_ENDPOINT_UNREACHABLE": "provider endpoint is unreachable",
         "MODEL_CONFIG_INVALID": "provider configuration is not supported by the native agent",
         "MODEL_PROVIDER_FAILED": "provider request failure",
@@ -3764,13 +3780,12 @@ def _safe_provider_failure_reply(context_payload: dict, error: Any = None) -> st
             else:
                 summaries.append(f"{name}: completed")
     evidence = "; ".join(summaries) if summaries else "no retrieval tools were required"
-    reason = (
-        _provider_error_label(error) if error else "provider did not return a response"
-    )
+    reason = _provider_error_label(error) if error else "no response was returned"
+    detail = _provider_error_detail(error) if error else "Retry the request or check the active provider configuration."
     return (
-        "I completed the permitted retrieval and safety checks, but the configured language "
-        f"model provider returned a {reason}. No unsupported database change was made. "
-        f"Operational results: {evidence}. Please retry or switch to another configured provider."
+        "I completed the permitted retrieval and safety checks, but I could not generate the "
+        f"answer because {reason}. {detail} No unsupported database change was made. "
+        f"Operational results: {evidence}"
     )
 
 
