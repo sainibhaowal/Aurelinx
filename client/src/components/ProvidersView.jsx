@@ -95,7 +95,7 @@ const LLM_FAMILIES = [
     name: "OpenCode Zen",
     defaultUrl: "https://opencode.ai/zen/v1",
     placeholder: "oc-zen-...",
-    standardModels: ["gpt-5.5", "minimax-m2.5-free"],
+    standardModels: ["gpt-5.5", "minimax-m2.5"],
   },
 ];
 
