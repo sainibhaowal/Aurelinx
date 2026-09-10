@@ -61,7 +61,7 @@ class WorkdayConnector(BaseConnector):
         page_size = min(1000, max(1, int(options.get("page_size", 100))))
         max_records = min(50000, max(page_size, int(options.get("max_records", 10000))))
         offset = 0
-        raw_rows = []
+        raw_rows: list[dict] = []
         with self._client(connection) as client:
             while len(raw_rows) < max_records:
                 response = self.request(client, "GET", path, params={"limit": min(page_size, max_records - len(raw_rows)), "offset": offset})

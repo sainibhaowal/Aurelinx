@@ -58,6 +58,7 @@ from app.models.database import (
     ForecastScenarioTable,
     GoldMetricSnapshotTable,
     IntegrationConnectionTable,
+    IntegrationEvidenceTable,
     InterventionOutcomeTable,
     InterventionTable,
     MLDriftSnapshotTable,
@@ -66,7 +67,6 @@ from app.models.database import (
     ProcurementArtifactTable,
     QuarantineEventTable,
     RawEventTable,
-    IntegrationEvidenceTable,
     ReleaseGateTable,
     SkillTable,
     engine,
@@ -92,7 +92,7 @@ from app.schemas.schemas import (
     ReleaseGateOut,
 )
 from app.services.connectors.factory import get_connector
-from app.services.connectors.secrets import open_credentials, seal_credentials
+from app.services.connectors.secrets import open_credentials
 
 router = APIRouter(prefix="/lean", tags=["lean-enterprise"])
 _SCHEDULER_TASK: asyncio.Task | None = None

@@ -838,9 +838,17 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                   className="mt-2 h-10 w-full"
                 >
                   <option value="">All sources</option>
-                  {[...new Set(employees.flatMap((row) => row.source_providers || []))].sort().map((source) => (
-                    <option key={source} value={source}>{source}</option>
-                  ))}
+                  {[
+                    ...new Set(
+                      employees.flatMap((row) => row.source_providers || []),
+                    ),
+                  ]
+                    .sort()
+                    .map((source) => (
+                      <option key={source} value={source}>
+                        {source}
+                      </option>
+                    ))}
                 </PremiumSelect>
               </label>
             </label>
@@ -1566,18 +1574,36 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                 {selectedEvidence.length ? (
                   <div className="max-h-56 space-y-2 overflow-y-auto">
                     {selectedEvidence.map((item, index) => (
-                      <div key={`${item.provider}-${item.external_id}-${index}`} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div
+                        key={`${item.provider}-${item.external_id}-${index}`}
+                        className="rounded-lg border border-white/10 bg-black/20 p-3"
+                      >
                         <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-wider">
-                          <span className="font-bold text-cyan-200">{item.provider} · {item.source_type}</span>
-                          <time className="text-slate-500">{new Date(item.observed_at).toLocaleString()}</time>
+                          <span className="font-bold text-cyan-200">
+                            {item.provider} · {item.source_type}
+                          </span>
+                          <time className="text-slate-500">
+                            {new Date(item.observed_at).toLocaleString()}
+                          </time>
                         </div>
-                        <div className="mt-1 text-slate-400">External ID: <span className="text-slate-200">{item.external_id || "not reported"}</span></div>
-                        {Object.keys(item.summary || {}).length > 0 && <pre className="mt-2 max-h-20 overflow-auto whitespace-pre-wrap text-[10px] text-slate-500">{JSON.stringify(item.summary, null, 2)}</pre>}
+                        <div className="mt-1 text-slate-400">
+                          External ID:{" "}
+                          <span className="text-slate-200">
+                            {item.external_id || "not reported"}
+                          </span>
+                        </div>
+                        {Object.keys(item.summary || {}).length > 0 && (
+                          <pre className="mt-2 max-h-20 overflow-auto whitespace-pre-wrap text-[10px] text-slate-500">
+                            {JSON.stringify(item.summary, null, 2)}
+                          </pre>
+                        )}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <span className="text-slate-500">No provider evidence is attached to this profile yet.</span>
+                  <span className="text-slate-500">
+                    No provider evidence is attached to this profile yet.
+                  </span>
                 )}
               </div>
             )}

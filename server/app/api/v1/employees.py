@@ -31,9 +31,9 @@ from app.core.security import TokenData, get_current_user
 from app.models.database import (
     AuditLogTable,
     CanonicalEmployeeTable,
-    IntegrationEvidenceTable,
     EmployeeTable,
     ExperienceTable,
+    IntegrationEvidenceTable,
     SkillTable,
     get_session,
 )

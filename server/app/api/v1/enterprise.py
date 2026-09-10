@@ -42,8 +42,6 @@ from app.models.database import (
     InterventionTable,
     get_session,
 )
-from app.services.connectors.factory import get_connector
-from app.services.connectors.secrets import open_credentials, seal_credentials
 from app.schemas.schemas import (
     AttritionDriverOut,
     AttritionExplainOut,
@@ -60,6 +58,8 @@ from app.schemas.schemas import (
     RiskDriverDrilldownItem,
     RiskDriverDrilldownResponse,
 )
+from app.services.connectors.factory import get_connector
+from app.services.connectors.secrets import open_credentials, seal_credentials
 
 router = APIRouter(prefix="/enterprise", tags=["enterprise"])
 

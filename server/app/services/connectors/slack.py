@@ -42,8 +42,8 @@ class SlackConnector(BaseConnector):
             # channel the installed bot can access; explicit channel_ids can
             # still restrict collection for least-privilege deployments.
             channels = [channel["id"] for channel in self.discover(connection).get("channels", []) if channel.get("id")]
-        rows = []
-        user_cache = {}
+        rows: list[dict] = []
+        user_cache: dict[str, dict] = {}
         with self._client(connection) as client:
             for channel_id in channels:
                 cursor = None

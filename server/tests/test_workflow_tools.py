@@ -48,8 +48,8 @@ from app.api.v1.chat import (
     _perform_approved_delete,
     _prepare_delete_spec,
 )
-from app.core.security import TokenData, get_current_user, get_tenant_id
 from app.core import config as app_config
+from app.core.security import TokenData, get_current_user, get_tenant_id
 from app.main import app
 from app.models import database as db
 from app.models.database import (

@@ -1123,7 +1123,9 @@ const ProvidersView = () => {
 
                         <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[9px] font-mono font-bold tracking-wider uppercase shrink-0">
                           <ShieldCheck size={11} />
-                          <span>Provider credentials are masked in the interface</span>
+                          <span>
+                            Provider credentials are masked in the interface
+                          </span>
                         </div>
                       </div>
 
@@ -1374,7 +1376,8 @@ const ProvidersView = () => {
                                       Generate Inbound Webhook Credential
                                     </h3>
                                     <span className="text-[10px] text-slate-400 font-mono block">
-                                      For approved provider-to-Aurelinx event delivery
+                                      For approved provider-to-Aurelinx event
+                                      delivery
                                     </span>
                                   </div>
                                 </div>
@@ -1407,7 +1410,10 @@ const ProvidersView = () => {
                                       className="w-full h-10 rounded-xl bg-slate-950/80 border border-white/10 px-3 text-xs outline-none focus:border-cyan-500/40 text-slate-200"
                                     />
                                     <p className="mt-1.5 text-[9px] leading-relaxed text-slate-500">
-                                      Used only when the inbound event identifies one employee. This does not connect a provider or create a demo employee.
+                                      Used only when the inbound event
+                                      identifies one employee. This does not
+                                      connect a provider or create a demo
+                                      employee.
                                     </p>
                                   </div>
                                   <button
@@ -1415,7 +1421,8 @@ const ProvidersView = () => {
                                     onClick={handleGenerateToken}
                                     className="w-full h-10 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-900 text-xs font-black tracking-wide transition-all shadow-md shadow-cyan-950/20 cursor-pointer uppercase inline-flex items-center justify-center gap-2 active:scale-95 mt-1"
                                   >
-                                    <Plus size={14} /> Generate Webhook Credential
+                                    <Plus size={14} /> Generate Webhook
+                                    Credential
                                   </button>
                                 </div>
 
@@ -1760,9 +1767,7 @@ const ProvidersView = () => {
                                       <Copy size={11} /> Copy URL
                                     </button>
                                     <button
-                                      onClick={() =>
-                                        handleTestIngest("jira")
-                                      }
+                                      onClick={() => handleTestIngest("jira")}
                                       disabled={simulatingWebhook === "jira"}
                                       className="flex-1 h-9 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
                                     >
@@ -1795,8 +1800,8 @@ const ProvidersView = () => {
                                     Slack channel Sentiment score
                                   </h4>
                                   <p className="text-[10px] text-slate-400 leading-relaxed">
-                                    Accepts a signed employee sentiment event.
-                                    A successful event updates the employee
+                                    Accepts a signed employee sentiment event. A
+                                    successful event updates the employee
                                     sentiment/risk fields used by later
                                     analytics and attrition calculations.
                                   </p>
@@ -1821,9 +1826,7 @@ const ProvidersView = () => {
                                       <Copy size={11} /> Copy URL
                                     </button>
                                     <button
-                                      onClick={() =>
-                                        handleTestIngest("slack")
-                                      }
+                                      onClick={() => handleTestIngest("slack")}
                                       disabled={simulatingWebhook === "slack"}
                                       className="flex-1 h-9 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
                                     >
@@ -2264,9 +2267,9 @@ console.log("Ingestion Status:", result);`}
                                 size={11}
                                 className="text-cyan-300 shrink-0"
                               />
-                              Provider settings are saved locally in this browser;
-                              use a trusted device and never share this browser
-                              profile.
+                              Provider settings are saved locally in this
+                              browser; use a trusted device and never share this
+                              browser profile.
                             </div>
                           </div>
                         ) : (
