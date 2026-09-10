@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.3](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.2...v0.2.3) (2026-09-10)
+
+
+### Bug Fixes
+
+* clarify integration setup and harden workflow safety ([f6ab8ea](https://github.com/sainibhaowal/Aurelinx/commit/f6ab8ea7cc8b1c90835977e5cc424b014bb8fae8))
+* satisfy release quality checks ([ec92a56](https://github.com/sainibhaowal/Aurelinx/commit/ec92a56c1f401af8d54d2cef7d7a8c4945e961f7))
+* use safe non-aggressive image cleanup ([5dbc4fb](https://github.com/sainibhaowal/Aurelinx/commit/5dbc4fb078544c7b71dbfbd681ecf75b95ec4fe4))
+
 ### [0.2.2](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.1...v0.2.2) (2026-09-08)
 
 
