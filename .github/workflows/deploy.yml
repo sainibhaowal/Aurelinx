@@ -59,8 +59,8 @@ jobs:
             fi
 
             echo \"==> 6. Cleaning old unused dangling images and build cache...\"
-            docker image prune -af
-            docker builder prune -af
+            docker image prune -f
+            docker builder prune -f
 
             echo \"==> 7. Aurelinx v${VERSION} is 100% live and fully operational!\"
           "
