@@ -1410,10 +1410,29 @@ def _opencode_api_mode(model: str | None) -> str:
     400, so this decision must be made server-side rather than relying on a
     browser configuration.
     """
-    model_id = (model or "gpt-5.5").strip().lower()
+    model_id = _opencode_model_id(model).lower()
     if model_id.startswith(("gpt-", "grok-", "muse-")):
         return "responses"
+    if model_id.startswith(("claude-", "qwen")):
+        return "messages"
     return "chat_completions"
+
+
+def _opencode_model_id(model: str | None) -> str:
+    """Normalize UI and OpenCode-config model names to a Zen API model id."""
+    model_id = (model or "gpt-5.5").strip()
+    if model_id.lower().startswith("opencode/"):
+        model_id = model_id.split("/", 1)[1]
+    # This retired Zen id was previously offered by the Aurelinx UI.
+    return {"minimax-m2.5-free": "minimax-m2.5"}.get(model_id.lower(), model_id)
+
+
+def _opencode_route(mode: str) -> str:
+    return {
+        "responses": "responses",
+        "messages": "messages",
+        "chat_completions": "chat/completions",
+    }[mode]
 
 
 def _opencode_base_url(base_url: str | None) -> str:
@@ -1453,12 +1472,14 @@ async def _llm_stream_response(
         headers = {"Content-Type": "application/json"}
     elif provider == "opencode":
         opencode_mode = _opencode_api_mode(model or "gpt-5.5")
-        route = "responses" if opencode_mode == "responses" else "chat/completions"
-        endpoint = f"{_opencode_base_url(base_url)}/{route}"
-        model_name = model or "gpt-5.5"
+        endpoint = f"{_opencode_base_url(base_url)}/{_opencode_route(opencode_mode)}"
+        model_name = _opencode_model_id(model)
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+            if opencode_mode == "messages":
+                headers["x-api-key"] = api_key
+                headers["anthropic-version"] = "2023-06-01"
     elif provider == "openai":
         endpoint = "https://api.openai.com/v1/chat/completions"
         model_name = model or "gpt-4o-mini"
@@ -1471,7 +1492,7 @@ async def _llm_stream_response(
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
-    elif provider == "claude":
+    elif provider == "claude" or (provider == "opencode" and opencode_mode == "messages"):
         endpoint = "https://api.anthropic.com/v1/messages"
         model_name = model or "claude-3-5-sonnet-20241022"
         headers = {
@@ -1650,7 +1671,7 @@ async def _llm_stream_response(
             "messages": messages,
             "stream": True,
         }
-    elif provider == "claude":
+    elif provider == "claude" or (provider == "opencode" and opencode_mode == "messages"):
         messages = list(history_messages[-6:])
         messages.append({"role": "user", "content": user_content})
         payload = {
@@ -1730,7 +1751,7 @@ async def _llm_stream_response(
                     except Exception:
                         continue
 
-        elif provider == "claude":
+        elif provider == "claude" or (provider == "opencode" and opencode_mode == "messages"):
             async for line in resp.aiter_lines():
                 if line.startswith("data:"):
                     data_str = line[5:].strip()
@@ -1821,12 +1842,14 @@ async def _llm_response(
         headers = {"Content-Type": "application/json"}
     elif provider == "opencode":
         opencode_mode = _opencode_api_mode(model or "gpt-5.5")
-        route = "responses" if opencode_mode == "responses" else "chat/completions"
-        endpoint = f"{_opencode_base_url(base_url)}/{route}"
-        model_name = model or "gpt-5.5"
+        endpoint = f"{_opencode_base_url(base_url)}/{_opencode_route(opencode_mode)}"
+        model_name = _opencode_model_id(model)
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+            if opencode_mode == "messages":
+                headers["x-api-key"] = api_key
+                headers["anthropic-version"] = "2023-06-01"
     elif provider == "openai":
         endpoint = "https://api.openai.com/v1/chat/completions"
         model_name = model or "gpt-4o-mini"
@@ -1839,7 +1862,7 @@ async def _llm_response(
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
-    elif provider == "claude":
+    elif provider == "claude" or (provider == "opencode" and opencode_mode == "messages"):
         endpoint = "https://api.anthropic.com/v1/messages"
         model_name = model or "claude-3-5-sonnet-20241022"
         headers = {
@@ -2013,7 +2036,7 @@ async def _llm_response(
             "temperature": response_temperature,
             "messages": messages,
         }
-    elif provider == "claude":
+    elif provider == "claude" or (provider == "opencode" and opencode_mode == "messages"):
         messages = list(history_messages[-6:])
         messages.append({"role": "user", "content": user_content})
         payload = {
@@ -2052,7 +2075,7 @@ async def _llm_response(
             return _sanitize_llm_response(
                 data["choices"][0]["message"]["content"], user_text
             )
-        if provider == "claude":
+        if provider == "claude" or (provider == "opencode" and opencode_mode == "messages"):
             text_blocks = [
                 b.get("text", "")
                 for b in data.get("content", [])
@@ -6404,15 +6427,23 @@ async def ping_provider(req: ProviderPingRequest):
             }
         elif provider == "opencode":
             opencode_mode = _opencode_api_mode(model or "gpt-5.5")
-            route = "responses" if opencode_mode == "responses" else "chat/completions"
-            endpoint = f"{_opencode_base_url(base_url)}/{route}"
-            model_name = model or "gpt-5.5"
+            endpoint = f"{_opencode_base_url(base_url)}/{_opencode_route(opencode_mode)}"
+            model_name = _opencode_model_id(model)
             headers = {"Content-Type": "application/json"}
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
+                if opencode_mode == "messages":
+                    headers["x-api-key"] = api_key
+                    headers["anthropic-version"] = "2023-06-01"
             payload = (
                 {"model": model_name, "input": "ping", "max_output_tokens": 16}
                 if opencode_mode == "responses"
+                else {
+                    "model": model_name,
+                    "max_tokens": 16,
+                    "messages": [{"role": "user", "content": "ping"}],
+                }
+                if opencode_mode == "messages"
                 else {
                     "model": model_name,
                     "max_tokens": 1,

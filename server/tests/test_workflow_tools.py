@@ -47,6 +47,8 @@ from app.api.v1.chat import (
     _execute_agent_tool,
     _opencode_api_mode,
     _opencode_base_url,
+    _opencode_model_id,
+    _opencode_route,
     _perform_approved_delete,
     _prepare_delete_spec,
     _safe_provider_failure_reply,
@@ -75,8 +77,12 @@ MEMBER = TokenData(
 
 def test_opencode_uses_the_responses_api_for_gpt_family_models():
     assert _opencode_api_mode("gpt-5.5") == "responses"
+    assert _opencode_api_mode("opencode/gpt-5.5") == "responses"
     assert _opencode_api_mode("grok-4.5") == "responses"
+    assert _opencode_api_mode("claude-sonnet-4-5") == "messages"
     assert _opencode_api_mode("deepseek-v4-flash") == "chat_completions"
+    assert _opencode_route("messages") == "messages"
+    assert _opencode_model_id("minimax-m2.5-free") == "minimax-m2.5"
     assert _opencode_base_url("https://opencode.ai/zen/v1") == "https://opencode.ai/zen/v1"
     assert (
         _opencode_base_url("https://opencode.ai/zen/v1/chat/completions")
