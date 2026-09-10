@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.4](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.3...v0.2.4) (2026-09-10)
+
+
+### Bug Fixes
+
+* route OpenCode Zen models to compatible APIs ([e29e60c](https://github.com/sainibhaowal/Aurelinx/commit/e29e60c4b8568dd727e1646b08ec5b554705c855))
+* use centralized release version in sidebar ([57cbdec](https://github.com/sainibhaowal/Aurelinx/commit/57cbdecb5a08a56f302fac3628278257f4d4217f))
+
 ### [0.2.3](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.2...v0.2.3) (2026-09-10)
 
 
