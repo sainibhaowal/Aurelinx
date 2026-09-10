@@ -1416,6 +1416,15 @@ def _opencode_api_mode(model: str | None) -> str:
     return "chat_completions"
 
 
+def _opencode_base_url(base_url: str | None) -> str:
+    """Normalize either a Zen base URL or a formerly saved full endpoint URL."""
+    base = (base_url or "https://opencode.ai/zen/v1").strip().rstrip("/")
+    for suffix in ("/chat/completions", "/responses", "/messages"):
+        if base.endswith(suffix):
+            return base[: -len(suffix)]
+    return base
+
+
 async def _llm_stream_response(
     provider: str,
     api_key: str,
@@ -1445,9 +1454,7 @@ async def _llm_stream_response(
     elif provider == "opencode":
         opencode_mode = _opencode_api_mode(model or "gpt-5.5")
         route = "responses" if opencode_mode == "responses" else "chat/completions"
-        endpoint = (
-            f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/{route}"
-        )
+        endpoint = f"{_opencode_base_url(base_url)}/{route}"
         model_name = model or "gpt-5.5"
         headers = {"Content-Type": "application/json"}
         if api_key:
@@ -1815,9 +1822,7 @@ async def _llm_response(
     elif provider == "opencode":
         opencode_mode = _opencode_api_mode(model or "gpt-5.5")
         route = "responses" if opencode_mode == "responses" else "chat/completions"
-        endpoint = (
-            f"{(base_url or 'https://opencode.ai/zen/v1').rstrip('/')}/{route}"
-        )
+        endpoint = f"{_opencode_base_url(base_url)}/{route}"
         model_name = model or "gpt-5.5"
         headers = {"Content-Type": "application/json"}
         if api_key:
@@ -6400,11 +6405,7 @@ async def ping_provider(req: ProviderPingRequest):
         elif provider == "opencode":
             opencode_mode = _opencode_api_mode(model or "gpt-5.5")
             route = "responses" if opencode_mode == "responses" else "chat/completions"
-            endpoint = (
-                f"{base_url.rstrip('/')}/{route}"
-                if base_url
-                else f"https://opencode.ai/zen/v1/{route}"
-            )
+            endpoint = f"{_opencode_base_url(base_url)}/{route}"
             model_name = model or "gpt-5.5"
             headers = {"Content-Type": "application/json"}
             if api_key:
@@ -6573,7 +6574,7 @@ async def discover_provider_models(req: ProviderDiscoverRequest):
                 url = "https://api.groq.com/openai/v1/models"
             elif provider == "opencode":
                 url = (
-                    f"{base_url.rstrip('/')}/models"
+                    f"{_opencode_base_url(base_url)}/models"
                     if base_url
                     else "https://opencode.ai/zen/v1/models"
                 )
