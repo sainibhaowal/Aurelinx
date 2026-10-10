@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - main
+      - 'release/**'
   workflow_dispatch:
 
 concurrency:
@@ -228,7 +229,7 @@ jobs:
   # PARALLEL RUNNER 8: Backend Pytest Integration
   # ==========================================
   backend-tests:
-    name: ⚡ Backend - Pytest 17 Integration Tests
+    name: ⚡ Backend - Pytest Full Suite
     runs-on: ubuntu-latest
     services:
       postgres:
