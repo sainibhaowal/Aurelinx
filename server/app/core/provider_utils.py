@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,6 +45,21 @@ def _replace_host(url: str, host: str) -> str:
     return urlunparse(parsed._replace(netloc=netloc))
 
 
+def _detect_docker_gateway() -> str | None:
+    try:
+        with open("/proc/net/route") as f:
+            for line in f:
+                fields = line.strip().split()
+                if len(fields) >= 3 and fields[1] == "00000000":
+                    import socket
+                    import struct
+
+                    return socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))
+    except Exception:
+        pass
+    return None
+
+
 def normalize_local_provider_base(
     base_url: str | None, default_base: str = DEFAULT_LMSTUDIO_BASE
 ) -> str:
@@ -55,6 +69,9 @@ def normalize_local_provider_base(
 
     parsed = urlparse(base)
     if parsed.hostname in LOCAL_LOOPBACK_HOSTS and is_docker_runtime():
+        gateway = _detect_docker_gateway()
+        if gateway:
+            return _replace_host(base, gateway)
         return _replace_host(base, DOCKER_HOST_ALIAS)
     return base
 
@@ -72,11 +89,19 @@ def build_local_provider_base_candidates(
 
     candidates: list[str] = []
     if is_docker_runtime():
-        for host in (
-            DOCKER_HOST_ALIAS,
-            parsed.hostname,
-            "127.0.0.1" if parsed.hostname == "localhost" else "localhost",
-        ):
+        gateway = _detect_docker_gateway()
+        hosts: list[str] = []
+        if gateway:
+            hosts.append(gateway)
+        hosts.extend(
+            [
+                "172.17.0.1",
+                DOCKER_HOST_ALIAS,
+                parsed.hostname,
+                "127.0.0.1" if parsed.hostname == "localhost" else "localhost",
+            ]
+        )
+        for host in hosts:
             candidate = _replace_host(base, host)
             if candidate not in candidates:
                 candidates.append(candidate)

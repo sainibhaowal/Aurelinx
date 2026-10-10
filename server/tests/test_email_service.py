@@ -44,9 +44,7 @@ def test_send_verification_email_includes_multipart_cta_links(monkeypatch):
     message = sent_messages[0]
     plain = message.get_body(preferencelist=("plain",)).get_content()
     html = message.get_body(preferencelist=("html",)).get_content()
-    verify_link = (
-        f"https://app.aurelinx.com/login?verify_email={quote(token, safe='')}&email=user%40example.com"
-    )
+    verify_link = f"https://app.aurelinx.com/login?verify_email={quote(token, safe='')}&email=user%40example.com"
 
     assert "Your Aurelinx verification code is: 123456" in plain
     assert verify_link in plain

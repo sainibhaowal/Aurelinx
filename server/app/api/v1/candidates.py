@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,6 +39,10 @@ router = APIRouter(prefix="/candidates", tags=["candidates"])
 logger = get_logger(__name__)
 
 
+def _tenant_id(user: TokenData) -> str:
+    return (user.tenant_id or "default").strip() or "default"
+
+
 def _candidate_quality(
     cand: CandidateTable, session: Session, current_user: TokenData | None = None
 ) -> dict:
@@ -62,7 +65,10 @@ def _candidate_quality(
         cand.email
         and len(
             session.exec(
-                select(CandidateTable).where(CandidateTable.email == cand.email)
+                select(CandidateTable).where(
+                    CandidateTable.email == cand.email,
+                    CandidateTable.tenant_id == cand.tenant_id,
+                )
             ).all()
         )
         > 1
@@ -72,7 +78,10 @@ def _candidate_quality(
         cand.full_name
         and len(
             session.exec(
-                select(CandidateTable).where(CandidateTable.full_name == cand.full_name)
+                select(CandidateTable).where(
+                    CandidateTable.full_name == cand.full_name,
+                    CandidateTable.tenant_id == cand.tenant_id,
+                )
             ).all()
         )
         > 1
@@ -92,6 +101,7 @@ def _candidate_quality(
                 AuditLogTable.resource_type == "candidate",
                 AuditLogTable.resource_id == cand.id,
                 AuditLogTable.user_id == user_uuid,
+                AuditLogTable.tenant_id == cand.tenant_id,
             )
             .order_by(AuditLogTable.created_at.desc())
             .limit(50)
@@ -122,10 +132,16 @@ def get_candidate_out(
     cand: CandidateTable, session: Session, current_user: TokenData | None = None
 ) -> CandidateOut:
     skills = session.exec(
-        select(SkillTable).where(SkillTable.candidate_id == cand.id)
+        select(SkillTable).where(
+            SkillTable.candidate_id == cand.id,
+            SkillTable.tenant_id == cand.tenant_id,
+        )
     ).all()
     experiences = session.exec(
-        select(ExperienceTable).where(ExperienceTable.candidate_id == cand.id)
+        select(ExperienceTable).where(
+            ExperienceTable.candidate_id == cand.id,
+            ExperienceTable.tenant_id == cand.tenant_id,
+        )
     ).all()
     return CandidateOut(
         id=cand.id,
@@ -135,7 +151,7 @@ def get_candidate_out(
         role=cand.role,
         sentiment_score=cand.sentiment_score,
         match_score=cand.match_score,
-        salary=cand.salary,
+        salary=cand.salary if current_user and current_user.is_admin else None,
         skills=[
             SkillOut(id=s.id, name=s.name, level=s.level, created_at=s.created_at)
             for s in skills
@@ -147,6 +163,9 @@ def get_candidate_out(
                 position=exp.position,
                 duration_years=exp.duration_years,
                 description=exp.description,
+                effective_start=exp.effective_start,
+                effective_end=exp.effective_end,
+                is_current=exp.is_current,
                 created_at=exp.created_at,
             )
             for exp in experiences
@@ -174,7 +193,8 @@ async def list_candidates(
     """
     logger.info(f"User {current_user.user_id} listing candidates")
 
-    query = select(CandidateTable)
+    tenant_id = _tenant_id(current_user)
+    query = select(CandidateTable).where(CandidateTable.tenant_id == tenant_id)
     if department:
         query = query.where(CandidateTable.department == department)
     if q and q.strip():
@@ -202,7 +222,13 @@ async def list_candidates(
     candidates = filter_real_records(session.exec(query).all())
 
     # Return lightweight response (no N+1 queries for skills/experiences)
-    return candidates
+    return [
+        {
+            **candidate.model_dump(),
+            "salary": candidate.salary if current_user.is_admin else None,
+        }
+        for candidate in candidates
+    ]
 
 
 @router.get("/count")
@@ -215,7 +241,12 @@ async def count_candidates(
     session: Session = Depends(get_session),
 ):
     """Return the authoritative candidate count without loading all profiles."""
-    query = select(func.count()).select_from(CandidateTable)
+    tenant_id = _tenant_id(current_user)
+    query = (
+        select(func.count())
+        .select_from(CandidateTable)
+        .where(CandidateTable.tenant_id == tenant_id)
+    )
     if department:
         query = query.where(CandidateTable.department == department)
     if q and q.strip():
@@ -246,7 +277,8 @@ async def list_candidate_departments(
     session: Session = Depends(get_session),
 ):
     query = select(CandidateTable.department).where(
-        CandidateTable.department.is_not(None)
+        CandidateTable.tenant_id == _tenant_id(current_user),
+        CandidateTable.department.is_not(None),
     )
     if not include_sample_data():
         query = query.where(
@@ -265,7 +297,12 @@ async def get_candidate(
 ):
     """Get a candidate by ID with skills and experiences."""
 
-    candidate = session.get(CandidateTable, candidate_id)
+    candidate = session.exec(
+        select(CandidateTable).where(
+            CandidateTable.id == candidate_id,
+            CandidateTable.tenant_id == _tenant_id(current_user),
+        )
+    ).first()
 
     if not candidate:
         raise HTTPException(

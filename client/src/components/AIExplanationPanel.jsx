@@ -17,8 +17,16 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ChevronDown, ChevronUp, Loader2, Sparkles, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  Sparkles,
+} from "lucide-react";
 import { intelligenceAPI } from "../services/apiClient";
+import { getExplanationProviderConfig } from "../services/explanationProviderConfig";
 
 const MarkdownRenderer = ({ children }) => (
   <ReactMarkdown
@@ -105,29 +113,6 @@ const MarkdownRenderer = ({ children }) => (
   </ReactMarkdown>
 );
 
-const getProviderConfig = () => {
-  if (typeof window === "undefined")
-    return { provider: "lmstudio", key: null, baseUrl: null, model: null };
-  try {
-    const raw = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
-    if (raw) {
-      const cfg = JSON.parse(raw);
-      return {
-        provider: cfg.activeProvider || "lmstudio",
-        key: cfg.providers?.[cfg.activeProvider]?.key || null,
-        baseUrl:
-          cfg.providers?.[cfg.activeProvider]?.endpoint ||
-          cfg.providers?.[cfg.activeProvider]?.base_url ||
-          null,
-        model: cfg.providers?.[cfg.activeProvider]?.selectedModel || null,
-      };
-    }
-  } catch (err) {
-    void err;
-  }
-  return { provider: "lmstudio", key: null, baseUrl: null, model: null };
-};
-
 /**
  * AIExplanationPanel — reusable collapsible panel that sends context to the LLM
  * and renders a structured Markdown explanation inline.
@@ -136,76 +121,101 @@ const getProviderConfig = () => {
  * - subtab: one of "skill-match" | "team-builder" | "attrition" | "ona" | "career-path"
  * - context: object containing the relevant intelligence data for the LLM to explain
  * - buttonText: label for the trigger button (default "Explain with AI")
- * - autoRefresh: if true, re-fetches explanation when `context` changes (debounced 2s)
+ * - autoRun: generate a new streamed explanation when a completed result key changes
+ * - autoRunKey: changes only when the current result has materially changed
  * - disabled: if true, the button is greyed out (e.g. no employee selected yet)
  */
 export default function AIExplanationPanel({
   subtab,
   context,
   buttonText = "Explain with AI",
-  autoRefresh = false,
+  autoRun = false,
+  autoRunKey = null,
   disabled = false,
 }) {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [explanation, setExplanation] = useState("");
   const [error, setError] = useState("");
-  const [hasFetched, setHasFetched] = useState(false);
-  const debounceRef = useRef(null);
-  const lastContextRef = useRef(null);
+  const controllerRef = useRef(null);
+  const contextRef = useRef(context);
+  const lastAutoRunRef = useRef(null);
+  contextRef.current = context;
 
   const fetchExplanation = useCallback(
     async (ctx) => {
       if (!ctx || (typeof ctx === "object" && Object.keys(ctx).length === 0))
         return;
+      controllerRef.current?.abort();
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      setOpen(true);
+      setExpanded(false);
       setLoading(true);
       setError("");
+      setExplanation("");
+      let receivedText = false;
       try {
-        const { provider, key, baseUrl, model } = getProviderConfig();
-        const res = await intelligenceAPI.explain(
+        const { provider, key, baseUrl, model } =
+          getExplanationProviderConfig();
+        await intelligenceAPI.explainStream(
           subtab,
           ctx,
+          (token) => {
+            if (!controller.signal.aborted && token) {
+              receivedText = true;
+              setExplanation((previous) => previous + token);
+            }
+          },
           provider,
           key,
           baseUrl,
           model,
+          controller.signal,
         );
-        setExplanation(res.explanation || "No explanation returned.");
-        setHasFetched(true);
+        if (!receivedText && !controller.signal.aborted) {
+          setError("The model finished without returning explanation text.");
+        }
       } catch (err) {
-        setError(err?.message || "Failed to get AI explanation.");
+        if (!controller.signal.aborted) {
+          setError(err?.message || "Failed to get AI explanation.");
+        }
       } finally {
-        setLoading(false);
+        if (controllerRef.current === controller) {
+          controllerRef.current = null;
+          setLoading(false);
+        }
       }
     },
     [subtab],
   );
 
-  const handleManualClick = () => {
-    if (disabled) return;
-    const wasOpen = open;
-    setOpen(!wasOpen);
-    if (!wasOpen && !hasFetched) {
-      fetchExplanation(context);
-    }
-  };
-
-  // Auto-refresh: debounced re-fetch when context changes (e.g. slider moved)
   useEffect(() => {
-    if (!autoRefresh || !open || !context) return;
-    const ctxStr = JSON.stringify(context);
-    if (ctxStr === lastContextRef.current) return;
-    lastContextRef.current = ctxStr;
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      fetchExplanation(context);
-    }, 2000);
-
+    if (!autoRun) return undefined;
+    if (disabled || autoRunKey == null) {
+      controllerRef.current?.abort();
+      return undefined;
+    }
+    const key =
+      typeof autoRunKey === "string" ? autoRunKey : JSON.stringify(autoRunKey);
+    if (key === lastAutoRunRef.current) return undefined;
+    lastAutoRunRef.current = key;
+    controllerRef.current?.abort();
+    const timer = setTimeout(() => {
+      fetchExplanation(contextRef.current);
+    }, 250);
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      clearTimeout(timer);
     };
-  }, [autoRefresh, open, context, fetchExplanation]);
+  }, [autoRun, autoRunKey, disabled, fetchExplanation]);
+
+  useEffect(
+    () => () => {
+      controllerRef.current?.abort();
+    },
+    [],
+  );
 
   return (
     <div className="mt-3 rounded-xl border border-cyan-500/15 bg-slate-950/60 overflow-hidden">
@@ -213,7 +223,7 @@ export default function AIExplanationPanel({
       <div className="flex items-center justify-between px-4 py-2.5">
         <button
           type="button"
-          onClick={handleManualClick}
+          onClick={() => fetchExplanation(context)}
           disabled={disabled}
           className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider transition cursor-pointer select-none ${
             disabled
@@ -227,25 +237,37 @@ export default function AIExplanationPanel({
             <Sparkles size={14} />
           )}
           {buttonText}
-          {open && !loading && <ChevronUp size={14} className="ml-1" />}
-          {!open && !loading && disabled && (
-            <ChevronDown size={14} className="ml-1 opacity-40" />
-          )}
+          {!open && <ChevronDown size={14} className="ml-1" />}
         </button>
         {open && (
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="text-slate-500 hover:text-slate-300 transition"
-          >
-            <X size={14} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setExpanded((value) => !value)}
+              aria-label={
+                expanded ? "Collapse explanation" : "Expand explanation"
+              }
+              className="text-slate-500 hover:text-cyan-300 transition"
+            >
+              {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Collapse AI explanation"
+              className="text-slate-500 hover:text-slate-300 transition"
+            >
+              <ChevronUp size={15} />
+            </button>
+          </div>
         )}
       </div>
 
       {/* Collapsible panel body */}
       {open && (
-        <div className="border-t border-white/5 px-4 py-3 max-h-[420px] overflow-y-auto custom-scrollbar">
+        <div
+          className={`border-t border-white/5 px-4 py-3 overflow-y-auto custom-scrollbar ${expanded ? "max-h-[75vh]" : "max-h-[420px]"}`}
+        >
           {error && (
             <div className="text-xs text-rose-400 bg-rose-950/20 rounded-lg p-3 mb-2 border border-rose-500/20">
               {error}
@@ -254,7 +276,7 @@ export default function AIExplanationPanel({
           {loading && !explanation && (
             <div className="flex items-center gap-2 text-xs text-slate-500 py-4">
               <Loader2 size={14} className="animate-spin" />
-              <span>AI is analyzing the data…</span>
+              <span>Analyzing this result and streaming the explanation…</span>
             </div>
           )}
           {loading && explanation && (
@@ -270,7 +292,8 @@ export default function AIExplanationPanel({
           )}
           {!loading && !explanation && !error && (
             <div className="text-xs text-slate-500 py-4">
-              No explanation available.
+              Choose “Explain with AI” to generate an explanation for this
+              result.
             </div>
           )}
         </div>

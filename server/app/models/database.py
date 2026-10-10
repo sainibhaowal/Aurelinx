@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -67,6 +66,44 @@ else:
     )
 
 
+_engine_cache: dict[str, object] = {"url": None, "engine": None}
+
+
+def resolve_engine():
+    """Return the engine bound to the *current* DATABASE_URL (import-order safe).
+
+    ``engine`` above is bound once at first import, but test modules and
+    operators may set ``DATABASE_URL`` afterwards. Resolving per call keeps
+    every ``Session(...)`` user on the right database no matter which module
+    imported the app first. An unchanged URL reuses the cached engine, so
+    production behavior is identical.
+    """
+    url = (os.getenv("DATABASE_URL", "") or "").strip()
+    if not url or url == DATABASE_URL:
+        return engine
+    cached_url = _engine_cache["url"]
+    cached_engine = _engine_cache["engine"]
+    if cached_engine is not None and cached_url == url:
+        return cached_engine
+    try:
+        if url.startswith("sqlite"):
+            from sqlalchemy.pool import StaticPool
+
+            eng = create_engine(
+                url, connect_args={"check_same_thread": False}, poolclass=StaticPool
+            )
+        else:
+            eng = create_engine(
+                url, pool_pre_ping=True, connect_args={"connect_timeout": 10}
+            )
+    except Exception:
+        logger.exception("engine rebind failed; using import-time engine")
+        return engine
+    _engine_cache["url"] = url
+    _engine_cache["engine"] = eng
+    return eng
+
+
 # ============ USER & AUTHENTICATION ============
 class UserTable(SQLModel, table=True):
     """System users for authentication"""
@@ -82,8 +119,25 @@ class UserTable(SQLModel, table=True):
     is_active: bool = Field(default=True, index=True)
     is_admin: bool = Field(default=False)
     is_verified: bool = Field(default=False, index=True)
+    tenant_id: str = Field(default="default", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AuthSessionTable(SQLModel, table=True):
+    """Revocable, sliding refresh sessions for browser and desktop clients."""
+
+    __tablename__ = "auth_sessions"
+
+    id: UUID = Field(
+        default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
+    )
+    user_id: UUID = Field(index=True)
+    token_hash: str = Field(unique=True, index=True)
+    expires_at: datetime = Field(index=True)
+    revoked_at: datetime | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_used_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 # ============ EMAIL VERIFICATION TOKENS ============
@@ -136,6 +190,7 @@ class SkillTable(SQLModel, table=True):
     id: UUID = Field(
         default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
     )
+    tenant_id: str = Field(default="default", index=True)
     name: str = Field(index=True)
     level: int = Field(ge=1, le=5)  # 1-5 proficiency scale
     employee_id: UUID | None = Field(
@@ -147,19 +202,74 @@ class SkillTable(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class SkillAliasTable(SQLModel, table=True):
+    """Tenant-reviewed names that map to a canonical skill graph node."""
+
+    __tablename__ = "skill_aliases"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "alias_key", name="uq_skill_alias_tenant_key"),
+    )
+
+    id: UUID = Field(
+        default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
+    )
+    tenant_id: str = Field(index=True)
+    alias: str = Field(index=True)
+    alias_key: str = Field(index=True)
+    canonical_skill: str = Field(index=True)
+    approved: bool = Field(default=False, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CollaborationEventTable(SQLModel, table=True):
+    """Imported, deduplicated evidence of a collaboration between employees."""
+
+    __tablename__ = "collaboration_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "source",
+            "external_event_id",
+            name="uq_collaboration_event_source_id",
+        ),
+    )
+
+    id: UUID = Field(
+        default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
+    )
+    tenant_id: str = Field(index=True)
+    source: str = Field(default="uploaded_csv", index=True)
+    external_event_id: str = Field(index=True)
+    employee_a_id: UUID = Field(foreign_key="employeetable.id", index=True)
+    employee_b_id: UUID = Field(foreign_key="employeetable.id", index=True)
+    event_type: str = Field(default="collaboration", index=True)
+    occurred_at: datetime = Field(index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
 # ============ EXPERIENCE ============
 class ExperienceTable(SQLModel, table=True):
     """Proper experience tracking"""
 
     __tablename__ = "experiences"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "source_record_key", name="uq_experience_tenant_source_key"
+        ),
+    )
 
     id: UUID = Field(
         default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
     )
+    tenant_id: str = Field(default="default", index=True)
     company: str
     position: str
     duration_years: float
     description: str
+    effective_start: datetime | None = Field(default=None, index=True)
+    effective_end: datetime | None = Field(default=None, index=True)
+    is_current: bool = Field(default=False, index=True)
+    source_record_key: str | None = Field(default=None, index=True)
     employee_id: UUID | None = Field(
         default=None, foreign_key="employeetable.id", index=True
     )
@@ -178,6 +288,7 @@ class EmployeeTable(SQLModel, table=True):
     id: UUID = Field(
         default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
     )
+    tenant_id: str = Field(default="default", index=True)
     full_name: str = Field(index=True)
     email: str = Field(unique=True, index=True)
     department: str = Field(index=True)
@@ -186,7 +297,17 @@ class EmployeeTable(SQLModel, table=True):
     is_at_risk: bool = Field(default=False, index=True)
     retention_prob: float | None = Field(default=None, ge=0.0, le=1.0)
     salary: int | None = Field(default=None)
+    salary_currency: str | None = Field(default=None, max_length=3, index=True)
+    salary_period: str | None = Field(default=None, max_length=16, index=True)
     join_date: datetime = Field(default_factory=datetime.utcnow)
+    employment_start_date: datetime | None = Field(default=None, index=True)
+    employment_end_date: datetime | None = Field(default=None, index=True)
+    employment_censor_date: datetime | None = Field(default=None, index=True)
+    employment_duration_years: float | None = Field(
+        default=None, ge=0, le=80, index=True
+    )
+    departure_event: bool | None = Field(default=None, index=True)
+    employment_status: str | None = Field(default=None, max_length=24, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -200,6 +321,7 @@ class CandidateTable(SQLModel, table=True):
     id: UUID = Field(
         default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
     )
+    tenant_id: str = Field(default="default", index=True)
     full_name: str = Field(index=True)
     email: str = Field(unique=True, index=True)
     department: str = Field(index=True)
@@ -238,6 +360,7 @@ class AuditLogTable(SQLModel, table=True):
     id: UUID = Field(
         default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
     )
+    tenant_id: str = Field(default="default", index=True)
     user_id: UUID | None = Field(default=None, foreign_key="users.id", index=True)
     action: str = Field(index=True)  # 'VIEW_EMPLOYEE', 'EXPORT_REPORT', etc
     resource_type: str  # 'employee', 'candidate', 'report'
@@ -254,6 +377,7 @@ class ChatSessionTable(SQLModel, table=True):
     __tablename__ = "chat_sessions"
 
     id: str | None = Field(default=None, sa_column=Column(String(36), primary_key=True))
+    tenant_id: str = Field(default="default", index=True)
     user_id: str = Field(index=True)
     title: str = Field(default="New Session")
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
@@ -271,6 +395,7 @@ class ChatMessageTable(SQLModel, table=True):
     __tablename__ = "chat_messages"
 
     id: str | None = Field(default=None, sa_column=Column(String(36), primary_key=True))
+    tenant_id: str = Field(default="default", index=True)
     session_id: str = Field(foreign_key="chat_sessions.id", index=True)
     role: str = Field(index=True)  # user | assistant | system
     content: str
@@ -294,6 +419,7 @@ class ChatFeedbackTable(SQLModel, table=True):
     __tablename__ = "chat_feedback"
 
     id: str | None = Field(default=None, sa_column=Column(String(36), primary_key=True))
+    tenant_id: str = Field(default="default", index=True)
     session_id: str = Field(foreign_key="chat_sessions.id", index=True)
     user_id: str = Field(index=True)
     message_id: str | None = Field(
@@ -317,6 +443,7 @@ class ChatAttachmentTable(SQLModel, table=True):
     __tablename__ = "chat_attachments"
 
     id: str | None = Field(default=None, sa_column=Column(String(36), primary_key=True))
+    tenant_id: str = Field(default="default", index=True)
     session_id: str = Field(foreign_key="chat_sessions.id", index=True)
     message_id: str | None = Field(
         default=None, foreign_key="chat_messages.id", index=True
@@ -400,6 +527,64 @@ class WorkflowApprovalTable(SQLModel, table=True):
     expires_at: datetime
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     resolved_at: datetime | None = Field(default=None)
+
+
+class ExternalActionRequestTable(SQLModel, table=True):
+    """Immutable, tenant-scoped proposal for an outbound HR action."""
+
+    __tablename__ = "external_action_requests"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(default="default", index=True)
+    requested_by: str = Field(index=True)
+    provider: str = Field(index=True)
+    action_type: str = Field(index=True)
+    connection_id: UUID | None = Field(default=None, index=True)
+    payload_hash: str = Field(index=True)
+    payload: str
+    status: str = Field(default="pending_approval", index=True)
+    idempotency_key: str = Field(unique=True, index=True)
+    approval_id: str | None = Field(default=None, index=True)
+    provider_request_id: str | None = Field(default=None, index=True)
+    result_summary: str | None = None
+    failure_reason: str | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    completed_at: datetime | None = None
+
+
+class ExternalActionAttemptTable(SQLModel, table=True):
+    """Retry/audit record for an external action dispatch attempt."""
+
+    __tablename__ = "external_action_attempts"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    action_id: str = Field(index=True)
+    tenant_id: str = Field(default="default", index=True)
+    attempt_number: int = Field(index=True)
+    status: str = Field(default="running", index=True)
+    provider_status_code: int | None = None
+    provider_request_id: str | None = None
+    safe_result: str | None = None
+    error_code: str | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class OAuthStateTable(SQLModel, table=True):
+    """One-time PKCE transaction bound to an authenticated tenant user."""
+
+    __tablename__ = "oauth_states"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    nonce: str = Field(unique=True, index=True)
+    user_id: str = Field(index=True)
+    tenant_id: str = Field(default="default", index=True)
+    provider: str = Field(index=True)
+    redirect_uri: str
+    code_verifier: str
+    expires_at: datetime = Field(index=True)
+    consumed_at: datetime | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
 # ============ ENTERPRISE INTEGRATIONS ============
@@ -569,7 +754,9 @@ class IntegrationEvidenceTable(SQLModel, table=True):
 
     __tablename__ = "integration_evidence"
 
-    id: UUID = Field(default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True))
+    id: UUID = Field(
+        default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
+    )
     tenant_id: str = Field(default="default", index=True)
     employee_email: str = Field(index=True)
     provider: str = Field(index=True)
@@ -691,6 +878,76 @@ class CompliancePolicyTable(SQLModel, table=True):
     blocked_if_missing_evidence: bool = Field(default=True, index=True)
     blocked_actions: str = Field(default="[]")  # JSON array string
     status: str = Field(default="active", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class PrivacyConsentTable(SQLModel, table=True):
+    """Tenant-scoped legal-basis/consent record for workforce data processing."""
+
+    __tablename__ = "privacy_consents"
+    id: UUID = Field(
+        default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
+    )
+    tenant_id: str = Field(default="default", index=True)
+    subject_ref: str = Field(index=True)
+    purpose: str = Field(index=True)
+    legal_basis: str = Field(index=True)
+    region: str = Field(default="global", index=True)
+    status: str = Field(default="active", index=True)
+    expires_at: datetime | None = Field(default=None, index=True)
+    recorded_by: str | None = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class RetentionPolicyTable(SQLModel, table=True):
+    """Tenant-scoped retention schedule; days are explicit and auditable."""
+
+    __tablename__ = "retention_policies"
+    id: UUID = Field(
+        default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
+    )
+    tenant_id: str = Field(default="default", index=True)
+    data_class: str = Field(index=True)
+    region: str = Field(default="global", index=True)
+    retention_days: int = Field(default=365, ge=1)
+    deletion_mode: str = Field(default="review_required", index=True)
+    status: str = Field(default="active", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class SensitiveFieldPolicyTable(SQLModel, table=True):
+    """Field-level handling policy preventing sensitive data leakage to tools/prompts."""
+
+    __tablename__ = "sensitive_field_policies"
+    id: UUID = Field(
+        default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
+    )
+    tenant_id: str = Field(default="default", index=True)
+    entity: str = Field(index=True)
+    field_name: str = Field(index=True)
+    classification: str = Field(default="confidential", index=True)
+    allowed_roles: str = Field(default='["admin"]')
+    redaction_mode: str = Field(default="omit", index=True)
+    status: str = Field(default="active", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class PrivacyExportRequestTable(SQLModel, table=True):
+    """Approval-gated request for a tenant data export; never auto-executed."""
+
+    __tablename__ = "privacy_export_requests"
+    id: UUID = Field(
+        default_factory=uuid4, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
+    )
+    tenant_id: str = Field(default="default", index=True)
+    requested_by: str = Field(index=True)
+    scope: str = Field(index=True)
+    region: str = Field(default="global", index=True)
+    purpose: str = Field(max_length=1000)
+    status: str = Field(default="pending_approval", index=True)
+    approval_id: str | None = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
@@ -884,7 +1141,7 @@ class IntegrationWebhookEventTable(SQLModel, table=True):
 def create_db_and_tables():
     """Create all tables - USE ALEMBIC IN PRODUCTION"""
     logger.info("Creating database tables...")
-    SQLModel.metadata.create_all(engine)
+    SQLModel.metadata.create_all(resolve_engine())
     _ensure_runtime_schema_compat()
     logger.info("Database initialization complete")
 
@@ -895,13 +1152,14 @@ def _ensure_runtime_schema_compat():
     Keeps existing dev/prod DBs compatible with newly added chat fields.
     """
     try:
-        inspector = inspect(engine)
+        _eng = resolve_engine()
+        inspector = inspect(_eng)
         table_names = set(inspector.get_table_names())
         if "chat_attachments" not in table_names:
             return
 
         cols = {c["name"] for c in inspector.get_columns("chat_attachments")}
-        dialect = engine.dialect.name
+        dialect = _eng.dialect.name
 
         alter_statements = []
         if "parsing_status" not in cols:
@@ -919,7 +1177,7 @@ def _ensure_runtime_schema_compat():
             )
 
         if alter_statements:
-            with engine.begin() as conn:
+            with _eng.begin() as conn:
                 for stmt in alter_statements:
                     conn.execute(text(stmt))
             logger.info(
@@ -963,7 +1221,7 @@ def _ensure_runtime_schema_compat():
             "procurement_artifacts": [("tenant_id", "VARCHAR(64) DEFAULT 'default'")],
         }
 
-        with engine.begin() as conn:
+        with _eng.begin() as conn:
             for table_name, columns in enterprise_column_plan.items():
                 if table_name not in table_names:
                     continue
@@ -989,5 +1247,5 @@ def _ensure_runtime_schema_compat():
 
 def get_session():
     """Get database session - use as dependency injection"""
-    with Session(engine) as session:
+    with Session(resolve_engine()) as session:
         yield session

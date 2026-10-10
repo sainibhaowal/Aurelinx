@@ -140,6 +140,7 @@ const AnalyticsView = () => {
   useEffect(() => {
     if (!token) return undefined;
     let active = true;
+    setTrend([]);
     analysisAPI
       .getAnalyticsHistory(24)
       .then((payload) => {
@@ -158,50 +159,16 @@ const AnalyticsView = () => {
               ),
             }))
             .filter((point) => point.timestamp);
-          // Only use backend history if points actually vary; if flat, use team cluster breakdown
-          const uniqueRisks = new Set(mapped.map((p) => p.atRiskPct));
-          if (uniqueRisks.size > 1) {
-            setTrend(mapped);
-          }
+          setTrend(mapped);
         }
       })
       .catch(() => {
-        /* stream remains the live fallback */
+        /* Keep the history empty when no persisted snapshots can be loaded. */
       });
     return () => {
       active = false;
     };
   }, [token]);
-
-  useEffect(() => {
-    if (!employees || employees.length === 0) return;
-    // Group & sort employees by department and role to reveal real team cluster variations
-    const sortedEmployees = [...employees].sort((a, b) => {
-      const deptCompare = (a.department || "").localeCompare(
-        b.department || "",
-      );
-      if (deptCompare !== 0) return deptCompare;
-      return (a.role || "").localeCompare(b.role || "");
-    });
-    const chunkSize = Math.max(1, Math.floor(sortedEmployees.length / 24));
-    const now = Date.now();
-    const batchPoints = Array.from({ length: 24 }, (_, i) => {
-      const slice = sortedEmployees.slice(i * chunkSize, (i + 1) * chunkSize);
-      const avgSent = slice.length
-        ? slice.reduce((sum, r) => sum + Number(r.sentiment_score || 0.7), 0) /
-          slice.length
-        : 0.7;
-      const riskPct = slice.length
-        ? (slice.filter((r) => r.is_at_risk).length / slice.length) * 100
-        : 15;
-      return {
-        timestamp: new Date(now - (24 - i) * 120000).toISOString(),
-        avgSentiment: Number(avgSent.toFixed(2)),
-        atRiskPct: Number(riskPct.toFixed(1)),
-      };
-    });
-    setTrend(batchPoints);
-  }, [employees]);
 
   const visibleEmployees = employees.filter(
     (employee) =>
@@ -644,10 +611,12 @@ const AnalyticsView = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
         <MetricCard
-          title="Total Workforce"
+          title="Active Employees"
           value={isFiltered ? serverScopeTotal : stats.total}
           delta={
-            isFiltered ? "Filtered employee records" : "Live employee records"
+            isFiltered
+              ? "Filtered active employee records"
+              : "Active employee records"
           }
           color="primary"
         />
@@ -718,7 +687,7 @@ const AnalyticsView = () => {
           <div className="flex items-center gap-3 mb-8">
             <Target className="text-risk" size={24} />
             <h3 className="text-xl font-bold uppercase tracking-tight">
-              Current Risk Rate
+              Current Imported Risk-Flag Rate
             </h3>
           </div>
 
@@ -732,7 +701,7 @@ const AnalyticsView = () => {
                 {displayedRiskPct.toFixed(1)}%
               </div>
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mt-2">
-                {displayedRiskLevel} Rule-Based Risk Rate
+                {displayedRiskLevel} derived from stored flags
               </div>
             </div>
           </div>
@@ -785,7 +754,7 @@ const AnalyticsView = () => {
                     </strong>
                   </span>
                   <span>
-                    Retention{" "}
+                    Stored indicator{" "}
                     <strong className="text-emerald-200">
                       {(row.retention * 100).toFixed(1)}%
                     </strong>
@@ -915,8 +884,9 @@ const AnalyticsView = () => {
                 Live snapshot history
               </h3>
               <p className="mt-1 text-[11px] text-slate-500">
-                One bar is one live analytics snapshot captured in this
-                workspace. Bar height is the at-risk percentage.
+                Each bar is one persisted analytics snapshot from this
+                workspace. Bar height is the percentage of active employees
+                carrying the stored at-risk flag.
               </p>
             </div>
             <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-slate-500">
@@ -987,8 +957,8 @@ const AnalyticsView = () => {
             </div>
           ) : (
             <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-white/10 text-xs text-slate-500">
-              History will appear after the live stream captures its first
-              snapshot.
+              No persisted snapshots are available yet. Snapshots are recorded
+              when the analytics stream runs.
             </div>
           )}
         </section>
@@ -996,11 +966,11 @@ const AnalyticsView = () => {
 
       <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-[10px] leading-relaxed text-slate-500">
         <strong className="text-slate-300">Data quality and provenance:</strong>{" "}
-        metrics use the authenticated tenant's filtered employee records.
-        Employee values are observed database fields; risk rate, department
-        concentration, and risk level are derived calculations. Import
-        validation, duplicate checks, and quarantine counts are available in
-        Data Ops.
+        metrics use the authenticated tenant's active employee records.
+        Sentiment, retention, and risk flags are stored profile values; risk
+        rate, department concentration, and risk level are derived calculations,
+        not validated forecasts. Import validation, duplicate checks, and
+        quarantine counts are available in Data Ops.
       </div>
     </div>
   );

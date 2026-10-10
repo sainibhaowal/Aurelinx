@@ -128,3 +128,6 @@ The backend is built via `infra/backend.Dockerfile` and published to **GHCR** as
 - Frontend: [`client/`](../client/README.md)
 - Desktop shell: [`desktop/`](../desktop/README.md)
 - Infrastructure: [`infra/`](../infra/README.md)
+# Production agent and provider actions
+
+The agent runtime uses native function schemas where supported and a bounded compatibility protocol otherwise. Provider writes are approval-bound through `/api/v1/actions`; see `../docs/security/action-governance.md` and `../docs/integrations/provider-setup.md`.

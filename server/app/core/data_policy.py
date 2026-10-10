@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,3 +42,15 @@ def filter_real_records(records: Iterable) -> list:
     if include_sample_data():
         return list(records)
     return [r for r in records if not _is_mock_email(getattr(r, "email", ""))]
+
+
+def is_active_employee(employee: object) -> bool:
+    """Treat explicit departure outcomes/statuses as former workers.
+
+    Older imports without status remain included for backward compatibility.
+    """
+    status = str(getattr(employee, "employment_status", "") or "").strip().casefold()
+    return (
+        status not in {"departed", "terminated", "inactive", "former"}
+        and getattr(employee, "departure_event", None) is not True
+    )

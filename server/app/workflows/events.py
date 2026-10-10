@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,7 +31,7 @@ from sqlmodel import Session, col, select
 from app.models.database import (
     WorkflowEventTable,
     WorkflowRunTable,
-    engine,
+    resolve_engine,
 )
 
 
@@ -73,7 +72,7 @@ def safe_summary(value: Any, max_chars: int = 500) -> Any:
 def create_workflow_run(
     session_id: str, user_id: str, tenant_id: str = "default"
 ) -> WorkflowRunTable:
-    with Session(engine) as db:
+    with Session(resolve_engine()) as db:
         run = WorkflowRunTable(
             session_id=str(session_id),
             user_id=str(user_id),
@@ -93,7 +92,7 @@ def update_workflow_run(
     phase: str | None = None,
     failure_reason: str | None = None,
 ) -> None:
-    with Session(engine) as db:
+    with Session(resolve_engine()) as db:
         run = db.get(WorkflowRunTable, str(run_id))
         if not run:
             return
@@ -122,7 +121,7 @@ def emit_workflow_event(
     parent_event_id: str | None = None,
 ) -> dict[str, Any]:
     """Persist and return one event. This is safe to call from a worker thread."""
-    with Session(engine) as db:
+    with Session(resolve_engine()) as db:
         last = db.exec(
             select(WorkflowEventTable)
             .where(WorkflowEventTable.run_id == str(run_id))
@@ -164,7 +163,7 @@ def update_workflow_event(
     duplicate 'completed' sibling event, so the timeline shows exactly one
     thinking card per provider turn.
     """
-    with Session(engine) as db:
+    with Session(resolve_engine()) as db:
         event = db.get(WorkflowEventTable, str(event_id))
         if not event:
             return None
