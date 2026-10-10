@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -65,6 +64,7 @@ class TokenData(BaseModel):
     user_id: str
     email: str
     is_admin: bool = False
+    tenant_id: str = "default"
 
 
 class AccessToken(BaseModel):
@@ -109,6 +109,7 @@ def verify_access_token(token: str) -> TokenData:
         user_id: str = payload.get("sub")
         email: str = payload.get("email")
         is_admin: bool = payload.get("is_admin", False)
+        tenant_id: str = payload.get("tenant_id", "default")
 
         if user_id is None:
             raise credentials_exception
@@ -121,7 +122,9 @@ def verify_access_token(token: str) -> TokenData:
         except ValueError:
             raise credentials_exception
 
-        token_data = TokenData(user_id=user_id, email=email, is_admin=is_admin)
+        token_data = TokenData(
+            user_id=user_id, email=email, is_admin=is_admin, tenant_id=tenant_id
+        )
         return token_data
 
     except JWTError as e:
@@ -154,7 +157,10 @@ def _get_dev_fallback_user() -> TokenData | None:
                 return None
 
             return TokenData(
-                user_id=str(user.id), email=user.email, is_admin=user.is_admin
+                user_id=str(user.id),
+                email=user.email,
+                is_admin=user.is_admin,
+                tenant_id=user.tenant_id,
             )
     except Exception as exc:
         logger.debug("Dev fallback auth unavailable: %s", exc)

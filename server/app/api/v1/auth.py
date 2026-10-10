@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +17,7 @@ Authentication endpoints - Login, Register, Token refresh
 """
 
 import asyncio
+import hashlib
 import secrets
 from datetime import datetime, timedelta
 from uuid import UUID
@@ -40,12 +40,18 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.models.database import EmailVerificationTable, UserTable, get_session
+from app.models.database import (
+    AuthSessionTable,
+    EmailVerificationTable,
+    UserTable,
+    get_session,
+)
 from app.schemas.schemas import (
     DeleteAccountRequest,
     EmailVerifyRequest,
     LoginRequest,
     LoginResponse,
+    RefreshSessionRequest,
     RegisterRequest,
     RegisterResponse,
     ResendVerificationRequest,
@@ -58,6 +64,47 @@ from app.services.email_service import EmailDeliveryError, send_verification_ema
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = get_logger(__name__)
+
+
+def _issue_session(user: UserTable, session: SQLSession) -> dict:
+    """Issue a short-lived access token and a persistent, revocable refresh token."""
+    access_token = create_access_token(
+        data={
+            "sub": str(user.id),
+            "email": user.email,
+            "is_admin": user.is_admin,
+            "tenant_id": user.tenant_id,
+        },
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+    refresh_token = secrets.token_urlsafe(48)
+    now = datetime.utcnow()
+    try:
+        session.add(
+            AuthSessionTable(
+                user_id=user.id,
+                token_hash=hashlib.sha256(refresh_token.encode()).hexdigest(),
+                expires_at=now
+                + timedelta(days=max(1, settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)),
+                created_at=now,
+                last_used_at=now,
+            )
+        )
+        session.commit()
+    except Exception as exc:
+        session.rollback()
+        logger.exception("Could not create refresh session for user %s", user.id)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to create a secure login session. Please try again shortly.",
+        ) from exc
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "user_id": user.id,
+    }
 
 
 def generate_otp_code() -> str:
@@ -109,7 +156,12 @@ async def register(
     if not name or not name.strip():
         user_prefix = request.email.split("@")[0]
         cleaned_parts = [
-            p.capitalize() for p in user_prefix.replace(".", " ").replace("_", " ").replace("-", " ").split() if p
+            p.capitalize()
+            for p in user_prefix.replace(".", " ")
+            .replace("_", " ")
+            .replace("-", " ")
+            .split()
+            if p
         ]
         name = " ".join(cleaned_parts) if cleaned_parts else user_prefix.capitalize()
 
@@ -345,25 +397,36 @@ async def claim_verification_session(
         )
     ).first()
     if not verification:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification session.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification session.",
+        )
 
     if verification.expires_at < datetime.utcnow():
         if not verification.is_used:
             verification.is_used = True
             session.commit()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Verification session expired. Please request a new code.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification session expired. Please request a new code.",
+        )
 
     if verification.approved_at is None:
         return {"status": "pending"}
 
     if verification.session_claimed_at is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This verification session has already been used.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This verification session has already been used.",
+        )
 
     user = session.exec(
         select(UserTable).where(UserTable.id == verification.user_id)
     ).first()
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is unavailable.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="User account is unavailable."
+        )
 
     # Claim atomically so a duplicated browser tab, or a copied session secret,
     # cannot race this request and obtain a second access token.
@@ -384,16 +447,10 @@ async def claim_verification_session(
             detail="This verification session has already been used.",
         )
     session.commit()
-    access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
+    tokens = _issue_session(user, session)
     return {
         "status": "approved",
-        "access_token": access_token,
-        "token_type": "bearer",
-        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        "user_id": user.id,
+        **tokens,
     }
 
 
@@ -432,19 +489,11 @@ async def login(request: LoginRequest, session: SQLSession = Depends(get_session
         )
 
     # Create tokens directly
-    access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
+    tokens = _issue_session(user, session)
 
     logger.info(f"Direct login successful for {user.id} ({user.email})")
 
-    return LoginResponse(
-        access_token=access_token,
-        token_type="bearer",
-        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user_id=user.id,
-    )
+    return LoginResponse(**tokens)
 
 
 @router.post("/verify-login", response_model=LoginResponse)
@@ -502,19 +551,11 @@ async def verify_login(
     session.commit()
 
     # Create JWT session
-    access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
+    tokens = _issue_session(user, session)
 
     logger.info(f"Login verified successfully for {user.id}")
 
-    return LoginResponse(
-        access_token=access_token,
-        token_type="bearer",
-        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user_id=user.id,
-    )
+    return LoginResponse(**tokens)
 
 
 @router.post("/login-direct", response_model=LoginResponse)
@@ -534,17 +575,7 @@ async def login_direct(
             detail="Invalid email or password",
         )
 
-    access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
-
-    return LoginResponse(
-        access_token=access_token,
-        token_type="bearer",
-        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user_id=user.id,
-    )
+    return LoginResponse(**_issue_session(user, session))
 
 
 @router.get("/me", response_model=UserOut)
@@ -568,6 +599,70 @@ async def get_current_user_profile(
         is_admin=user.is_admin,
         is_verified=user.is_verified,
         created_at=user.created_at,
+    )
+
+
+@router.post("/refresh")
+async def refresh_session(
+    request: RefreshSessionRequest, session: SQLSession = Depends(get_session)
+):
+    """Renew an expired access token while its persistent session is active."""
+    token_hash = hashlib.sha256(request.refresh_token.encode()).hexdigest()
+    auth_session = session.exec(
+        select(AuthSessionTable).where(AuthSessionTable.token_hash == token_hash)
+    ).first()
+    now = datetime.utcnow()
+    if (
+        not auth_session
+        or auth_session.revoked_at
+        or (auth_session.expires_at is not None and auth_session.expires_at <= now)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired. Please sign in again.",
+        )
+
+    user = session.get(UserTable, auth_session.user_id)
+    if not user or not user.is_active:
+        auth_session.revoked_at = now
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is unavailable.",
+        )
+
+    auth_session.last_used_at = now
+    auth_session.expires_at = now + timedelta(
+        days=max(1, settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
+    )
+    session.commit()
+    tokens = _issue_session_access_token(user)
+    return {"access_token": tokens, "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60}
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout_session(
+    request: RefreshSessionRequest, session: SQLSession = Depends(get_session)
+):
+    """Revoke the refresh session associated with an explicit sign out."""
+    token_hash = hashlib.sha256(request.refresh_token.encode()).hexdigest()
+    auth_session = session.exec(
+        select(AuthSessionTable).where(AuthSessionTable.token_hash == token_hash)
+    ).first()
+    if auth_session and auth_session.revoked_at is None:
+        auth_session.revoked_at = datetime.utcnow()
+        session.commit()
+
+
+def _issue_session_access_token(user: UserTable) -> str:
+    return create_access_token(
+        data={
+            "sub": str(user.id),
+            "email": user.email,
+            "is_admin": user.is_admin,
+            "tenant_id": user.tenant_id,
+        },
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
 
@@ -763,18 +858,15 @@ async def google_callback(
             session.refresh(user)
 
         # Log them in! Create JWT access token
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        jwt_token = create_access_token(
-            data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
-            expires_delta=access_token_expires,
-        )
+        oauth_session = _issue_session(user, session)
+        jwt_token = oauth_session["access_token"]
 
         import urllib.parse
 
         encoded_user = urllib.parse.quote(user.email)
         encoded_name = urllib.parse.quote(user.full_name)
         return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/app?oauth_token={jwt_token}&oauth_email={encoded_user}&oauth_name={encoded_name}"
+            url=f"{settings.FRONTEND_URL}/app#oauth_token={jwt_token}&oauth_refresh={oauth_session['refresh_token']}&oauth_email={encoded_user}&oauth_name={encoded_name}"
         )
 
 
@@ -903,16 +995,13 @@ async def github_callback(
             session.refresh(user)
 
         # Log them in! Create JWT access token
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        jwt_token = create_access_token(
-            data={"sub": str(user.id), "email": user.email, "is_admin": user.is_admin},
-            expires_delta=access_token_expires,
-        )
+        oauth_session = _issue_session(user, session)
+        jwt_token = oauth_session["access_token"]
 
         import urllib.parse
 
         encoded_user = urllib.parse.quote(user.email)
         encoded_name = urllib.parse.quote(user.full_name)
         return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/app?oauth_token={jwt_token}&oauth_email={encoded_user}&oauth_name={encoded_name}"
+            url=f"{settings.FRONTEND_URL}/app#oauth_token={jwt_token}&oauth_refresh={oauth_session['refresh_token']}&oauth_email={encoded_user}&oauth_name={encoded_name}"
         )

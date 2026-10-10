@@ -60,14 +60,18 @@ const LLM_FAMILIES = [
     name: "Google",
     defaultUrl: "https://generativelanguage.googleapis.com",
     placeholder: "AIzaSy...",
-    standardModels: ["gemini-1.5-flash", "gemini-1.5-pro"],
+    standardModels: ["gemini-3.6-flash", "gemini-2.0-flash"],
   },
   {
     id: "groq",
     name: "Groq",
     defaultUrl: "https://api.groq.com/openai/v1",
     placeholder: "gsk_...",
-    standardModels: ["llama-3.1-70b-versatile", "llama-3.1-8b-instant"],
+    standardModels: [
+      "openai/gpt-oss-20b",
+      "llama-3.3-70b-versatile",
+      "qwen-qwq-32b",
+    ],
   },
   {
     id: "lmstudio",
@@ -91,11 +95,67 @@ const LLM_FAMILIES = [
     standardModels: ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
   },
   {
+    id: "openrouter",
+    name: "OpenRouter",
+    defaultUrl: "https://openrouter.ai/api/v1",
+    placeholder: "sk-or-v1-...",
+    standardModels: [
+      "nvidia/nemotron-3.5-lightning:free",
+      "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "inclusionai/ling-3.0-flash-fin:free",
+    ],
+  },
+  {
+    id: "moonshot",
+    name: "Kimi (Moonshot AI)",
+    defaultUrl: "https://api.moonshot.ai/v1",
+    placeholder: "sk-...",
+    standardModels: ["kimi-k2.6", "kimi-k2.5"],
+  },
+  {
+    id: "zai",
+    name: "Z.AI (GLM)",
+    defaultUrl: "https://api.z.ai/api/paas/v4",
+    placeholder: "...",
+    standardModels: ["glm-5.3", "glm-5.2"],
+  },
+  {
+    id: "nvidia",
+    name: "NVIDIA NIM",
+    defaultUrl: "https://integrate.api.nvidia.com/v1",
+    placeholder: "nvapi-...",
+    standardModels: [
+      "nvidia/llama-3.3-nemotron-super-49b-v1",
+      "deepseek-ai/deepseek-v4-flash",
+    ],
+  },
+  {
+    id: "deepseek",
+    name: "DeepSeek",
+    defaultUrl: "https://api.deepseek.com",
+    placeholder: "sk-...",
+    standardModels: ["deepseek-flash", "deepseek-reasoner"],
+  },
+  {
+    id: "mistral",
+    name: "Mistral AI",
+    defaultUrl: "https://api.mistral.ai/v1",
+    placeholder: "...",
+    standardModels: ["mistral-small-latest", "mistral-large-latest"],
+  },
+  {
+    id: "cline",
+    name: "Cline",
+    defaultUrl: "https://api.cline.bot/api/v1",
+    placeholder: "...",
+    standardModels: ["minimax/minimax-m2.5"],
+  },
+  {
     id: "opencode",
     name: "OpenCode Zen",
     defaultUrl: "https://opencode.ai/zen/v1",
     placeholder: "oc-zen-...",
-    standardModels: ["gpt-5.5", "minimax-m2.5"],
+    standardModels: ["gpt-6-astra", "kimi-k3", "deepseek-v4.1-flash"],
   },
 ];
 
@@ -242,7 +302,16 @@ const ProvidersView = () => {
               parsed[fam.id].endpoint ||
               fam.defaultUrl,
             selectedModel:
-              parsed[fam.id].selectedModel || fam.standardModels[0],
+              (Array.isArray(parsed[fam.id].discoveredModels) &&
+                parsed[fam.id].discoveredModels.includes(
+                  parsed[fam.id].selectedModel,
+                )) ||
+              fam.standardModels.includes(parsed[fam.id].selectedModel)
+                ? parsed[fam.id].selectedModel
+                : fam.standardModels[0],
+            discoveredModels: Array.isArray(parsed[fam.id].discoveredModels)
+              ? parsed[fam.id].discoveredModels
+              : fam.standardModels,
             isActive: parsed.activeProvider === fam.id,
           });
         }
@@ -581,14 +650,22 @@ const ProvidersView = () => {
     setSelectedConnection(family);
     // Find existing config or load defaults
     const existing = linkedConnections.find((c) => c.id === family.id);
+    const existingModels =
+      Array.isArray(existing?.discoveredModels) &&
+      existing.discoveredModels.length
+        ? existing.discoveredModels
+        : family.standardModels;
     setFormData({
       authProtocol:
         family.id === "lmstudio" || family.id === "ollama" ? "None" : "API Key",
       url: existing ? existing.url : family.defaultUrl,
       token: existing ? existing.key : "",
-      selectedModel: existing ? existing.selectedModel : "Not Assigned",
+      selectedModel:
+        existing && existingModels.includes(existing.selectedModel)
+          ? existing.selectedModel
+          : "Not Assigned",
     });
-    setAvailableModels(family.standardModels);
+    setAvailableModels(existingModels);
     setPingStatus(existing ? "connected" : null);
     setPingMessage(existing ? "Configuration loaded." : "");
     setInventoryMode("list");
@@ -630,12 +707,43 @@ const ProvidersView = () => {
           ) {
             setFormData((prev) => ({ ...prev, selectedModel: data.models[0] }));
           }
+          setLinkedConnections((prev) =>
+            prev.map((c) =>
+              c.id === selectedConnection.id
+                ? { ...c, discoveredModels: data.models }
+                : c,
+            ),
+          );
+          try {
+            const savedRaw = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
+            if (savedRaw) {
+              const parsed = JSON.parse(savedRaw);
+              if (parsed[selectedConnection.id]) {
+                parsed[selectedConnection.id].discoveredModels = data.models;
+                localStorage.setItem(
+                  "AURELINX_PROVIDERS_CONFIG",
+                  JSON.stringify(parsed),
+                );
+                window.dispatchEvent(new Event("aurelinx-provider-changed"));
+              }
+            }
+          } catch {
+            /* ignore */
+          }
           showToast(
             `Discovered ${data.models.length} active models!`,
             "success",
           );
         } else {
           setAvailableModels(selectedConnection.standardModels);
+          setFormData((prev) => ({
+            ...prev,
+            selectedModel: selectedConnection.standardModels.includes(
+              prev.selectedModel,
+            )
+              ? prev.selectedModel
+              : selectedConnection.standardModels[0],
+          }));
           showToast(
             "Live discovery failed, loaded pre-defined models.",
             "info",
@@ -643,10 +751,26 @@ const ProvidersView = () => {
         }
       } else {
         setAvailableModels(selectedConnection.standardModels);
+        setFormData((prev) => ({
+          ...prev,
+          selectedModel: selectedConnection.standardModels.includes(
+            prev.selectedModel,
+          )
+            ? prev.selectedModel
+            : selectedConnection.standardModels[0],
+        }));
       }
     } catch (err) {
       console.error(err);
       setAvailableModels(selectedConnection.standardModels);
+      setFormData((prev) => ({
+        ...prev,
+        selectedModel: selectedConnection.standardModels.includes(
+          prev.selectedModel,
+        )
+          ? prev.selectedModel
+          : selectedConnection.standardModels[0],
+      }));
     } finally {
       setLoadingModels(false);
     }
@@ -663,9 +787,12 @@ const ProvidersView = () => {
       selectedConnection.id === "ollama" ||
       selectedConnection.id === "custom" ||
       formData.authProtocol === "None";
+    const isOpenRouter = selectedConnection.id === "openrouter";
     const canDiscover = isLocalOrCustom
       ? formData.url && formData.url.length > 5
-      : formData.token && formData.token.length > 5;
+      : isOpenRouter
+        ? true
+        : formData.token && formData.token.length > 5;
 
     if (canDiscover) {
       const timer = setTimeout(() => {
@@ -683,14 +810,15 @@ const ProvidersView = () => {
     setPingStatus(null);
     setPingMessage("");
 
+    const selectedModel =
+      formData.selectedModel !== "Not Assigned"
+        ? formData.selectedModel
+        : selectedConnection.standardModels[0];
     const payload = {
       provider: selectedConnection.id,
       api_key: formData.token || null,
       base_url: formData.url,
-      model:
-        formData.selectedModel !== "Not Assigned"
-          ? formData.selectedModel
-          : selectedConnection.standardModels[0],
+      model: selectedModel,
     };
 
     try {
@@ -705,12 +833,15 @@ const ProvidersView = () => {
 
       if (data.status === "healthy") {
         setPingStatus("connected");
-        setPingMessage("Connection healthy! Latency 42ms.");
+        setPingMessage(
+          `Connection healthy! Latency ${Number.isFinite(data.latency_ms) ? data.latency_ms : "—"}ms.`,
+        );
         showToast("Ping succeeded!", "success");
       } else {
+        const message = data.message || "Provider rejected the test request.";
         setPingStatus("error");
-        setPingMessage(`Ping failed: ${data.message}`);
-        showToast("Ping failed", "error");
+        setPingMessage(`Ping failed: ${message}`);
+        showToast(message, "error");
       }
     } catch (err) {
       console.error(err);
@@ -739,6 +870,9 @@ const ProvidersView = () => {
         formData.selectedModel !== "Not Assigned"
           ? formData.selectedModel
           : selectedConnection.standardModels[0],
+      discoveredModels: availableModels.length
+        ? availableModels
+        : selectedConnection.standardModels,
       isActive: true,
     };
 
@@ -765,12 +899,21 @@ const ProvidersView = () => {
         base_url: conn.url,
         endpoint: conn.url,
         selectedModel: conn.selectedModel,
+        discoveredModels:
+          Array.isArray(conn.discoveredModels) && conn.discoveredModels.length
+            ? conn.discoveredModels
+            : conn.standardModels || [],
       };
     });
     localStorage.setItem(
       "AURELINX_PROVIDERS_CONFIG",
       JSON.stringify(savedConfig),
     );
+    try {
+      window.dispatchEvent(new Event("aurelinx-provider-changed"));
+    } catch {
+      /* non-browser safe */
+    }
     showToast(`Successfully linked ${selectedConnection.name}!`, "success");
     setSelectedConnection(null);
   };
@@ -789,6 +932,11 @@ const ProvidersView = () => {
       }
       localStorage.setItem("AURELINX_PROVIDERS_CONFIG", JSON.stringify(parsed));
     }
+    try {
+      window.dispatchEvent(new Event("aurelinx-provider-changed"));
+    } catch {
+      /* non-browser safe */
+    }
     showToast("Unlinked connection", "info");
     if (selectedConnection?.id === connId) {
       setSelectedConnection(null);
@@ -801,6 +949,11 @@ const ProvidersView = () => {
       const parsed = JSON.parse(saved);
       parsed.activeProvider = connId;
       localStorage.setItem("AURELINX_PROVIDERS_CONFIG", JSON.stringify(parsed));
+      try {
+        window.dispatchEvent(new Event("aurelinx-provider-changed"));
+      } catch {
+        /* non-browser safe */
+      }
     }
 
     setLinkedConnections((prev) =>
@@ -1300,7 +1453,7 @@ const ProvidersView = () => {
                       </div>
 
                       {/* SUB-TAB NAVIGATION BAR */}
-                      <div className="flex items-center gap-2 p-2 rounded-2xl bg-[#06101e]/95 border border-cyan-500/30 shadow-[0_12px_40px_rgba(0,0,0,0.7)] backdrop-blur-2xl overflow-x-auto custom-scrollbar mb-4 shrink-0">
+                      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 items-stretch gap-2 p-2 rounded-2xl bg-[#06101e]/95 border border-cyan-500/30 shadow-[0_12px_40px_rgba(0,0,0,0.7)] backdrop-blur-2xl mb-4 shrink-0">
                         {[
                           {
                             id: "keys",
@@ -1330,9 +1483,9 @@ const ProvidersView = () => {
                             <button
                               key={st.id}
                               onClick={() => setIntegrationSubTab(st.id)}
-                              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all duration-300 whitespace-nowrap cursor-pointer ${
+                              className={`w-full min-w-0 flex flex-wrap items-center justify-center gap-2 px-2 sm:px-4 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider text-center transition-colors duration-300 cursor-pointer ${
                                 isActive
-                                  ? "bg-gradient-to-r from-cyan-500/20 via-teal-500/15 to-cyan-500/10 border border-cyan-400/40 text-cyan-300 shadow-lg shadow-cyan-950/50 scale-[1.02]"
+                                  ? "bg-gradient-to-r from-cyan-500/20 via-teal-500/15 to-cyan-500/10 border border-cyan-400/40 text-cyan-300 shadow-lg shadow-cyan-950/50"
                                   : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent"
                               }`}
                             >
@@ -1342,10 +1495,12 @@ const ProvidersView = () => {
                                   isActive ? "text-cyan-400" : "text-slate-500"
                                 }
                               />
-                              <span>{st.label}</span>
+                              <span className="min-w-0 whitespace-normal leading-tight">
+                                {st.label}
+                              </span>
                               {st.badge !== undefined && (
                                 <span
-                                  className={`ml-1 px-2 py-0.5 rounded-full text-[9px] font-mono ${
+                                  className={`shrink-0 ml-1 px-2 py-0.5 rounded-full text-[9px] font-mono ${
                                     isActive
                                       ? "bg-cyan-400/20 text-cyan-200 border border-cyan-400/30"
                                       : "bg-white/5 text-slate-400 border border-white/10"
@@ -1793,7 +1948,7 @@ const ProvidersView = () => {
                                       Slack Morale API
                                     </span>
                                     <span className="text-[8px] text-slate-500 font-mono">
-                                      Cox Attrition Curve
+                                      Sentiment Trend Analytics
                                     </span>
                                   </div>
                                   <h4 className="text-xs font-bold text-white mb-1.5 uppercase">
@@ -1802,8 +1957,8 @@ const ProvidersView = () => {
                                   <p className="text-[10px] text-slate-400 leading-relaxed">
                                     Accepts a signed employee sentiment event. A
                                     successful event updates the employee
-                                    sentiment/risk fields used by later
-                                    analytics and attrition calculations.
+                                    sentiment/risk fields used by tenant-scoped
+                                    workforce analytics.
                                   </p>
                                 </div>
                                 <div className="space-y-2 mt-auto">

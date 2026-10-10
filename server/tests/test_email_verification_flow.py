@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -27,8 +28,9 @@ os.environ["ALLOW_SQLITE"] = "1"
 os.environ["SECRET_KEY"] = "test-secret-key-at-least-32-characters-long"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
+from app.core.security import create_access_token
 from app.main import app
-from app.models.database import get_session
+from app.models.database import AuthSessionTable, get_session
 
 
 @pytest.fixture()
@@ -51,6 +53,7 @@ def client():
 
 
 def test_one_time_email_verification_and_direct_signin(client):
+    assert AuthSessionTable.__table__.c.expires_at.nullable is False
     email = "marcus.vance@aurelinx.com"
     password = "SecurePassword123!"
 
@@ -91,6 +94,7 @@ def test_one_time_email_verification_and_direct_signin(client):
     assert login_resp.status_code == 200
     auth_data = login_resp.json()
     assert "access_token" in auth_data
+    assert auth_data.get("refresh_token")
     token = auth_data["access_token"]
 
     # Step 5: Access protected /me route
@@ -102,6 +106,53 @@ def test_one_time_email_verification_and_direct_signin(client):
     me_data = me_resp.json()
     assert me_data["email"] == email
     assert me_data["is_verified"] is True
+
+    # An expired access token can be renewed without asking the user to log in.
+    expired_token = create_access_token(
+        data={
+            "sub": str(auth_data["user_id"]),
+            "email": email,
+            "is_admin": False,
+            "tenant_id": "default",
+        },
+        expires_delta=timedelta(seconds=-1),
+    )
+    assert (
+        client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {expired_token}"},
+        ).status_code
+        == 401
+    )
+    refresh_resp = client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": auth_data["refresh_token"]},
+    )
+    assert refresh_resp.status_code == 200
+    renewed_token = refresh_resp.json()["access_token"]
+    assert (
+        client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {renewed_token}"},
+        ).status_code
+        == 200
+    )
+
+    # Explicit sign out revokes the persistent session.
+    assert (
+        client.post(
+            "/api/v1/auth/logout",
+            json={"refresh_token": auth_data["refresh_token"]},
+        ).status_code
+        == 204
+    )
+    assert (
+        client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": auth_data["refresh_token"]},
+        ).status_code
+        == 401
+    )
 
 
 def test_email_link_approves_the_initiating_device_session(client):

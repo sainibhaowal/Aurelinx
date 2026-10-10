@@ -31,6 +31,8 @@ const LONG_REQUEST_TIMEOUT = 60000;
 // Max retries for failed requests
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
+let refreshInFlight = null;
+const inFlightReadRequests = new Map();
 
 function getStoredAuthToken() {
   if (typeof window === "undefined") return null;
@@ -76,6 +78,67 @@ export class APIError extends Error {
 
 function isAuthEndpoint(url) {
   return typeof url === "string" && /\/api\/v1\/auth\//.test(url);
+}
+
+function canRefreshFor(url) {
+  if (typeof url !== "string") return true;
+  if (!isAuthEndpoint(url)) return true;
+  return /\/auth\/(me|verify-token)(?:\?|$)/.test(url);
+}
+
+async function refreshAccessToken() {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    const refreshToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("auth_refresh_token")
+        : null;
+    if (!refreshToken) {
+      const error = new Error("No refresh session is available");
+      error.status = 401;
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("auth:expired"));
+      }
+      throw error;
+    }
+    const urls = buildRequestUrls(`${API_V1}/auth/refresh`);
+    let response;
+    let lastError;
+    for (const url of urls) {
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (!response) throw lastError || new Error("Session refresh failed");
+    if (!response.ok) {
+      const error = new Error(`Session refresh failed: ${response.status}`);
+      error.status = response.status;
+      if (response.status === 401 || response.status === 403) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("auth:expired"));
+        }
+      }
+      throw error;
+    }
+    const data = await response.json();
+    if (!data?.access_token)
+      throw new Error("Session refresh returned no access token");
+    localStorage.setItem("auth_token", data.access_token);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("auth:refreshed"));
+    }
+    return data.access_token;
+  })().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
 }
 
 function buildFallbackBases(baseUrl) {
@@ -157,12 +220,6 @@ function formatErrorMessage(data, fallback = "Request failed") {
 
 async function consumeEventStream(response, handlers = {}, signal = null) {
   if (!response.ok || !response.body) {
-    if (response.status === 401 && !isAuthEndpoint(response.url)) {
-      localStorage.removeItem("auth_token");
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("auth:expired"));
-      }
-    }
     const err = new Error(`Stream request failed: ${response.status}`);
     err.status = response.status;
     err.data = await response.text().catch(() => "");
@@ -181,6 +238,12 @@ async function consumeEventStream(response, handlers = {}, signal = null) {
     }
   };
 
+  // Instant-paint throttling: timeline cards paint immediately, while
+  // high-frequency answer chunks are batched so a 60-token/s stream does
+  // not pay a ~16ms requestAnimationFrame tax per token. The final flush
+  // below guarantees no chunk is left unpainted.
+  let chunkFramesSincePaint = 0;
+  let lastChunkPaintAt = 0;
   try {
     while (true) {
       if (signal?.aborted) {
@@ -213,17 +276,31 @@ async function consumeEventStream(response, handlers = {}, signal = null) {
         if (typeof handler === "function") {
           handler(data, eventName);
           // A proxy or browser read can contain several SSE frames at once.
-          // Yield after every workflow event and answer chunk so React paints
-          // token-by-token instead of committing a whole buffered response.
+          // Paint timeline cards immediately; batch answer chunks.
           if (
             eventName === "agent_step" ||
-            eventName === "model_reasoning_delta" ||
-            eventName === "chunk"
+            eventName === "model_reasoning_delta"
           ) {
             await yieldForPaint();
+          } else if (eventName === "chunk") {
+            chunkFramesSincePaint += 1;
+            const now =
+              typeof performance !== "undefined"
+                ? performance.now()
+                : Date.now();
+            if (chunkFramesSincePaint >= 8 || now - lastChunkPaintAt >= 64) {
+              chunkFramesSincePaint = 0;
+              lastChunkPaintAt = now;
+              await yieldForPaint();
+            }
           }
         }
       }
+    }
+    // Flush any trailing chunks so the final tokens always paint.
+    if (chunkFramesSincePaint > 0) {
+      chunkFramesSincePaint = 0;
+      await yieldForPaint();
     }
   } catch (error) {
     if (error?.name === "AbortError") {
@@ -264,9 +341,11 @@ async function streamRequest(url, handlers = {}, signal = null) {
 /**
  * Make HTTP request with error handling and retry logic
  */
-async function request(url, options = {}, responseType = "json") {
+async function executeRequest(url, options = {}, responseType = "json") {
   const timeoutMs = options.timeoutMs || REQUEST_TIMEOUT;
   const fetchOptions = { ...options };
+  const authRetry = Boolean(fetchOptions._authRetry);
+  delete fetchOptions._authRetry;
   delete fetchOptions.timeoutMs;
   const isFormData =
     typeof FormData !== "undefined" && options.body instanceof FormData;
@@ -289,6 +368,9 @@ async function request(url, options = {}, responseType = "json") {
   let lastError;
   // Retry logic
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    let timeoutId = null;
+    let timeoutState = null;
+    let removeExternalAbortListener = null;
     try {
       const requestUrls = buildRequestUrls(url);
       let response;
@@ -301,9 +383,21 @@ async function request(url, options = {}, responseType = "json") {
       ) {
         const requestUrl = requestUrls[requestIndex];
         const controller = new AbortController();
-        let timedOut = false;
-        const timeoutId = setTimeout(() => {
-          timedOut = true;
+        timeoutState = { timedOut: false };
+        if (options.signal) {
+          const abortFromCaller = () => controller.abort(options.signal.reason);
+          if (options.signal.aborted) {
+            abortFromCaller();
+          } else {
+            options.signal.addEventListener("abort", abortFromCaller, {
+              once: true,
+            });
+            removeExternalAbortListener = () =>
+              options.signal.removeEventListener("abort", abortFromCaller);
+          }
+        }
+        timeoutId = setTimeout(() => {
+          timeoutState.timedOut = true;
           controller.abort();
         }, timeoutMs);
 
@@ -317,6 +411,18 @@ async function request(url, options = {}, responseType = "json") {
           break;
         } catch (error) {
           lastError = error;
+          clearTimeout(timeoutId);
+          timeoutId = null;
+          removeExternalAbortListener?.();
+          removeExternalAbortListener = null;
+          if (timeoutState.timedOut) {
+            throw new APIError(
+              "REQUEST_TIMEOUT",
+              `Request timed out after ${timeoutMs}ms`,
+              0,
+            );
+          }
+          if (options.signal?.aborted) throw error;
           if (
             shouldTryLocalFallback(
               error,
@@ -326,15 +432,9 @@ async function request(url, options = {}, responseType = "json") {
               options.method,
             )
           ) {
-            clearTimeout(timeoutId);
             continue;
           }
-          if (error?.name === "AbortError" && !timedOut) {
-            throw error;
-          }
           throw error;
-        } finally {
-          clearTimeout(timeoutId);
         }
       }
 
@@ -353,10 +453,17 @@ async function request(url, options = {}, responseType = "json") {
       let data;
       const contentType = response.headers.get("content-type");
       if (responseType === "blob") {
-        return await response.blob();
+        const blob = await response.blob();
+        clearTimeout(timeoutId);
+        timeoutId = null;
+        removeExternalAbortListener?.();
+        return blob;
       }
 
       const rawBody = await response.text();
+      clearTimeout(timeoutId);
+      timeoutId = null;
+      removeExternalAbortListener?.();
       if (!rawBody) {
         data = null;
       } else if (contentType?.includes("application/json")) {
@@ -369,9 +476,25 @@ async function request(url, options = {}, responseType = "json") {
         data = rawBody;
       }
 
-      if (response.status === 401 && !isAuthEndpoint(requestUrlUsed)) {
-        localStorage.removeItem("auth_token");
-        if (typeof window !== "undefined") {
+      if (response.status === 401 && canRefreshFor(requestUrlUsed)) {
+        if (!authRetry && canRefreshFor(requestUrlUsed)) {
+          try {
+            await refreshAccessToken();
+            return request(url, { ...options, _authRetry: true }, responseType);
+          } catch (refreshError) {
+            if (refreshError?.status === 401 || refreshError?.status === 403) {
+              throw new APIError(
+                "SESSION_EXPIRED",
+                "Your session expired. Please sign in again.",
+                refreshError.status,
+              );
+            }
+            // A network or server failure while refreshing must not erase the
+            // existing session. Surface the request error and retry later.
+            throw refreshError;
+          }
+        }
+        if (authRetry && typeof window !== "undefined") {
           window.dispatchEvent(new Event("auth:expired"));
         }
         throw new APIError(
@@ -394,43 +517,35 @@ async function request(url, options = {}, responseType = "json") {
 
       return data;
     } catch (error) {
-      lastError = error;
+      clearTimeout(timeoutId);
+      removeExternalAbortListener?.();
+      const requestError = timeoutState?.timedOut
+        ? new APIError(
+            "REQUEST_TIMEOUT",
+            `Request timed out after ${timeoutMs}ms`,
+            0,
+          )
+        : error;
+      lastError = requestError;
 
       // Don't retry mutating requests (POST, PUT, PATCH, DELETE) to avoid delayed cascading timeouts/double execs
       const isIdempotentOrNonMutating =
         !options.method ||
         ["GET", "HEAD", "OPTIONS"].includes(options.method.toUpperCase());
       if (!isIdempotentOrNonMutating) {
-        throw error;
+        throw requestError;
       }
 
       // Don't retry on certain errors
       if (
-        error.status === 401 ||
-        error.status === 403 ||
-        error.status === 422
+        requestError.status === 401 ||
+        requestError.status === 403 ||
+        requestError.status === 422
       ) {
-        throw error;
+        throw requestError;
       }
-      if (
-        error?.name === "AbortError" ||
-        /aborted/i.test(error?.message || "")
-      ) {
-        const isTimeoutAbort =
-          error?.message?.includes("timeout") ||
-          error?.message?.includes("timed out") ||
-          (error?.name === "AbortError" && !error?.message?.includes("reason"));
-        if (isTimeoutAbort) {
-          lastError = new Error(`Request timed out after ${timeoutMs}ms`);
-          if (attempt < MAX_RETRIES - 1) {
-            await new Promise((resolve) =>
-              setTimeout(resolve, RETRY_DELAY * Math.pow(2, attempt)),
-            );
-            continue;
-          }
-          throw lastError;
-        }
-        throw error;
+      if (requestError?.name === "AbortError") {
+        throw requestError;
       }
 
       // Retry with exponential backoff
@@ -446,7 +561,55 @@ async function request(url, options = {}, responseType = "json") {
   throw lastError;
 }
 
-function uploadRequest(url, formData, onProgress = null) {
+function request(url, options = {}, responseType = "json") {
+  const method = (options.method || "GET").toUpperCase();
+  const canShareRequest =
+    ["GET", "HEAD"].includes(method) && options.body == null && !options.signal;
+  if (!canShareRequest) {
+    return executeRequest(url, options, responseType);
+  }
+
+  const token = getStoredAuthToken() || "";
+  const tenantId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("tenant_id") || ""
+      : "";
+  const headersKey = JSON.stringify(
+    [...new Headers(options.headers || {}).entries()].sort(([a], [b]) =>
+      a.localeCompare(b),
+    ),
+  );
+  const requestOptions = { ...options };
+  delete requestOptions.method;
+  delete requestOptions.headers;
+  delete requestOptions.signal;
+  delete requestOptions.body;
+  delete requestOptions._authRetry;
+  const requestKey = JSON.stringify([
+    url,
+    method,
+    responseType,
+    preferredApiBase,
+    token,
+    tenantId,
+    headersKey,
+    requestOptions,
+    options._authRetry === true,
+  ]);
+  const existingRequest = inFlightReadRequests.get(requestKey);
+  if (existingRequest) return existingRequest;
+
+  const sharedRequest = executeRequest(url, options, responseType);
+  const trackedRequest = sharedRequest.finally(() => {
+    if (inFlightReadRequests.get(requestKey) === trackedRequest) {
+      inFlightReadRequests.delete(requestKey);
+    }
+  });
+  inFlightReadRequests.set(requestKey, trackedRequest);
+  return trackedRequest;
+}
+
+function uploadRequest(url, formData, onProgress = null, authRetry = false) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", url, true);
@@ -487,17 +650,14 @@ function uploadRequest(url, formData, onProgress = null) {
       }
 
       if (xhr.status === 401) {
-        if (isAuthEndpoint(url)) {
-          localStorage.removeItem("auth_token");
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new Event("auth:expired"));
-          }
-          reject(
-            new Error(
-              formatErrorMessage(data, "Session expired. Please login again."),
-            ),
-          );
+        if (!authRetry && canRefreshFor(url)) {
+          refreshAccessToken()
+            .then(() => uploadRequest(url, formData, onProgress, true))
+            .then(resolve, reject);
           return;
+        }
+        if (authRetry && typeof window !== "undefined") {
+          window.dispatchEvent(new Event("auth:expired"));
         }
 
         reject({
@@ -585,6 +745,18 @@ export const authAPI = {
 
   getCurrentUser: () => request(`${API_V1}/auth/me`),
 
+  refreshSession: (refreshToken) =>
+    request(`${API_V1}/auth/refresh`, {
+      method: "POST",
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }),
+
+  logout: (refreshToken) =>
+    request(`${API_V1}/auth/logout`, {
+      method: "POST",
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }),
+
   verifyToken: () => request(`${API_V1}/auth/verify-token`),
 
   deleteCurrentUser: (confirmationText) =>
@@ -612,6 +784,7 @@ export const employeesAPI = {
     q = null,
     sentimentMin = null,
     sentimentMax = null,
+    employmentStatus = null,
   ) => {
     const params = new URLSearchParams();
     params.append("skip", skip);
@@ -621,6 +794,7 @@ export const employeesAPI = {
     if (q) params.append("q", q);
     if (sentimentMin != null) params.append("sentiment_min", sentimentMin);
     if (sentimentMax != null) params.append("sentiment_max", sentimentMax);
+    if (employmentStatus) params.append("employment_status", employmentStatus);
     return request(`${API_V1}/employees?${params}`, {
       timeoutMs: LONG_REQUEST_TIMEOUT,
     });
@@ -632,6 +806,7 @@ export const employeesAPI = {
     department = null,
     sentimentMin = null,
     sentimentMax = null,
+    employmentStatus = null,
   ) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
@@ -639,6 +814,7 @@ export const employeesAPI = {
     if (department) params.set("department", department);
     if (sentimentMin != null) params.set("sentiment_min", sentimentMin);
     if (sentimentMax != null) params.set("sentiment_max", sentimentMax);
+    if (employmentStatus) params.set("employment_status", employmentStatus);
     const query = params.toString();
     return request(`${API_V1}/employees/count${query ? `?${query}` : ""}`);
   },
@@ -738,6 +914,88 @@ export const intelligenceAPI = {
       }),
       timeoutMs: LONG_REQUEST_TIMEOUT,
     }),
+
+  explainStream: async (
+    subtab,
+    context,
+    onToken,
+    provider = "lmstudio",
+    apiKey = null,
+    baseUrl = null,
+    model = null,
+    signal = null,
+    authRetry = false,
+  ) => {
+    const token = getStoredAuthToken();
+    if (!token) {
+      const error = new Error("Authentication required");
+      error.status = 401;
+      throw error;
+    }
+    const tenantId =
+      typeof window !== "undefined" ? localStorage.getItem("tenant_id") : null;
+    const headers = { "Content-Type": "application/json" };
+    headers.Authorization = `Bearer ${token}`;
+    if (tenantId) headers["X-Tenant-ID"] = tenantId;
+
+    const response = await fetch(`${API_V1}/intelligence/explain/stream`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        subtab,
+        context,
+        provider,
+        api_key: apiKey,
+        base_url: baseUrl,
+        model,
+      }),
+      signal,
+      cache: "no-store",
+    });
+
+    if (response.status === 401 && !authRetry) {
+      await refreshAccessToken();
+      return intelligenceAPI.explainStream(
+        subtab,
+        context,
+        onToken,
+        provider,
+        apiKey,
+        baseUrl,
+        model,
+        signal,
+        true,
+      );
+    }
+    if (!response.ok) {
+      const raw = await response.text().catch(() => "");
+      let detail = raw;
+      try {
+        detail = JSON.parse(raw)?.detail || raw;
+      } catch {
+        // Keep the provider or server response text for a useful UI error.
+      }
+      const error = new Error(
+        detail || `Explanation request failed (${response.status})`,
+      );
+      error.status = response.status;
+      throw error;
+    }
+
+    return consumeEventStream(
+      response,
+      {
+        chunk: (data) => onToken?.(data?.text || ""),
+        error: (data) => {
+          throw new Error(
+            data?.message ||
+              "The AI provider could not complete the explanation.",
+          );
+        },
+      },
+      signal,
+    );
+  },
 };
 
 /**
@@ -841,6 +1099,8 @@ export const enterpriseAPI = {
     }),
 
   listConnections: () => request(`${API_V1}/enterprise/connections`),
+  listProviderPresets: () =>
+    request(`${API_V1}/enterprise/connection-providers`),
 
   createConnection: (payload) =>
     request(`${API_V1}/enterprise/connections`, {
@@ -886,7 +1146,19 @@ export const enterpriseAPI = {
     return request(`${API_V1}/enterprise/risk-drivers/drilldown?${params}`);
   },
 
-  streamConnectionSync: async (id, handlers = {}, signal = null) => {
+  getRiskExplain: (email) =>
+    request(
+      `${API_V1}/enterprise/risk-explain?email=${encodeURIComponent(email)}`,
+    ),
+
+  getSyncHealth: () => request(`${API_V1}/enterprise/sync-health`),
+
+  streamConnectionSync: async (
+    id,
+    handlers = {},
+    signal = null,
+    authRetry = false,
+  ) => {
     const token = getStoredAuthToken();
     if (!token) {
       const err = new Error("Authentication required");
@@ -905,11 +1177,76 @@ export const enterpriseAPI = {
       },
     );
 
+    if (response.status === 401 && !authRetry) {
+      await refreshAccessToken();
+      return enterpriseAPI.streamConnectionSync(id, handlers, signal, true);
+    }
+    if (response.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new Event("auth:expired"));
+    }
+
     return consumeEventStream(response, {
       sync: handlers.onSync,
       ...handlers,
     });
   },
+};
+
+export const actionsAPI = {
+  listPendingApprovals: () => request(`${API_V1}/actions/approvals/pending`),
+  listProposals: () => request(`${API_V1}/actions/proposals`),
+  createProposal: (payload) =>
+    request(`${API_V1}/actions/proposals`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  decideProposal: (id, decision, reason = "") =>
+    request(`${API_V1}/actions/proposals/${encodeURIComponent(id)}/decision`, {
+      method: "POST",
+      body: JSON.stringify({ decision, reason }),
+    }),
+  executeProposal: (id) =>
+    request(`${API_V1}/actions/proposals/${encodeURIComponent(id)}/execute`, {
+      method: "POST",
+    }),
+};
+
+export const oauthAPI = {
+  start: (provider, connectionId) =>
+    request(
+      `${API_V1}/oauth/${encodeURIComponent(provider)}/start?connection_id=${encodeURIComponent(connectionId)}&mode=json`,
+    ),
+};
+
+export const privacyAPI = {
+  listConsents: () => request(`${API_V1}/privacy/consents`),
+  createConsent: (payload) =>
+    request(`${API_V1}/privacy/consents`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  withdrawConsent: (id) =>
+    request(`${API_V1}/privacy/consents/${encodeURIComponent(id)}/withdraw`, {
+      method: "POST",
+    }),
+  listRetentionPolicies: () => request(`${API_V1}/privacy/retention`),
+  createRetentionPolicy: (payload) =>
+    request(`${API_V1}/privacy/retention`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  listSensitiveFields: () => request(`${API_V1}/privacy/sensitive-fields`),
+  createSensitiveField: (payload) =>
+    request(`${API_V1}/privacy/sensitive-fields`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  listExports: () => request(`${API_V1}/privacy/exports`),
+  requestExport: (payload) =>
+    request(`${API_V1}/privacy/exports`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const leanAPI = {
@@ -1131,6 +1468,7 @@ export const chatAPI = {
     payload,
     handlers = {},
     signal = null,
+    authRetry = false,
   ) => {
     const token = getStoredAuthToken();
     if (!token) {
@@ -1151,6 +1489,19 @@ export const chatAPI = {
           signal,
         },
       );
+      if (response.status === 401 && !authRetry) {
+        await refreshAccessToken();
+        return chatAPI.sendMessageStream(
+          sessionId,
+          payload,
+          handlers,
+          signal,
+          true,
+        );
+      }
+      if (response.status === 401 && typeof window !== "undefined") {
+        window.dispatchEvent(new Event("auth:expired"));
+      }
       return consumeEventStream(
         response,
         {
@@ -1188,6 +1539,16 @@ export const chatAPI = {
         method: "POST",
       },
     ),
+  discoverModels: (payload) =>
+    request(`${API_V1}/chat/providers/discover`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  pingProvider: (payload) =>
+    request(`${API_V1}/chat/providers/ping`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
 
 /**
@@ -1205,6 +1566,8 @@ export default {
   intelligenceAPI,
   analysisAPI,
   enterpriseAPI,
+  actionsAPI,
+  oauthAPI,
   leanAPI,
   chatAPI,
   healthAPI,

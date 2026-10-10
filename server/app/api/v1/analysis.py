@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,7 +28,7 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from app.api.v1.employees import get_employee_out
-from app.core.data_policy import filter_real_records
+from app.core.data_policy import filter_real_records, is_active_employee
 from app.core.logging_config import get_logger
 from app.core.provider_utils import normalize_local_provider_base
 from app.core.security import TokenData, get_current_user
@@ -88,8 +87,16 @@ def _save_analytics_snapshot(
         session.commit()
 
 
-def _analytics_snapshot(session: Session) -> dict:
-    employees = filter_real_records(session.exec(select(EmployeeTable)).all())
+def _analytics_snapshot(session: Session, tenant_id: str) -> dict:
+    employees = [
+        employee
+        for employee in filter_real_records(
+            session.exec(
+                select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
+            ).all()
+        )
+        if is_active_employee(employee)
+    ]
     total = len(employees)
     at_risk = len([e for e in employees if e.is_at_risk])
     at_risk_pct = round((at_risk / total) * 100, 1) if total > 0 else 0.0
@@ -169,8 +176,16 @@ def _analytics_snapshot(session: Session) -> dict:
     }
 
 
-def _workspace_context(session: Session) -> dict:
-    employees = filter_real_records(session.exec(select(EmployeeTable)).all())
+def _workspace_context(session: Session, tenant_id: str) -> dict:
+    employees = [
+        employee
+        for employee in filter_real_records(
+            session.exec(
+                select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
+            ).all()
+        )
+        if is_active_employee(employee)
+    ]
     top_risky = sorted(
         employees,
         key=lambda e: (
@@ -181,24 +196,30 @@ def _workspace_context(session: Session) -> dict:
     )[:5]
     interventions = session.exec(
         select(InterventionTable)
+        .where(InterventionTable.tenant_id == tenant_id)
         .order_by(InterventionTable.created_at.desc())
         .limit(10)
     ).all()
     policies = session.exec(
         select(CompliancePolicyTable)
+        .where(CompliancePolicyTable.tenant_id == tenant_id)
         .where(CompliancePolicyTable.status == "active")
         .order_by(CompliancePolicyTable.created_at.desc())
         .limit(5)
     ).all()
     model_cards = session.exec(
-        select(MLModelCardTable).order_by(MLModelCardTable.created_at.desc()).limit(5)
+        select(MLModelCardTable)
+        .where(MLModelCardTable.tenant_id == tenant_id)
+        .order_by(MLModelCardTable.created_at.desc())
+        .limit(5)
     ).all()
     scenarios = session.exec(
         select(ForecastScenarioTable)
+        .where(ForecastScenarioTable.tenant_id == tenant_id)
         .order_by(ForecastScenarioTable.created_at.desc())
         .limit(3)
     ).all()
-    snapshot = _analytics_snapshot(session)
+    snapshot = _analytics_snapshot(session, tenant_id)
     return {
         "snapshot": snapshot,
         "top_at_risk": [
@@ -495,15 +516,15 @@ async def _call_copilot_model(
 
     system_msg = (
         "You are Aurelinx Copilot, an HR intelligence assistant that turns workforce data into "
-        "decisions. Be practical, concise, and evidence-backed. Use the provided context only. "
+        "decisions. Be practical, evidence-backed, and appropriately thorough. Use the provided context only. "
         "Always mention the key evidence, recommended actions, and any risks or caveats. "
         "Do not invent facts not present in the context. "
-        "Return Markdown only, using short headings and bullets. Do not wrap the whole answer in code fences."
+        "Return polished Markdown only. Choose headings, prose, tables, or bullets based on what best explains the request; do not force a short template or wrap the whole answer in code fences."
     )
     user_msg = (
         f"User request:\n{prompt}\n\n"
         f"Workspace context (JSON):\n{json.dumps(context, default=str)}\n\n"
-        "Return a concise executive answer with Markdown sections for headline, answer, evidence, recommendations, actions, and warnings."
+        "Return a complete executive answer with the evidence, reasoning, recommendations, actions, and warnings relevant to the request. Do not omit necessary context merely to be brief."
     )
     if provider in ["openai", "lmstudio", "groq", "opencode", "ollama", "custom"]:
         payload = {
@@ -517,7 +538,6 @@ async def _call_copilot_model(
     elif provider == "claude":
         payload = {
             "model": selected_model,
-            "max_tokens": 1200,
             "temperature": 0.2,
             "system": system_msg,
             "messages": [{"role": "user", "content": user_msg}],
@@ -563,8 +583,21 @@ async def analyze_talent(
     logger.info(f"User {current_user.user_id} analyzing talent with {request.provider}")
 
     try:
-        candidates = filter_real_records(session.exec(select(CandidateTable)).all())
-        employees = filter_real_records(session.exec(select(EmployeeTable)).all())
+        tenant_id = _tenant_key(current_user)
+        candidates = filter_real_records(
+            session.exec(
+                select(CandidateTable).where(CandidateTable.tenant_id == tenant_id)
+            ).all()
+        )
+        employees = [
+            employee
+            for employee in filter_real_records(
+                session.exec(
+                    select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
+                ).all()
+            )
+            if is_active_employee(employee)
+        ]
 
         # Fetch skills in one query instead of issuing one query per profile.
         # This keeps ranking server-side while avoiding N+1 database latency.
@@ -572,9 +605,10 @@ async def analyze_talent(
         if candidates:
             candidate_skill_rows = session.exec(
                 select(SkillTable).where(
+                    SkillTable.tenant_id == tenant_id,
                     SkillTable.candidate_id.in_(
                         [candidate.id for candidate in candidates]
-                    )
+                    ),
                 )
             ).all()
             for skill in candidate_skill_rows:
@@ -583,7 +617,8 @@ async def analyze_talent(
         if employees:
             employee_skill_rows = session.exec(
                 select(SkillTable).where(
-                    SkillTable.employee_id.in_([employee.id for employee in employees])
+                    SkillTable.tenant_id == tenant_id,
+                    SkillTable.employee_id.in_([employee.id for employee in employees]),
                 )
             ).all()
             for skill in employee_skill_rows:
@@ -748,7 +783,9 @@ async def get_sentiment_report(
     logger.info(f"User {current_user.user_id} requesting sentiment report")
 
     try:
-        query = select(EmployeeTable)
+        query = select(EmployeeTable).where(
+            EmployeeTable.tenant_id == _tenant_key(current_user)
+        )
 
         if department:
             query = query.where(EmployeeTable.department == department)
@@ -756,7 +793,11 @@ async def get_sentiment_report(
         if include_at_risk_only:
             query = query.where(EmployeeTable.is_at_risk)
 
-        employees = filter_real_records(session.exec(query).all())
+        employees = [
+            employee
+            for employee in filter_real_records(session.exec(query).all())
+            if is_active_employee(employee)
+        ]
 
         if not employees:
             return SentimentReportResponse(
@@ -820,19 +861,29 @@ async def sentiment_stream(
     """
     logger.info(f"User {current_user.user_id} connected to sentiment SSE stream")
 
-    stream_key = f"{department or 'all'}::{include_at_risk_only}"
+    # Stream deltas are process-local; scope their cache by tenant as well as
+    # filters so concurrent workspaces cannot observe one another's changes.
+    stream_key = (
+        f"{_tenant_key(current_user)}::{department or 'all'}::{include_at_risk_only}"
+    )
 
     async def event_generator():
         global _SENTIMENT_PREV_SNAPSHOT
         while True:
             try:
                 with Session(engine) as session:
-                    query = select(EmployeeTable)
+                    query = select(EmployeeTable).where(
+                        EmployeeTable.tenant_id == _tenant_key(current_user)
+                    )
                     if department:
                         query = query.where(EmployeeTable.department == department)
                     if include_at_risk_only:
                         query = query.where(EmployeeTable.is_at_risk)
-                    employees = filter_real_records(session.exec(query).all())
+                    employees = [
+                        employee
+                        for employee in filter_real_records(session.exec(query).all())
+                        if is_active_employee(employee)
+                    ]
 
                 prev = _SENTIMENT_PREV_SNAPSHOT.get(stream_key, {})
                 metrics, current = _build_sentiment_metrics(employees, prev)
@@ -898,7 +949,7 @@ async def analytics_stream(
         while True:
             try:
                 with Session(engine) as session:
-                    snapshot = _analytics_snapshot(session)
+                    snapshot = _analytics_snapshot(session, _tenant_key(current_user))
                     _save_analytics_snapshot(
                         session, snapshot, _tenant_key(current_user)
                     )
@@ -927,7 +978,7 @@ async def analytics_snapshot(
     Point-in-time analytics snapshot with totals and top risk drivers.
     """
     with Session(engine) as session:
-        return _analytics_snapshot(session)
+        return _analytics_snapshot(session, _tenant_key(current_user))
 
 
 @router.get("/analytics/history")
@@ -974,7 +1025,16 @@ async def analytics_overview(
     offset = max(0, int(offset))
     limit = max(1, min(int(limit), 200))
     with Session(engine) as session:
-        employees = filter_real_records(session.exec(select(EmployeeTable)).all())
+        tenant_id = _tenant_key(current_user)
+        employees = [
+            employee
+            for employee in filter_real_records(
+                session.exec(
+                    select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
+                ).all()
+            )
+            if is_active_employee(employee)
+        ]
         if department:
             employees = [row for row in employees if row.department == department]
         if risk_only:
@@ -1019,7 +1079,11 @@ async def analytics_overview(
                 row.retention_prob if row.retention_prob is not None else 0.5
             ),
         )
-        candidates = filter_real_records(session.exec(select(CandidateTable)).all())
+        candidates = filter_real_records(
+            session.exec(
+                select(CandidateTable).where(CandidateTable.tenant_id == tenant_id)
+            ).all()
+        )
         match_scores = [
             float(row.match_score) for row in candidates if row.match_score is not None
         ]
@@ -1054,7 +1118,7 @@ async def copilot_context(
     Structured workspace context for AI copilot screens.
     """
     logger.info(f"User {current_user.user_id} requested copilot context")
-    return _workspace_context(session)
+    return _workspace_context(session, _tenant_key(current_user))
 
 
 @router.post("/copilot/brief", response_model=AICopilotResponse)
@@ -1069,7 +1133,7 @@ async def copilot_brief(
     logger.info(
         f"User {current_user.user_id} requested copilot brief on {request.surface}"
     )
-    context = _workspace_context(session)
+    context = _workspace_context(session, _tenant_key(current_user))
     context["surface"] = request.surface
     context["prompt"] = request.prompt
     context["page_context"] = request.page_context or {}

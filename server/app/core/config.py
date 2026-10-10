@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,11 +38,15 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "your-secret-key-min-32-chars-change-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # Refresh sessions slide forward on every successful refresh so active
+    # browser sessions survive normal access-token expiry and reloads.
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 365
     ALGORITHM: str = "HS256"
     REQUIRE_HTTPS: bool = False
 
     # CORS
     FRONTEND_URL: str = "http://localhost:3000"
+    PUBLIC_API_URL: str = "http://localhost:5100"
     ALLOWED_ORIGINS: list[str] | str = [
         "http://localhost:3000",
         "http://localhost:3100",
@@ -78,6 +81,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     CLAUDE_API_KEY: str | None = None
     GROQ_API_KEY: str | None = None
+    OPENROUTER_API_KEY: str | None = None
     OPENCODE_ZEN: str | None = None
 
     # Vector Search
@@ -105,13 +109,17 @@ class Settings(BaseSettings):
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
         self.CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
         self.GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+        self.OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         self.OPENCODE_ZEN = os.getenv("OPENCODE_ZEN")
         self.ENVIRONMENT = os.getenv("ENVIRONMENT", self.ENVIRONMENT)
+        self.PUBLIC_API_URL = os.getenv("PUBLIC_API_URL", self.PUBLIC_API_URL)
         self.REQUIRE_HTTPS = self._parse_bool(
             os.getenv("REQUIRE_HTTPS", self.REQUIRE_HTTPS)
         )
         self.DEBUG = self._parse_bool(os.getenv("DEBUG", self.DEBUG))
-        self.SMTP_ENABLED = self._parse_bool(os.getenv("SMTP_ENABLED", self.SMTP_ENABLED))
+        self.SMTP_ENABLED = self._parse_bool(
+            os.getenv("SMTP_ENABLED", self.SMTP_ENABLED)
+        )
         self.SMTP_TLS = self._parse_bool(os.getenv("SMTP_TLS", self.SMTP_TLS))
         self.ALLOWED_ORIGINS = self._parse_allowed_origins(
             os.getenv("ALLOWED_ORIGINS"),

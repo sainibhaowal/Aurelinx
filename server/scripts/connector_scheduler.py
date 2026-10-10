@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 from redis import Redis
 from retry_scheduler import enqueue_due_events
 from rq import Queue
-from sqlmodel import Session, select
+from sqlalchemy import or_
+from sqlmodel import Session, col, select
 
 from app.models.database import IntegrationConnectionTable, engine
 
@@ -31,8 +32,10 @@ def enqueue_due_connections() -> int:
             select(IntegrationConnectionTable)
             .where(IntegrationConnectionTable.status == "active")
             .where(
-                (IntegrationConnectionTable.next_sync_at.is_(None))
-                | (IntegrationConnectionTable.next_sync_at <= now)
+                or_(
+                    col(IntegrationConnectionTable.next_sync_at).is_(None),
+                    col(IntegrationConnectionTable.next_sync_at) <= now,
+                )
             )
         ).all()
         for row in rows:
@@ -49,7 +52,9 @@ def enqueue_due_connections() -> int:
             # duplicate enqueueing during the next scheduler poll.
             row.last_sync_status = "queued"
             row.last_sync_summary = "Sync queued for background worker"
-            row.next_sync_at = now + timedelta(minutes=max(5, row.sync_interval_minutes))
+            row.next_sync_at = now + timedelta(
+                minutes=max(5, row.sync_interval_minutes)
+            )
             row.updated_at = now
             session.add(row)
             count += 1

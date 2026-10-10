@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -242,7 +242,7 @@ const PLATFORM_MODULES = [
     body: "Maps employee pull request reviews and collaborations onto an interactive ONA graph. Computes influence scores using PageRank, Brandes Betweenness centrality, and Dijkstra skill pathways.",
     tags: [
       "PageRank Centrality",
-      "Spring-Physics Physics",
+      "Spring-Physics Layout",
       "Dijkstra skill distances",
     ],
   },
@@ -266,12 +266,12 @@ const MATH_PILLARS = [
     applied: "Team Assembly Sandbox",
   },
   {
-    title: "Attrition Sandbox & Cox Hazards",
-    formula: "h(t) = h₀(t) · exp(Σ βᵢ·Xᵢ)",
+    title: "Attrition Survival Readiness",
+    formula: "employment duration + observed outcome",
     accent: "#ef4444",
-    desc: "Estimates cumulative baseline hazards across double-Gaussian peak tenures. Integrates SHAP-covariate weights (morale, salary ratio, workload fatigue) to compute dynamic hazard multipliers and flight risk mitigation paths.",
-    highlight: "Proportional Hazards Regression",
-    applied: "Attrition Risk Scoring",
+    desc: "Checks tenant-scoped employment durations and observed departure/censoring outcomes. Individual forecasts remain unavailable until historical outcomes are connected and the model is validated.",
+    highlight: "Observed-outcome survival analysis",
+    applied: "Model data readiness",
   },
   {
     title: "Organizational Network Analysis (ONA)",
@@ -301,6 +301,30 @@ const spotlightMove = (e) => {
   e.currentTarget.style.setProperty("--my", `${e.clientY - rect.top}px`);
 };
 
+// Scroll to a landing section inside the custom scroll container.
+// Plain hash anchors only scroll the window, which never moves here
+// (the page scrolls #landing-scroll-root), so nav uses this instead.
+const scrollToLandingSection = (index) => {
+  const el = document.getElementById(`section-${index}`);
+  if (!el) return;
+  const root = document.getElementById("landing-scroll-root");
+  if (root) {
+    const top =
+      el.getBoundingClientRect().top -
+      root.getBoundingClientRect().top +
+      root.scrollTop -
+      88; /* clear the sticky pill nav */
+    root.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  } else {
+    el.scrollIntoView({ behavior: "smooth" });
+  }
+  try {
+    window.history.replaceState(null, "", `#section-${index}`);
+  } catch {
+    /* non-fatal: hash sync is cosmetic */
+  }
+};
+
 const AuroraBlob = ({ color, className = "", size = 480, delay = "0s" }) => (
   <div
     aria-hidden="true"
@@ -318,11 +342,11 @@ const GradientWord = ({ children }) => (
   <span className="gradient-headline">{children}</span>
 );
 
-const CountUp = ({
+const CountUp = memo(function CountUp({
   value,
   format = (v) => v.toLocaleString(),
   duration = 950,
-}) => {
+}) {
   const [display, setDisplay] = React.useState(0);
   const ref = React.useRef(null);
   const started = React.useRef(false);
@@ -351,22 +375,22 @@ const CountUp = ({
   }, [value, duration]);
 
   return <span ref={ref}>{format(display)}</span>;
-};
+});
 
 /* ─────────────────────────────────────────
    HELPER COMPONENTS
 ───────────────────────────────────────── */
 const GlassCard = ({ children, className = "", style = {}, delay = 0 }) => (
   <motion.div
-    initial={{ opacity: 0, y: 30 }}
-    whileInView={{ opacity: 1, y: 0 }}
+    initial={{ opacity: 0, y: 26, scale: 0.985 }}
+    whileInView={{ opacity: 1, y: 0, scale: 1 }}
     viewport={{ once: true, amount: 0.12 }}
-    transition={{ duration: 0.6, delay, ease: [0.16, 1, 0.3, 1] }}
+    transition={{ duration: 0.65, delay, ease: [0.16, 1, 0.3, 1] }}
     whileHover={{
       y: -4,
       transition: { type: "spring", stiffness: 350, damping: 25 },
     }}
-    className={`group relative rounded-[22px] luxe-card ${className}`}
+    className={`group spotlight-card relative luxe-card landing-radius-panel ${className}`}
     style={{
       background:
         "linear-gradient(160deg, rgba(52,122,86,0.14), rgba(4,16,11,0.55) 55%), rgba(255,255,255,0.025)",
@@ -375,7 +399,6 @@ const GlassCard = ({ children, className = "", style = {}, delay = 0 }) => (
       WebkitBackdropFilter: "blur(16px) saturate(130%)",
       boxShadow:
         "inset 0 1px 0 0 rgba(255,255,255,0.05), 0 20px 60px rgba(2,10,6,0.55)",
-      willChange: "transform, opacity",
       ...style,
     }}
     onMouseMove={spotlightMove}
@@ -385,7 +408,11 @@ const GlassCard = ({ children, className = "", style = {}, delay = 0 }) => (
 );
 
 const SectionLabel = ({ children }) => (
-  <p
+  <motion.p
+    initial={{ opacity: 0, y: 12 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, amount: 0.6 }}
+    transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
     className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.25em]"
     style={{
       background: "rgba(110,231,183,0.07)",
@@ -402,13 +429,19 @@ const SectionLabel = ({ children }) => (
       }}
     />
     {children}
-  </p>
+  </motion.p>
 );
 
 const SectionHeading = ({ children }) => (
-  <h2 className="mt-5 text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[1.05] tracking-tight text-white [text-shadow:0_0_40px_rgba(110,231,183,0.15)]">
+  <motion.h2
+    initial={{ opacity: 0, y: 16 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, amount: 0.6 }}
+    transition={{ duration: 0.55, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+    className="mt-5 text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[1.05] tracking-tight text-white [text-shadow:0_0_40px_rgba(110,231,183,0.15)]"
+  >
     {children}
-  </h2>
+  </motion.h2>
 );
 
 const Tag = ({ children, accent = null }) => (
@@ -436,32 +469,34 @@ const TICKER_PALETTE = [
   "#a78bfa",
 ];
 
-const Ticker = ({ items, className = "" }) => (
-  <div className={`ticker-mask ${className}`} aria-hidden="true">
-    <div className="ticker-track items-center">
-      {[0, 1].map((dup) => (
-        <div key={dup} className="flex items-center gap-10 pr-10">
-          {items.map((item, i) => (
-            <span
-              key={`${dup}-${i}`}
-              className="flex items-center gap-3 whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "rgba(148,163,184,0.55)" }}
-            >
+const Ticker = memo(function Ticker({ items, className = "" }) {
+  return (
+    <div className={`ticker-mask ${className}`} aria-hidden="true">
+      <div className="ticker-track items-center">
+        {[0, 1].map((dup) => (
+          <div key={dup} className="flex items-center gap-10 pr-10">
+            {items.map((item, i) => (
               <span
-                className="h-1 w-1 rounded-full"
-                style={{
-                  background: TICKER_PALETTE[i % TICKER_PALETTE.length],
-                  boxShadow: `0 0 6px ${TICKER_PALETTE[i % TICKER_PALETTE.length]}80`,
-                }}
-              />
-              {item}
-            </span>
-          ))}
-        </div>
-      ))}
+                key={`${dup}-${i}`}
+                className="flex items-center gap-3 whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "rgba(148,163,184,0.55)" }}
+              >
+                <span
+                  className="h-1 w-1 rounded-full"
+                  style={{
+                    background: TICKER_PALETTE[i % TICKER_PALETTE.length],
+                    boxShadow: `0 0 6px ${TICKER_PALETTE[i % TICKER_PALETTE.length]}80`,
+                  }}
+                />
+                {item}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+});
 
 /* ─────────────────────────────────────────
    WAVEFORM (audio-style live bars)
@@ -710,7 +745,12 @@ const CONNECTOR_PALETTE = [
   "#a78bfa",
 ];
 
-const ConnectorTile = ({ name, type, status, index = 0 }) => {
+const ConnectorTile = memo(function ConnectorTile({
+  name,
+  type,
+  status,
+  index = 0,
+}) {
   const statusStyle = {
     active: {
       color: "#6ee7b7",
@@ -752,8 +792,8 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
         transition: { type: "spring", stiffness: 400, damping: 25 },
       }}
       onMouseMove={spotlightMove}
-      className="group spotlight-card luxe-card relative overflow-hidden rounded-[18px] px-5 py-5 border border-white/10 bg-white/[0.02] hover:border-white/15 transition-colors duration-300 shadow-xl"
-      style={{ willChange: "transform, opacity", "--card-accent": accent }}
+      className="group spotlight-card luxe-card landing-radius-tile relative overflow-hidden px-5 py-5 border border-white/10 bg-white/[0.02] shadow-xl"
+      style={{ "--card-accent": accent }}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -773,10 +813,7 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
             </span>
           </div>
           <div>
-            <div
-              className="text-sm font-semibold text-white transition-colors duration-200 group-hover:text-white"
-              style={{ color: accent }}
-            >
+            <div className="text-sm font-semibold" style={{ color: accent }}>
               {name}
             </div>
             <div
@@ -800,7 +837,7 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
       </div>
     </motion.div>
   );
-};
+});
 
 /* ─────────────────────────────────────────
    SLIDER FILL (gradient progress thumb track)
@@ -1103,6 +1140,110 @@ const LuxeScrollbar = () => {
 };
 
 /* ─────────────────────────────────────────
+   STATIC SHOWCASE DATA (module scope)
+   Hoisted out of the component so memoized cards keep referentially
+   stable props — simulator ticks and ROI slider drags then skip
+   reconciling these subtrees instead of re-rendering the whole page.
+   The landing page never reads the tenant's live registries
+   (public-facing surface must expose nothing).
+───────────────────────────────────────── */
+const LANDING_TICKER_ITEMS = [
+  "Workday HRIS",
+  "Greenhouse ATS",
+  "SAP SuccessFactors",
+  "Oracle HCM Cloud",
+  "BambooHR",
+  "ADP Workforce",
+  "Slack Morale Pipeline",
+  "Jira PR Telemetry",
+  "REST API & Webhooks",
+  "Bronze → Silver → Gold",
+  "Policy Release Gates",
+  "Retention Intervention Loops",
+  "Explainable ML Model Cards",
+];
+
+const LANDING_CONNECTORS = [
+  {
+    name: "Workday HRIS API",
+    type: "Core Employee DB",
+    status: "ACTIVE",
+  },
+  {
+    name: "Greenhouse ATS",
+    type: "Candidate Pipeline",
+    status: "SUPPORTED",
+  },
+  {
+    name: "SAP SuccessFactors",
+    type: "Performance Analytics",
+    status: "SUPPORTED",
+  },
+  {
+    name: "Oracle HCM Cloud",
+    type: "Workforce Planning",
+    status: "SUPPORTED",
+  },
+  { name: "BambooHR", type: "Directory Sync", status: "SUPPORTED" },
+  {
+    name: "ADP Workforce",
+    type: "Compensation Mapping",
+    status: "SUPPORTED",
+  },
+];
+
+const LANDING_FALLBACK_RUNBOOKS = [
+  {
+    name: "Core Database Recovery",
+    env: "production",
+    rto: 15,
+    rpo: 5,
+    note: "Daily SRE backups mirroring the primary PostgreSQL cluster across active instances.",
+    status: "validated",
+  },
+  {
+    name: "API Server Recovery",
+    env: "production",
+    rto: 5,
+    rpo: 0,
+    note: "FastAPI health-check ping and autoscaling trigger protocols.",
+    status: "validated",
+  },
+];
+
+const LANDING_FALLBACK_PROCUREMENT = [
+  {
+    title: "Security Controls Review",
+    type: "Compliance",
+    ver: "2026.1",
+    status: "in review",
+    notes:
+      "Continuous SRE log analysis auditing data gates and schema isolation boundaries.",
+  },
+  {
+    title: "Data Protection (GDPR) Review",
+    type: "Legal",
+    ver: "v4",
+    status: "in review",
+    notes: "Tenant-default isolation across database schemas.",
+  },
+  {
+    title: "CAIQ Security Questionnaire",
+    type: "Assessment",
+    ver: "v2",
+    status: "mapped",
+    notes: "Control mapping across raw, silver, and gold pipelines.",
+  },
+  {
+    title: "API Service Level Objectives",
+    type: "Contract",
+    ver: "2026.2",
+    status: "draft",
+    notes: "API health monitoring with local sync fallback modes.",
+  },
+];
+
+/* ─────────────────────────────────────────
    MAIN COMPONENT
 ───────────────────────────────────────── */
 const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
@@ -1125,7 +1266,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
   const [activeModule, setActiveModule] = useState(0);
   const [manualOpen, setManualOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
-  const [subscribed, setSubscribed] = useState(false);
+
   const simSectionRef = useRef(null);
 
   useEffect(() => {
@@ -1208,88 +1349,6 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
     return () => obs.disconnect();
   }, []);
 
-  /* Static connector showcase — the landing page never reads the tenant's
-     live connection registry (public-facing surface must expose nothing) */
-  const displayConnectors = [
-    {
-      name: "Workday HRIS API",
-      type: "Core Employee DB",
-      status: "ACTIVE",
-    },
-    {
-      name: "Greenhouse ATS",
-      type: "Candidate Pipeline",
-      status: "SUPPORTED",
-    },
-    {
-      name: "SAP SuccessFactors",
-      type: "Performance Analytics",
-      status: "SUPPORTED",
-    },
-    {
-      name: "Oracle HCM Cloud",
-      type: "Workforce Planning",
-      status: "SUPPORTED",
-    },
-    { name: "BambooHR", type: "Directory Sync", status: "SUPPORTED" },
-    {
-      name: "ADP Workforce",
-      type: "Compensation Mapping",
-      status: "SUPPORTED",
-    },
-  ];
-
-  /* ── Fallback compliance data ── */
-  const fallbackRunbooks = [
-    {
-      name: "Core Database Recovery",
-      env: "production",
-      rto: 15,
-      rpo: 5,
-      note: "Daily SRE backups mirroring the primary PostgreSQL cluster across active instances.",
-      status: "validated",
-    },
-    {
-      name: "API Server Recovery",
-      env: "production",
-      rto: 5,
-      rpo: 0,
-      note: "FastAPI health-check ping and autoscaling trigger protocols.",
-      status: "validated",
-    },
-  ];
-  const fallbackProcurement = [
-    {
-      title: "SOC 2 Type II Security Inquest",
-      type: "Compliance",
-      ver: "2026.1",
-      status: "approved",
-      notes:
-        "Continuous SRE log analysis auditing data gates and schema isolation boundaries.",
-    },
-    {
-      title: "Standard GDPR DPA Addendum",
-      type: "Legal",
-      ver: "v4",
-      status: "enforced",
-      notes: "Guarantees absolute tenant default isolation database schemas.",
-    },
-    {
-      title: "CAIQ Security Questionnaire",
-      type: "Assessment",
-      ver: "v2",
-      status: "compliant",
-      notes: "100% compliance mapping across raw, silver, and gold pipelines.",
-    },
-    {
-      title: "MSA API Service Level Agreement",
-      type: "Contract",
-      ver: "2026.2",
-      status: "signed",
-      notes: "99.95% API uptime guaranteed under secondary local sync modes.",
-    },
-  ];
-
   /* ROI computations */
   const departures = Math.round((calcWorkforce * calcTurnover) / 100);
   const costToday = departures * calcSalary * 1.5;
@@ -1298,23 +1357,6 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
   const afterCost = costToday - savings;
   const afterPct =
     costToday > 0 ? Math.max(0, (afterCost / costToday) * 100) : 0;
-
-  /* Capability ticker items */
-  const tickerItems = [
-    "Workday HRIS",
-    "Greenhouse ATS",
-    "SAP SuccessFactors",
-    "Oracle HCM Cloud",
-    "BambooHR",
-    "ADP Workforce",
-    "Slack Morale Pipeline",
-    "Jira PR Telemetry",
-    "REST API & Webhooks",
-    "Bronze → Silver → Gold",
-    "Policy Release Gates",
-    "Retention Intervention Loops",
-    "Explainable ML Model Cards",
-  ];
 
   /* Illustrative risk pattern (decorative narrative visual) */
   const RISK_SIGNAL = [
@@ -1365,7 +1407,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         <NeonParticlesWave />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-[1800px] px-4 sm:px-6 lg:px-10">
+      <div className="landing-scale-90 relative z-10 mx-auto max-w-[1800px] px-4 sm:px-6 lg:px-10">
         {/* ══════════ NAV ══════════ */}
         <header className="sticky top-4 z-50 mb-4 pt-4">
           <div
@@ -1378,10 +1420,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           >
             {/* Logo */}
             <div
-              onClick={() => {
-                const el = document.getElementById("section-0");
-                if (el) el.scrollIntoView({ behavior: "smooth" });
-              }}
+              onClick={() => scrollToLandingSection(0)}
               className="flex items-center gap-3 select-none cursor-pointer hover:opacity-80 transition-opacity"
               title="Scroll to Top"
             >
@@ -1418,6 +1457,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             <nav
               className="hidden items-center gap-7 text-[11px] font-semibold uppercase tracking-widest lg:flex"
               style={{ color: "rgba(148,163,184,0.6)" }}
+              aria-label="Landing sections"
             >
               {[
                 "Overview",
@@ -1427,13 +1467,14 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 "Connectors",
                 "Compliance",
               ].map((item, i) => (
-                <a
+                <button
                   key={item}
-                  href={`#section-${i}`}
-                  className="transition-colors hover:text-white"
+                  type="button"
+                  onClick={() => scrollToLandingSection(i)}
+                  className="uppercase tracking-widest transition-colors hover:text-white cursor-pointer"
                 >
                   {item}
-                </a>
+                </button>
               ))}
             </nav>
 
@@ -1687,7 +1728,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             className="mt-10 border-y border-white/5 py-1"
             aria-hidden="true"
           >
-            <Ticker items={tickerItems} />
+            <Ticker items={LANDING_TICKER_ITEMS} />
           </div>
 
           {/* Scroll hint */}
@@ -2305,13 +2346,21 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
           <div className="mx-auto mt-12 grid max-w-[1500px] gap-5 lg:grid-cols-[340px_1fr]">
             {/* Pillar selector */}
-            <div className="space-y-2.5">
+            <div className="space-y-2.5 landing-selector-strip">
               {MATH_PILLARS.map((pillar, idx) => (
-                <button
+                <motion.button
                   key={pillar.title}
                   type="button"
+                  initial={{ opacity: 0, x: -14 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true, amount: 0.4 }}
+                  transition={{
+                    duration: 0.45,
+                    delay: idx * 0.06,
+                    ease: [0.16, 1, 0.3, 1],
+                  }}
                   onClick={() => setActivePillar(idx)}
-                  className="w-full rounded-[18px] p-4 text-left transition-all duration-200 select-none"
+                  className="w-full landing-radius-tile p-4 text-left transition-colors duration-200 select-none"
                   style={{
                     background:
                       idx === activePillar
@@ -2346,7 +2395,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       </span>
                     </span>
                   </div>
-                </button>
+                </motion.button>
               ))}
             </div>
 
@@ -2467,16 +2516,24 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
           <div className="mx-auto mt-12 grid max-w-[1500px] gap-5 lg:grid-cols-[300px_1fr]">
             {/* Module selector */}
-            <div className="space-y-2">
+            <div className="space-y-2 landing-selector-strip">
               {PLATFORM_MODULES.map((mod, idx) => {
                 const Icon = mod.icon;
                 const isActive = idx === activeModule;
                 return (
-                  <button
+                  <motion.button
                     key={mod.title}
                     type="button"
+                    initial={{ opacity: 0, x: -14 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, amount: 0.4 }}
+                    transition={{
+                      duration: 0.45,
+                      delay: idx * 0.05,
+                      ease: [0.16, 1, 0.3, 1],
+                    }}
                     onClick={() => setActiveModule(idx)}
-                    className="w-full rounded-[16px] p-3.5 text-left transition-all duration-200 select-none"
+                    className="w-full landing-radius-tile p-3.5 text-left transition-colors duration-200 select-none"
                     style={{
                       background: isActive
                         ? `${mod.accent}0d`
@@ -2513,7 +2570,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                         </span>
                       </span>
                     </div>
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
@@ -2934,9 +2991,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           </div>
 
           <div className="mt-12 mx-auto max-w-[1600px]">
-            <Ticker items={tickerItems} className="mb-8" />
+            <Ticker items={LANDING_TICKER_ITEMS} className="mb-8" />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {displayConnectors.slice(0, 6).map((c, i) => (
+              {LANDING_CONNECTORS.slice(0, 6).map((c, i) => (
                 <ConnectorTile key={`${c.name}-${i}`} {...c} />
               ))}
             </div>
@@ -3017,7 +3074,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       workspace holds the live runbooks for your own tenant.
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      {fallbackRunbooks.map((rb, i) => (
+                      {LANDING_FALLBACK_RUNBOOKS.map((rb, i) => (
                         <div
                           key={i}
                           className="rounded-[16px] p-4"
@@ -3080,7 +3137,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       workspace holds the signed documents for your tenant.
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      {fallbackProcurement.map((pa, i) => (
+                      {LANDING_FALLBACK_PROCUREMENT.map((pa, i) => (
                         <div
                           key={i}
                           className="rounded-[16px] p-4"
@@ -3392,7 +3449,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       AURELINX
                     </div>
                     <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                      Management OS · v4.4
+                      Management OS · v{APP_VERSION}
                     </div>
                   </div>
                 </div>
@@ -3427,55 +3484,15 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                         <BrandIcon name={name} />
                       </a>
                     ) : (
-                      <button
+                      <span
                         key={name}
-                        type="button"
                         title={label}
-                        onClick={onOpenEnterprise}
-                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-500 transition-all duration-200 hover:border-cyan-400/40 hover:text-cyan-300 hover:shadow-[0_0_12px_rgba(52,211,153,0.2)]"
+                        aria-hidden="true"
+                        className="flex h-8 w-8 cursor-default items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-600"
                       >
                         <BrandIcon name={name} />
-                      </button>
+                      </span>
                     ),
-                  )}
-                </div>
-
-                {/* Newsletter */}
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                    Product updates
-                  </div>
-                  {subscribed ? (
-                    <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-2.5 text-xs text-emerald-300">
-                      <CheckCircle2 size={14} />
-                      Subscribed — product updates on the way.
-                    </div>
-                  ) : (
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        setSubscribed(true);
-                      }}
-                      className="mt-2.5 flex gap-2"
-                    >
-                      <input
-                        type="email"
-                        required
-                        placeholder="Work email"
-                        className="h-9 w-full min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-3 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400/50"
-                      />
-                      <button
-                        type="submit"
-                        className="btn-shine h-9 flex-none rounded-lg px-4 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
-                        style={{
-                          background:
-                            "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
-                          color: "#020a07",
-                        }}
-                      >
-                        Subscribe
-                      </button>
-                    </form>
                   )}
                 </div>
               </div>
@@ -3484,62 +3501,32 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               <div className="grid grid-cols-2 gap-10 sm:grid-cols-4 lg:col-span-8">
                 <FooterColumn title="Product">
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-0");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(0)}>
                       Platform Overview
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-1");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(1)}>
                       Ingest Pipeline
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-2");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(2)}>
                       Math Engine
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-3");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(3)}>
                       Platform Modules
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-4");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(4)}>
                       Connectors
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-5");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(5)}>
                       Compliance &amp; Audit
                     </FooterLink>
                   </li>
@@ -3547,32 +3534,22 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
                 <FooterColumn title="Solutions">
                   <li>
-                    <FooterLink onClick={onEnterWorkspace}>
-                      Enterprise Suite
-                    </FooterLink>
-                  </li>
-                  <li>
-                    <FooterLink onClick={onEnterWorkspace}>
+                    <FooterLink onClick={() => scrollToLandingSection(1)}>
                       Attrition Analytics
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink onClick={onEnterWorkspace}>
+                    <FooterLink onClick={() => scrollToLandingSection(2)}>
                       Talent Intelligence
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink onClick={onOpenEnterprise}>
+                    <FooterLink onClick={() => scrollToLandingSection(5)}>
                       Data Governance
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-5");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(5)}>
                       Security &amp; Policy
                     </FooterLink>
                   </li>
@@ -3584,26 +3561,13 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       Documentation
                     </FooterLink>
                   </li>
+
                   <li>
-                    <FooterLink onClick={onOpenEnterprise}>
-                      API Reference
-                    </FooterLink>
-                  </li>
-                  <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-0");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(0)}>
                       System Status
                     </FooterLink>
                   </li>
-                  <li>
-                    <FooterLink onClick={onEnterWorkspace}>
-                      Changelog
-                    </FooterLink>
-                  </li>
+
                   <li>
                     <FooterLink href="mailto:redacted@example.invalid">
                       Support
@@ -3625,19 +3589,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink onClick={onOpenEnterprise}>Careers</FooterLink>
-                  </li>
-                  <li>
-                    <FooterLink onClick={onEnterWorkspace}>Blog</FooterLink>
-                  </li>
-                  <li>
                     <FooterLink href="mailto:redacted@example.invalid">
                       Contact
-                    </FooterLink>
-                  </li>
-                  <li>
-                    <FooterLink onClick={onOpenEnterprise}>
-                      Press Kit
                     </FooterLink>
                   </li>
                 </FooterColumn>
@@ -3651,10 +3604,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             >
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                 {[
-                  ["SOC 2 Type II", "#6ee7b7"],
-                  ["GDPR Compliant", "#6ee7b7"],
+                  ["SOC 2-ready controls", "#6ee7b7"],
+                  ["GDPR-ready architecture", "#6ee7b7"],
                   ["EU AI Act Ready", "#a78bfa"],
-                  ["Zero-Knowledge Isolation", null],
+                  ["Tenant-isolated data", null],
                   ["HMAC-SHA256 Signatures", null],
                 ].map(([label, accent]) => (
                   <span
@@ -3678,8 +3631,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   color: "rgba(148,163,184,0.6)",
                 }}
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
-                System Status: Operational (
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${sreStatus === "operational" ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" : "bg-red-400"}`}
+                />
+                System Status: {sreStatus} (
                 {pingLatency ? `${pingLatency}ms` : "checking…"})
               </div>
             </div>
@@ -3690,22 +3645,6 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <span>
                   &copy; {new Date().getFullYear()} Aurelinx Inc. All rights
                   reserved.
-                </span>
-                <span className="opacity-40">•</span>
-                <span className="cursor-default hover:text-slate-300">
-                  Privacy Policy
-                </span>
-                <span className="opacity-40">•</span>
-                <span className="cursor-default hover:text-slate-300">
-                  Terms of Service
-                </span>
-                <span className="opacity-40">•</span>
-                <span className="cursor-default hover:text-slate-300">
-                  Security
-                </span>
-                <span className="opacity-40">•</span>
-                <span className="cursor-default hover:text-slate-300">
-                  Cookies
                 </span>
               </div>
               <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider">

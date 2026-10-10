@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,8 +31,10 @@ from sqlmodel import Session, select
 from app.core.logging_config import get_logger
 from app.core.security import get_current_admin_user_strict, get_tenant_id
 from app.models.database import (
+    CollaborationEventTable,
     EmployeeTable,
     IntegrationApiKeyTable,
+    IntegrationEvidenceTable,
     IntegrationLogTable,
     IntegrationWebhookEventTable,
     SkillTable,
@@ -385,7 +386,11 @@ def ingest_workday_hris(
     action = payload.get("action", "update")
     employee_data = payload.get("employee")
 
-    if not employee_data or not employee_data.get("email"):
+    if (
+        not isinstance(employee_data, dict)
+        or not isinstance(employee_data.get("email"), str)
+        or not employee_data["email"].strip()
+    ):
         update_webhook_event_status(
             session,
             event,
@@ -404,17 +409,20 @@ def ingest_workday_hris(
     skills = employee_data.get("skills", [])
 
     emp = session.exec(
-        select(EmployeeTable).where(EmployeeTable.email == email)
+        select(EmployeeTable).where(
+            EmployeeTable.tenant_id == api_key.tenant_id,
+            EmployeeTable.email == email,
+        )
     ).first()
     summary = ""
 
     if action == "hire" and not emp:
         emp = EmployeeTable(
+            tenant_id=api_key.tenant_id,
             full_name=full_name,
             email=email,
             department=dept,
             role=role,
-            sentiment_score=0.75,
             is_at_risk=False,
             join_date=datetime.utcnow(),
         )
@@ -424,6 +432,7 @@ def ingest_workday_hris(
 
         for s in skills:
             skill_obj = SkillTable(
+                tenant_id=api_key.tenant_id,
                 name=s.get("name"),
                 level=s.get("level", 3),
                 employee_id=emp.id,
@@ -434,6 +443,7 @@ def ingest_workday_hris(
     else:
         if not emp:
             emp = EmployeeTable(
+                tenant_id=api_key.tenant_id,
                 full_name=full_name,
                 email=email,
                 department=dept,
@@ -453,7 +463,10 @@ def ingest_workday_hris(
         existing_skills = {
             s.name.lower()
             for s in session.exec(
-                select(SkillTable).where(SkillTable.employee_id == emp.id)
+                select(SkillTable).where(
+                    SkillTable.tenant_id == api_key.tenant_id,
+                    SkillTable.employee_id == emp.id,
+                )
             ).all()
             if s.name
         }
@@ -461,6 +474,7 @@ def ingest_workday_hris(
             s_name = s.get("name")
             if s_name and s_name.lower() not in existing_skills:
                 skill_obj = SkillTable(
+                    tenant_id=api_key.tenant_id,
                     name=s_name,
                     level=s.get("level", 3),
                     employee_id=emp.id,
@@ -539,7 +553,10 @@ def ingest_slack_sentiment(
 
     email = email.strip().lower()
     emp = session.exec(
-        select(EmployeeTable).where(EmployeeTable.email == email)
+        select(EmployeeTable).where(
+            EmployeeTable.tenant_id == api_key.tenant_id,
+            EmployeeTable.email == email,
+        )
     ).first()
     if not emp:
         update_webhook_event_status(
@@ -550,19 +567,71 @@ def ingest_slack_sentiment(
             detail=f"Employee with email {email} not found in directory.",
         )
 
-    old_sentiment = emp.sentiment_score
-    emp.sentiment_score = max(0.0, min(1.0, float(sentiment)))
+    try:
+        sentiment_value = float(sentiment)
+    except (TypeError, ValueError) as exc:
+        update_webhook_event_status(
+            session, event, success=False, error_message="Invalid sentiment_score"
+        )
+        raise HTTPException(
+            status_code=422, detail="sentiment_score must be a number from 0 to 1."
+        ) from exc
+    if not 0.0 <= sentiment_value <= 1.0:
+        update_webhook_event_status(
+            session,
+            event,
+            success=False,
+            error_message="sentiment_score outside [0, 1]",
+        )
+        raise HTTPException(
+            status_code=422, detail="sentiment_score must be a number from 0 to 1."
+        )
+    try:
+        message_count_value = int(message_count or 0)
+    except (TypeError, ValueError) as exc:
+        update_webhook_event_status(
+            session, event, success=False, error_message="Invalid message_count"
+        )
+        raise HTTPException(
+            status_code=422, detail="message_count must be a nonnegative integer."
+        ) from exc
+    if message_count_value < 0:
+        update_webhook_event_status(
+            session, event, success=False, error_message="Negative message_count"
+        )
+        raise HTTPException(
+            status_code=422, detail="message_count must be a nonnegative integer."
+        )
 
-    if emp.sentiment_score <= 0.35:
-        emp.is_at_risk = True
-    elif emp.sentiment_score >= 0.70:
-        emp.is_at_risk = False
+    old_sentiment = emp.sentiment_score
+    emp.sentiment_score = sentiment_value
 
     emp.updated_at = datetime.utcnow()
     session.add(emp)
+    session.add(
+        IntegrationEvidenceTable(
+            tenant_id=api_key.tenant_id,
+            employee_email=email,
+            provider="slack",
+            source_type="engagement",
+            external_id=str(idempotency_key or event.id),
+            evidence_type="sentiment_aggregate",
+            summary=json.dumps(
+                {
+                    "message_count": message_count_value,
+                    "source_model": str(
+                        payload.get("source_model") or "external_sentiment_model"
+                    )[:120],
+                    "window_start": payload.get("window_start"),
+                    "window_end": payload.get("window_end"),
+                    "sentiment_score": sentiment_value,
+                }
+            ),
+        )
+    )
     session.commit()
 
-    summary = f"Slack Sync: Adjusted morale score for {emp.full_name} from {old_sentiment:.2f} to {emp.sentiment_score:.2f} (Activity: {message_count} messages)."
+    summary = f"Slack Sync: Updated sentiment signal for {emp.full_name} from {old_sentiment:.2f} to {emp.sentiment_score:.2f} (Activity: {message_count_value} messages). Risk flags were unchanged."
 
     update_webhook_event_status(session, event, success=True)
 
@@ -624,7 +693,12 @@ def ingest_jira_collaboration(
     issue_key = payload.get("issue_key", "TASK")
     activity_type = payload.get("activity_type", "ticket_resolved")
 
-    if not reporter_email or not assignee_email:
+    if (
+        not isinstance(reporter_email, str)
+        or not reporter_email.strip()
+        or not isinstance(assignee_email, str)
+        or not assignee_email.strip()
+    ):
         update_webhook_event_status(
             session,
             event,
@@ -640,10 +714,16 @@ def ingest_jira_collaboration(
     assignee_email = assignee_email.strip().lower()
 
     rep = session.exec(
-        select(EmployeeTable).where(EmployeeTable.email == reporter_email)
+        select(EmployeeTable).where(
+            EmployeeTable.tenant_id == api_key.tenant_id,
+            EmployeeTable.email == reporter_email,
+        )
     ).first()
     asg = session.exec(
-        select(EmployeeTable).where(EmployeeTable.email == assignee_email)
+        select(EmployeeTable).where(
+            EmployeeTable.tenant_id == api_key.tenant_id,
+            EmployeeTable.email == assignee_email,
+        )
     ).first()
 
     if not rep or not asg:
@@ -654,8 +734,81 @@ def ingest_jira_collaboration(
             error_message="Reporter or assignee not found in directory",
         )
         raise HTTPException(
-            status_code=400,
-            detail=f"Both developers must exist in directory. Reporter found: {rep is not None}, Assignee found: {asg is not None}",
+            status_code=404,
+            detail="Both the Jira reporter and assignee must exist in this tenant's employee directory.",
+        )
+    if rep.id == asg.id:
+        update_webhook_event_status(
+            session,
+            event,
+            success=False,
+            error_message="Self-assignment is not a collaboration edge",
+        )
+        raise HTTPException(
+            status_code=422,
+            detail="A Jira collaboration event requires two distinct employees.",
+        )
+
+    occurred_raw = payload.get("occurred_at") or payload.get("updated_at")
+    if not occurred_raw:
+        update_webhook_event_status(
+            session,
+            event,
+            success=False,
+            error_message="Missing collaboration event timestamp",
+        )
+        raise HTTPException(
+            status_code=422,
+            detail="Jira collaboration requires occurred_at or updated_at.",
+        )
+    try:
+        occurred_at = datetime.fromisoformat(str(occurred_raw).replace("Z", "+00:00"))
+        occurred_at = (
+            occurred_at.replace(tzinfo=None) if occurred_at.tzinfo else occurred_at
+        )
+    except ValueError as exc:
+        update_webhook_event_status(
+            session,
+            event,
+            success=False,
+            error_message="Invalid collaboration event timestamp",
+        )
+        raise HTTPException(
+            status_code=422, detail="Jira collaboration timestamp must be ISO 8601."
+        ) from exc
+    external_event_id = str(
+        payload.get("external_event_id")
+        or payload.get("event_id")
+        or hashlib.sha256(
+            "|".join(
+                (
+                    str(issue_key),
+                    reporter_email,
+                    assignee_email,
+                    str(activity_type),
+                    occurred_at.isoformat(),
+                )
+            ).encode("utf-8")
+        ).hexdigest()
+    )
+    existing_collaboration = session.exec(
+        select(CollaborationEventTable).where(
+            CollaborationEventTable.tenant_id == api_key.tenant_id,
+            CollaborationEventTable.source == "jira_webhook",
+            CollaborationEventTable.external_event_id == external_event_id,
+        )
+    ).first()
+    if not existing_collaboration:
+        session.add(
+            CollaborationEventTable(
+                tenant_id=api_key.tenant_id,
+                source="jira_webhook",
+                external_event_id=external_event_id,
+                employee_a_id=rep.id,
+                employee_b_id=asg.id,
+                event_type=str(activity_type)[:80],
+                occurred_at=occurred_at,
+            )
         )
 
     summary = f"Jira Collaboration: {rep.email} <-> {asg.email} on issue {issue_key} ({activity_type})"

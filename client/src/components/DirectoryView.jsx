@@ -24,7 +24,6 @@ import {
   RefreshCw,
   Globe,
   Cpu,
-  DollarSign,
 } from "lucide-react";
 import TalentCard from "./TalentCard";
 import PremiumSelect from "./PremiumSelect";
@@ -35,7 +34,11 @@ import {
   intelligenceAPI,
 } from "../services/apiClient";
 
-const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
+const DirectoryView = ({
+  onExport,
+  cacheScope = "workspace",
+  isAdmin = false,
+}) => {
   // Keep the first paint light. Counts remain authoritative while records are
   // paged in as the user requests them.
   const DIRECTORY_PAGE_SIZE = 100;
@@ -67,6 +70,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [riskFilter, setRiskFilter] = useState("all");
+  const [employmentStatusFilter, setEmploymentStatusFilter] = useState("");
   const [sentimentBand, setSentimentBand] = useState("all");
   const [employeeDepartments, setEmployeeDepartments] = useState([]);
   const [candidateDepartments, setCandidateDepartments] = useState([]);
@@ -100,7 +104,9 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
         setOnaSummary({
           nodes,
           links,
+          scopeTruncated: Boolean(data?.metrics?.employee_scope_truncated),
           leaders: [...nodes]
+            .filter((node) => (node.degree || 0) > 0)
             .sort(
               (a, b) =>
                 Number(b.influence_pagerank || 0) -
@@ -411,6 +417,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
             query || null,
             sentimentMin,
             sentimentMax,
+            isAdmin ? employmentStatusFilter || null : null,
           ),
           candidatesAPI.list(
             0,
@@ -426,6 +433,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
             employeeDepartment,
             sentimentMin,
             sentimentMax,
+            isAdmin ? employmentStatusFilter || null : null,
           ),
           candidatesAPI.count(
             query || null,
@@ -439,6 +447,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
             employeeDepartment,
             sentimentMin,
             sentimentMax,
+            isAdmin ? employmentStatusFilter || null : null,
           ),
         ]);
         setEmployees(employeeRows || []);
@@ -465,7 +474,15 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
       }
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [filter, departmentFilter, riskFilter, sentimentBand, sentimentBounds]);
+  }, [
+    filter,
+    departmentFilter,
+    riskFilter,
+    sentimentBand,
+    sentimentBounds,
+    employmentStatusFilter,
+    isAdmin,
+  ]);
 
   const loadMore = async () => {
     if (loadingMore || (!hasMoreEmployees && !hasMoreCandidates)) return;
@@ -488,6 +505,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
               query,
               sentimentMin,
               sentimentMax,
+              isAdmin ? employmentStatusFilter || null : null,
             )
             .then((rows) => ({ type: "employees", rows })),
         );
@@ -558,6 +576,8 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
     riskFilter,
     sentimentBand,
     sentimentBounds,
+    employmentStatusFilter,
+    isAdmin,
   ]);
 
   const isCandidateRecord = (person) =>
@@ -609,7 +629,15 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
       !departmentFilter || person.department === departmentFilter;
     const sourceMatches =
       !sourceFilter || (person.source_providers || []).includes(sourceFilter);
-    const riskMatches = riskFilter !== "at_risk" || Boolean(person.is_at_risk);
+    const riskMatches =
+      isCandidateRecord(person) ||
+      riskFilter !== "at_risk" ||
+      Boolean(person.is_at_risk);
+    const employmentStatusMatches =
+      !employmentStatusFilter ||
+      (employmentStatusFilter === "unknown"
+        ? !person.employment_status
+        : person.employment_status === employmentStatusFilter);
     const score = Number(person.sentiment_score);
     const sentimentMatches =
       sentimentBand === "all" ||
@@ -623,17 +651,36 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
       departmentMatches &&
       sourceMatches &&
       riskMatches &&
+      (isCandidateRecord(person) || !isAdmin || employmentStatusMatches) &&
       (Number.isNaN(score) ? sentimentBand === "all" : sentimentMatches)
     );
   };
 
   const visibleEmployees = useMemo(
     () => employees.filter(matchesFilter),
-    [employees, filter],
+    [
+      employees,
+      filter,
+      departmentFilter,
+      sourceFilter,
+      riskFilter,
+      sentimentBand,
+      sentimentBounds,
+      employmentStatusFilter,
+      isAdmin,
+    ],
   );
   const visibleCandidates = useMemo(
     () => candidates.filter(matchesFilter),
-    [candidates, filter],
+    [
+      candidates,
+      filter,
+      departmentFilter,
+      sourceFilter,
+      riskFilter,
+      sentimentBand,
+      sentimentBounds,
+    ],
   );
   const showEmployees = viewMode === "employees" || viewMode === "all";
   const showCandidates = viewMode === "candidates" || viewMode === "all";
@@ -663,6 +710,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
       viewMode,
       department: departmentFilter || null,
       riskOnly: riskFilter === "at_risk",
+      employmentStatus: isAdmin ? employmentStatusFilter || null : null,
       sentimentMin: sentimentBounds[0],
       sentimentMax: sentimentBounds[1],
     });
@@ -830,37 +878,37 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                     </option>
                   ))}
               </PremiumSelect>
-              <label className="min-w-[190px] flex-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
-                Live source
-                <PremiumSelect
-                  value={sourceFilter}
-                  onChange={(e) => setSourceFilter(e.target.value)}
-                  className="mt-2 h-10 w-full"
-                >
-                  <option value="">All sources</option>
-                  {[
-                    ...new Set(
-                      employees.flatMap((row) => row.source_providers || []),
-                    ),
-                  ]
-                    .sort()
-                    .map((source) => (
-                      <option key={source} value={source}>
-                        {source}
-                      </option>
-                    ))}
-                </PremiumSelect>
-              </label>
+            </label>
+            <label className="min-w-[190px] flex-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+              Live source
+              <PremiumSelect
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value)}
+                className="mt-2 h-10 w-full"
+              >
+                <option value="">All sources</option>
+                {[
+                  ...new Set(
+                    employees.flatMap((row) => row.source_providers || []),
+                  ),
+                ]
+                  .sort()
+                  .map((source) => (
+                    <option key={source} value={source}>
+                      {source}
+                    </option>
+                  ))}
+              </PremiumSelect>
             </label>
             <label className="min-w-[160px] flex-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
-              Risk status
+              Source risk flag
               <PremiumSelect
                 value={riskFilter}
                 onChange={(e) => setRiskFilter(e.target.value)}
                 className="mt-2 h-10 w-full"
               >
-                <option value="all">All workforce status</option>
-                <option value="at_risk">At-risk employees only</option>
+                <option value="all">All risk flags</option>
+                <option value="at_risk">Imported at-risk flag only</option>
               </PremiumSelect>
             </label>
             <label className="min-w-[170px] flex-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
@@ -876,17 +924,36 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                 <option value="high">High (≥ 0.75)</option>
               </PremiumSelect>
             </label>
-            {(departmentFilter ||
+            {isAdmin && viewMode !== "candidates" && (
+              <label className="min-w-[170px] flex-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                Employment status
+                <PremiumSelect
+                  value={employmentStatusFilter}
+                  onChange={(e) => setEmploymentStatusFilter(e.target.value)}
+                  className="mt-2 h-10 w-full"
+                >
+                  <option value="">All employee records</option>
+                  <option value="active">Active</option>
+                  <option value="on_leave">On leave</option>
+                  <option value="departed">Departed</option>
+                  <option value="unknown">Not provided</option>
+                </PremiumSelect>
+              </label>
+            )}
+            {((departmentFilter && viewMode !== "candidates") ||
               sourceFilter ||
               riskFilter !== "all" ||
               sentimentBand !== "all" ||
+              employmentStatusFilter ||
               filter) && (
               <button
                 onClick={() => {
                   setFilter("");
                   setDepartmentFilter("");
+                  setSourceFilter("");
                   setRiskFilter("all");
                   setSentimentBand("all");
+                  setEmploymentStatusFilter("");
                 }}
                 className="h-10 rounded-xl border border-white/10 px-4 text-xs font-semibold text-slate-300 hover:bg-white/10"
               >
@@ -895,8 +962,9 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
             )}
           </div>
           <p className="mt-3 text-[10px] text-slate-500">
-            Filters run on the complete database. Only matching metadata is
-            paged into this view; full dossiers load when opened.
+            Search, department, risk, sentiment, and administrator employment
+            status filters query the database. Live source selection filters
+            loaded provider metadata. Full dossiers load when opened.
           </p>
         </div>
       </div>
@@ -930,7 +998,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
         </div>
         <div className="premium-card p-4">
           <div className="text-xs text-slate-300 uppercase tracking-[0.14em] mb-2">
-            At-Risk Matches
+            Imported At-Risk Flags
           </div>
           <div className="text-2xl font-extrabold text-rose-300">
             {showEmployees ? (
@@ -993,11 +1061,17 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
           <span className="rounded-full border border-indigo-300/20 bg-indigo-300/10 px-2.5 py-1 text-[10px] text-indigo-200">
             {onaLoading
               ? "Analyzing…"
-              : `${onaSummary?.nodes?.length || 0} people · ${onaSummary?.links?.length || 0} links`}
+              : `${onaSummary?.nodes?.length || 0} people · ${onaSummary?.links?.length || 0} ties${onaSummary?.scopeTruncated ? " · partial sample" : ""}`}
           </span>
         </div>
         {onaError ? (
           <p className="mt-3 text-xs text-amber-200">{onaError}</p>
+        ) : onaSummary?.scopeTruncated ? (
+          <p className="mt-4 text-xs text-amber-200">
+            This directory summary is limited to a partial employee sample, so
+            organization-wide centrality rankings are hidden. Review the Intel
+            Center graph scope before interpreting its scores.
+          </p>
         ) : (
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             {(onaSummary?.leaders || []).map((leader) => (
@@ -1014,11 +1088,11 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                 </div>
                 <div className="mt-2 flex justify-between text-[10px] text-indigo-200">
                   <span>
-                    Influence{" "}
+                    PageRank (relative){" "}
                     {(Number(leader.influence_pagerank || 0) * 100).toFixed(0)}%
                   </span>
                   <span>
-                    Bridge{" "}
+                    Betweenness (relative){" "}
                     {(Number(leader.bridge_betweenness || 0) * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -1169,11 +1243,11 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
 
       {selectedProfile && (
         <div
-          className="fixed inset-0 z-[250] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-[250] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-hidden"
           onClick={() => setSelectedProfile(null)}
         >
           <div
-            className={`relative w-full max-w-3xl my-8 overflow-hidden rounded-xl border bg-[#0b1329] p-6 md:p-8 text-slate-100 shadow-[0_0_50px_rgba(0,0,0,0.5)] ${
+            className={`relative w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain rounded-xl border bg-[#0b1329] p-6 md:p-8 text-slate-100 shadow-[0_0_50px_rgba(0,0,0,0.5)] ${
               selectedProfile.is_at_risk
                 ? "border-red-500/40 shadow-red-950/20"
                 : "border-blue-500/40 shadow-blue-950/20"
@@ -1207,8 +1281,8 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                 {selectedProfileIsCandidate
                   ? "CANDIDATE CONTEXT"
                   : selectedProfile.is_at_risk
-                    ? "RISK LEVEL: AT RISK"
-                    : "RISK LEVEL: MINIMAL"}
+                    ? "SOURCE FLAG: AT RISK"
+                    : "SOURCE FLAG: NOT AT RISK"}
               </span>
             </div>
 
@@ -1235,7 +1309,9 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                 <div className="text-[9px] font-mono mt-3 tracking-widest text-slate-400 uppercase">
                   {selectedProfileIsCandidate
                     ? "Candidate Pool"
-                    : "Active Directory"}
+                    : isAdmin && selectedProfile.employment_status
+                      ? `Employment: ${selectedProfile.employment_status}`
+                      : "Employee Record"}
                 </div>
               </div>
 
@@ -1267,18 +1343,30 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                   <div>
                     {selectedProfileIsCandidate
                       ? "APPLICATION DATE"
-                      : "JOIN DATE"}
+                      : String(selectedProfile.email || "")
+                            .toLowerCase()
+                            .endsWith("@public.local")
+                        ? "EMPLOYMENT START DATE"
+                        : "JOIN DATE"}
                     :{" "}
                     <span className="text-slate-300">
                       {(
                         selectedProfileIsCandidate
                           ? selectedProfile.application_date
-                          : selectedProfile.join_date
+                          : String(selectedProfile.email || "")
+                                .toLowerCase()
+                                .endsWith("@public.local")
+                            ? selectedProfile.employment_start_date
+                            : selectedProfile.join_date
                       )
                         ? new Date(
                             selectedProfileIsCandidate
                               ? selectedProfile.application_date
-                              : selectedProfile.join_date,
+                              : String(selectedProfile.email || "")
+                                    .toLowerCase()
+                                    .endsWith("@public.local")
+                                ? selectedProfile.employment_start_date
+                                : selectedProfile.join_date,
                           ).toLocaleDateString()
                         : "N/A"}
                     </span>
@@ -1307,7 +1395,84 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
               </div>
             </div>
 
-            {/* Core Diagnostics & Salary Matrix */}
+            {String(selectedProfile.email || "")
+              .toLowerCase()
+              .endsWith("@public.local") && (
+              <div className="mb-5 rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[11px] leading-relaxed text-amber-100">
+                Public benchmark sample with pseudonymous identities. Imported
+                indicators are not validated predictions about real employees.
+              </div>
+            )}
+
+            {!selectedProfileIsCandidate && isAdmin && (
+              <section className="mb-6 rounded-xl border border-indigo-300/15 bg-indigo-300/[0.03] p-4 space-y-3 text-xs">
+                <h4 className="font-semibold uppercase tracking-[0.16em] text-indigo-200">
+                  Employment &amp; outcome record
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-400">
+                  <span>
+                    Employment status:{" "}
+                    <strong className="text-slate-200">
+                      {selectedProfile.employment_status || "Not provided"}
+                    </strong>
+                  </span>
+                  <span>
+                    Departure outcome:{" "}
+                    <strong className="text-slate-200">
+                      {selectedProfile.departure_event == null
+                        ? "Not provided"
+                        : selectedProfile.departure_event
+                          ? "Departed"
+                          : "Active/censored"}
+                    </strong>
+                  </span>
+                  <span>
+                    Employment start:{" "}
+                    <strong className="text-slate-200">
+                      {selectedProfile.employment_start_date
+                        ? new Date(
+                            selectedProfile.employment_start_date,
+                          ).toLocaleDateString()
+                        : "Not provided"}
+                    </strong>
+                  </span>
+                  <span>
+                    Employment end:{" "}
+                    <strong className="text-slate-200">
+                      {selectedProfile.employment_end_date
+                        ? new Date(
+                            selectedProfile.employment_end_date,
+                          ).toLocaleDateString()
+                        : "Not provided"}
+                    </strong>
+                  </span>
+                  <span>
+                    Censor/observation date:{" "}
+                    <strong className="text-slate-200">
+                      {selectedProfile.employment_censor_date
+                        ? new Date(
+                            selectedProfile.employment_censor_date,
+                          ).toLocaleDateString()
+                        : "Not provided"}
+                    </strong>
+                  </span>
+                  <span>
+                    Recorded duration:{" "}
+                    <strong className="text-slate-200">
+                      {selectedProfile.employment_duration_years == null
+                        ? "Not provided"
+                        : `${Number(selectedProfile.employment_duration_years).toFixed(2)} years`}
+                    </strong>
+                  </span>
+                </div>
+                <p className="text-[10px] leading-relaxed text-slate-500">
+                  These are source outcome fields. They support cohort survival
+                  analysis and are not an individual attrition forecast.
+                </p>
+              </section>
+            )}
+
+            {/* Core Diagnostics & Compensation */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               {/* Retention probability */}
               <div className="p-4 rounded-lg bg-slate-900/60 border border-white/5 font-mono">
@@ -1315,7 +1480,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                   <span>
                     {selectedProfileIsCandidate
                       ? "Match Score"
-                      : "Retention Prob"}
+                      : "Imported Retention Indicator"}
                   </span>
                   <span
                     className={
@@ -1346,8 +1511,8 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                 </div>
                 <div className="text-[9px] text-slate-500 mt-2 text-right">
                   {selectedProfileIsCandidate
-                    ? "MATCH SIGNAL"
-                    : "MODEL CALCULATED"}
+                    ? "SAMPLE MATCH SIGNAL; NOT VALIDATED"
+                    : "SOURCE VALUE; NOT A VALIDATED FORECAST"}
                 </div>
               </div>
 
@@ -1368,7 +1533,7 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                   />
                 </div>
                 <div className="text-[9px] text-slate-500 mt-2 text-right">
-                  METRIC: SENTIMENT
+                  STORED PROFILE SCORE
                 </div>
               </div>
 
@@ -1383,11 +1548,13 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                   {selectedProfileIsCandidate
                     ? "NOT A RISK SCORE"
                     : selectedProfile.is_at_risk
-                      ? "HIGH RISK [!]"
-                      : "STABLE"}
+                      ? "IMPORTED FLAG: TRUE"
+                      : "IMPORTED FLAG: FALSE"}
                 </div>
                 <div className="text-[9px] text-slate-500 mt-2 text-right">
-                  MONITORED
+                  {selectedProfileIsCandidate
+                    ? "NO ATTRITION LABEL"
+                    : "SOURCE FLAG; NOT A RISK MODEL"}
                 </div>
               </div>
             </div>
@@ -1395,30 +1562,20 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
             {/* Financial Telemetry (Salary Details) */}
             <div className="p-4 rounded-lg bg-gradient-to-r from-cyan-950/20 to-slate-900/60 border border-cyan-500/20 mb-6 font-mono">
               <div className="text-[10px] text-cyan-400 uppercase tracking-widest mb-2 flex items-center gap-1">
-                <DollarSign size={12} /> COMPENSATION TELEMETRY
+                <FileText size={12} /> COMPENSATION TELEMETRY
               </div>
               <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
-                <div className="text-2xl font-bold tracking-tight text-white flex items-baseline gap-1">
-                  $
-                  {selectedProfile.salary != null
-                    ? selectedProfile.salary.toLocaleString()
-                    : "115,000"}
-                  <span className="text-xs text-slate-500 font-normal">
-                    / yr base salary
-                  </span>
+                <div className="text-xl font-bold tracking-tight text-white">
+                  {!isAdmin
+                    ? "Restricted to administrators"
+                    : selectedProfile.salary == null
+                      ? "Not reported"
+                      : `${selectedProfile.salary_currency ? `${selectedProfile.salary_currency} ` : ""}${Number(selectedProfile.salary).toLocaleString()}${selectedProfile.salary_currency ? "" : " · currency not specified"}`}
                 </div>
-                {/* Market Ratio indicator based on salary */}
-                <div className="px-2 py-0.5 rounded text-[10px] bg-cyan-400/10 border border-cyan-400/20 text-cyan-300 font-bold">
-                  MARKET INDEX:{" "}
-                  {(
-                    (selectedProfile.salary != null
-                      ? selectedProfile.salary
-                      : 115000) / 108000
-                  ).toFixed(2)}
-                  x Avg
-                  {selectedProfile.salary == null && (
-                    <span className="ml-1 text-[9px] text-amber-200">DEMO</span>
-                  )}
+                <div className="text-xs text-slate-500">
+                  {isAdmin && selectedProfile.salary != null
+                    ? `Pay period: ${selectedProfile.salary_period || "not specified"}`
+                    : "Compensation is confidential; no market comparison is inferred."}
                 </div>
               </div>
             </div>
@@ -1470,31 +1627,56 @@ const DirectoryView = ({ onExport, cacheScope = "workspace" }) => {
                 Chronological Experience Record
               </div>
               <div className="relative border-l border-white/10 pl-6 ml-3 space-y-6">
-                {(selectedProfile.experiences || []).map((experience, idx) => (
-                  <div
-                    key={`${experience.company}-${experience.position}-${idx}`}
-                    className="relative"
-                  >
-                    {/* Glowing timeline node */}
-                    <div className="absolute -left-[32px] top-1.5 w-4 h-4 rounded-full border border-cyan-400 bg-slate-950 flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                        {experience.position}
+                {[...(selectedProfile.experiences || [])]
+                  .sort((left, right) => {
+                    const leftDate = left.effective_start
+                      ? Date.parse(left.effective_start)
+                      : 0;
+                    const rightDate = right.effective_start
+                      ? Date.parse(right.effective_start)
+                      : 0;
+                    return leftDate - rightDate;
+                  })
+                  .map((experience, idx) => (
+                    <div
+                      key={`${experience.company}-${experience.position}-${idx}`}
+                      className="relative"
+                    >
+                      {/* Glowing timeline node */}
+                      <div className="absolute -left-[32px] top-1.5 w-4 h-4 rounded-full border border-cyan-400 bg-slate-950 flex items-center justify-center">
+                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                       </div>
-                      <div className="text-[11px] text-cyan-400/90 mt-0.5 font-bold">
-                        {experience.company}{" "}
-                        <span className="text-slate-500">//</span>{" "}
-                        {experience.duration_years ?? "N/A"} years tenure
+                      <div>
+                        <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                          {experience.position}
+                        </div>
+                        <div className="text-[11px] text-cyan-400/90 mt-0.5 font-bold">
+                          {experience.company}{" "}
+                          <span className="text-slate-500">//</span>{" "}
+                          {experience.duration_years ?? "N/A"} years tenure
+                        </div>
+                        <div className="mt-1 text-[10px] text-slate-500">
+                          {experience.effective_start
+                            ? new Date(
+                                experience.effective_start,
+                              ).toLocaleDateString()
+                            : "Start date not provided"}
+                          {" — "}
+                          {experience.is_current
+                            ? "Current"
+                            : experience.effective_end
+                              ? new Date(
+                                  experience.effective_end,
+                                ).toLocaleDateString()
+                              : "End date not provided"}
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-relaxed mt-2 p-2 rounded bg-slate-900/30 border border-white/5">
+                          {experience.description ||
+                            "No duties specification recorded."}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-slate-400 leading-relaxed mt-2 p-2 rounded bg-slate-900/30 border border-white/5">
-                        {experience.description ||
-                          "No duties specification recorded."}
-                      </p>
                     </div>
-                  </div>
-                ))}
+                  ))}
                 {(!selectedProfile.experiences ||
                   selectedProfile.experiences.length === 0) && (
                   <div className="text-xs text-slate-500 italic">

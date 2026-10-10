@@ -121,6 +121,110 @@
 }
 
 @layer components {
+  /* Auth surface: refined, high-contrast, minimalist obsidian production theme. */
+  .auth-shell {
+    min-height: 100dvh;
+    background: #06090d !important;
+  }
+
+  .auth-shell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      circle at 50% 0%,
+      rgba(16, 185, 129, 0.05),
+      transparent 45rem
+    );
+  }
+
+  .auth-grid {
+    opacity: 0.18;
+    background-image: radial-gradient(
+      rgba(255, 255, 255, 0.1) 1px,
+      transparent 1px
+    );
+    background-size: 28px 28px;
+    mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+  }
+
+  .auth-brand-panel {
+    z-index: 1;
+    background: #080c11 !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+  }
+
+  .auth-headline {
+    letter-spacing: -0.035em !important;
+  }
+
+  .auth-card {
+    background: rgba(12, 17, 24, 0.85) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    backdrop-filter: blur(24px) !important;
+    box-shadow:
+      0 24px 64px -12px rgba(0, 0, 0, 0.7),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+    border-radius: 1.25rem !important;
+  }
+
+  .auth-input {
+    min-height: 2.85rem;
+    background: rgba(7, 11, 16, 0.95) !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    border-radius: 0.75rem !important;
+    color: #f8fafc !important;
+    font-size: 0.875rem !important;
+    transition: all 0.18s ease-in-out;
+  }
+
+  .auth-input:hover {
+    border-color: rgba(255, 255, 255, 0.18) !important;
+  }
+
+  .auth-input:focus {
+    border-color: #34d399 !important;
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.14) !important;
+  }
+
+  .auth-input::placeholder {
+    color: #475569 !important;
+  }
+
+  .auth-social {
+    min-height: 2.75rem;
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 0.75rem !important;
+    color: #cbd5e1 !important;
+    font-size: 0.875rem !important;
+    transition: all 0.18s ease-in-out;
+  }
+
+  .auth-social:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    color: #ffffff !important;
+  }
+
+  @media (max-width: 1023px) {
+    .auth-shell {
+      background: #06090d !important;
+    }
+
+    .auth-card {
+      max-width: 28rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .auth-card {
+      border-color: rgba(255, 255, 255, 0.07) !important;
+      box-shadow: none !important;
+    }
+  }
+
   .premium-card {
     @apply bg-[#0a1a12]/75 border border-white/10 rounded-2xl shadow-2xl transition-all duration-300;
     background:
@@ -610,13 +714,18 @@ input:-webkit-autofill:active {
 
 /* Calm, premium card hover: NO rotation, NO loops. Just a soft lift,
    an accent-tinted border, and a gentle light bloom - quiet and refined.
-   Per-card accent color is supplied inline via --card-accent. */
+   Per-card accent color is supplied inline via --card-accent.
+   NOTE: no !important here — the luxe hover is the single hover system,
+   so Tailwind hover utilities on the same node must not compete with it. */
 .luxe-card {
   --card-accent: #6ee7b7;
   transition:
     border-color 0.45s ease,
     box-shadow 0.45s ease,
-    background-color 0.45s ease;
+    background-color 0.45s ease,
+    transform 0.35s ease;
+}
+.luxe-card:hover {
   will-change: transform;
 }
 .luxe-card::after {
@@ -638,14 +747,50 @@ input:-webkit-autofill:active {
   pointer-events: none;
 }
 .luxe-card:hover {
-  border-color: color-mix(
-    in srgb,
-    var(--card-accent) 36%,
-    transparent
-  ) !important;
+  border-color: color-mix(in srgb, var(--card-accent) 36%, transparent);
   box-shadow:
     0 24px 60px -26px color-mix(in srgb, var(--card-accent) 42%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+/* ── Landing geometric radius scale ──
+   panel (large cards) 22px · tile (tiles/selectors) 18px · chip 14px.
+   Use these instead of ad-hoc rounded-[Npx] so card geometry stays uniform. */
+.landing-radius-panel {
+  border-radius: 22px;
+}
+.landing-radius-tile {
+  border-radius: 18px;
+}
+.landing-radius-chip {
+  border-radius: 14px;
+}
+/* ── Native 90% landing scale ──
+   Layout-aware (unlike transform: scale, zoom re-flows layout so no
+   dead space or broken scroll math). Applied to the content wrapper
+   only — ambient particles and fixed overlays stay full-bleed. */
+.landing-scale-90 {
+  zoom: 0.9;
+}
+/* ── Mobile snap-strip for card selector lists (module/pillar pickers).
+   Horizontal scroll-snap on small screens, plain vertical stack on lg+. */
+@media (max-width: 1023.98px) {
+  .landing-selector-strip {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 0.5rem;
+    scrollbar-width: thin;
+  }
+  .landing-selector-strip > * {
+    min-width: 230px;
+    scroll-snap-align: start;
+    flex-shrink: 0;
+  }
+  /* Cancel Tailwind space-y top-margins when the list becomes a row. */
+  .landing-selector-strip > * + * {
+    margin-top: 0;
+  }
 }
 .luxe-card:hover::after {
   opacity: 1;
@@ -766,6 +911,23 @@ input:-webkit-autofill:active {
   }
   50% {
     filter: brightness(1.6);
+  }
+}
+.skill-match-indeterminate {
+  transform: translateX(-120%);
+  animation: skill-match-indeterminate 1.25s ease-in-out infinite;
+}
+@keyframes skill-match-indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skill-match-indeterminate {
+    animation-duration: 2.5s;
   }
 }
 .scroll-progress-bar {
