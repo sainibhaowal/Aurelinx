@@ -148,6 +148,22 @@ const App = () => {
     if (!isAppPath(window.location.pathname)) return "landing";
     return getTabFromPathname(window.location.pathname) || defaultWorkspaceTab;
   });
+  const userScope = user
+    ? `${user.tenant_id || user.workspace_id || "tenant"}:${user.id || user.user_id || user.email || "user"}`
+    : "anonymous";
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([activeTab]));
+  const [visitedTabsUserScope, setVisitedTabsUserScope] = useState(userScope);
+
+  useEffect(() => {
+    if (visitedTabsUserScope !== userScope) {
+      setVisitedTabs(new Set([activeTab]));
+      setVisitedTabsUserScope(userScope);
+      return;
+    }
+    setVisitedTabs((visited) =>
+      visited.has(activeTab) ? visited : new Set([...visited, activeTab]),
+    );
+  }, [activeTab, userScope, visitedTabsUserScope]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !isAppPath(window.location.pathname))
@@ -790,11 +806,9 @@ const App = () => {
               >
                 <AnimatePresence mode="wait">
                   <motion.div
-                    key={activeTab}
                     variants={containerVariants}
-                    initial="hidden"
+                    initial={false}
                     animate="visible"
-                    exit="hidden"
                     className={`relative min-h-0 flex flex-col ${activeTab === "intelligence" ? "h-full" : activeTab === "intel-center" || activeTab === "enterprise" ? "h-auto lg:h-full" : "h-auto"}`}
                   >
                     {activeTab === "dashboard" && (
@@ -1287,30 +1301,158 @@ const App = () => {
                         </section>
                       </>
                     )}
-                    {activeTab === "directory" && (
-                      <DirectoryView
-                        onExport={exportCurrentReport}
-                        isAdmin={Boolean(user?.is_admin)}
-                        cacheScope={
-                          user?.tenant_id ||
-                          user?.workspace_id ||
-                          user?.user_id ||
-                          "workspace"
-                        }
-                      />
-                    )}
-                    {activeTab === "analytics" && <AnalyticsView />}
-                    {activeTab === "scout" && <TalentScoutView />}
-                    {activeTab === "intelligence" && (
-                      <div className="absolute inset-0 flex min-h-0 flex-col">
-                        <IntelligenceChatView />
+                    {visitedTabs.has("directory") && (
+                      <div
+                        hidden={activeTab !== "directory"}
+                        style={{
+                          display:
+                            activeTab === "directory" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Directory" />}
+                        >
+                          <DirectoryView
+                            onExport={exportCurrentReport}
+                            isAdmin={Boolean(user?.is_admin)}
+                            cacheScope={
+                              user?.tenant_id ||
+                              user?.workspace_id ||
+                              user?.user_id ||
+                              "workspace"
+                            }
+                          />
+                        </Suspense>
                       </div>
                     )}
-                    {activeTab === "intel-center" && <IntelligenceCenterView />}
-                    {activeTab === "sentiment" && <SentimentPulseView />}
-                    {activeTab === "enterprise" && <EnterpriseOpsView />}
-                    {activeTab === "retention" && <RetentionOpsView />}
-                    {activeTab === "providers" && <SettingsWorkspaceView />}
+                    {visitedTabs.has("analytics") && (
+                      <div
+                        hidden={activeTab !== "analytics"}
+                        style={{
+                          display:
+                            activeTab === "analytics" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Analytics" />}
+                        >
+                          <AnalyticsView />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("scout") && (
+                      <div
+                        hidden={activeTab !== "scout"}
+                        style={{
+                          display: activeTab === "scout" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Talent Scout" />}
+                        >
+                          <TalentScoutView />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("intelligence") && (
+                      <div
+                        hidden={activeTab !== "intelligence"}
+                        style={{
+                          display:
+                            activeTab === "intelligence" ? undefined : "none",
+                        }}
+                        className="absolute inset-0 flex min-h-0 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Intelligence" />}
+                        >
+                          <IntelligenceChatView />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("intel-center") && (
+                      <div
+                        hidden={activeTab !== "intel-center"}
+                        style={{
+                          display:
+                            activeTab === "intel-center" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={
+                            <LoadingScreen label="Intelligence Center" />
+                          }
+                        >
+                          <IntelligenceCenterView />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("sentiment") && (
+                      <div
+                        hidden={activeTab !== "sentiment"}
+                        style={{
+                          display:
+                            activeTab === "sentiment" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Sentiment" />}
+                        >
+                          <SentimentPulseView />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("enterprise") && (
+                      <div
+                        hidden={activeTab !== "enterprise"}
+                        style={{
+                          display:
+                            activeTab === "enterprise" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Enterprise Ops" />}
+                        >
+                          <EnterpriseOpsView />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("retention") && (
+                      <div
+                        hidden={activeTab !== "retention"}
+                        style={{
+                          display:
+                            activeTab === "retention" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Retention" />}
+                        >
+                          <RetentionOpsView />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("providers") && (
+                      <div
+                        hidden={activeTab !== "providers"}
+                        style={{
+                          display:
+                            activeTab === "providers" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense fallback={<LoadingScreen label="Settings" />}>
+                          <SettingsWorkspaceView />
+                        </Suspense>
+                      </div>
+                    )}
                   </motion.div>
                 </AnimatePresence>
               </Suspense>

@@ -48,6 +48,59 @@ import {
 } from "../utils/survivalModel";
 import AIExplanationPanel from "./AIExplanationPanel";
 
+function getIntelligenceSessionScope() {
+  if (typeof window === "undefined") return "server";
+  try {
+    const user = JSON.parse(localStorage.getItem("auth_user") || "{}");
+    const tenant =
+      user.tenant_id || user.workspace_id || localStorage.getItem("tenant_id");
+    const identity = user.id || user.user_id || user.email;
+    if (tenant || identity)
+      return `${tenant || "tenant"}:${identity || "user"}`;
+
+    const token = localStorage.getItem("auth_token") || "";
+    const payload = token.split(".")[1];
+    if (payload) {
+      const normalized = payload
+        .replace(/-/g, "+")
+        .replace(/_/g, "/")
+        .padEnd(Math.ceil(payload.length / 4) * 4, "=");
+      const claims = JSON.parse(atob(normalized));
+      if (claims.sub || claims.tenant_id) {
+        return `${claims.tenant_id || "tenant"}:${claims.sub || "user"}`;
+      }
+    }
+  } catch {
+    // Fall back to a per-tab scope if auth metadata is unavailable.
+  }
+  return "session";
+}
+
+function useSessionState(name, initialValue) {
+  const storageKey = `aurelinx:intelligence-center:v1:${getIntelligenceSessionScope()}:${name}`;
+  const [value, setValue] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.sessionStorage.getItem(storageKey);
+        if (stored !== null) return JSON.parse(stored);
+      } catch {
+        // Invalid or unavailable browser storage should not block the view.
+      }
+    }
+    return typeof initialValue === "function" ? initialValue() : initialValue;
+  });
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(storageKey, JSON.stringify(value));
+    } catch {
+      // Storage quota/private browsing errors leave the in-memory state usable.
+    }
+  }, [storageKey, value]);
+
+  return [value, setValue];
+}
+
 const MobileSplitPane = ({
   activePane,
   setActivePane,
@@ -447,8 +500,14 @@ const apiCallWithProgress = async (url, body, onProgress) => {
 };
 
 const IntelligenceCenterView = () => {
-  const [activeSubTab, setActiveSubTab] = useState("skill-match");
-  const [graphExpanded, setGraphExpanded] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useSessionState(
+    "active-subtab",
+    "skill-match",
+  );
+  const [graphExpanded, setGraphExpanded] = useSessionState(
+    "graph-expanded",
+    false,
+  );
   const [mobileActivePane, setMobileActivePane] = useState("left");
   const [resultRevisions, setResultRevisions] = useState({
     skill: 0,
@@ -464,51 +523,82 @@ const IntelligenceCenterView = () => {
     }));
 
   // 1. Skill Match State
-  const [matchSkillsInput, setMatchSkillsInput] = useState([
-    { name: "React", level: 4 },
-    { name: "FastAPI", level: 3 },
-  ]);
-  const [newSkillName, setNewSkillName] = useState("");
-  const [newSkillLevel, setNewSkillLevel] = useState(3);
-  const [matchResults, setMatchResults] = useState([]);
+  const [matchSkillsInput, setMatchSkillsInput] = useSessionState(
+    "match-skills",
+    [
+      { name: "React", level: 4 },
+      { name: "FastAPI", level: 3 },
+    ],
+  );
+  const [newSkillName, setNewSkillName] = useSessionState("new-skill-name", "");
+  const [newSkillLevel, setNewSkillLevel] = useSessionState(
+    "new-skill-level",
+    3,
+  );
+  const [matchResults, setMatchResults] = useSessionState("match-results", []);
   const [matchingLoading, setMatchingLoading] = useState(false);
-  const [skillMatchStatus, setSkillMatchStatus] = useState("idle");
+  const [skillMatchStatus, setSkillMatchStatus] = useState(() =>
+    matchResults.length > 0 ? "complete" : "idle",
+  );
   const [skillMatchProgress, setSkillMatchProgress] = useState({
     phase: "idle",
     message: "",
     completed: 0,
     total: 0,
   });
-  const [activeMatchEmployeeId, setActiveMatchEmployeeId] = useState(null);
+  const [activeMatchEmployeeId, setActiveMatchEmployeeId] = useSessionState(
+    "active-match-employee",
+    null,
+  );
 
   // 2. Team Optimize State
-  const [teamBudget, setTeamBudget] = useState(300000);
-  const [teamSize, setTeamSize] = useState(3);
-  const [teamSkillsInput, setTeamSkillsInput] = useState([
+  const [teamBudget, setTeamBudget] = useSessionState("team-budget", 300000);
+  const [teamSize, setTeamSize] = useSessionState("team-size", 3);
+  const [teamSkillsInput, setTeamSkillsInput] = useSessionState("team-skills", [
     { name: "React", level: 4 },
     { name: "Python", level: 3 },
     { name: "AWS", level: 3 },
   ]);
-  const [optimizedTeam, setOptimizedTeam] = useState(null);
+  const [optimizedTeam, setOptimizedTeam] = useSessionState(
+    "optimized-team",
+    null,
+  );
   const [optimizingLoading, setOptimizingLoading] = useState(false);
   const [teamOptimizeError, setTeamOptimizeError] = useState("");
 
   // Team solver result state
   const [, setAnnealingStep] = useState(0);
-  const [annealingHistory, setAnnealingHistory] = useState([]);
-  const [annealingStatus, setAnnealingStatus] = useState("idle"); // idle, running, complete
+  const [annealingHistory, setAnnealingHistory] = useSessionState(
+    "team-search-history",
+    [],
+  );
+  const [annealingStatus, setAnnealingStatus] = useState(() =>
+    optimizedTeam ? "complete" : "idle",
+  ); // idle, running, complete
 
   // 3. Attrition State
   const [attritionData, setAttritionData] = useState([]);
   const [populationStats, setPopulationStats] = useState(null);
   const [attritionModel, setAttritionModel] = useState(null);
   const [survivalCurve, setSurvivalCurve] = useState([]);
-  const [selectedAttritionEmp, setSelectedAttritionEmp] = useState(null);
+  const [selectedAttritionEmp, setSelectedAttritionEmp] = useSessionState(
+    "selected-attrition-employee",
+    null,
+  );
   const [attritionLoading, setAttritionLoading] = useState(false);
   const [attritionError, setAttritionError] = useState("");
-  const [attritionSearch, setAttritionSearch] = useState("");
-  const [attritionSort, setAttritionSort] = useState("hazard"); // hazard | name | tenure | percentile
-  const [attritionSortDesc, setAttritionSortDesc] = useState(true);
+  const [attritionSearch, setAttritionSearch] = useSessionState(
+    "attrition-search",
+    "",
+  );
+  const [attritionSort, setAttritionSort] = useSessionState(
+    "attrition-sort",
+    "hazard",
+  ); // hazard | name | tenure | percentile
+  const [attritionSortDesc, setAttritionSortDesc] = useSessionState(
+    "attrition-sort-desc",
+    true,
+  );
 
   // Legacy fixed-formula scenario controls; not a trained survival model.
   const [moraleSlider, setMoraleSlider] = useState(0.8);
@@ -609,10 +699,19 @@ const IntelligenceCenterView = () => {
   const [onaData, setOnaData] = useState({ nodes: [], links: [], metrics: {} });
   const [onaLoading, setOnaLoading] = useState(false);
   const [onaError, setOnaError] = useState("");
-  const [selectedOnaNode, setSelectedOnaNode] = useState(null);
-  const [onaColorMode, setOnaColorMode] = useState("department"); // "department" | "pagerank" | "betweenness" | "silo"
-  const [onaDeptFilter, setOnaDeptFilter] = useState("all");
-  const [onaSearchQuery, setOnaSearchQuery] = useState("");
+  const [selectedOnaNode, setSelectedOnaNode] = useSessionState(
+    "selected-ona-node",
+    null,
+  );
+  const [onaColorMode, setOnaColorMode] = useSessionState(
+    "ona-color-mode",
+    "department",
+  ); // "department" | "pagerank" | "betweenness" | "silo"
+  const [onaDeptFilter, setOnaDeptFilter] = useSessionState(
+    "ona-department-filter",
+    "all",
+  );
+  const [onaSearchQuery, setOnaSearchQuery] = useSessionState("ona-search", "");
   const [intelligenceReadiness, setIntelligenceReadiness] = useState(null);
 
   const topInfluencers = useMemo(() => {
@@ -670,8 +769,14 @@ const IntelligenceCenterView = () => {
   const [careerEmployees, setCareerEmployees] = useState([]);
   const [careerEmployeeScopeTruncated, setCareerEmployeeScopeTruncated] =
     useState(false);
-  const [selectedCareerEmpId, setSelectedCareerEmpId] = useState("");
-  const [careerPathData, setCareerPathData] = useState(null);
+  const [selectedCareerEmpId, setSelectedCareerEmpId] = useSessionState(
+    "selected-career-employee",
+    "",
+  );
+  const [careerPathData, setCareerPathData] = useSessionState(
+    "career-path-result",
+    null,
+  );
   const [careerLoading, setCareerLoading] = useState(false);
   const [careerError, setCareerError] = useState("");
   const careerRequestRef = useRef(0);
@@ -722,6 +827,15 @@ const IntelligenceCenterView = () => {
         model.validation?.holdout_evaluated === true &&
         model.validation?.calibration_passed === true;
       const employees = forecastsValidated ? data.employees || [] : [];
+      const selectedEmployeeId =
+        selectedAttritionEmp?.employee_id || selectedAttritionEmp?.id;
+      const nextSelectedEmployee =
+        employees.find(
+          (employee) =>
+            (employee.employee_id || employee.id) === selectedEmployeeId,
+        ) ||
+        employees[0] ||
+        null;
       setAttritionData(employees);
       setPopulationStats(forecastsValidated ? data.population || null : null);
       setAttritionModel(
@@ -738,11 +852,7 @@ const IntelligenceCenterView = () => {
               },
       );
       markResultUpdated("attrition");
-      if (employees.length > 0) {
-        setSelectedAttritionEmp(employees[0]);
-      } else {
-        setSelectedAttritionEmp(null);
-      }
+      setSelectedAttritionEmp(nextSelectedEmployee);
     } catch (err) {
       setAttritionError(
         err?.message || "Unable to load attrition model status.",
@@ -760,7 +870,11 @@ const IntelligenceCenterView = () => {
       setOnaData(data);
       markResultUpdated("ona");
       if (data.nodes && data.nodes.length > 0) {
-        setSelectedOnaNode(data.nodes[0]);
+        const selectedNodeId = selectedOnaNode?.id;
+        setSelectedOnaNode(
+          data.nodes.find((node) => node.id === selectedNodeId) ||
+            data.nodes[0],
+        );
       }
       setOnaLoading(false);
     } catch (err) {
