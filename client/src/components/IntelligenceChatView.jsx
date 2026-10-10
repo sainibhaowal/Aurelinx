@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { UserManualButton } from "./UserManual";
 import { chatAPI } from "../services/apiClient";
+import { usePersistentState } from "../services/workspacePersistence";
 
 const QUICK_MODEL_DEFAULTS = {
   moonshot: ["kimi-k3", "kimi-k2.6", "kimi-k2.5"],
@@ -1314,13 +1315,19 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
   );
 };
 
-const IntelligenceChatView = () => {
+const IntelligenceChatView = ({ active = true }) => {
   const [sessions, setSessions] = useState([]);
-  const [selectedSessionId, setSelectedSessionId] = useState(null);
+  const [selectedSessionId, setSelectedSessionId] = usePersistentState(
+    "workflow-selected-session",
+    null,
+  );
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = usePersistentState("workflow-draft", "");
   const [busy, setBusy] = useState(false);
-  const [selectedSessions, setSelectedSessions] = useState([]);
+  const [selectedSessions, setSelectedSessions] = usePersistentState(
+    "workflow-selected-sessions",
+    [],
+  );
   const [attachments, setAttachments] = useState([]);
   const [streamText, setStreamText] = useState("");
   const [streamPhase, setStreamPhase] = useState(null);
@@ -1331,12 +1338,18 @@ const IntelligenceChatView = () => {
   const [agentSteps, setAgentSteps] = useState([]);
   // Keep the session history out of the way on first visit. Users can still
   // expand it with the rail control whenever they need to switch workflows.
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = usePersistentState(
+    "workflow-history-open",
+    false,
+  );
   const [helpOpen, setHelpOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [lastFailedPrompt, setLastFailedPrompt] = useState("");
+  const [lastFailedPrompt, setLastFailedPrompt] = usePersistentState(
+    "workflow-last-failed-prompt",
+    "",
+  );
   const abortRef = useRef(null);
   const messagesScrollRef = useRef(null);
 
@@ -1420,10 +1433,13 @@ const IntelligenceChatView = () => {
   };
 
   useEffect(() => {
+    if (!active) return undefined;
     loadSessions().catch(console.error);
-  }, []);
+    return undefined;
+  }, [active]);
 
   useEffect(() => {
+    if (!active) return undefined;
     loadMessages(selectedSessionId).catch(console.error);
     if (typeof window !== "undefined" && selectedSessionId) {
       const sidToken = makeOpaqueSid(selectedSessionId);
@@ -1433,7 +1449,8 @@ const IntelligenceChatView = () => {
         window.history.replaceState({}, "", url.pathname + url.search);
       }
     }
-  }, [selectedSessionId]);
+    return undefined;
+  }, [active, selectedSessionId]);
 
   const scrollToBottom = () => {
     const messagesContainer = messagesScrollRef.current;

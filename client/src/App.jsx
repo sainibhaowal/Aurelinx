@@ -170,8 +170,11 @@ const App = () => {
       return;
     if (activeTab && VALID_APP_TABS.includes(activeTab)) {
       localStorage.setItem("aurelinx_active_tab", activeTab);
-      const targetPath = getPathnameForTab(activeTab);
-      if (window.location.pathname !== targetPath) {
+      const targetPath = `${getPathnameForTab(activeTab)}${window.location.search}${window.location.hash}`;
+      if (
+        `${window.location.pathname}${window.location.search}${window.location.hash}` !==
+        targetPath
+      ) {
         window.history.pushState({ tab: activeTab }, "", targetPath);
       }
     }
@@ -236,7 +239,12 @@ const App = () => {
     if (isApp && !targetTab) {
       targetTab = getTabFromPathname(path);
     }
-    const finalPath = isApp && targetTab ? getPathnameForTab(targetTab) : path;
+    const currentUrl = new URL(window.location.href);
+    const requestedUrl = new URL(path, window.location.origin);
+    const finalPath =
+      isApp && targetTab
+        ? `${getPathnameForTab(targetTab)}${requestedUrl.search || currentUrl.search}${requestedUrl.hash || currentUrl.hash}`
+        : path;
     window.history.pushState({ tab: targetTab }, "", finalPath);
     setRoute(isApp ? "app" : isAuthPath(finalPath) ? "auth" : "landing");
     if (targetTab) setActiveTab(targetTab);
@@ -1369,7 +1377,9 @@ const App = () => {
                         <Suspense
                           fallback={<LoadingScreen label="Intelligence" />}
                         >
-                          <IntelligenceChatView />
+                          <IntelligenceChatView
+                            active={activeTab === "intelligence"}
+                          />
                         </Suspense>
                       </div>
                     )}
@@ -1387,7 +1397,9 @@ const App = () => {
                             <LoadingScreen label="Intelligence Center" />
                           }
                         >
-                          <IntelligenceCenterView />
+                          <IntelligenceCenterView
+                            active={activeTab === "intel-center"}
+                          />
                         </Suspense>
                       </div>
                     )}
@@ -1419,7 +1431,9 @@ const App = () => {
                         <Suspense
                           fallback={<LoadingScreen label="Enterprise Ops" />}
                         >
-                          <EnterpriseOpsView />
+                          <EnterpriseOpsView
+                            active={activeTab === "enterprise"}
+                          />
                         </Suspense>
                       </div>
                     )}

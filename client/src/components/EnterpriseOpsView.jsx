@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PremiumSelect from "./PremiumSelect";
 import {
   Link2,
@@ -43,6 +43,12 @@ import { UserManualButton } from "./UserManual";
 import { enterpriseAPI, leanAPI, oauthAPI } from "../services/apiClient";
 import AgentActionsView from "./AgentActionsView";
 import PrivacyGovernanceView from "./PrivacyGovernanceView";
+import {
+  deleteWorkspaceFile,
+  loadWorkspaceFile,
+  saveWorkspaceFile,
+  usePersistentState,
+} from "../services/workspacePersistence";
 
 const PROVIDER_SETUP = {
   jira: {
@@ -129,42 +135,105 @@ const PROVIDER_SETUP = {
   },
 };
 
-const EnterpriseOpsView = () => {
+const EnterpriseOpsView = ({ active = true }) => {
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("pipelines"); // 'pipelines', 'ai-gov', 'workflows', 'compliance'
-  const [riskView, setRiskView] = useState("reviews");
+  const [activeTab, setActiveTab] = usePersistentState(
+    "dataops-active-tab",
+    "pipelines",
+  ); // 'pipelines', 'ai-gov', 'workflows', 'compliance'
+  const [riskView, setRiskView] = usePersistentState(
+    "dataops-risk-view",
+    "reviews",
+  );
 
   // Data States
-  const [connections, setConnections] = useState([]);
-  const [providerPresets, setProviderPresets] = useState({});
-  const [interventions, setInterventions] = useState([]);
-  const [attrition, setAttrition] = useState([]);
-  const [contracts, setContracts] = useState([]);
-  const [models, setModels] = useState([]);
-  const [drifts, setDrifts] = useState([]);
-  const [quarantine, setQuarantine] = useState([]);
-  const [scenarioResult, setScenarioResult] = useState(null);
-  const [, setScenarios] = useState([]);
-  const [policies, setPolicies] = useState([]);
-  const [modelCards, setModelCards] = useState([]);
-  const [fairness, setFairness] = useState(null);
-  const [releaseGates, setReleaseGates] = useState([]);
-  const [auditEvents, setAuditEvents] = useState([]);
-  const [drRunbooks, setDrRunbooks] = useState([]);
-  const [procurementArtifacts, setProcurementArtifacts] = useState([]);
-  const [drillResult, setDrillResult] = useState(null);
-  const [dataSummary, setDataSummary] = useState(null);
-  const [validationResults, setValidationResults] = useState({});
-  const [uploadProgress, setUploadProgress] = useState({});
-  const [executivePacket, setExecutivePacket] = useState(null);
-  const [selectedConnectionId, setSelectedConnectionId] = useState(null);
-  const [fieldMappings, setFieldMappings] = useState([]);
-  const [syncJobs, setSyncJobs] = useState([]);
+  const [connections, setConnections] = usePersistentState(
+    "dataops-connections",
+    [],
+  );
+  const [providerPresets, setProviderPresets] = usePersistentState(
+    "dataops-provider-presets",
+    {},
+  );
+  const [interventions, setInterventions] = usePersistentState(
+    "dataops-interventions",
+    [],
+  );
+  const [attrition, setAttrition] = usePersistentState("dataops-attrition", []);
+  const [contracts, setContracts] = usePersistentState("dataops-contracts", []);
+  const [models, setModels] = usePersistentState("dataops-models", []);
+  const [drifts, setDrifts] = usePersistentState("dataops-drifts", []);
+  const [quarantine, setQuarantine] = usePersistentState(
+    "dataops-quarantine",
+    [],
+  );
+  const [scenarioResult, setScenarioResult] = usePersistentState(
+    "dataops-scenario-result",
+    null,
+  );
+  const [, setScenarios] = usePersistentState("dataops-scenarios", []);
+  const [policies, setPolicies] = usePersistentState("dataops-policies", []);
+  const [modelCards, setModelCards] = usePersistentState(
+    "dataops-model-cards",
+    [],
+  );
+  const [fairness, setFairness] = usePersistentState("dataops-fairness", null);
+  const [releaseGates, setReleaseGates] = usePersistentState(
+    "dataops-release-gates",
+    [],
+  );
+  const [auditEvents, setAuditEvents] = usePersistentState(
+    "dataops-audit-events",
+    [],
+  );
+  const [drRunbooks, setDrRunbooks] = usePersistentState(
+    "dataops-dr-runbooks",
+    [],
+  );
+  const [procurementArtifacts, setProcurementArtifacts] = usePersistentState(
+    "dataops-procurement-artifacts",
+    [],
+  );
+  const [drillResult, setDrillResult] = usePersistentState(
+    "dataops-drill-result",
+    null,
+  );
+  const [dataSummary, setDataSummary] = usePersistentState(
+    "dataops-data-summary",
+    null,
+  );
+  const [validationResults, setValidationResults] = usePersistentState(
+    "dataops-validation-results",
+    {},
+  );
+  const [uploadProgress, setUploadProgress] = usePersistentState(
+    "dataops-upload-progress",
+    {},
+  );
+  const [executivePacket, setExecutivePacket] = usePersistentState(
+    "dataops-executive-packet",
+    null,
+  );
+  const [selectedConnectionId, setSelectedConnectionId] = usePersistentState(
+    "dataops-selected-connection",
+    null,
+  );
+  const [fieldMappings, setFieldMappings] = usePersistentState(
+    "dataops-field-mappings",
+    [],
+  );
+  const [syncJobs, setSyncJobs] = usePersistentState("dataops-sync-jobs", []);
   const [evidenceModalIntervention, setEvidenceModalIntervention] =
     useState(null);
-  const [interventionOutcomes, setInterventionOutcomes] = useState({});
+  const [interventionOutcomes, setInterventionOutcomes] = usePersistentState(
+    "dataops-intervention-outcomes",
+    {},
+  );
   const [outcomeLoading, setOutcomeLoading] = useState({});
-  const [outcomeFeedback, setOutcomeFeedback] = useState({});
+  const [outcomeFeedback, setOutcomeFeedback] = usePersistentState(
+    "dataops-outcome-feedback",
+    {},
+  );
 
   // Helper to calculate 100% dynamic risk metrics per employee card
   const getEmployeeMetrics = (item) => {
@@ -183,30 +252,69 @@ const EnterpriseOpsView = () => {
   };
 
   // Filter States for Reviews & Active Interventions
-  const [reviewSearchText, setReviewSearchText] = useState("");
-  const [reviewPriorityFilter, setReviewPriorityFilter] = useState("all");
-  const [reviewDeptFilter, setReviewDeptFilter] = useState("all");
+  const [reviewSearchText, setReviewSearchText] = usePersistentState(
+    "dataops-review-search",
+    "",
+  );
+  const [reviewPriorityFilter, setReviewPriorityFilter] = usePersistentState(
+    "dataops-review-priority",
+    "all",
+  );
+  const [reviewDeptFilter, setReviewDeptFilter] = usePersistentState(
+    "dataops-review-department",
+    "all",
+  );
 
-  const [activeSearchText, setActiveSearchText] = useState("");
-  const [activeStatusFilter, setActiveStatusFilter] = useState("all");
-  const [activeScopeFilter, setActiveScopeFilter] = useState("all");
+  const [activeSearchText, setActiveSearchText] = usePersistentState(
+    "dataops-active-search",
+    "",
+  );
+  const [activeStatusFilter, setActiveStatusFilter] = usePersistentState(
+    "dataops-active-status",
+    "all",
+  );
+  const [activeScopeFilter, setActiveScopeFilter] = usePersistentState(
+    "dataops-active-scope",
+    "all",
+  );
 
   // Modal States for Interactive Workflows
-  const [activeModal, setActiveModal] = useState(null); // 'escalate' | 'schedule' | 'dismiss'
-  const [selectedReview, setSelectedReview] = useState(null);
+  const [activeModal, setActiveModal] = usePersistentState(
+    "dataops-active-modal",
+    null,
+  ); // 'escalate' | 'schedule' | 'dismiss'
+  const [selectedReview, setSelectedReview] = usePersistentState(
+    "dataops-selected-review",
+    null,
+  );
 
-  const [modalBudget, setModalBudget] = useState("15000");
-  const [modalOwner, setModalOwner] = useState("HRBP Senior Lead");
-  const [modalPriority, setModalPriority] = useState("high");
-  const [modalNotes, setModalNotes] = useState(
+  const [modalBudget, setModalBudget] = usePersistentState(
+    "dataops-modal-budget",
+    "15000",
+  );
+  const [modalOwner, setModalOwner] = usePersistentState(
+    "dataops-modal-owner",
+    "HRBP Senior Lead",
+  );
+  const [modalPriority, setModalPriority] = usePersistentState(
+    "dataops-modal-priority",
+    "high",
+  );
+  const [modalNotes, setModalNotes] = usePersistentState(
+    "dataops-modal-notes",
     "Execute 12% salary adjustment & clear promotion path.",
   );
 
-  const [modalDate, setModalDate] = useState("");
-  const [modalAgenda, setModalAgenda] = useState(
+  const [modalDate, setModalDate] = usePersistentState(
+    "dataops-modal-date",
+    "",
+  );
+  const [modalAgenda, setModalAgenda] = usePersistentState(
+    "dataops-modal-agenda",
     "Discuss workload balance, equity options, and market pay alignment.",
   );
-  const [modalReason, setModalReason] = useState(
+  const [modalReason, setModalReason] = usePersistentState(
+    "dataops-modal-reason",
     "False positive risk signal / Employee satisfied",
   );
 
@@ -304,11 +412,24 @@ const EnterpriseOpsView = () => {
   };
 
   // Pipeline, Governance & Compliance Sub-Tab States
-  const [pipelineSubTab, setPipelineSubTab] = useState("connectors");
-  const [govSubTab, setGovSubTab] = useState("registry");
-  const [compSubTab, setCompSubTab] = useState("briefings_audit");
+  const [pipelineSubTab, setPipelineSubTab] = usePersistentState(
+    "dataops-pipeline-subtab",
+    "connectors",
+  );
+  const [govSubTab, setGovSubTab] = usePersistentState(
+    "dataops-governance-subtab",
+    "registry",
+  );
+  const [compSubTab, setCompSubTab] = usePersistentState(
+    "dataops-compliance-subtab",
+    "briefings_audit",
+  );
 
   // Form States
+  const [connFormDraft, setConnFormDraft] = usePersistentState(
+    "dataops-connection-form",
+    {},
+  );
   const [connForm, setConnForm] = useState({
     name: "",
     source_type: "hris",
@@ -327,16 +448,20 @@ const EnterpriseOpsView = () => {
     access_token: "",
     slack_channel_ids: "",
     workday_workers_path: "/ccx/api/v1/workers",
+    ...connFormDraft,
   });
 
-  const [intForm, setIntForm] = useState({
-    title: "",
-    target_scope: "team",
-    target_department: "",
-    priority: "medium",
-    owner_name: "",
-    expected_impact: "",
-  });
+  const [intForm, setIntForm] = usePersistentState(
+    "dataops-intervention-form",
+    {
+      title: "",
+      target_scope: "team",
+      target_department: "",
+      priority: "medium",
+      owner_name: "",
+      expected_impact: "",
+    },
+  );
 
   const [connectionFeedback, setConnectionFeedback] = useState({});
   const [connectionFormError, setConnectionFormError] = useState("");
@@ -352,31 +477,47 @@ const EnterpriseOpsView = () => {
     skill_aliases: null,
     bundle: null,
   });
+  const [activeImportJobs, setActiveImportJobs] = usePersistentState(
+    "dataops-active-import-jobs",
+    [],
+  );
+  const activeImportJobIds = useRef(new Set());
+  const touchedImportFiles = useRef(new Set());
+  const activeUploadKinds = useRef(new Set());
 
-  const [contractForm, setContractForm] = useState({
-    source_type: "hris",
-    provider: "workday",
-    required_fields: "external_id,full_name,email,department,role",
-  });
+  const [contractForm, setContractForm] = usePersistentState(
+    "dataops-contract-form",
+    {
+      source_type: "hris",
+      provider: "workday",
+      required_fields: "external_id,full_name,email,department,role",
+    },
+  );
 
-  const [mappingForm, setMappingForm] = useState({
-    source_field: "",
-    canonical_field: "",
-    transform_rule: "",
-    required: true,
-  });
+  const [mappingForm, setMappingForm] = usePersistentState(
+    "dataops-mapping-form",
+    {
+      source_field: "",
+      canonical_field: "",
+      transform_rule: "",
+      required: true,
+    },
+  );
 
-  const [policyForm, setPolicyForm] = useState({
-    region: "global",
-    policy_name: "",
-    action_type: "intervention",
-    min_confidence: 0.75,
-    requires_approval: true,
-    blocked_if_missing_evidence: true,
-    blocked_actions: "",
-  });
+  const [policyForm, setPolicyForm] = usePersistentState(
+    "dataops-policy-form",
+    {
+      region: "global",
+      policy_name: "",
+      action_type: "intervention",
+      min_confidence: 0.75,
+      requires_approval: true,
+      blocked_if_missing_evidence: true,
+      blocked_actions: "",
+    },
+  );
 
-  const [drForm, setDrForm] = useState({
+  const [drForm, setDrForm] = usePersistentState("dataops-dr-form", {
     runbook_name: "",
     environment: "prod",
     rto_minutes: 120,
@@ -385,17 +526,165 @@ const EnterpriseOpsView = () => {
     notes: "",
   });
 
-  const [artifactForm, setArtifactForm] = useState({
-    artifact_type: "msa",
-    title: "",
-    version: "v1",
-    status: "draft",
-    notes: "",
-  });
+  const [artifactForm, setArtifactForm] = usePersistentState(
+    "dataops-artifact-form",
+    {
+      artifact_type: "msa",
+      title: "",
+      version: "v1",
+      status: "draft",
+      notes: "",
+    },
+  );
+
+  useEffect(() => {
+    if (!Object.keys(connFormDraft).length) return;
+    setConnForm((current) => {
+      const next = { ...current, ...connFormDraft };
+      const unchanged = Object.keys(connFormDraft).every(
+        (key) => current[key] === next[key],
+      );
+      return unchanged ? current : next;
+    });
+  }, [connFormDraft]);
+
+  useEffect(() => {
+    const {
+      name,
+      source_type,
+      provider,
+      status,
+      auth_type,
+      base_url,
+      account_email,
+      slack_channel_ids,
+      workday_workers_path,
+    } = connForm;
+    setConnFormDraft({
+      name,
+      source_type,
+      provider,
+      status,
+      auth_type,
+      base_url,
+      account_email,
+      slack_channel_ids,
+      workday_workers_path,
+    });
+  }, [connForm]);
+
+  useEffect(() => {
+    const fileKinds = [
+      "employees",
+      "candidates",
+      "employee_skills",
+      "candidate_skills",
+      "employee_experience",
+      "candidate_experience",
+      "collaboration_events",
+      "skill_aliases",
+      "bundle",
+    ];
+    let cancelled = false;
+    Promise.all(
+      fileKinds.map(async (kind) => [
+        kind,
+        await loadWorkspaceFile(`dataops-import-${kind}`),
+      ]),
+    )
+      .then((entries) => {
+        if (cancelled) return;
+        setImportFiles((current) => {
+          const restored = Object.fromEntries(entries);
+          touchedImportFiles.current.forEach((kind) => {
+            restored[kind] = current[kind];
+          });
+          return restored;
+        });
+      })
+      .catch((error) => {
+        console.error("Unable to restore saved import files", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleImportFileChange = async (kind, file) => {
+    touchedImportFiles.current.add(kind);
+    setImportFiles((previous) => ({ ...previous, [kind]: file || null }));
+    if (!file) {
+      await deleteWorkspaceFile(`dataops-import-${kind}`).catch(console.error);
+      return;
+    }
+    try {
+      await saveWorkspaceFile(`dataops-import-${kind}`, file);
+    } catch (error) {
+      window.dispatchEvent(
+        new CustomEvent("aurelinx:toast", {
+          detail: {
+            type: "error",
+            message: `Could not preserve ${file.name} in this browser: ${error.message}`,
+          },
+        }),
+      );
+    }
+  };
+
+  const forgetImportJob = (jobId) => {
+    activeImportJobIds.current.delete(jobId);
+    setActiveImportJobs((jobs) => jobs.filter((job) => job.jobId !== jobId));
+  };
 
   const trackImportJob = async (jobId, scope, kind = null) => {
+    if (activeImportJobIds.current.has(jobId)) return;
+    activeImportJobIds.current.add(jobId);
+    setActiveImportJobs((jobs) =>
+      jobs.some((job) => job.jobId === jobId)
+        ? jobs
+        : [...jobs, { jobId, scope, kind, startedAt: Date.now() }],
+    );
+    let consecutiveErrors = 0;
     while (true) {
-      const job = await leanAPI.getImportJobStatus(jobId);
+      let job;
+      try {
+        job = await leanAPI.getImportJobStatus(jobId);
+        consecutiveErrors = 0;
+      } catch (error) {
+        if (error?.status === 404) {
+          const interrupted = {
+            phase: "interrupted",
+            percent: 0,
+            message:
+              "The server no longer has this job. The saved file is ready to upload again.",
+          };
+          if (scope === "bundle") {
+            setUploadProgress((prev) => ({ ...prev, bundle: interrupted }));
+          } else if (kind) {
+            setUploadProgress((prev) => ({ ...prev, [kind]: interrupted }));
+          }
+          forgetImportJob(jobId);
+          return;
+        }
+        consecutiveErrors += 1;
+        const delay = Math.min(
+          30000,
+          500 * 2 ** Math.min(consecutiveErrors, 6),
+        );
+        const reconnecting = {
+          phase: "reconnecting",
+          percent: 0,
+          message: `Connection interrupted; retrying import status in ${Math.ceil(delay / 1000)}s.`,
+        };
+        if (scope === "bundle") {
+          setUploadProgress((prev) => ({ ...prev, bundle: reconnecting }));
+        } else if (kind) {
+          setUploadProgress((prev) => ({ ...prev, [kind]: reconnecting }));
+        }
+        console.warn("Import status check failed; will retry", error);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
       const nextState = {
         phase: job.phase || "running",
         percent: Number(job.progress || 0),
@@ -428,6 +717,7 @@ const EnterpriseOpsView = () => {
             },
           }));
         }
+        forgetImportJob(jobId);
         await loadAll();
         return job.result;
       }
@@ -453,12 +743,52 @@ const EnterpriseOpsView = () => {
             },
           }));
         }
+        forgetImportJob(jobId);
         throw error;
       }
 
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   };
+
+  useEffect(() => {
+    activeImportJobs.forEach(({ jobId, scope, kind }) => {
+      if (jobId && !activeImportJobIds.current.has(jobId)) {
+        trackImportJob(jobId, scope, kind).catch((error) => {
+          console.error("Could not resume import job", error);
+          forgetImportJob(jobId);
+        });
+      }
+    });
+  }, [activeImportJobs]);
+
+  useEffect(() => {
+    setUploadProgress((current) => {
+      let changed = false;
+      const next = { ...current };
+      Object.entries(current).forEach(([kind, progress]) => {
+        if (
+          ["uploading", "validating", "processing", "queued"].includes(
+            progress?.phase,
+          )
+        ) {
+          const hasTrackedJob = activeImportJobs.some(
+            (job) => job.jobId && (job.scope === kind || job.kind === kind),
+          );
+          if (!hasTrackedJob && !activeUploadKinds.current.has(kind)) {
+            next[kind] = {
+              ...progress,
+              phase: "interrupted",
+              message:
+                "The browser session ended before this step completed. Retry with the saved file.",
+            };
+            changed = true;
+          }
+        }
+      });
+      return changed ? next : current;
+    });
+  }, [activeImportJobs, setUploadProgress]);
 
   const loadAll = async () => {
     setLoading(true);
@@ -470,6 +800,13 @@ const EnterpriseOpsView = () => {
       ]);
       setConnections(connData || []);
       setInterventions(intData || []);
+      if (selectedReview) {
+        const refreshed = (intData || []).find(
+          (item) => String(item.id) === String(selectedReview.id),
+        );
+        setSelectedReview(refreshed || null);
+        if (!refreshed) setActiveModal(null);
+      }
       setAttrition(explainData?.items || []);
 
       const [contractData, modelData, quarantineData] = await Promise.all([
@@ -517,7 +854,11 @@ const EnterpriseOpsView = () => {
 
       // Auto select connection if available
       if (connData?.[0]?.id) {
-        const connectionId = connData[0].id;
+        const connectionId =
+          connData.find(
+            (connection) =>
+              String(connection.id) === String(selectedConnectionId),
+          )?.id || connData[0].id;
         setSelectedConnectionId(connectionId);
         const [mapData, jobData] = await Promise.all([
           leanAPI.listFieldMappings(connectionId),
@@ -532,6 +873,7 @@ const EnterpriseOpsView = () => {
   };
 
   useEffect(() => {
+    if (!active) return undefined;
     let isMounted = true;
     const run = async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -543,7 +885,7 @@ const EnterpriseOpsView = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [active]);
 
   useEffect(() => {
     enterpriseAPI
@@ -891,29 +1233,35 @@ const EnterpriseOpsView = () => {
   const uploadImport = async (kind) => {
     const file = importFiles[kind];
     if (!file) return;
+    activeUploadKinds.current.add(kind);
     setUploadProgress((prev) => ({
       ...prev,
       [kind]: { phase: "uploading", percent: 0, message: "Uploading CSV..." },
     }));
-    const queued = await leanAPI.importCsvAsync(kind, file, (percent) => {
-      setUploadProgress((prev) => ({
-        ...prev,
-        [kind]: {
-          phase: percent >= 100 ? "queued" : "uploading",
-          percent,
-          message:
-            percent >= 100
-              ? "Upload complete. Waiting for backend import..."
-              : `Uploading CSV... ${percent}%`,
-        },
-      }));
-    });
-    await trackImportJob(queued.job_id, "csv", kind);
+    try {
+      const queued = await leanAPI.importCsvAsync(kind, file, (percent) => {
+        setUploadProgress((prev) => ({
+          ...prev,
+          [kind]: {
+            phase: percent >= 100 ? "queued" : "uploading",
+            percent,
+            message:
+              percent >= 100
+                ? "Upload complete. Waiting for backend import..."
+                : `Uploading CSV... ${percent}%`,
+          },
+        }));
+      });
+      await trackImportJob(queued.job_id, "csv", kind);
+    } finally {
+      activeUploadKinds.current.delete(kind);
+    }
   };
 
   const uploadBundleImport = async () => {
     const file = importFiles.bundle;
     if (!file) return;
+    activeUploadKinds.current.add("bundle");
     setUploadProgress((prev) => ({
       ...prev,
       bundle: {
@@ -922,25 +1270,30 @@ const EnterpriseOpsView = () => {
         message: "Uploading ZIP bundle...",
       },
     }));
-    const queued = await leanAPI.importDatasetBundleAsync(file, (percent) => {
-      setUploadProgress((prev) => ({
-        ...prev,
-        bundle: {
-          phase: percent >= 100 ? "queued" : "uploading",
-          percent,
-          message:
-            percent >= 100
-              ? "Upload complete. Waiting for backend bundle import..."
-              : `Uploading ZIP bundle... ${percent}%`,
-        },
-      }));
-    });
-    await trackImportJob(queued.job_id, "bundle");
+    try {
+      const queued = await leanAPI.importDatasetBundleAsync(file, (percent) => {
+        setUploadProgress((prev) => ({
+          ...prev,
+          bundle: {
+            phase: percent >= 100 ? "queued" : "uploading",
+            percent,
+            message:
+              percent >= 100
+                ? "Upload complete. Waiting for backend bundle import..."
+                : `Uploading ZIP bundle... ${percent}%`,
+          },
+        }));
+      });
+      await trackImportJob(queued.job_id, "bundle");
+    } finally {
+      activeUploadKinds.current.delete("bundle");
+    }
   };
 
   const validateImport = async (kind) => {
     const file = importFiles[kind];
     if (!file) return;
+    activeUploadKinds.current.add(kind);
     setUploadProgress((prev) => ({
       ...prev,
       [kind]: {
@@ -949,28 +1302,32 @@ const EnterpriseOpsView = () => {
         message: "Uploading file for validation...",
       },
     }));
-    const result = await leanAPI.validateCsv(kind, file, (percent) => {
+    try {
+      const result = await leanAPI.validateCsv(kind, file, (percent) => {
+        setUploadProgress((prev) => ({
+          ...prev,
+          [kind]: {
+            phase: percent >= 100 ? "processing" : "validating",
+            percent,
+            message:
+              percent >= 100
+                ? "Computing validation score..."
+                : `Validating file... ${percent}%`,
+          },
+        }));
+      });
+      setValidationResults((prev) => ({ ...prev, [kind]: result }));
       setUploadProgress((prev) => ({
         ...prev,
         [kind]: {
-          phase: percent >= 100 ? "processing" : "validating",
-          percent,
-          message:
-            percent >= 100
-              ? "Computing validation score..."
-              : `Validating file... ${percent}%`,
+          phase: "validated",
+          percent: 100,
+          message: "Validation complete.",
         },
       }));
-    });
-    setValidationResults((prev) => ({ ...prev, [kind]: result }));
-    setUploadProgress((prev) => ({
-      ...prev,
-      [kind]: {
-        phase: "validated",
-        percent: 100,
-        message: "Validation complete.",
-      },
-    }));
+    } finally {
+      activeUploadKinds.current.delete(kind);
+    }
   };
 
   const refreshExecutivePacket = async () => {
@@ -2250,10 +2607,10 @@ const EnterpriseOpsView = () => {
                           id="dataset-bundle-file"
                           className="hidden"
                           onChange={(e) =>
-                            setImportFiles((p) => ({
-                              ...p,
-                              bundle: e.target.files?.[0] || null,
-                            }))
+                            handleImportFileChange(
+                              "bundle",
+                              e.target.files?.[0] || null,
+                            )
                           }
                         />
                         <label
@@ -2367,10 +2724,10 @@ const EnterpriseOpsView = () => {
                               id={`csv-file-${key}`}
                               className="hidden"
                               onChange={(e) =>
-                                setImportFiles((p) => ({
-                                  ...p,
-                                  [key]: e.target.files?.[0] || null,
-                                }))
+                                handleImportFileChange(
+                                  key,
+                                  e.target.files?.[0] || null,
+                                )
                               }
                             />
                             <label

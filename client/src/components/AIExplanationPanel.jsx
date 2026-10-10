@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { intelligenceAPI } from "../services/apiClient";
 import { getExplanationProviderConfig } from "../services/explanationProviderConfig";
+import { usePersistentState } from "../services/workspacePersistence";
 
 const MarkdownRenderer = ({ children }) => (
   <ReactMarkdown
@@ -133,18 +134,48 @@ export default function AIExplanationPanel({
   autoRunKey = null,
   disabled = false,
 }) {
-  const [open, setOpen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = usePersistentState(
+    `ai-explanation-open:${subtab}`,
+    false,
+  );
+  const [expanded, setExpanded] = usePersistentState(
+    `ai-explanation-expanded:${subtab}`,
+    false,
+  );
   const [loading, setLoading] = useState(false);
-  const [explanation, setExplanation] = useState("");
+  const [savedExplanation, setSavedExplanation] = usePersistentState(
+    `ai-explanation:${subtab}`,
+    { resultKey: null, text: "", complete: false },
+  );
+  const [explanation, setExplanation] = useState(savedExplanation?.text || "");
   const [error, setError] = useState("");
   const controllerRef = useRef(null);
+  const explanationRef = useRef(savedExplanation?.text || "");
+  const explanationKeyRef = useRef(savedExplanation?.resultKey ?? null);
   const contextRef = useRef(context);
   const lastAutoRunRef = useRef(null);
   contextRef.current = context;
 
+  useEffect(() => {
+    explanationRef.current = savedExplanation?.text || "";
+    explanationKeyRef.current = savedExplanation?.resultKey ?? null;
+    setExplanation(explanationRef.current);
+  }, [savedExplanation?.resultKey, savedExplanation?.text]);
+
+  useEffect(() => {
+    if (!explanation) return undefined;
+    const timer = window.setTimeout(() => {
+      setSavedExplanation((previous) => ({
+        resultKey: explanationKeyRef.current,
+        text: explanationRef.current,
+        complete: previous?.complete || false,
+      }));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [explanation, setSavedExplanation]);
+
   const fetchExplanation = useCallback(
-    async (ctx) => {
+    async (ctx, resultKey = null) => {
       if (!ctx || (typeof ctx === "object" && Object.keys(ctx).length === 0))
         return;
       controllerRef.current?.abort();
@@ -154,7 +185,10 @@ export default function AIExplanationPanel({
       setExpanded(false);
       setLoading(true);
       setError("");
+      explanationRef.current = "";
+      explanationKeyRef.current = resultKey;
       setExplanation("");
+      setSavedExplanation({ resultKey, text: "", complete: false });
       let receivedText = false;
       try {
         const { provider, key, baseUrl, model } =
@@ -165,7 +199,9 @@ export default function AIExplanationPanel({
           (token) => {
             if (!controller.signal.aborted && token) {
               receivedText = true;
-              setExplanation((previous) => previous + token);
+              const nextText = `${explanationRef.current}${token}`;
+              explanationRef.current = nextText;
+              setExplanation(nextText);
             }
           },
           provider,
@@ -183,12 +219,19 @@ export default function AIExplanationPanel({
         }
       } finally {
         if (controllerRef.current === controller) {
+          setSavedExplanation({
+            resultKey,
+            text: explanationRef.current,
+            complete: !controller.signal.aborted && receivedText,
+          });
+        }
+        if (controllerRef.current === controller) {
           controllerRef.current = null;
           setLoading(false);
         }
       }
     },
-    [subtab],
+    [subtab, setSavedExplanation],
   );
 
   useEffect(() => {
@@ -199,16 +242,24 @@ export default function AIExplanationPanel({
     }
     const key =
       typeof autoRunKey === "string" ? autoRunKey : JSON.stringify(autoRunKey);
+    if (
+      savedExplanation?.resultKey === key &&
+      savedExplanation.text &&
+      savedExplanation.complete
+    ) {
+      lastAutoRunRef.current = key;
+      return undefined;
+    }
     if (key === lastAutoRunRef.current) return undefined;
     lastAutoRunRef.current = key;
     controllerRef.current?.abort();
     const timer = setTimeout(() => {
-      fetchExplanation(contextRef.current);
+      fetchExplanation(contextRef.current, key);
     }, 250);
     return () => {
       clearTimeout(timer);
     };
-  }, [autoRun, autoRunKey, disabled, fetchExplanation]);
+  }, [autoRun, autoRunKey, disabled, fetchExplanation, savedExplanation]);
 
   useEffect(
     () => () => {

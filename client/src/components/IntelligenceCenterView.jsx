@@ -46,60 +46,8 @@ import {
   tierColor,
   tierBg,
 } from "../utils/survivalModel";
+import { usePersistentState } from "../services/workspacePersistence";
 import AIExplanationPanel from "./AIExplanationPanel";
-
-function getIntelligenceSessionScope() {
-  if (typeof window === "undefined") return "server";
-  try {
-    const user = JSON.parse(localStorage.getItem("auth_user") || "{}");
-    const tenant =
-      user.tenant_id || user.workspace_id || localStorage.getItem("tenant_id");
-    const identity = user.id || user.user_id || user.email;
-    if (tenant || identity)
-      return `${tenant || "tenant"}:${identity || "user"}`;
-
-    const token = localStorage.getItem("auth_token") || "";
-    const payload = token.split(".")[1];
-    if (payload) {
-      const normalized = payload
-        .replace(/-/g, "+")
-        .replace(/_/g, "/")
-        .padEnd(Math.ceil(payload.length / 4) * 4, "=");
-      const claims = JSON.parse(atob(normalized));
-      if (claims.sub || claims.tenant_id) {
-        return `${claims.tenant_id || "tenant"}:${claims.sub || "user"}`;
-      }
-    }
-  } catch {
-    // Fall back to a per-tab scope if auth metadata is unavailable.
-  }
-  return "session";
-}
-
-function useSessionState(name, initialValue) {
-  const storageKey = `aurelinx:intelligence-center:v1:${getIntelligenceSessionScope()}:${name}`;
-  const [value, setValue] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const stored = window.sessionStorage.getItem(storageKey);
-        if (stored !== null) return JSON.parse(stored);
-      } catch {
-        // Invalid or unavailable browser storage should not block the view.
-      }
-    }
-    return typeof initialValue === "function" ? initialValue() : initialValue;
-  });
-
-  useEffect(() => {
-    try {
-      window.sessionStorage.setItem(storageKey, JSON.stringify(value));
-    } catch {
-      // Storage quota/private browsing errors leave the in-memory state usable.
-    }
-  }, [storageKey, value]);
-
-  return [value, setValue];
-}
 
 const MobileSplitPane = ({
   activePane,
@@ -499,23 +447,20 @@ const apiCallWithProgress = async (url, body, onProgress) => {
   return results;
 };
 
-const IntelligenceCenterView = () => {
-  const [activeSubTab, setActiveSubTab] = useSessionState(
+const IntelligenceCenterView = ({ active = true }) => {
+  const [activeSubTab, setActiveSubTab] = usePersistentState(
     "active-subtab",
     "skill-match",
   );
-  const [graphExpanded, setGraphExpanded] = useSessionState(
+  const [graphExpanded, setGraphExpanded] = usePersistentState(
     "graph-expanded",
     false,
   );
   const [mobileActivePane, setMobileActivePane] = useState("left");
-  const [resultRevisions, setResultRevisions] = useState({
-    skill: 0,
-    team: 0,
-    attrition: 0,
-    ona: 0,
-    career: 0,
-  });
+  const [resultRevisions, setResultRevisions] = usePersistentState(
+    "result-revisions",
+    { skill: 0, team: 0, attrition: 0, ona: 0, career: 0 },
+  );
   const markResultUpdated = (result) =>
     setResultRevisions((current) => ({
       ...current,
@@ -523,19 +468,25 @@ const IntelligenceCenterView = () => {
     }));
 
   // 1. Skill Match State
-  const [matchSkillsInput, setMatchSkillsInput] = useSessionState(
+  const [matchSkillsInput, setMatchSkillsInput] = usePersistentState(
     "match-skills",
     [
       { name: "React", level: 4 },
       { name: "FastAPI", level: 3 },
     ],
   );
-  const [newSkillName, setNewSkillName] = useSessionState("new-skill-name", "");
-  const [newSkillLevel, setNewSkillLevel] = useSessionState(
+  const [newSkillName, setNewSkillName] = usePersistentState(
+    "new-skill-name",
+    "",
+  );
+  const [newSkillLevel, setNewSkillLevel] = usePersistentState(
     "new-skill-level",
     3,
   );
-  const [matchResults, setMatchResults] = useSessionState("match-results", []);
+  const [matchResults, setMatchResults] = usePersistentState(
+    "match-results",
+    [],
+  );
   const [matchingLoading, setMatchingLoading] = useState(false);
   const [skillMatchStatus, setSkillMatchStatus] = useState(() =>
     matchResults.length > 0 ? "complete" : "idle",
@@ -546,20 +497,23 @@ const IntelligenceCenterView = () => {
     completed: 0,
     total: 0,
   });
-  const [activeMatchEmployeeId, setActiveMatchEmployeeId] = useSessionState(
+  const [activeMatchEmployeeId, setActiveMatchEmployeeId] = usePersistentState(
     "active-match-employee",
     null,
   );
 
   // 2. Team Optimize State
-  const [teamBudget, setTeamBudget] = useSessionState("team-budget", 300000);
-  const [teamSize, setTeamSize] = useSessionState("team-size", 3);
-  const [teamSkillsInput, setTeamSkillsInput] = useSessionState("team-skills", [
-    { name: "React", level: 4 },
-    { name: "Python", level: 3 },
-    { name: "AWS", level: 3 },
-  ]);
-  const [optimizedTeam, setOptimizedTeam] = useSessionState(
+  const [teamBudget, setTeamBudget] = usePersistentState("team-budget", 300000);
+  const [teamSize, setTeamSize] = usePersistentState("team-size", 3);
+  const [teamSkillsInput, setTeamSkillsInput] = usePersistentState(
+    "team-skills",
+    [
+      { name: "React", level: 4 },
+      { name: "Python", level: 3 },
+      { name: "AWS", level: 3 },
+    ],
+  );
+  const [optimizedTeam, setOptimizedTeam] = usePersistentState(
     "optimized-team",
     null,
   );
@@ -568,7 +522,7 @@ const IntelligenceCenterView = () => {
 
   // Team solver result state
   const [, setAnnealingStep] = useState(0);
-  const [annealingHistory, setAnnealingHistory] = useSessionState(
+  const [annealingHistory, setAnnealingHistory] = usePersistentState(
     "team-search-history",
     [],
   );
@@ -577,33 +531,54 @@ const IntelligenceCenterView = () => {
   ); // idle, running, complete
 
   // 3. Attrition State
-  const [attritionData, setAttritionData] = useState([]);
-  const [populationStats, setPopulationStats] = useState(null);
-  const [attritionModel, setAttritionModel] = useState(null);
-  const [survivalCurve, setSurvivalCurve] = useState([]);
-  const [selectedAttritionEmp, setSelectedAttritionEmp] = useSessionState(
+  const [attritionData, setAttritionData] = usePersistentState(
+    "attrition-result",
+    [],
+  );
+  const [populationStats, setPopulationStats] = usePersistentState(
+    "attrition-population-stats",
+    null,
+  );
+  const [attritionModel, setAttritionModel] = usePersistentState(
+    "attrition-model-metadata",
+    null,
+  );
+  const [survivalCurve, setSurvivalCurve] = usePersistentState(
+    "attrition-survival-curve",
+    [],
+  );
+  const [selectedAttritionEmp, setSelectedAttritionEmp] = usePersistentState(
     "selected-attrition-employee",
     null,
   );
   const [attritionLoading, setAttritionLoading] = useState(false);
   const [attritionError, setAttritionError] = useState("");
-  const [attritionSearch, setAttritionSearch] = useSessionState(
+  const [attritionSearch, setAttritionSearch] = usePersistentState(
     "attrition-search",
     "",
   );
-  const [attritionSort, setAttritionSort] = useSessionState(
+  const [attritionSort, setAttritionSort] = usePersistentState(
     "attrition-sort",
     "hazard",
   ); // hazard | name | tenure | percentile
-  const [attritionSortDesc, setAttritionSortDesc] = useSessionState(
+  const [attritionSortDesc, setAttritionSortDesc] = usePersistentState(
     "attrition-sort-desc",
     true,
   );
 
   // Legacy fixed-formula scenario controls; not a trained survival model.
-  const [moraleSlider, setMoraleSlider] = useState(0.8);
-  const [salarySlider, setSalarySlider] = useState(0.0); // 0% to 50% increase
-  const [workloadSlider, setWorkloadSlider] = useState(3); // skills count
+  const [moraleSlider, setMoraleSlider] = usePersistentState(
+    "attrition-morale-slider",
+    0.8,
+  );
+  const [salarySlider, setSalarySlider] = usePersistentState(
+    "attrition-salary-slider",
+    0.0,
+  ); // 0% to 50% increase
+  const [workloadSlider, setWorkloadSlider] = usePersistentState(
+    "attrition-workload-slider",
+    3,
+  ); // skills count
   const [hoveredSurvMonth, setHoveredSurvMonth] = useState(null);
   const [hoveredHazMonth, setHoveredHazMonth] = useState(null);
   const [hoveredAnnealIndex, setHoveredAnnealIndex] = useState(null);
@@ -696,23 +671,33 @@ const IntelligenceCenterView = () => {
     });
     return sorted;
   }, [attritionData, attritionSearch, attritionSort, attritionSortDesc]); // 4. ONA State
-  const [onaData, setOnaData] = useState({ nodes: [], links: [], metrics: {} });
+  const [onaData, setOnaData] = usePersistentState("ona-result", {
+    nodes: [],
+    links: [],
+    metrics: {},
+  });
   const [onaLoading, setOnaLoading] = useState(false);
   const [onaError, setOnaError] = useState("");
-  const [selectedOnaNode, setSelectedOnaNode] = useSessionState(
+  const [selectedOnaNode, setSelectedOnaNode] = usePersistentState(
     "selected-ona-node",
     null,
   );
-  const [onaColorMode, setOnaColorMode] = useSessionState(
+  const [onaColorMode, setOnaColorMode] = usePersistentState(
     "ona-color-mode",
     "department",
   ); // "department" | "pagerank" | "betweenness" | "silo"
-  const [onaDeptFilter, setOnaDeptFilter] = useSessionState(
+  const [onaDeptFilter, setOnaDeptFilter] = usePersistentState(
     "ona-department-filter",
     "all",
   );
-  const [onaSearchQuery, setOnaSearchQuery] = useSessionState("ona-search", "");
-  const [intelligenceReadiness, setIntelligenceReadiness] = useState(null);
+  const [onaSearchQuery, setOnaSearchQuery] = usePersistentState(
+    "ona-search",
+    "",
+  );
+  const [intelligenceReadiness, setIntelligenceReadiness] = usePersistentState(
+    "intelligence-readiness",
+    null,
+  );
 
   const topInfluencers = useMemo(() => {
     if (!onaData?.nodes?.length) return [];
@@ -766,14 +751,17 @@ const IntelligenceCenterView = () => {
   }, [onaData]);
 
   // 5. Career Path State
-  const [careerEmployees, setCareerEmployees] = useState([]);
+  const [careerEmployees, setCareerEmployees] = usePersistentState(
+    "career-employees",
+    [],
+  );
   const [careerEmployeeScopeTruncated, setCareerEmployeeScopeTruncated] =
     useState(false);
-  const [selectedCareerEmpId, setSelectedCareerEmpId] = useSessionState(
+  const [selectedCareerEmpId, setSelectedCareerEmpId] = usePersistentState(
     "selected-career-employee",
     "",
   );
-  const [careerPathData, setCareerPathData] = useSessionState(
+  const [careerPathData, setCareerPathData] = usePersistentState(
     "career-path-result",
     null,
   );
@@ -783,6 +771,7 @@ const IntelligenceCenterView = () => {
 
   // Load basic initial data
   useEffect(() => {
+    if (!active) return undefined;
     fetchAttrition();
     fetchOna();
     fetchCareerEmployees();
@@ -794,7 +783,8 @@ const IntelligenceCenterView = () => {
           err?.message,
         ),
       );
-  }, []);
+    return undefined;
+  }, [active]);
 
   // Sync sliders to the selected employee's recorded baseline values
   useEffect(() => {

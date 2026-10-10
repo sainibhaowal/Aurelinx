@@ -33,6 +33,7 @@ import TalentCard from "./TalentCard";
 import { UserManualButton } from "./UserManual";
 import { analysisAPI, candidatesAPI } from "../services/apiClient";
 import PremiumSelect from "./PremiumSelect";
+import { usePersistentState } from "../services/workspacePersistence";
 
 const MarkdownRenderer = ({ children }) => (
   <ReactMarkdown
@@ -119,90 +120,85 @@ const MarkdownRenderer = ({ children }) => (
   </ReactMarkdown>
 );
 
+const readLegacyScoutValue = (key, selector, fallback) => {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) || "null");
+    return selector ? (selector(parsed) ?? fallback) : (parsed ?? fallback);
+  } catch {
+    return fallback;
+  }
+};
+
 const TalentScoutView = () => {
-  const SCOUT_CACHE_KEY = "aurelinx_talent_scout_history_v1";
-  const [query, setQuery] = useState(() => {
-    if (typeof window === "undefined") return "";
-    try {
-      return (
-        JSON.parse(window.localStorage.getItem(SCOUT_CACHE_KEY) || "null")
-          ?.query || ""
-      );
-    } catch {
-      return "";
-    }
-  });
-  const [results, setResults] = useState(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      return (
-        JSON.parse(window.localStorage.getItem(SCOUT_CACHE_KEY) || "null")
-          ?.results || []
-      );
-    } catch {
-      return [];
-    }
-  });
+  const [query, setQuery] = usePersistentState("scout-query", () =>
+    readLegacyScoutValue(
+      "aurelinx_talent_scout_history_v1",
+      (value) => value?.query,
+      "",
+    ),
+  );
+  const [results, setResults] = usePersistentState("scout-results", () =>
+    readLegacyScoutValue(
+      "aurelinx_talent_scout_history_v1",
+      (value) => value?.results,
+      [],
+    ),
+  );
   const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState(() => {
-    if (typeof window === "undefined") return "";
-    try {
-      return (
-        JSON.parse(window.localStorage.getItem(SCOUT_CACHE_KEY) || "null")
-          ?.analysis || ""
-      );
-    } catch {
-      return "";
-    }
-  });
-  const [history, setHistory] = useState(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      return JSON.parse(
-        window.localStorage.getItem(`${SCOUT_CACHE_KEY}_list`) || "[]",
-      );
-    } catch {
-      return [];
-    }
-  });
-  const [selectedTalent, setSelectedTalent] = useState(null);
+  const [analysis, setAnalysis] = usePersistentState("scout-analysis", () =>
+    readLegacyScoutValue(
+      "aurelinx_talent_scout_history_v1",
+      (value) => value?.analysis,
+      "",
+    ),
+  );
+  const [history, setHistory] = usePersistentState("scout-history", () =>
+    readLegacyScoutValue("aurelinx_talent_scout_history_v1_list", null, []),
+  );
+  const [selectedTalent, setSelectedTalent] = usePersistentState(
+    "scout-selected-talent",
+    null,
+  );
   const [selectedTalentLoading, setSelectedTalentLoading] = useState(false);
-  const [departmentFilter, setDepartmentFilter] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [minMatch, setMinMatch] = useState(0);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [shortlist, setShortlist] = useState(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      return JSON.parse(
-        window.localStorage.getItem("aurelinx_scout_shortlist_v1") || "[]",
-      );
-    } catch {
-      return [];
-    }
-  });
-  const [candidateNotes, setCandidateNotes] = useState(() => {
-    if (typeof window === "undefined") return {};
-    try {
-      return JSON.parse(
-        window.localStorage.getItem("aurelinx_scout_notes_v1") || "{}",
-      );
-    } catch {
-      return {};
-    }
-  });
-  const [candidateStatus, setCandidateStatus] = useState(() => {
-    if (typeof window === "undefined") return {};
-    try {
-      return JSON.parse(
-        window.localStorage.getItem("aurelinx_scout_status_v1") || "{}",
-      );
-    } catch {
-      return {};
-    }
-  });
-  const [scoutRun, setScoutRun] = useState(null);
+  const [departmentFilter, setDepartmentFilter] = usePersistentState(
+    "scout-department-filter",
+    "",
+  );
+  const [roleFilter, setRoleFilter] = usePersistentState(
+    "scout-role-filter",
+    "",
+  );
+  const [minMatch, setMinMatch] = usePersistentState("scout-min-match", 0);
+  const [selectedIds, setSelectedIds] = usePersistentState(
+    "scout-selected-ids",
+    [],
+  );
+  const [shortlist, setShortlist] = usePersistentState("scout-shortlist", () =>
+    readLegacyScoutValue("aurelinx_scout_shortlist_v1", null, []),
+  );
+  const [candidateNotes, setCandidateNotes] = usePersistentState(
+    "scout-candidate-notes",
+    () => readLegacyScoutValue("aurelinx_scout_notes_v1", null, {}),
+  );
+  const [candidateStatus, setCandidateStatus] = usePersistentState(
+    "scout-candidate-status",
+    () => readLegacyScoutValue("aurelinx_scout_status_v1", null, {}),
+  );
+  const [scoutRun, setScoutRun] = usePersistentState("scout-run", null);
   const [scoutElapsed, setScoutElapsed] = useState(0);
+
+  useEffect(() => {
+    if (scoutRun?.status === "running" && !loading) {
+      setScoutRun({
+        ...scoutRun,
+        status: "interrupted",
+        duration: scoutRun.startedAt
+          ? Date.now() - scoutRun.startedAt
+          : scoutRun.duration,
+      });
+    }
+  }, [loading, scoutRun]);
 
   useEffect(() => {
     if (!loading || !scoutRun?.startedAt) return undefined;
@@ -270,28 +266,16 @@ const TalentScoutView = () => {
         analysis: data.analysis || "",
         savedAt: Date.now(),
       };
-      localStorage.setItem(SCOUT_CACHE_KEY, JSON.stringify(saved));
       setHistory((previous) => {
         const next = [
           saved,
           ...previous.filter((item) => item.query !== query),
         ].slice(0, 10);
-        localStorage.setItem(`${SCOUT_CACHE_KEY}_list`, JSON.stringify(next));
         return next;
       });
 
       const fullText = data.analysis || "";
-      let index = 0;
-      const step = 8;
-      const interval = setInterval(() => {
-        index += step;
-        if (index >= fullText.length) {
-          setAnalysis(fullText);
-          clearInterval(interval);
-        } else {
-          setAnalysis(fullText.slice(0, index));
-        }
-      }, 15);
+      setAnalysis(fullText);
     } catch (err) {
       console.error(err);
       setScoutRun((previous) =>
@@ -355,7 +339,6 @@ const TalentScoutView = () => {
       const next = previous.some((item) => item.id === candidate.id)
         ? previous.filter((item) => item.id !== candidate.id)
         : [...previous, candidate];
-      localStorage.setItem("aurelinx_scout_shortlist_v1", JSON.stringify(next));
       return next;
     });
   };
@@ -370,12 +353,10 @@ const TalentScoutView = () => {
   const saveCandidateNote = (candidateId, value) => {
     const next = { ...candidateNotes, [candidateId]: value };
     setCandidateNotes(next);
-    localStorage.setItem("aurelinx_scout_notes_v1", JSON.stringify(next));
   };
   const saveCandidateStatus = (candidateId, value) => {
     const next = { ...candidateStatus, [candidateId]: value };
     setCandidateStatus(next);
-    localStorage.setItem("aurelinx_scout_status_v1", JSON.stringify(next));
   };
   const exportCandidates = async (format) => {
     const { generateAurelinxReport } = await import("../utils/reportGenerator");
