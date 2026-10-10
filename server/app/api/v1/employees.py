@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -50,6 +49,57 @@ router = APIRouter(prefix="/employees", tags=["employees"])
 logger = get_logger(__name__)
 
 
+def _tenant_id(user: TokenData) -> str:
+    return (user.tenant_id or "default").strip() or "default"
+
+
+def _filter_employment_status(
+    query, employment_status: str | None, current_user: TokenData
+):
+    if employment_status is None:
+        return query
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can filter employee employment outcomes",
+        )
+    normalized = employment_status.strip().casefold()
+    if normalized not in {"active", "on_leave", "departed", "unknown"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="employment_status must be active, on_leave, departed, or unknown",
+        )
+    if normalized == "unknown":
+        return query.where(
+            or_(
+                EmployeeTable.employment_status.is_(None),
+                EmployeeTable.employment_status == "",
+            )
+        )
+    return query.where(EmployeeTable.employment_status == normalized)
+
+
+_ADMIN_ONLY_EMPLOYEE_FIELDS = (
+    "salary",
+    "salary_currency",
+    "salary_period",
+    "employment_start_date",
+    "employment_end_date",
+    "employment_censor_date",
+    "employment_duration_years",
+    "departure_event",
+    "employment_status",
+)
+
+
+def _employee_sensitive_values(
+    emp: EmployeeTable, current_user: TokenData | None
+) -> dict:
+    if current_user and current_user.is_admin:
+        return {field: getattr(emp, field) for field in _ADMIN_ONLY_EMPLOYEE_FIELDS}
+    return dict.fromkeys(_ADMIN_ONLY_EMPLOYEE_FIELDS)
+
+
 @router.get("/{employee_id}/integration-evidence")
 async def employee_integration_evidence(
     employee_id: UUID,
@@ -57,12 +107,18 @@ async def employee_integration_evidence(
     session: Session = Depends(get_session),
 ):
     """Return safe, tenant-scoped provider evidence for one employee."""
-    employee = session.get(EmployeeTable, employee_id)
+    tenant_id = _tenant_id(current_user)
+    employee = session.exec(
+        select(EmployeeTable).where(
+            EmployeeTable.id == employee_id,
+            EmployeeTable.tenant_id == tenant_id,
+        )
+    ).first()
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
     rows = session.exec(
         select(IntegrationEvidenceTable)
-        .where(IntegrationEvidenceTable.tenant_id == str(getattr(current_user, "tenant_id", None) or "default"))
+        .where(IntegrationEvidenceTable.tenant_id == tenant_id)
         .where(IntegrationEvidenceTable.employee_email == employee.email)
         .order_by(IntegrationEvidenceTable.observed_at.desc())
         .limit(100)
@@ -102,13 +158,19 @@ def _employee_quality(
     duplicate_warnings = []
     if emp.email:
         email_count = session.exec(
-            select(EmployeeTable).where(EmployeeTable.email == emp.email)
+            select(EmployeeTable).where(
+                EmployeeTable.email == emp.email,
+                EmployeeTable.tenant_id == emp.tenant_id,
+            )
         ).all()
         if len(email_count) > 1:
             duplicate_warnings.append("duplicate employee email")
     if emp.full_name:
         name_count = session.exec(
-            select(EmployeeTable).where(EmployeeTable.full_name == emp.full_name)
+            select(EmployeeTable).where(
+                EmployeeTable.full_name == emp.full_name,
+                EmployeeTable.tenant_id == emp.tenant_id,
+            )
         ).all()
         if len(name_count) > 1:
             duplicate_warnings.append("duplicate employee name")
@@ -126,6 +188,7 @@ def _employee_quality(
                 AuditLogTable.resource_type == "employee",
                 AuditLogTable.resource_id == emp.id,
                 AuditLogTable.user_id == user_uuid,
+                AuditLogTable.tenant_id == emp.tenant_id,
             )
             .order_by(AuditLogTable.created_at.desc())
             .limit(50)
@@ -143,7 +206,10 @@ def _employee_quality(
             )
     canonical = session.exec(
         select(CanonicalEmployeeTable)
-        .where(CanonicalEmployeeTable.email == emp.email)
+        .where(
+            CanonicalEmployeeTable.email == emp.email,
+            CanonicalEmployeeTable.tenant_id == emp.tenant_id,
+        )
         .order_by(CanonicalEmployeeTable.updated_at.desc())
     ).all()
     providers = sorted({row.provider for row in canonical if row.provider})
@@ -165,10 +231,16 @@ def get_employee_out(
     emp: EmployeeTable, session: Session, current_user: TokenData | None = None
 ) -> EmployeeOut:
     skills = session.exec(
-        select(SkillTable).where(SkillTable.employee_id == emp.id)
+        select(SkillTable).where(
+            SkillTable.employee_id == emp.id,
+            SkillTable.tenant_id == emp.tenant_id,
+        )
     ).all()
     experiences = session.exec(
-        select(ExperienceTable).where(ExperienceTable.employee_id == emp.id)
+        select(ExperienceTable).where(
+            ExperienceTable.employee_id == emp.id,
+            ExperienceTable.tenant_id == emp.tenant_id,
+        )
     ).all()
     return EmployeeOut(
         id=emp.id,
@@ -179,7 +251,7 @@ def get_employee_out(
         sentiment_score=emp.sentiment_score,
         is_at_risk=emp.is_at_risk,
         retention_prob=emp.retention_prob,
-        salary=emp.salary,
+        **_employee_sensitive_values(emp, current_user),
         join_date=emp.join_date,
         skills=[
             SkillOut(id=s.id, name=s.name, level=s.level, created_at=s.created_at)
@@ -192,6 +264,9 @@ def get_employee_out(
                 position=exp.position,
                 duration_years=exp.duration_years,
                 description=exp.description,
+                effective_start=exp.effective_start,
+                effective_end=exp.effective_end,
+                is_current=exp.is_current,
                 created_at=exp.created_at,
             )
             for exp in experiences
@@ -211,6 +286,7 @@ async def list_employees(
     q: str = Query(None, max_length=120),
     sentiment_min: float = Query(None, ge=0.0, le=1.0),
     sentiment_max: float = Query(None, ge=0.0, le=1.0),
+    employment_status: str | None = Query(None, max_length=24),
     current_user: TokenData = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -225,7 +301,9 @@ async def list_employees(
 
     logger.info(f"User {current_user.user_id} listing employees")
 
-    query = select(EmployeeTable)
+    tenant_id = _tenant_id(current_user)
+    query = select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
+    query = _filter_employment_status(query, employment_status, current_user)
 
     if department:
         query = query.where(EmployeeTable.department == department)
@@ -262,9 +340,14 @@ async def list_employees(
     provenance = {}
     if emails:
         for row in session.exec(
-            select(CanonicalEmployeeTable).where(CanonicalEmployeeTable.email.in_(emails))
+            select(CanonicalEmployeeTable).where(
+                CanonicalEmployeeTable.email.in_(emails),
+                CanonicalEmployeeTable.tenant_id == tenant_id,
+            )
         ).all():
-            item = provenance.setdefault(row.email, {"providers": set(), "types": set(), "updated": None})
+            item = provenance.setdefault(
+                row.email, {"providers": set(), "types": set(), "updated": None}
+            )
             item["providers"].add(row.provider)
             item["types"].add("hris")
             if item["updated"] is None or row.updated_at > item["updated"]:
@@ -272,7 +355,10 @@ async def list_employees(
     return [
         {
             **row.model_dump(),
-            "source_providers": sorted(provenance.get(row.email, {}).get("providers", set())),
+            **_employee_sensitive_values(row, current_user),
+            "source_providers": sorted(
+                provenance.get(row.email, {}).get("providers", set())
+            ),
             "source_types": sorted(provenance.get(row.email, {}).get("types", set())),
             "source_updated_at": provenance.get(row.email, {}).get("updated"),
         }
@@ -292,7 +378,10 @@ async def create_employee(
 
     # Check if email exists
     existing = session.exec(
-        select(EmployeeTable).where(EmployeeTable.email == employee_data.email)
+        select(EmployeeTable).where(
+            EmployeeTable.email == employee_data.email,
+            EmployeeTable.tenant_id == _tenant_id(current_user),
+        )
     ).first()
 
     if existing:
@@ -301,14 +390,47 @@ async def create_employee(
             detail="Employee with this email already exists",
         )
 
+    submitted_fields = employee_data.model_dump(exclude_unset=True)
+    if not current_user.is_admin and any(
+        field in submitted_fields and submitted_fields[field] is not None
+        for field in _ADMIN_ONLY_EMPLOYEE_FIELDS
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can set compensation or employment outcome data",
+        )
+
     employee = EmployeeTable(
         full_name=employee_data.full_name,
+        tenant_id=_tenant_id(current_user),
         email=employee_data.email,
         department=employee_data.department,
         role=employee_data.role,
         sentiment_score=employee_data.sentiment_score or 0.5,
-        salary=employee_data.salary,
+        salary=employee_data.salary if current_user.is_admin else None,
+        salary_currency=(
+            employee_data.salary_currency if current_user.is_admin else None
+        ),
+        salary_period=employee_data.salary_period if current_user.is_admin else None,
         join_date=employee_data.join_date or datetime.utcnow(),
+        employment_start_date=(
+            employee_data.employment_start_date if current_user.is_admin else None
+        ),
+        employment_end_date=(
+            employee_data.employment_end_date if current_user.is_admin else None
+        ),
+        employment_censor_date=(
+            employee_data.employment_censor_date if current_user.is_admin else None
+        ),
+        employment_duration_years=(
+            employee_data.employment_duration_years if current_user.is_admin else None
+        ),
+        departure_event=(
+            employee_data.departure_event if current_user.is_admin else None
+        ),
+        employment_status=(
+            employee_data.employment_status if current_user.is_admin else None
+        ),
     )
 
     session.add(employee)
@@ -317,7 +439,7 @@ async def create_employee(
 
     logger.info(f"Employee created: {employee.id}")
 
-    return get_employee_out(employee, session)
+    return get_employee_out(employee, session, current_user)
 
 
 @router.get("/count")
@@ -327,11 +449,18 @@ async def count_employees(
     department: str = Query(None),
     sentiment_min: float = Query(None, ge=0.0, le=1.0),
     sentiment_max: float = Query(None, ge=0.0, le=1.0),
+    employment_status: str | None = Query(None, max_length=24),
     current_user: TokenData = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     """Return the authoritative employee count without loading profile details."""
-    query = select(func.count()).select_from(EmployeeTable)
+    tenant_id = _tenant_id(current_user)
+    query = (
+        select(func.count())
+        .select_from(EmployeeTable)
+        .where(EmployeeTable.tenant_id == tenant_id)
+    )
+    query = _filter_employment_status(query, employment_status, current_user)
     if department:
         query = query.where(EmployeeTable.department == department)
     if q and q.strip():
@@ -364,7 +493,8 @@ async def list_employee_departments(
     session: Session = Depends(get_session),
 ):
     query = select(EmployeeTable.department).where(
-        EmployeeTable.department.is_not(None)
+        EmployeeTable.tenant_id == _tenant_id(current_user),
+        EmployeeTable.department.is_not(None),
     )
     if not include_sample_data():
         query = query.where(
@@ -383,7 +513,12 @@ async def get_employee(
 ):
     """Get employee by ID"""
 
-    employee = session.get(EmployeeTable, employee_id)
+    employee = session.exec(
+        select(EmployeeTable).where(
+            EmployeeTable.id == employee_id,
+            EmployeeTable.tenant_id == _tenant_id(current_user),
+        )
+    ).first()
 
     if not employee:
         raise HTTPException(
@@ -405,7 +540,12 @@ async def update_employee(
 ):
     """Update employee"""
 
-    employee = session.get(EmployeeTable, employee_id)
+    employee = session.exec(
+        select(EmployeeTable).where(
+            EmployeeTable.id == employee_id,
+            EmployeeTable.tenant_id == _tenant_id(current_user),
+        )
+    ).first()
 
     if not employee:
         raise HTTPException(
@@ -415,6 +555,13 @@ async def update_employee(
 
     # Update fields that were provided
     update_dict = update_data.model_dump(exclude_unset=True)
+    if not current_user.is_admin and any(
+        field in update_dict for field in _ADMIN_ONLY_EMPLOYEE_FIELDS
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can change compensation or employment outcome data",
+        )
     for field, value in update_dict.items():
         setattr(employee, field, value)
 
@@ -424,7 +571,7 @@ async def update_employee(
 
     logger.info(f"User {current_user.user_id} updated employee {employee_id}")
 
-    return get_employee_out(employee, session)
+    return get_employee_out(employee, session, current_user)
 
 
 @router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -441,7 +588,12 @@ async def delete_employee(
             detail="Only admins can delete employees",
         )
 
-    employee = session.get(EmployeeTable, employee_id)
+    employee = session.exec(
+        select(EmployeeTable).where(
+            EmployeeTable.id == employee_id,
+            EmployeeTable.tenant_id == _tenant_id(current_user),
+        )
+    ).first()
 
     if not employee:
         raise HTTPException(

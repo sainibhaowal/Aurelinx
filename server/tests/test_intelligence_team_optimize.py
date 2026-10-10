@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,23 +13,17 @@
 # limitations under the License.
 
 """
-Tests for the Team Assembly Simulated Annealing optimizer.
-
-Verifies that team assembly uses real compensation from employee records,
-emits a complete optimization_history (temperature, energy, best_energy,
-coverage, cost, budget usage), is deterministic for a fixed seed, and does not
-regress on the response contract consumed by the Intelligence Center UI.
+Tests for tenant isolation, exact team optimization, hard budget constraints,
+compensation data quality, and the response consumed by the Intelligence Center.
 """
 
 import os
+from itertools import combinations
+from types import SimpleNamespace
 from uuid import uuid4
 
-TEST_DATABASE_URL = os.getenv(
-    "TEST_DATABASE_URL",
-    "postgresql+psycopg://aurelinx:AurelinxPg_2026!ChangeMe@localhost:55433/aurelinx_db"
-    "?options=-csearch_path%3Dtest,public",
-)
-os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["DATABASE_URL"] = "sqlite://"
+os.environ["ALLOW_SQLITE"] = "1"
 os.environ["ALLOWED_HOSTS"] = "*"
 os.environ.setdefault("ENVIRONMENT", "development")
 
@@ -38,13 +31,12 @@ from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import (
-    create_engine,
-    select,
-)
+from sqlalchemy import create_engine, select
+from sqlalchemy.pool import StaticPool
 from sqlmodel import Session as SQLSession
 
-from app.core.security import TokenData, get_current_user, get_tenant_id
+from app.api.v1.intelligence import _solve_team_milp
+from app.core.security import TokenData, get_current_user
 from app.main import app
 from app.models import database as db
 from app.models.database import (
@@ -57,10 +49,11 @@ from app.models.database import (
 
 @pytest.fixture()
 def client_db(monkeypatch):
-    engine = create_engine(TEST_DATABASE_URL, echo=False, pool_pre_ping=True)
-    with engine.begin() as conn:
-        conn.exec_driver_sql("CREATE SCHEMA IF NOT EXISTS test AUTHORIZATION aurelinx")
-    SQLModel.metadata.drop_all(engine)
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     SQLModel.metadata.create_all(engine)
 
     def _get_session_override():
@@ -71,25 +64,31 @@ def client_db(monkeypatch):
     app.dependency_overrides[get_session] = _get_session_override
     app.dependency_overrides[db.get_session] = _get_session_override
     app.dependency_overrides[get_current_user] = lambda: TokenData(
-        user_id=str(uuid4()), email="optimizer@aurelinx.com", is_admin=True
+        user_id=str(uuid4()),
+        email="optimizer@aurelinx.com",
+        is_admin=True,
+        tenant_id="test-tenant",
     )
-    app.dependency_overrides[get_tenant_id] = lambda: "test-tenant"
     yield {"client": TestClient(app), "engine": engine}
     app.dependency_overrides.clear()
+    engine.dispose()
 
 
-def _seed_employees(engine, count=8):
+def _seed_employees(engine, count=8, tenant_id="test-tenant", salary_start=90000):
     employees = []
     with SQLSession(engine) as s:
         for idx in range(count):
             emp = EmployeeTable(
+                tenant_id=tenant_id,
                 full_name=f"Engineer {idx}",
-                email=f"engineer{idx}@aurelinx.io",
+                email=f"engineer{idx}-{tenant_id}@aurelinx.io",
                 department="Engineering",
                 role="Software Engineer",
                 sentiment_score=0.6,
                 is_at_risk=False,
-                salary=90000 + idx * 5000,  # real recorded compensation
+                salary=salary_start + idx * 5000,
+                salary_currency="USD",
+                salary_period="annual",
                 join_date=datetime.utcnow() - timedelta(days=400),
             )
             s.add(emp)
@@ -97,8 +96,14 @@ def _seed_employees(engine, count=8):
         s.commit()
         for emp in employees:
             s.refresh(emp)
+        employee_ids = [emp.id for emp in employees]
         skills = [
-            SkillTable(employee_id=emp.id, name=name, level=level)
+            SkillTable(
+                tenant_id=tenant_id,
+                employee_id=emp.id,
+                name=name,
+                level=level,
+            )
             for emp in employees
             for name, level in [
                 ("React", 4),
@@ -109,10 +114,10 @@ def _seed_employees(engine, count=8):
         ]
         s.add_all(skills)
         s.commit()
-    return employees
+    return employee_ids
 
 
-def test_team_optimize_uses_real_salary_and_full_history(client_db):
+def test_team_optimize_uses_recorded_salary_and_reports_solver_proof(client_db):
     engine = client_db["engine"]
     _seed_employees(engine, count=8)
 
@@ -141,13 +146,18 @@ def test_team_optimize_uses_real_salary_and_full_history(client_db):
     # Budget cap exposed for the UI budget line
     assert data["budget_cap"] == 500000.0
 
-    # History must contain every field the chart draws
+    assert data["optimality_proven"] is True
+    assert data["search_status"] == "optimal"
+    assert data["solver"] == "HiGHS MILP"
+    assert data["solver_relative_gap"] == 0.0
+
+    # The chart reports one final measurement, not simulated solver iterations.
     history = data["optimization_history"]
-    assert len(history) >= 5
+    assert len(history) == 1
     first = history[0]
     for field in (
         "step",
-        "temperature",
+        "search_nodes",
         "energy",
         "best_energy",
         "coverage",
@@ -155,11 +165,6 @@ def test_team_optimize_uses_real_salary_and_full_history(client_db):
         "budget_usage_percentage",
     ):
         assert field in first, f"history missing field {field}"
-
-    # best_energy is the best-so-far and is monotonic non-decreasing
-    bests = [h["best_energy"] for h in history]
-    assert bests == sorted(bests, reverse=True) or bests == sorted(bests)
-    assert max(bests) == max(h["energy"] for h in history)
 
     # Coverage/cost used by the chart axes are sane
     assert all(0 <= h["coverage"] <= 100 for h in history)
@@ -180,7 +185,7 @@ def test_team_optimize_uses_real_salary_and_full_history(client_db):
     assert metrics["salary_record_ratio"] == 1.0
 
 
-def test_team_optimize_deterministic_for_same_seed(client_db):
+def test_team_optimize_is_deterministic_for_same_inputs(client_db):
     engine = client_db["engine"]
     _seed_employees(engine, count=8)
 
@@ -207,12 +212,16 @@ def test_team_optimize_deterministic_for_same_seed(client_db):
     assert d1["metrics"] == d2["metrics"]
 
 
-def test_team_optimize_falls_back_when_salary_missing(client_db):
+def test_team_optimize_rejects_missing_compensation_instead_of_estimating(client_db):
     engine = client_db["engine"]
     employees = _seed_employees(engine, count=6)
-    # Null out salaries to force the deterministic fallback estimator
+    # Missing compensation is not replaced with a fabricated estimate.
     with SQLSession(engine) as s:
-        for emp in employees:
+        for emp in (
+            s.exec(select(EmployeeTable).where(EmployeeTable.id.in_(employees)))
+            .scalars()
+            .all()
+        ):
             emp.salary = None
             s.add(emp)
         s.commit()
@@ -223,12 +232,92 @@ def test_team_optimize_falls_back_when_salary_missing(client_db):
         "max_team_size": 2,
     }
     resp = client_db["client"].post("/api/v1/intelligence/team-optimize", json=payload)
-    assert resp.status_code == 200, resp.text
-    data = resp.json()
+    assert resp.status_code == 422, resp.text
+    assert (
+        "positive salary with explicit currency and pay period" in resp.json()["detail"]
+    )
 
-    assert data["metrics"]["salary_record_ratio"] == 0.0
-    assert data["metrics"]["compensation_basis"] == "role_estimate_fallback"
-    for member in data["optimized_team"]:
-        assert member["salary_source"] == "role_estimate"
-        # fallback: 80000 + len(role) * 1500
-        assert member["estimated_cost"] == 80000 + len("Software Engineer") * 1500
+
+def test_team_optimize_enforces_budget_and_prefers_lower_cost_on_equal_coverage(
+    client_db,
+):
+    engine = client_db["engine"]
+    employees = _seed_employees(engine, count=5)
+    payload = {
+        "target_skills": [{"name": "React", "level": 4}],
+        "budget_cap": 190000,
+        "max_team_size": 2,
+    }
+    response = client_db["client"].post(
+        "/api/v1/intelligence/team-optimize", json=payload
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["metrics"]["is_under_budget"] is True
+    assert data["metrics"]["total_cost"] == 185000
+    assert {member["id"] for member in data["optimized_team"]} == {
+        str(employees[0]),
+        str(employees[1]),
+    }
+
+    payload["budget_cap"] = 180000
+    infeasible = client_db["client"].post(
+        "/api/v1/intelligence/team-optimize", json=payload
+    )
+    assert infeasible.status_code == 422
+
+
+def test_team_optimize_ignores_untrusted_tenant_header(client_db):
+    engine = client_db["engine"]
+    allowed = _seed_employees(engine, count=4, tenant_id="test-tenant")
+    _seed_employees(engine, count=4, tenant_id="other-tenant", salary_start=1000)
+    response = client_db["client"].post(
+        "/api/v1/intelligence/team-optimize",
+        headers={"X-Tenant-ID": "other-tenant"},
+        json={
+            "target_skills": [{"name": "React", "level": 4}],
+            "budget_cap": 300000,
+            "max_team_size": 2,
+        },
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    allowed_ids = {str(employee_id) for employee_id in allowed}
+    assert all(member["id"] in allowed_ids for member in data["optimized_team"])
+    assert data["source_scope"]["tenant_id"] == "test-tenant"
+    assert data["source_scope"]["eligible_employee_count"] == 4
+
+
+def test_milp_matches_exhaustive_search_for_small_fixture():
+    employees = [SimpleNamespace(id=f"candidate-{idx}") for idx in range(6)]
+    costs = [10, 20, 30, 40, 50, 60]
+    contributions = [
+        [1.0, 0.0, 0.2],
+        [0.0, 1.0, 0.2],
+        [0.5, 0.5, 0.8],
+        [0.7, 0.0, 0.1],
+        [0.0, 0.7, 0.9],
+        [0.2, 0.2, 0.2],
+    ]
+    budget = 80
+    selected, score, cost, info = _solve_team_milp(
+        employees, costs, contributions, team_size=2, budget=budget
+    )
+
+    feasible = []
+    for team in combinations(range(len(employees)), 2):
+        team_cost = sum(costs[index] for index in team)
+        if team_cost <= budget:
+            team_score = sum(
+                max(round(contributions[index][skill], 12) for index in team)
+                for skill in range(len(contributions[0]))
+            ) / len(contributions[0])
+            feasible.append((team_score, team_cost))
+    expected_score, expected_cost = max(
+        feasible, key=lambda result: (result[0], -result[1])
+    )
+
+    assert score == expected_score
+    assert cost == expected_cost
+    assert sum(costs[index] for index in selected) <= budget
+    assert info["optimality_proven"] is True

@@ -789,7 +789,7 @@ const TalentScoutView = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-hidden"
             onClick={() => setSelectedTalent(null)}
           >
             <motion.div
@@ -797,7 +797,7 @@ const TalentScoutView = () => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.98 }}
               transition={{ duration: 0.18 }}
-              className="relative w-full max-w-3xl my-8 overflow-hidden rounded-xl border border-blue-500/40 bg-[#0b1329] p-6 md:p-8 text-slate-100 shadow-[0_0_50px_rgba(0,0,0,0.5)] shadow-blue-950/20"
+              className="relative w-full max-w-3xl max-h-[calc(100vh-2rem)] overscroll-contain overflow-y-auto rounded-xl border border-blue-500/40 bg-[#0b1329] p-6 md:p-8 text-slate-100 shadow-[0_0_50px_rgba(0,0,0,0.5)] shadow-blue-950/20"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Dossier Title */}
@@ -829,7 +829,7 @@ const TalentScoutView = () => {
                       : "CD"}
                   </div>
                   <div className="text-[9px] font-mono mt-3 tracking-widest text-slate-400 uppercase">
-                    Active Directory
+                    Candidate Pool
                   </div>
                 </div>
 
@@ -872,6 +872,17 @@ const TalentScoutView = () => {
                 </div>
               </div>
 
+              {String(selectedTalent.email || "")
+                .toLowerCase()
+                .endsWith("@public.local") && (
+                <div className="mb-5 rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[11px] leading-relaxed text-amber-100">
+                  Pseudonymous offline demo profile. The stored candidate and
+                  match scores are sample indicators, not validated hiring
+                  recommendations. Salary and hiring-stage data are not present
+                  in this bundle.
+                </div>
+              )}
+
               {/* Core Diagnostics & Salary Matrix */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 {/* Match Score Progress */}
@@ -896,14 +907,14 @@ const TalentScoutView = () => {
                     />
                   </div>
                   <div className="text-[9px] text-slate-500 mt-2 text-right">
-                    PROFILE FIT
+                    STORED MATCH SCORE · NOT A VALIDATED FIT MODEL
                   </div>
                 </div>
 
                 {/* Sentiment Vector */}
                 <div className="p-4 rounded-lg bg-slate-900/60 border border-white/5 font-mono">
                   <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-2 flex justify-between">
-                    <span>Morale Sentiment</span>
+                    <span>Stored candidate score</span>
                     <span className="text-slate-200 font-bold">
                       {selectedTalent.sentiment_score ?? "N/A"}
                     </span>
@@ -917,7 +928,7 @@ const TalentScoutView = () => {
                     />
                   </div>
                   <div className="text-[9px] text-slate-500 mt-2 text-right">
-                    METRIC: INTERVIEW_SCORE
+                    SOURCE VALUE · NOT AN EMPLOYEE MORALE MEASURE
                   </div>
                 </div>
 
@@ -942,18 +953,17 @@ const TalentScoutView = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
                   <div className="text-2xl font-bold tracking-tight text-white flex items-baseline gap-1">
-                    $
-                    {selectedTalent.salary
-                      ? selectedTalent.salary.toLocaleString()
-                      : "110,000"}
+                    {selectedTalent.salary == null
+                      ? "Not provided"
+                      : Number(selectedTalent.salary).toLocaleString()}
                     <span className="text-xs text-slate-500 font-normal">
-                      / yr expected base
+                      {selectedTalent.salary == null
+                        ? ""
+                        : " · unit not provided"}
                     </span>
                   </div>
                   <div className="px-2 py-0.5 rounded text-[10px] bg-cyan-400/10 border border-cyan-400/20 text-cyan-300 font-bold">
-                    MARKET COMPARE:{" "}
-                    {((selectedTalent.salary || 110000) / 108000).toFixed(2)}x
-                    Avg
+                    MARKET COMPARISON: UNAVAILABLE
                   </div>
                 </div>
               </div>
@@ -1005,31 +1015,56 @@ const TalentScoutView = () => {
                   Chronological Experience Record
                 </div>
                 <div className="relative border-l border-white/10 pl-6 ml-3 space-y-6">
-                  {(selectedTalent.experiences || []).map((experience, idx) => (
-                    <div
-                      key={`${experience.company}-${experience.position}-${idx}`}
-                      className="relative"
-                    >
-                      {/* Glowing timeline node */}
-                      <div className="absolute -left-[32px] top-1.5 w-4 h-4 rounded-full border border-cyan-400 bg-slate-950 flex items-center justify-center">
-                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                          {experience.position}
+                  {[...(selectedTalent.experiences || [])]
+                    .sort((left, right) => {
+                      const leftDate = left.effective_start
+                        ? Date.parse(left.effective_start)
+                        : 0;
+                      const rightDate = right.effective_start
+                        ? Date.parse(right.effective_start)
+                        : 0;
+                      return leftDate - rightDate;
+                    })
+                    .map((experience, idx) => (
+                      <div
+                        key={`${experience.company}-${experience.position}-${idx}`}
+                        className="relative"
+                      >
+                        {/* Glowing timeline node */}
+                        <div className="absolute -left-[32px] top-1.5 w-4 h-4 rounded-full border border-cyan-400 bg-slate-950 flex items-center justify-center">
+                          <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                         </div>
-                        <div className="text-[11px] text-cyan-400/90 mt-0.5 font-bold">
-                          {experience.company}{" "}
-                          <span className="text-slate-500">//</span>{" "}
-                          {experience.duration_years ?? "N/A"} years tenure
+                        <div>
+                          <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                            {experience.position}
+                          </div>
+                          <div className="text-[11px] text-cyan-400/90 mt-0.5 font-bold">
+                            {experience.company}{" "}
+                            <span className="text-slate-500">//</span>{" "}
+                            {experience.duration_years ?? "N/A"} years tenure
+                          </div>
+                          <div className="mt-1 text-[10px] text-slate-500">
+                            {experience.effective_start
+                              ? new Date(
+                                  experience.effective_start,
+                                ).toLocaleDateString()
+                              : "Start date not provided"}
+                            {" — "}
+                            {experience.is_current
+                              ? "Current"
+                              : experience.effective_end
+                                ? new Date(
+                                    experience.effective_end,
+                                  ).toLocaleDateString()
+                                : "End date not provided"}
+                          </div>
+                          <p className="text-[11px] text-slate-400 leading-relaxed mt-2 p-2 rounded bg-slate-900/30 border border-white/5">
+                            {experience.description ||
+                              "No duties specification recorded."}
+                          </p>
                         </div>
-                        <p className="text-[11px] text-slate-400 leading-relaxed mt-2 p-2 rounded bg-slate-900/30 border border-white/5">
-                          {experience.description ||
-                            "No duties specification recorded."}
-                        </p>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                   {(!selectedTalent.experiences ||
                     selectedTalent.experiences.length === 0) && (
                     <div className="text-xs text-slate-500 italic">

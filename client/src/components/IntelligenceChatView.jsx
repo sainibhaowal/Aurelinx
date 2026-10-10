@@ -35,11 +35,328 @@ import {
   ThumbsDown,
   Check,
   FileSpreadsheet,
+  Cpu,
+  ChevronDown,
+  Search,
 } from "lucide-react";
 import { UserManualButton } from "./UserManual";
 import { chatAPI } from "../services/apiClient";
 
-// ── Premium Markdown renderer — full GFM: tables, code, blockquotes, lists, task lists, images ──
+const QUICK_MODEL_DEFAULTS = {
+  moonshot: ["kimi-k3", "kimi-k2.6", "kimi-k2.5"],
+  zai: ["glm-5.3", "glm-5.2", "glm-5.1"],
+  nvidia: [
+    "deepseek-ai/deepseek-v4-flash",
+    "moonshotai/kimi-k3",
+    "z-ai/glm-5.3",
+  ],
+  deepseek: ["deepseek-flash", "deepseek-reasoner"],
+  mistral: ["mistral-small-latest", "mistral-large-latest"],
+  cline: ["minimax/minimax-m2.5", "anthropic/claude-sonnet-4-6"],
+  openrouter: [
+    "nvidia/nemotron-3.5-lightning:free",
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "inclusionai/ling-3.0-flash-fin:free",
+  ],
+  opencode: [
+    "gpt-6-astra",
+    "gpt-6-sol",
+    "gpt-6.1-sol",
+    "gpt-6-luna",
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "gpt-5.5",
+    "gpt-5.5-pro",
+    "gpt-5.4",
+    "gpt-5.4-pro",
+    "gpt-5.4-mini",
+    "gpt-5.4-nano",
+    "gpt-5.3-codex",
+    "gpt-5.3-codex-spark",
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
+    "claude-sonnet-5",
+    "claude-sonnet-4-6",
+    "claude-haiku-5-5",
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-pro",
+    "gemini-3-flash",
+    "grok-4.7",
+    "grok-4.6",
+    "grok-4.5",
+    "grok-build-0.1",
+    "muse-spark-1.3",
+    "muse-spark-1.2",
+    "qwen3.8-max",
+    "qwen3.8-flash",
+    "qwen3.7-max",
+    "qwen3.7-plus",
+    "qwen3.6-plus",
+    "qwen3.5-plus",
+    "deepseek-v4.1-flash",
+    "deepseek-v4-pro",
+    "deepseek-v4-flash",
+    "deepseek-v4-flash-vision-exp",
+    "minimax-m3",
+    "minimax-m2.7",
+    "minimax-m2.5",
+    "mistral-large-4",
+    "glm-5.3-flash",
+    "glm-5.3",
+    "glm-5.2",
+    "glm-5.1",
+    "glm-5",
+    "kimi-k2.5",
+    "kimi-k2.6",
+    "kimi-k2.7-code",
+    "kimi-k3",
+    "big-pickle",
+    "nemotron-3.5-lightning-free",
+  ],
+};
+
+const QuickModelPicker = () => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [configVersion, setConfigVersion] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const pickerRef = useRef(null);
+
+  const providers = useMemo(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const config = JSON.parse(
+        localStorage.getItem("AURELINX_PROVIDERS_CONFIG") || "{}",
+      );
+      return Object.entries(config)
+        .filter(
+          ([provider, value]) =>
+            provider !== "activeProvider" &&
+            value &&
+            typeof value === "object" &&
+            (value.key ||
+              value.endpoint ||
+              value.base_url ||
+              provider === "openrouter"),
+        )
+        .map(([provider, value]) => ({
+          provider,
+          name: provider === "opencode" ? "OpenCode Zen" : provider,
+          active: config.activeProvider === provider,
+          selectedModel: value.selectedModel || "",
+          models: [
+            ...(Array.isArray(value.discoveredModels) &&
+            value.discoveredModels.length
+              ? value.discoveredModels
+              : QUICK_MODEL_DEFAULTS[provider] || []),
+            value.selectedModel,
+          ].filter(Boolean),
+        }));
+    } catch {
+      return [];
+    }
+  }, [configVersion]);
+
+  const active = providers.find((item) => item.active) || providers[0];
+
+  const syncDiscovery = async (targetProvider = active?.provider) => {
+    if (!targetProvider) return;
+    setSyncing(true);
+    try {
+      const config = JSON.parse(
+        localStorage.getItem("AURELINX_PROVIDERS_CONFIG") || "{}",
+      );
+      const provCfg = config[targetProvider] || {};
+      const payload = {
+        provider: targetProvider,
+        api_key: provCfg.key || null,
+        base_url: provCfg.endpoint || provCfg.base_url || null,
+      };
+      const res = await chatAPI.discoverModels(payload);
+      if (
+        res &&
+        res.status === "success" &&
+        Array.isArray(res.models) &&
+        res.models.length
+      ) {
+        config[targetProvider] = {
+          ...provCfg,
+          discoveredModels: res.models,
+        };
+        localStorage.setItem(
+          "AURELINX_PROVIDERS_CONFIG",
+          JSON.stringify(config),
+        );
+        window.dispatchEvent(new Event("aurelinx-provider-changed"));
+        setConfigVersion((v) => v + 1);
+      }
+    } catch (err) {
+      console.error("Failed to sync models from backend:", err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open && active?.provider) {
+      const config = JSON.parse(
+        localStorage.getItem("AURELINX_PROVIDERS_CONFIG") || "{}",
+      );
+      const provCfg = config[active.provider] || {};
+      if (
+        !Array.isArray(provCfg.discoveredModels) ||
+        provCfg.discoveredModels.length <= 3
+      ) {
+        syncDiscovery(active.provider);
+      }
+    }
+  }, [open, active?.provider]);
+
+  useEffect(() => {
+    const close = (event) => {
+      if (pickerRef.current && !pickerRef.current.contains(event.target))
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    const refresh = () => setConfigVersion((version) => version + 1);
+    window.addEventListener("aurelinx-provider-changed", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("aurelinx-provider-changed", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredProviders = providers
+    .map((provider) => ({
+      ...provider,
+      models: [...new Set(provider.models)].filter((model) =>
+        `${provider.name} ${model}`.toLowerCase().includes(normalizedQuery),
+      ),
+    }))
+    .filter((provider) => provider.models.length);
+
+  const activate = (provider, model) => {
+    try {
+      const config = JSON.parse(
+        localStorage.getItem("AURELINX_PROVIDERS_CONFIG") || "{}",
+      );
+      config.activeProvider = provider.provider;
+      config[provider.provider] = {
+        ...(config[provider.provider] || {}),
+        selectedModel: model,
+      };
+      localStorage.setItem("AURELINX_PROVIDERS_CONFIG", JSON.stringify(config));
+      window.dispatchEvent(new Event("aurelinx-provider-changed"));
+      setConfigVersion((version) => version + 1);
+      setQuery("");
+      setOpen(false);
+    } catch (error) {
+      console.error("Could not activate model", error);
+    }
+  };
+
+  return (
+    <div className="relative flex-shrink-0" ref={pickerRef}>
+      <button
+        type="button"
+        onClick={() => {
+          setConfigVersion((version) => version + 1);
+          setOpen((value) => !value);
+        }}
+        className="h-9 max-w-[155px] rounded-xl border border-white/10 bg-white/[0.03] px-2.5 text-[11px] text-slate-300 flex items-center gap-1.5 hover:border-cyan-300/40 hover:text-cyan-100 transition"
+        title="Quick model picker"
+      >
+        <Cpu size={14} className="text-cyan-300" />
+        <span className="truncate">
+          {active?.selectedModel || "Select model"}
+        </span>
+        <ChevronDown size={13} className="text-slate-500" />
+      </button>
+      {open && (
+        <div className="absolute bottom-11 left-0 z-[100] w-[320px] rounded-2xl border border-cyan-300/20 bg-[#07101d]/[.98] p-2 shadow-2xl shadow-black/50 backdrop-blur-xl">
+          <div className="mb-2 flex items-center justify-between border-b border-white/10 px-2 pb-2 gap-2">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Search size={14} className="text-slate-500 shrink-0" />
+              <input
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search provider or model..."
+                className="w-full bg-transparent text-xs text-slate-100 outline-none placeholder:text-slate-600"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => syncDiscovery()}
+              disabled={syncing}
+              className="flex items-center gap-1 text-[10px] text-cyan-400 hover:text-cyan-200 transition font-mono shrink-0 px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/20 disabled:opacity-50"
+              title="Sync live discoveries from backend"
+            >
+              <RefreshCw size={10} className={syncing ? "animate-spin" : ""} />
+              <span>{syncing ? "Syncing..." : "Sync"}</span>
+            </button>
+          </div>
+          <div className="max-h-64 overflow-y-auto custom-scrollbar">
+            {filteredProviders.length ? (
+              filteredProviders.map((provider) => (
+                <div key={provider.provider} className="mb-2 last:mb-0">
+                  <div className="flex items-center justify-between px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-cyan-300/70">
+                    <span>
+                      {provider.name} {provider.active && "· Active"}
+                    </span>
+                    <span className="text-slate-500 font-mono lowercase text-[9px]">
+                      {provider.models.length} models
+                    </span>
+                  </div>
+                  {provider.models.map((model) => (
+                    <button
+                      key={`${provider.provider}-${model}`}
+                      type="button"
+                      onClick={() => activate(provider, model)}
+                      className={`w-full rounded-lg px-2 py-2 text-left text-[11px] transition hover:bg-cyan-400/10 ${provider.active && provider.selectedModel === model ? "bg-cyan-400/10 text-cyan-200 font-medium" : "text-slate-300"}`}
+                    >
+                      <span className="block truncate">{model}</span>
+                      <span className="text-[9px] text-slate-500">
+                        {provider.active && provider.selectedModel === model
+                          ? "Currently active"
+                          : "Use for next message"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ))
+            ) : (
+              <div className="px-2 py-4 text-center text-[11px] text-slate-500">
+                {syncing
+                  ? "Discovering models from backend..."
+                  : "No connected models found. Add or discover one in Settings."}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = "/app/providers";
+            }}
+            className="mt-2 w-full border-t border-white/10 pt-2 text-[10px] text-cyan-300 hover:text-cyan-100"
+          >
+            Manage providers and discover models in Settings →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Premium Markdown renderer: full GFM tables, code, blockquotes, lists, task lists, images
 const TableWithActions = ({ children }) => {
   const [flash, setFlash] = useState("");
 
@@ -210,9 +527,9 @@ const MarkdownRenderer = ({ children }) => (
         <del className="line-through text-slate-500">{children}</del>
       ),
 
-      // ── Code (inline and block) — react-markdown v10 uses node.position to differentiate ──
+      // Code (inline and block): react-markdown v10 uses node.position to differentiate
       code: ({ node, className, children, ...props }) => {
-        // If the parent is a <pre>, this is a fenced code block — render as block code
+        // If the parent is a <pre>, this is a fenced code block: render as block code
         const isBlock =
           node?.position?.start?.line !== node?.position?.end?.line ||
           (className && className.startsWith("language-"));
@@ -345,7 +662,7 @@ const MarkdownRenderer = ({ children }) => (
         </div>
       ),
 
-      // ── GFM Tables — premium glassmorphic dark styling ──
+      // GFM Tables: premium glassmorphic dark styling
       table: TableWithActions,
       thead: ({ children }) => (
         <thead className="bg-cyan-950/60 border-b border-cyan-500/20">
@@ -393,9 +710,9 @@ const MarkdownRenderer = ({ children }) => (
   </ReactMarkdown>
 );
 
-// Provider reasoning is represented by model_reasoning workflow events. The
-// private reasoning text itself is never rendered as an assistant answer.
 const ThinkingMessageContent = ({ text, children }) => {
+  const [thinkingOpen, setThinkingOpen] = useState(false);
+
   const rawText = useMemo(() => {
     if (text) return text;
     if (typeof children === "string") return children;
@@ -424,27 +741,64 @@ const ThinkingMessageContent = ({ text, children }) => {
     };
   }, [rawText]);
 
-  // A streamed <think> block is telemetry, not answer content. The live
-  // timeline shows whether the provider entered/exited reasoning, so do not
-  // create a second fake reasoning card here.
-  // During active streaming: if <think> opened but </think> not yet closed,
-  // parsed.content is "" — but any text BEFORE <think> should still show.
   const preThinkContent = (() => {
     if (!rawText) return "";
     const thinkStart = rawText.indexOf("<think>");
     return thinkStart > 0 ? rawText.slice(0, thinkStart).trim() : "";
   })();
+
   const visibleContent = parsed.thinking
     ? parsed.content || preThinkContent
     : rawText;
-  if (!visibleContent) return null;
+
+  if (!visibleContent && !parsed.thinking) return null;
 
   return (
-    <div className="mt-2 min-w-0 w-full overflow-hidden pt-2">
-      <MarkdownRenderer>{visibleContent}</MarkdownRenderer>
+    <div className="mt-2 min-w-0 w-full overflow-hidden pt-2 space-y-2">
+      {parsed.thinking ? (
+        <div className="rounded-lg border border-cyan-500/20 bg-slate-950/70 overflow-hidden text-xs">
+          <button
+            type="button"
+            onClick={() => setThinkingOpen(!thinkingOpen)}
+            className="w-full flex items-center justify-between px-3 py-1.5 text-slate-300 hover:text-cyan-300 transition-colors bg-slate-900/60 text-left font-mono text-[11px]"
+          >
+            <span className="flex items-center gap-1.5">
+              <span className="text-cyan-400">⚡</span>
+              <span className="font-medium">Reasoning Process</span>
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {parsed.thinking.length} chars {thinkingOpen ? "▲" : "▼"}
+            </span>
+          </button>
+          {thinkingOpen && (
+            <div className="p-3 text-cyan-100/90 font-mono text-[11px] leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto bg-black/50 border-t border-cyan-500/10">
+              {parsed.thinking}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {visibleContent ? (
+        <MarkdownRenderer>{visibleContent}</MarkdownRenderer>
+      ) : null}
     </div>
   );
 };
+
+const ProgressDots = ({ className = "" }) => (
+  <span
+    className={`inline-flex items-center gap-1 text-cyan-300 ${className}`}
+    aria-label="Aurelinx is working"
+  >
+    <span className="animate-pulse-dots">●</span>
+    <span className="animate-pulse-dots" style={{ animationDelay: "150ms" }}>
+      ●
+    </span>
+    <span className="animate-pulse-dots" style={{ animationDelay: "300ms" }}>
+      ●
+    </span>
+  </span>
+);
 
 const parseServerTime = (value) => {
   if (!value) return NaN;
@@ -453,10 +807,39 @@ const parseServerTime = (value) => {
   return new Date(hasTz ? text : `${text}Z`).getTime();
 };
 
-const toolNameForStep = (step) => step?.tool || step?.tool_name || "unknown";
+const TOOL_LABELS = {
+  employee_directory: "Employee Directory",
+  candidate_pipeline: "Candidate Pipeline",
+  talent_scout: "Talent Scout",
+  sentiment_pulse: "Sentiment Pulse",
+  enterprise_ops: "Enterprise Ops",
+  workforce_analytics: "Workforce Analytics",
+  compliance_audit: "Compliance Audit",
+  policy_lookup: "Policy Lookup",
+  analyse: "Analyze Workspace",
+  search: "Search Records",
+  read_by_email: "Lookup by Email",
+  modify: "Modify Record",
+  write: "Create Record",
+  delete: "Delete Record",
+};
+
+const formatToolName = (rawName) => {
+  if (!rawName) return "Tool";
+  const normalized = String(rawName).trim().toLowerCase();
+  if (TOOL_LABELS[normalized]) return TOOL_LABELS[normalized];
+  return normalized
+    .replace(/[._]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+const toolNameForStep = (step) => {
+  const raw = step?.tool || step?.tool_name || "";
+  return formatToolName(raw);
+};
 
 const formatDuration = (milliseconds) => {
-  if (!Number.isFinite(milliseconds) || milliseconds < 0) return "—";
+  if (!Number.isFinite(milliseconds) || milliseconds < 0) return "-";
   if (milliseconds < 1000) return `${Math.max(0, Math.round(milliseconds))}ms`;
   return `${(milliseconds / 1000).toFixed(1)}s`;
 };
@@ -473,6 +856,7 @@ const displayPayload = (payload) => {
 const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
   const [expandedId, setExpandedId] = useState(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const autoExpandedRef = useRef(null);
 
   // Deterministic settling: a finished stream is history. Any step still
   // marked "running" on a non-active stream is deterministically finalized so
@@ -506,17 +890,23 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
       const next = list[index + 1];
       if (
         step.type === "model_reasoning" &&
-        wasRunning[index] &&
         next &&
-        next.type === "model_reasoning"
+        next.type === "model_reasoning" &&
+        (step.event_id === next.event_id || wasRunning[index])
       ) {
         collapsed.push({
           ...next,
           started_at: step.started_at || next.started_at,
           created_at: step.created_at || next.created_at,
+          duration_ms: next.duration_ms || step.duration_ms || 0,
           result_summary: {
-            ...(next.result_summary || {}),
             ...(step.result_summary || {}),
+            ...(next.result_summary || {}),
+            characters:
+              next.result_summary?.characters ??
+              step.result_summary?.characters ??
+              0,
+            text: next.result_summary?.text || step.result_summary?.text || "",
           },
         });
         index += 1;
@@ -537,6 +927,20 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
     return () => window.clearInterval(timer);
   }, [hasRunningStep]);
 
+  // Auto-expand the active thinking step so users immediately see raw reasoning streaming
+  useEffect(() => {
+    const activeReasoning = deterministicSteps.find(
+      (s) => s.type === "model_reasoning" && s.status === "running",
+    );
+    if (activeReasoning) {
+      const id = activeReasoning.event_id || "model_reasoning-running";
+      if (autoExpandedRef.current !== id) {
+        autoExpandedRef.current = id;
+        setExpandedId(id);
+      }
+    }
+  }, [deterministicSteps]);
+
   const runningDuration = (step) => {
     const startedAt = step.started_at || step.created_at;
     const timestamp = startedAt ? parseServerTime(startedAt) : NaN;
@@ -550,32 +954,83 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
       ? runningDuration(step)
       : Number(step.duration_ms || 0);
 
-  // Merge each tool call and result into one stable execution card. Correlation
-  // IDs are preferred; the per-tool queue is a safe fallback for older events.
   const mergedSteps = useMemo(() => {
     const visible = deterministicSteps.filter((step) => {
       if (step.tool === "conversation.context") return false;
+      // Selection start is useful live feedback; its completed update is an
+      // internal transport detail and should not become a second visible row.
+      if (step.type === "native_tool_selection") return false;
+      if (
+        step.type === "model_reasoning" &&
+        step.status !== "running" &&
+        !step.result_summary?.text &&
+        !step.text &&
+        !step.reasoning &&
+        (!step.duration_ms || step.duration_ms <= 0)
+      ) {
+        return false;
+      }
       if (
         [
           "workflow_started",
           "agent_started",
+          "agent_ready",
+          "conversation_mode",
+          "agent_evaluated",
           "validation_completed",
           "workflow_completed",
           "final_response_completed",
           "final_response_started",
           "agent_decision",
-          "controller_call",
           "controller_output_normalized",
           "controller_output_repaired",
+          "native_tool_decision",
+          "native_tool_selection",
+          "live_evidence_guard",
+          "intent_classified",
+          "workflow_metrics",
+          "instant_lane",
+          "intent_detected",
+          "turn_metrics",
+          "controller_completed",
         ].includes(step.type)
       )
         return false;
+      const rawMsg = (step.display_message || step.message || "").toLowerCase();
+      if (
+        rawMsg.includes("request routed to instant lane") ||
+        rawMsg.includes("instant turn metrics")
+      ) {
+        return false;
+      }
       if (
         step.type === "workflow_failed" &&
         deterministicSteps.some((item) => item.type === "agent_failed")
       )
         return false;
       return true;
+    });
+
+    // A native selection phase is emitted once when it starts and once when
+    // its same database row is updated. Restored traces can contain both
+    // representations, so collapse them by model iteration as well as ID.
+    const dedupedVisible = [];
+    const nativeSelectionIndex = new Map();
+    visible.forEach((step) => {
+      if (step.type !== "native_tool_selection") {
+        dedupedVisible.push(step);
+        return;
+      }
+      const iteration = step.result_summary?.iteration ?? step.sequence;
+      const key = `native-selection-${iteration}`;
+      const existing = nativeSelectionIndex.get(key);
+      if (existing == null) {
+        nativeSelectionIndex.set(key, dedupedVisible.length);
+        dedupedVisible.push(step);
+      } else {
+        // The completion update is the more informative representation.
+        dedupedVisible[existing] = step;
+      }
     });
 
     const pendingByKey = new Map();
@@ -591,7 +1046,7 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
       return id == null ? null : `${toolNameForStep(step)}:${id}`;
     };
 
-    visible.forEach((step) => {
+    dedupedVisible.forEach((step) => {
       if (step.type === "tool_call") {
         const mergedItem = {
           ...step,
@@ -659,13 +1114,14 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
           const isError = status === "failed" || status === "blocked";
           const isToolExecution = step.type === "tool_execution";
           const isReasoning = step.type === "model_reasoning";
+          const isNativeSelection = step.type === "native_tool_selection";
           const duration = stepDuration(step);
           const durationLabel = formatDuration(duration);
           const toolName = toolNameForStep(step);
 
           const isExpanded = expandedId === id;
 
-          let displayTitle = step.message || step.type;
+          let displayTitle = step.display_message || step.message || step.type;
           if (isReasoning) {
             displayTitle =
               status === "running"
@@ -678,8 +1134,16 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
               (Array.isArray(step.result?.matches)
                 ? step.result.matches.length
                 : null);
-            const matchSuffix = matches != null ? ` (${matches} matches)` : "";
+            const matchSuffix =
+              matches != null
+                ? ` (${matches} ${matches === 1 ? "match" : "matches"})`
+                : "";
             displayTitle = `${toolName}${matchSuffix}`;
+          } else if (isNativeSelection) {
+            displayTitle =
+              status === "running"
+                ? "Selecting next tool"
+                : "Next tool selected";
           }
 
           return (
@@ -738,56 +1202,56 @@ const AgenticStepTracker = ({ steps = [], onApproval, phase }) => {
               {isExpanded && (
                 <div className="ml-5 mt-1 mb-2 p-2.5 rounded-lg border border-white/10 bg-slate-950/90 text-[11px] text-slate-300 space-y-2">
                   {isReasoning ? (
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-cyan-400 font-semibold border-b border-white/5 pb-1">
-                        <span className="flex items-center gap-1.5">
-                          {status === "running" ? (
-                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                          ) : (
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                          )}
-                          Thinking
-                        </span>
-                        <span
-                          className="font-mono"
-                          aria-label="reasoning character count"
-                        >
-                          {step.result_summary?.characters || 0} chars
-                        </span>
-                      </div>
-                      <pre className="p-2.5 rounded bg-black/40 border border-white/5 font-mono text-[11px] leading-relaxed text-cyan-100/90 overflow-y-auto whitespace-pre-wrap break-words max-h-52 min-h-[3rem]">
-                        {step.result_summary?.text ? (
-                          <>
-                            {step.result_summary.text}
-                            {status === "running" && (
-                              <span className="inline-block w-1.5 h-3.5 bg-cyan-400/80 animate-pulse ml-0.5 align-text-bottom" />
-                            )}
-                          </>
-                        ) : (
-                          <span className="text-slate-500">
-                            {status === "running" ? (
-                              <span className="flex items-center gap-0.5">
-                                <span className="animate-pulse-dots">●</span>
-                                <span
-                                  className="animate-pulse-dots"
-                                  style={{ animationDelay: "150ms" }}
-                                >
-                                  ●
-                                </span>
-                                <span
-                                  className="animate-pulse-dots"
-                                  style={{ animationDelay: "300ms" }}
-                                >
-                                  ●
-                                </span>
-                              </span>
+                    (() => {
+                      // Reasoning is private model telemetry, never user-facing
+                      // content. Older persisted traces may contain text, so do
+                      // not render those historical fields either.
+                      const reasoningText = "";
+                      const charCount = step.result_summary?.characters || 0;
+                      if (!reasoningText && status !== "running") {
+                        return (
+                          <div className="p-2 text-slate-500 font-mono text-[11px] italic">
+                            Model formulation completed with direct response
+                            tokens.
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-cyan-400 font-semibold border-b border-white/5 pb-1">
+                            <span className="flex items-center gap-1.5">
+                              {status === "running" ? (
+                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                              ) : (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              )}
+                              Thinking Process
+                            </span>
+                            <span
+                              className="font-mono"
+                              aria-label="reasoning character count"
+                            >
+                              {charCount} chars
+                            </span>
+                          </div>
+                          <pre className="p-2.5 rounded bg-black/40 border border-white/5 font-mono text-[11px] leading-relaxed text-cyan-100/90 overflow-y-auto whitespace-pre-wrap break-words max-h-52 min-h-[3rem]">
+                            {reasoningText ? (
+                              <>
+                                {reasoningText}
+                                {status === "running" && (
+                                  <span className="inline-block w-1.5 h-3.5 bg-cyan-400/80 animate-pulse ml-0.5 align-text-bottom" />
+                                )}
+                              </>
                             ) : (
-                              "No reasoning text captured — this model may not expose thinking."
+                              <span className="text-slate-500 flex items-center gap-1.5">
+                                <span>Generating thoughts</span>
+                                <ProgressDots />
+                              </span>
                             )}
-                          </span>
-                        )}
-                      </pre>
-                    </div>
+                          </pre>
+                        </div>
+                      );
+                    })()
                   ) : (
                     <div className="space-y-2">
                       {step.safe_input && (
@@ -1201,22 +1665,48 @@ const IntelligenceChatView = () => {
         custom: { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
         google: {
           baseUrl: "https://generativelanguage.googleapis.com",
-          model: "gemini-1.5-flash",
+          model: "gemini-3.6-flash",
         },
         groq: {
           baseUrl: "https://api.groq.com/openai/v1",
-          model: "llama-3.1-70b-versatile",
+          model: "openai/gpt-oss-20b",
         },
         lmstudio: {
           baseUrl: "http://127.0.0.1:1234/v1",
-          model: "liquid/lfm2.5-1.2b",
+          model: "qwen2.5-0.5b-instruct",
         },
         ollama: { baseUrl: "http://127.0.0.1:11434/v1", model: "llama3" },
         openai: { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
-        opencode: { baseUrl: "https://opencode.ai/zen/v1", model: "gpt-5.5" },
+        openrouter: {
+          baseUrl: "https://openrouter.ai/api/v1",
+          model: "nvidia/nemotron-3.5-lightning:free",
+        },
+        moonshot: { baseUrl: "https://api.moonshot.ai/v1", model: "kimi-k2.6" },
+        zai: { baseUrl: "https://api.z.ai/api/paas/v4", model: "glm-5.3" },
+        nvidia: {
+          baseUrl: "https://integrate.api.nvidia.com/v1",
+          model: "nvidia/llama-3.3-nemotron-super-49b-v1",
+        },
+        deepseek: {
+          baseUrl: "https://api.deepseek.com",
+          model: "deepseek-flash",
+        },
+        mistral: {
+          baseUrl: "https://api.mistral.ai/v1",
+          model: "mistral-small-latest",
+        },
+        cline: {
+          baseUrl: "https://api.cline.bot/api/v1",
+          model: "minimax/minimax-m2.5",
+        },
+        opencode: {
+          baseUrl: "https://opencode.ai/zen/v1",
+          model: "gpt-6-astra",
+        },
       };
       const defaults = providerDefaults[provider] || providerDefaults.lmstudio;
-      const model = providerCfg.selectedModel || defaults.model;
+      const savedModel = providerCfg.selectedModel;
+      const model = savedModel || defaults.model;
       const baseUrl =
         providerCfg.endpoint || providerCfg.base_url || defaults.baseUrl;
       const payload = {
@@ -1230,6 +1720,12 @@ const IntelligenceChatView = () => {
         sessionId,
         payload,
         {
+          onChunk: (chunk) => {
+            const text = typeof chunk === "string" ? chunk : chunk?.text || "";
+            if (text) {
+              setStreamText((prev) => prev + text);
+            }
+          },
           onStatus: ({ phase }) => setStreamPhase(phase),
           onAgentStep: (event) => {
             setAgentSteps((previous) => {
@@ -1237,8 +1733,18 @@ const IntelligenceChatView = () => {
               const index = next.findIndex(
                 (item) => item.event_id === event.event_id,
               );
-              if (index >= 0) next[index] = event;
-              else next.push(event);
+              if (index >= 0) {
+                const prevText = next[index].result_summary?.text || "";
+                next[index] = {
+                  ...event,
+                  result_summary: {
+                    ...(event.result_summary || {}),
+                    text: event.result_summary?.text || prevText,
+                  },
+                };
+              } else {
+                next.push(event);
+              }
               return next;
             });
             setStreamPhase(event.phase || event.type || null);
@@ -1253,21 +1759,56 @@ const IntelligenceChatView = () => {
                       result_summary: {
                         ...(item.result_summary || {}),
                         characters: event.characters,
-                        text: event.text || item.result_summary?.text || "",
+                        text:
+                          (item.result_summary?.text || "") +
+                          (event.text || ""),
                       },
                     }
                   : item,
               ),
             );
           },
-          onChunk: ({ text }) => setStreamText((prev) => prev + text),
           onDone: ({ assistant_message, user_message, session }) => {
+            const enrichedEvents = (
+              assistant_message.workflow_events || []
+            ).map((ev) => {
+              const liveMatch = agentSteps.find(
+                (s) =>
+                  s.event_id === ev.event_id ||
+                  (s.type === "model_reasoning" &&
+                    ev.type === "model_reasoning"),
+              );
+              if (liveMatch) {
+                const liveText =
+                  liveMatch.result_summary?.text || liveMatch.text || "";
+                const evText = ev.result_summary?.text || ev.text || "";
+                if (liveText && (!evText || evText.length < liveText.length)) {
+                  return {
+                    ...ev,
+                    duration_ms: ev.duration_ms || liveMatch.duration_ms || 0,
+                    result_summary: {
+                      ...(ev.result_summary || {}),
+                      text: liveText,
+                      characters: liveText.length,
+                    },
+                  };
+                }
+              }
+              return ev;
+            });
+            const finalAssistantMsg = {
+              ...assistant_message,
+              workflow_events:
+                enrichedEvents.length > 0
+                  ? enrichedEvents
+                  : assistant_message.workflow_events,
+            };
             setMessages((prev) => [
               ...prev.filter(
                 (m) => !m.id.toString().startsWith("optimistic-user-msg-"),
               ),
               user_message,
-              assistant_message,
+              finalAssistantMsg,
             ]);
             setAgentSteps((previous) =>
               previous.map((item) =>
@@ -1740,7 +2281,7 @@ const IntelligenceChatView = () => {
                                     ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-300"
                                     : "border-white/10 bg-white/5 text-slate-400 hover:bg-emerald-500/10 hover:text-emerald-300"
                                 }`}
-                                title="Good response — helps the model improve"
+                                title="Good response: helps the model improve"
                               >
                                 <ThumbsUp size={12} />
                               </button>
@@ -1752,7 +2293,7 @@ const IntelligenceChatView = () => {
                                     ? "border-rose-400/40 bg-rose-500/20 text-rose-300"
                                     : "border-white/10 bg-white/5 text-slate-400 hover:bg-rose-500/10 hover:text-rose-300"
                                 }`}
-                                title="Bad response — the model will improve the next answer"
+                                title="Bad response: the model will improve the next answer"
                               >
                                 <ThumbsDown size={12} />
                               </button>
@@ -1815,6 +2356,38 @@ const IntelligenceChatView = () => {
                       <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-cyan-400/70">
                         <span>Live answer</span>
                         <span>{streamText.length} characters received</span>
+                      </div>
+                    )}
+                    {!streamText && (
+                      <div className="mt-3 flex items-center justify-between text-xs text-slate-400 bg-white/[0.02] border border-white/5 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2.5">
+                          <ProgressDots />
+                          <span className="font-medium text-slate-300">
+                            {streamPhase === "planning"
+                              ? "Consulting model and planning next step..."
+                              : streamPhase === "retrieval" ||
+                                  streamPhase === "context"
+                                ? "Retrieving live workspace records..."
+                                : streamPhase === "execution"
+                                  ? "Executing verified specialist tool..."
+                                  : streamPhase === "response"
+                                    ? "Preparing verified answer..."
+                                    : "Processing workspace request..."}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (abortRef.current) {
+                              abortRef.current.abort();
+                            }
+                            setBusy(false);
+                            setStreamPhase(null);
+                          }}
+                          className="px-2 py-0.5 text-[11px] font-medium text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded transition-colors cursor-pointer"
+                        >
+                          Stop
+                        </button>
                       </div>
                     )}
                     <div className="text-sm relative">
@@ -1886,6 +2459,8 @@ const IntelligenceChatView = () => {
                   <Paperclip size={18} />
                   <input type="file" className="hidden" onChange={uploadFile} />
                 </label>
+
+                <QuickModelPicker />
 
                 <textarea
                   className="flex-1 bg-transparent border-0 outline-none focus:ring-0 text-slate-100 placeholder:text-slate-500 text-sm py-2 resize-none h-9 max-h-28 overflow-y-auto leading-relaxed custom-scrollbar"

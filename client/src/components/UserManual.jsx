@@ -412,12 +412,12 @@ export const UserManualModal = ({
                 Overview
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                Welcome to Aurelinx, an enterprise-grade Talent Intelligence &
-                Org Health Platform. Aurelinx integrates live business telemetry
-                (Slack, Jira, Workday) with explainable Machine Learning models,
-                policy compliance gates, and cognitive AI agents to help
-                organizations optimize retention and build high-performance
-                teams.
+                Aurelinx brings workforce records, analytics, and decision
+                support into one workspace. You can explore the offline demo
+                bundle without connecting a provider, or configure supported
+                provider connectors and webhooks for tenant data. A connection
+                only supplies the fields and event types that its source
+                actually returns.
               </p>
             </div>
 
@@ -437,8 +437,9 @@ export const UserManualModal = ({
                   <strong className="text-white">
                     Review Workforce Analytics:
                   </strong>{" "}
-                  Monitor the Dashboard to inspect attrition risk, morale
-                  metrics, and high-risk clusters.
+                  Review the Dashboard and Sentiment views as stored indicators.
+                  Demo values are synthetic and are not evidence about a real
+                  workforce.
                 </li>
                 <li>
                   <strong className="text-white">Launch Interventions:</strong>{" "}
@@ -447,8 +448,9 @@ export const UserManualModal = ({
                 </li>
                 <li>
                   <strong className="text-white">Setup Data Ingestion:</strong>{" "}
-                  Connect secure Slack, Jira, and Workday webhooks to sync live
-                  workforce events.
+                  Upload the offline demo ZIP through Data Ops, or configure a
+                  provider connection and verify its sync results before using
+                  the returned data.
                 </li>
               </ol>
             </div>
@@ -458,12 +460,12 @@ export const UserManualModal = ({
                 System Architecture Flow
               </h3>
               <div className="rounded-xl bg-slate-950/40 border border-white/5 p-4 text-xs font-mono text-cyan-200/90 leading-relaxed">
-                [Integrations: Slack/Workday/Jira] ➔ [Webhook Ingestion API]{" "}
+                [Data Ops ZIP / Provider Sync / Webhooks] ➔ [Tenant Records]{" "}
                 <br />
-                &nbsp;&nbsp;➔ [PostgreSQL database] ➔ [ONA Centrality Solvers]
+                &nbsp;&nbsp;➔ [PostgreSQL database] ➔ [Directory / Analytics]
                 <br />
-                &nbsp;&nbsp;&nbsp;&nbsp;➔ [Explainable ML Prediction Engine] ➔
-                [Policy gates Audit]
+                &nbsp;&nbsp;&nbsp;&nbsp;➔ [Intelligence Center evidence] ➔ [AI
+                explanations]
                 <br />
                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➔ [Agentic Workflows Chat &
                 Client Dashboard]
@@ -2014,10 +2016,10 @@ export const UserManualModal = ({
                   </strong>
                   <br />A <strong>Review Request</strong> is a preliminary,
                   documented HR triage ticket generated when an HRBP or Manager
-                  discovers a high attrition risk signal in{" "}
-                  <em>Operational Analytics</em>. It captures the target
-                  employee, risk factors, department, and recommended triage
-                  steps without altering the core employee record.
+                  reviews an imported employee source flag or another documented
+                  review criterion in <em>Operational Analytics</em>. It
+                  captures the target employee, available evidence, department,
+                  and triage steps without changing the source profile.
                 </p>
 
                 <p>
@@ -2043,9 +2045,9 @@ export const UserManualModal = ({
                       Step 1
                     </span>
                     <span>
-                      <strong>Signal Discovery:</strong> AI models detect low
-                      retention probability or high burnout indicators in
-                      Operational Analytics.
+                      <strong>Signal Review:</strong> Operational Analytics
+                      displays stored source indicators and derived summaries.
+                      It does not produce an individual attrition forecast.
                     </span>
                   </div>
                   <div className="flex items-start gap-2">
@@ -2547,9 +2549,11 @@ export const UserManualModal = ({
                 </li>
                 <li>
                   Use the Department, Risk status, and Sentiment range filters
-                  to query the complete server-side population. “At-risk
-                  employees only” applies only to employees; candidates remain
-                  separate.
+                  to query the complete server-side population. Administrators
+                  also have an employee employment-status filter for active,
+                  on-leave, departed, and unreported records. “At-risk employees
+                  only” and employment status apply only to employees;
+                  candidates remain separate.
                 </li>
                 <li>
                   Scroll-to-load uses paginated metadata. Off-screen cards use
@@ -2558,12 +2562,11 @@ export const UserManualModal = ({
                   once. This is not a limit on search or totals.
                 </li>
                 <li>
-                  <strong>Demo compensation display:</strong> when a sample
-                  profile has no salary value, the dossier may show an
-                  illustrative base salary and market index marked{" "}
-                  <strong className="text-amber-200">DEMO</strong>. This is
-                  presentation scaffolding, not an authoritative compensation
-                  value.
+                  Employee dossiers show salary and employment outcome details
+                  only to administrators. Missing salary, currency, pay period,
+                  outcome, and censor fields are shown as not provided; the
+                  system does not fill them with estimates. The long dossier
+                  scrolls inside its window.
                 </li>
                 <li>
                   Use the refresh icon to re-fetch directory pages, totals,
@@ -2574,8 +2577,9 @@ export const UserManualModal = ({
                   Use the export menu or{" "}
                   <strong className="text-white">Quick PDF</strong> to request a
                   report. Exports repeat the active tab, search, department,
-                  risk, and sentiment filters and page through the matching
-                  database population until complete.
+                  risk, sentiment, and administrator employment-status filters
+                  and page through the matching database population until
+                  complete.
                 </li>
                 <li>
                   If a warning appears, use{" "}
@@ -2650,23 +2654,21 @@ export const UserManualModal = ({
                 Center (Decision Workbench)
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                The **Intelligence Center** is the mathematical core of the
-                Aurelinx platform. While typical enterprise directories rely on
-                static lists, Aurelinx implements a dynamic decision workbench
-                powered by graph algorithms, global combinatorial search
-                solvers, and semi-parametric survival models to optimize
-                organizational structures.
+                The Intelligence Center computes results from tenant-scoped
+                employee skills, dated employee experience, collaboration
+                records, and employment outcomes. Each tab uses different
+                evidence and shows its own readiness and interpretation limits.
               </p>
               <div className="rounded-lg border border-amber-400/15 bg-amber-400/[0.04] p-3 text-[11px] leading-relaxed text-slate-300">
                 <strong className="text-amber-200">
                   Observed versus modeled:
                 </strong>{" "}
                 employee and network records come from the tenant data scope.
-                Adjacency paths, team optimization, survival curves, and Markov
-                career probabilities are modeled outputs. Team optimization
-                results include a model version, deterministic seed, tenant
-                scope, generated timestamp, and persisted scenario ID so a
-                result can be reproduced and audited.
+                Skill similarity, team selection, survival curves, network
+                measures, and role-transition probabilities are calculated
+                outputs. Check their input coverage and status. Offline demo
+                records and calculated values are synthetic and should not be
+                treated as facts about a real workforce.
               </div>
             </div>
 
@@ -2686,29 +2688,29 @@ export const UserManualModal = ({
                                          v
 +---------------------------------------------------------------------------------+
 |                            1. SEMANTIC ADJACENCY RESOLVER                       |
-|   * Dijkstra shortest path finder computes similarity weight distance matrix.   |
+|   * Skill graph paths estimate transfer similarity between named skills.      |
 |   * Resolves conceptual transfers: [Vue.js] --> [JS] --> [React]                |
 +---------------------------------------------------------------------------------+
                                          |
                                          v
 +---------------------------------------------------------------------------------+
 |                            2. COMBINATORIAL TEAM BUILDER                        |
-|   * Simulated Annealing starts global exploration at high temperature (T).      |
-|   * Roster perturbation swaps candidates to optimize overall capability cost.   |
-|   * Cools parameter T to converge on global budget/skill optima.               |
+|   * MILP maximizes skill coverage under the hard team-size and budget limits.   |
+|   * A second solve minimizes cost among maximum-coverage feasible teams.        |
+|   * Solver errors are returned when feasibility/optimality cannot be proven.   |
 +---------------------------------------------------------------------------------+
                                          |
                                          v
 +---------------------------------------------------------------------------------+
 |                            3. SURVIVAL SANDBOX FORECASTER                       |
-|   * Applies Cox Proportional Hazards Model to predict attrition probability.    |
-|   * Computes Hazard Ratios: HR = exp(B1*Morale + B2*Salary + B3*Workload).      |
+|   * Kaplan-Meier describes the uploaded cohort with censoring.                 |
+|   * It does not emit unvalidated individual attrition forecasts.               |
 +---------------------------------------------------------------------------------+
                                          |
                                          v
 +---------------------------------------------------------------------------------+
 |                               OUTPUT RESULTS STAGE                              |
-|   * Optimal Team Roster + Learning Paths + 12-Month Retention Probabilities      |
+|   * Data-backed calculations with coverage and interpretation limits            |
 +---------------------------------------------------------------------------------+`}
                 </div>
               </div>
@@ -2752,372 +2754,102 @@ export const UserManualModal = ({
                   <div className="flex items-center gap-2">
                     <Zap className="text-pink-400 h-4.5 w-4.5" />
                     <h4 className="text-xs font-black uppercase tracking-wider text-pink-300">
-                      2. Optimal Team Assembly (Simulated Annealing Math)
+                      2. Optimal Team Assembly (Constrained MILP)
                     </h4>
                   </div>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    **What is it**: An optimization model that solves the team
-                    configuration problem: picking a team of $K$ employees from
-                    a pool of $N$ candidates to satisfy a set of skill matrix
-                    demands while remaining under a budget cap (CFO Limit) and
-                    minimizing cost.
+                    The solver chooses the requested number of employees while
+                    respecting a hard budget cap. It first maximizes skill
+                    coverage under the configured skill graph, then minimizes
+                    compensation among teams with that maximum coverage. This is
+                    an exact mixed-integer optimization for the submitted data
+                    and objective; it does not prove that the skill definitions
+                    or salaries represent real business value.
                   </p>
-                  <p className="text-xs text-slate-300 leading-relaxed font-semibold text-pink-200">
-                    Why we need it: The Combinatorial Explosion
-                  </p>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Assembling a team is an NP-Hard combinatorial optimization
-                    problem. Selecting a team of $K = 5$ members from an
-                    organization of $N = 100$ employees yields $\binom{100}
-                    {5} = 75,287,520$ possible combinations. Brute-force
-                    calculation would halt the server, whereas Simulated
-                    Annealing maps the search space and converges on the global
-                    optimum in milliseconds.
-                  </p>
-
                   <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
                     <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
-                      Core Mathematical Formulation
+                      Required inputs and outputs
                     </strong>
-                    <p className="leading-relaxed">
-                      At each step, the model calculates the team&apos;s{" "}
-                      <strong>Energy ($E$)</strong>, which we seek to maximize:
-                    </p>
-                    <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
-                      E = (Coverage Percentage &times; 10.0) - Cost Penalty
-                    </div>
                     <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
                       <li>
-                        <strong>Coverage Percentage:</strong> Evaluates skills
-                        in the merged roster. For each target skill $T_j$ at
-                        target level $L_j$, the solver checks team members&apos;
-                        skills using Dijkstra graph distances: <br />
-                        <code className="text-cyan-300">
-                          effective_level = candidate_level &times; (1 / (1 +
-                          dijkstra_distance))
-                        </code>{" "}
-                        <br />
-                        The achievement ratio for that skill is bounded at 1.0:{" "}
-                        <code className="text-cyan-300">
-                          min(1.0, effective_level / L_j)
-                        </code>
-                        .
+                        Choose target skills, minimum levels, team size, and
+                        budget.
                       </li>
                       <li>
-                        <strong>CFO Budget Cap Constraint:</strong> Salaries are
-                        read from the <strong>recorded compensation</strong> on
-                        each employee profile (
-                        <code className="text-cyan-300">
-                          EmployeeTable.salary
-                        </code>
-                        ), so the budget math reflects your real pay data. Only
-                        when a profile has no salary record does the solver fall
-                        back to a deterministic role-length estimate:{" "}
-                        <code className="text-cyan-300">
-                          cost = $80,000 + (length(role) &times; $1,500)
-                        </code>
-                        . Each roster member is labeled{" "}
-                        <code className="text-cyan-300">
-                          salary_source: employee_record | role_estimate
-                        </code>{" "}
-                        and the metrics report a{" "}
-                        <code className="text-cyan-300">
-                          salary_record_ratio
-                        </code>{" "}
-                        so you always know how much of the cost is real versus
-                        estimated. If total cost exceeds the Budget Cap, a
-                        severe penalty is applied: <br />
-                        <code className="text-rose-400">
-                          Cost Penalty = ((Total Cost - Budget Cap) / Budget
-                          Cap) &times; 5.0
-                        </code>
-                        .
+                        Only employees with positive recorded salary, currency,
+                        and pay period matching the selected budget units are
+                        eligible. Missing units are not filled with an estimated
+                        salary.
+                      </li>
+                      <li>
+                        The budget is a hard constraint. If no team fits, the
+                        API returns a validation error instead of an over-budget
+                        roster.
+                      </li>
+                      <li>
+                        The result shows coverage, roster costs, compensation
+                        units, solver status, and reproducibility details. The
+                        chart history is returned after solving; it is not live
+                        solver progress.
+                      </li>
+                      <li>
+                        Solver optimality applies to the supplied skills, graph
+                        weights, salary records, team size, and budget. Demo
+                        salaries and skill coverage are synthetic and do not
+                        make the result a real staffing recommendation.
                       </li>
                     </ul>
                   </div>
-
-                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
-                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-pink-300">
-                      The Metropolis-Hastings Acceptance Criterion
-                    </strong>
-                    <p className="leading-relaxed">
-                      At each iteration, the solver proposes a neighboring team
-                      by swapping a random roster member with a non-member. If
-                      the energy difference (Delta E = E_new - E_current) is
-                      greater than 0, the swap is{" "}
-                      <strong>always accepted</strong>. If the candidate team is
-                      worse (Delta E is less than 0), it is accepted
-                      probabilistically based on the current{" "}
-                      <strong>Temperature ($T$)</strong>:
-                    </p>
-                    <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
-                      P(Accept) = exp(&Delta;E / T)
-                    </div>
-                    <p className="leading-relaxed">
-                      *Why this works*: High temperature at the beginning (T_0 =
-                      10.0) allows the solver to accept worse teams, exploring
-                      the organization and escaping local suboptimal traps. As
-                      the temperature cools down by a factor of alpha = 0.85 (T
-                      = T &times; 0.85) toward T_min = 0.1, the solver
-                      stabilizes, narrowing down to lock in the absolute global
-                      optimum.
-                    </p>
-                  </div>
-
-                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
-                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-amber-300">
-                      Stochastic Convergence (Why results may vary)
-                    </strong>
-                    <p className="leading-relaxed">
-                      You may notice that running the solver multiple times for
-                      the same inputs yields different employee names.{" "}
-                      <strong>This is mathematically expected behavior:</strong>
-                    </p>
-                    <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
-                      <li>
-                        The search starts with a random initial team selection.
-                      </li>
-                      <li>
-                        Because Simulated Annealing is a stochastic
-                        (probabilistic) solver, the exploration path accepts
-                        temporary suboptimal states randomly.
-                      </li>
-                      <li>
-                        If your organization contains multiple employees with
-                        matching/similar skill sets (e.g. multiple engineers
-                        with Python or Docker), there exist{" "}
-                        <strong>
-                          multiple mathematically equivalent global optima
-                        </strong>
-                        . The solver will converge on different, but equally
-                        perfect, teams depending on its random seed trajectory.
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
-                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-emerald-300">
-                      Roster & Convergence Outputs
-                    </strong>
-                    <p className="leading-relaxed">
-                      When a run finishes, the workbench displays:
-                    </p>
-                    <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
-                      <li>
-                        <strong>Assembly Roster:</strong> The optimized team
-                        configuration showing the roles, recorded salary (or
-                        fallback estimate), and per-member{" "}
-                        <code>salary_source</code>.
-                      </li>
-                      <li>
-                        <strong>Total Skills Coverage:</strong> The coverage
-                        percentage and achievement pathways showing how the team
-                        covers the matrix demand (including bridge matches).
-                      </li>
-                      <li>
-                        <strong>Total Team Cost Calculation:</strong> Aggregated
-                        real salaries verified against the CFO Limit.
-                      </li>
-                      <li>
-                        <strong>Convergence Timeline:</strong> A dual-axis SVG
-                        dashboard with real tick values and gridlines. The top
-                        chart plots objective energy E(x) (teal), Best-so-far E*
-                        (emerald dashed), and Skill Coverage % (indigo, right
-                        axis) across every annealing step. The bottom chart
-                        plots Team Cost bars against the Budget Cap line (rose
-                        dashed) and the Temperature cooling curve (amber, right
-                        axis). X-axis labels show the actual solver step
-                        numbers; hovering shows the full per-step breakdown
-                        (temperature, energy, best-so-far, coverage, cost, and
-                        budget usage).
-                      </li>
-                    </ul>
-                  </div>
+                  <p className="text-amber-200 text-[11px] leading-relaxed">
+                    If the solver cannot prove feasibility and optimality, it
+                    returns an error rather than presenting an unproven team.
+                    Larger datasets or harder inputs can take longer; the
+                    objective is defined by the configured data and constraints.
+                  </p>
                 </div>
 
                 {/* Pillar 3 */}
-                <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-3 text-left">
+                <div className="p-4 bg-white/5 rounded-xl border border-amber-400/20 space-y-3 text-left">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="text-emerald-400 h-4.5 w-4.5" />
-                    <h4 className="text-xs font-black uppercase tracking-wider text-emerald-300">
-                      3. Attrition Sandbox Simulator (Cox Proportional Hazards
-                      Model)
+                    <TrendingUp className="text-amber-300 h-4.5 w-4.5" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-amber-200">
+                      3. Attrition Model Data Readiness
                     </h4>
                   </div>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    **What is it**: An interactive forecasting sandbox powered
-                    by the Cox Proportional Hazards regression model that
-                    calculates employee survival probability and flight risk
-                    over a 12-month timeline.
+                    The current survival endpoint describes a cohort when valid
+                    employment durations and departure/censor outcomes exist. It
+                    does not emit individual employee forecasts. Stored
+                    sentiment, retention scores, salary, and risk flags do not
+                    replace observed employment outcomes.
                   </p>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    **Why we need it**: Retaining key talent is a critical
-                    business objective. Instead of relying on static indicators
-                    or retroactive exit interviews, the engine uses
-                    semi-parametric survival models to estimate the probability
-                    of resignation based on organizational morale, compensation
-                    adjustment, tenure milestones, and skill fatigue.
-                  </p>
-
                   <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
                     <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
-                      Mathematical Foundations
+                      Required historical records
                     </strong>
-                    <p className="leading-relaxed">
-                      The engine is a Cox Proportional Hazards model with a
-                      piecewise-constant baseline hazard h_0(t) by tenure
-                      bucket, plus a log-linear covariate risk surface. Each
-                      employee&apos;s hazard rate is:
-                    </p>
-                    <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
-                      h(t) = h_0(t) &times; seniority &times; exp(dept) &times;
-                      exp(&sum; &beta;_i (X_i - X&#772;_i))
-                    </div>
                     <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
                       <li>
-                        <strong>h_0(t) (Baseline Hazard Function):</strong>{" "}
-                        Piecewise-constant monthly attrition risk by tenure
-                        bucket, calibrated to industry tenure-attrition
-                        benchmarks: probation (&lt;6 mo: 0.8%/mo), first
-                        role-fit wave (6–12 mo: 1.3%/mo), 12–18 month peak
-                        (1.7%/mo), post-peak fade (18–24 mo: 1.4%/mo),
-                        career-climber wave (24–36 mo: 1.1%/mo), then decay to a
-                        stable senior cohort (60+ mo: 0.5%/mo).
+                        Employment start date for each observed employment
+                        episode.
                       </li>
                       <li>
-                        <strong>
-                          Hazard Ratio (Simulated Attrition Multiplier):
-                        </strong>{" "}
-                        <code className="text-cyan-300">
-                          exp(&sum; &beta;_i (X_i - X&#772;_i))
-                        </code>{" "}
-                        — the multiplicative hazard of the employee&apos;s
-                        profile versus the population-average profile (HR =
-                        1.00). Covariates are centered on the population mean,
-                        so an average employee scores exactly x1.00. The ratio
-                        is clamped to [x0.20, x6.00] to keep extreme profiles
-                        from exploding.
+                        Departure date for employees who left, or a censor date
+                        for employees still active.
                       </li>
                       <li>
-                        <strong>Survival &amp; CI:</strong> S(t) =
-                        exp(-&sum;h(t)); the shaded band is a 95% model band
-                        around S(t) (log-cumulative-hazard standard error). The
-                        gray band and dashed line are the population P10–P90
-                        range and population median survival, both derived from
-                        the live workforce.
+                        An explicit indicator distinguishing a departure from an
+                        active, censored observation.
                       </li>
                       <li>
-                        <strong>Median Residual Tenure:</strong> The
-                        interpolated month where S(t) crosses 50% — the point at
-                        which the employee has a 50/50 chance of having left.
+                        Tenant ownership and source provenance for every record.
                       </li>
                     </ul>
-                  </div>
-
-                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
-                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-pink-300">
-                      Baseline Covariates (SHAP Explainability)
-                    </strong>
                     <p className="leading-relaxed">
-                      Nine covariates drive the log hazard ratio. Each
-                      one&apos;s SHAP-style contribution &beta;_i(X_i -
-                      X&#772;_i) is shown as a multiplicative factor in the
-                      waterfall; factors multiply exactly to the displayed
-                      hazard ratio. Green = protective, red = risky:
-                    </p>
-                    <ul className="list-disc pl-4 space-y-2 text-[11px] leading-relaxed">
-                      <li>
-                        <strong>Organizational Morale Index:</strong> sentiment
-                        score; coefficient &beta; = -1.5 per morale unit. Low
-                        morale raises hazard, high morale protects.
-                      </li>
-                      <li>
-                        <strong>Salary Compression:</strong> log of salary vs
-                        department median salary; &beta; = -1.0 per log unit.
-                        Paying 10% above median cuts hazard by ~10%; compression
-                        raises it.
-                      </li>
-                      <li>
-                        <strong>Historical Risk Trigger:</strong> the
-                        administrative `is_at_risk` flag; &beta; = +0.8.
-                      </li>
-                      <li>
-                        <strong>Skill Overload:</strong> every assigned skill
-                        beyond the healthy baseline of 4 adds &beta; = +0.06
-                        (burnout proxy).
-                      </li>
-                      <li>
-                        <strong>Proficiency Depth:</strong> average skill level
-                        (1–5) vs the 3.0 reference; &beta; = -0.25 per level.
-                      </li>
-                      <li>
-                        <strong>Role-Skill Alignment:</strong> semantic coverage
-                        of the role&apos;s required skill family by the
-                        employee&apos;s stack (0–1); &beta; = -1.2 per unit vs
-                        the 0.6 reference. Misaligned employees carry the
-                        highest preventable risk.
-                      </li>
-                      <li>
-                        <strong>Experience Maturity:</strong> years of
-                        experience beyond the 10-year inflection; &beta; = +0.08
-                        per year (senior talent is more poachable).
-                      </li>
-                      <li>
-                        <strong>Tenure Fragmentation:</strong> number of past
-                        employers beyond 3; &beta; = +0.12 per employer
-                        (job-hopping signal).
-                      </li>
-                      <li>
-                        <strong>Department Base Rate:</strong> calibrated offset
-                        (e.g. Sales +35%, Support +22%, Engineering -8%, Legal
-                        -20%).
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
-                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-amber-300">
-                      Flight Risk Mitigation Simulator & Sandbox
-                    </strong>
-                    <p className="leading-relaxed">
-                      This sandbox is a real what-if engine: every slider
-                      movement re-runs the full Cox model client-side (identical
-                      math to the server, same coefficients and population
-                      means) and live-updates the hazard ratio, survival curve,
-                      95% band, hazard function, SHAP waterfall, tier and
-                      percentile — nothing is precomputed or cosmetic:
-                    </p>
-                    <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
-                      <li>
-                        <strong>Morale Index Slider:</strong> Simulates
-                        structural interventions (team changes, workload relief)
-                        lifting morale; the morale covariate contribution is
-                        recomputed against the population mean.
-                      </li>
-                      <li>
-                        <strong>Salary Increase Slider:</strong> Simulates a
-                        raise (0–50%); the new salary is re-baselined against
-                        the department median and the salary-compression
-                        contribution is recomputed.
-                      </li>
-                      <li>
-                        <strong>Skill Load Slider:</strong> Simulates
-                        adding/removing assigned skills; the skill-overload
-                        contribution is recomputed.
-                      </li>
-                      <li>
-                        <strong>Net effect chips:</strong> show the exact Δ in
-                        12-month attrition probability, Δ hazard ratio, new
-                        median tenure and the simulated risk tier vs the
-                        employee&apos;s recorded baseline.
-                      </li>
-                    </ul>
-                    <p className="leading-relaxed mt-1">
-                      <strong>The Benefit:</strong> managers get live,
-                      mathematically-exact ROI of salary increases or task
-                      redistribution before allocating budgets — with the same
-                      engine that powers the registry, so the simulation and the
-                      reporting never disagree.
+                      The offline bundle includes synthetic dates and
+                      benchmark-linked outcomes so the cohort calculation can be
+                      demonstrated. The curve is descriptive; it is not an
+                      individually validated prediction. Check the reported
+                      eligible, excluded, departure, and censor counts.
                     </p>
                   </div>
                 </div>
@@ -3445,47 +3177,24 @@ export const UserManualModal = ({
 
                 <div className="p-4 bg-black/40 rounded-xl border border-white/5 space-y-2 text-left text-xs">
                   <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-indigo-300">
-                    Dynamic Collaboration Weight Ingestion (Jira Logs)
+                    Collaboration evidence and graph scope
                   </strong>
                   <p className="text-slate-300 leading-relaxed">
-                    Rather than relying on self-reported survey matrices, the
-                    collaboration links in the ONA graph are calculated by
-                    compiling actual, passive interaction events:
+                    ONA builds ties from dated collaboration-event records that
+                    link two distinct employees in the tenant. It does not
+                    create a relationship just because employees share a
+                    department or skills. Repeated events increase the recorded
+                    tie count; centrality and bridge values describe the
+                    resulting graph structure, not job performance or influence
+                    outside the observed events.
                   </p>
-                  <ul className="list-disc pl-4 space-y-1 text-slate-400 text-[11px]">
-                    <li>
-                      <strong className="text-slate-300">
-                        Shared Department adjacency:
-                      </strong>{" "}
-                      Injects a base connection weight of{" "}
-                      <code className="text-indigo-300">+0.4</code>.
-                    </li>
-                    <li>
-                      <strong className="text-slate-300">
-                        Skills Overlap adjacency:
-                      </strong>{" "}
-                      Injects <code className="text-indigo-300">+0.1</code> per
-                      overlapping skill (capped at{" "}
-                      <code className="text-indigo-300">+0.4</code>).
-                    </li>
-                    <li>
-                      <strong className="text-slate-300">
-                        Dynamic Jira Log Ingestion:
-                      </strong>{" "}
-                      Evaluates project logs. If two employee emails are found
-                      co-assigned or collaborating on the same Jira ticket, the
-                      edge weight increases by{" "}
-                      <code className="text-emerald-400">+0.3</code> per log
-                      (capped at <code className="text-emerald-400">+0.9</code>
-                      ).
-                    </li>
-                  </ul>
-                  <p className="text-slate-300 leading-relaxed">
-                    An interaction link is established between two employees if
-                    the total aggregate weight exceeds{" "}
-                    <code className="text-indigo-300">0.1</code>. This makes the
-                    force-directed graph a real representation of informal
-                    workflow channels.
+                  <p className="text-amber-200 leading-relaxed">
+                    Demo event links are simulated. Jira reporter-to-assignee
+                    links can be used as an issue-based proxy when both emails
+                    match employee records; Jira issue assignment does not prove
+                    direct communication. Review event source, date coverage,
+                    exclusions, and duplicate handling before interpreting a
+                    graph.
                   </p>
                 </div>
               </div>
@@ -3495,98 +3204,40 @@ export const UserManualModal = ({
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                 <TrendingUp className="text-cyan-400 h-4 w-4" /> Markov Career
-                Path & Transition Horizon
+                Path: Evidence and Interpretation
               </h3>
-
               <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4 text-left text-xs">
                 <p className="text-slate-300 leading-relaxed">
-                  <strong>What is it?</strong> The Markov Career Path is a
-                  predictive modeling framework that maps potential employee
-                  career progression as a probabilistic state transition
-                  network. Rather than viewing career paths as static, linear
-                  ladders, Aurelinx recognizes that employees move across
-                  departments and roles stochastically, modeled as a{" "}
-                  <strong>First-Order Markov Chain</strong>.
+                  Career Markov reads dated role records linked to employees in
+                  the current tenant. Candidate history is excluded. The service
+                  orders an employee&apos;s non-overlapping role records by
+                  effective date and counts transitions between consecutive,
+                  distinct roles.
                 </p>
-                <p className="text-slate-300 leading-relaxed">
-                  <strong>Why we need it:</strong> Traditional performance
-                  reviews and development plans are qualitative and subjective.
-                  By modeling career paths mathematically, managers can see
-                  where employees are structurally headed, identify potential
-                  retention risks, and design optimized development paths based
-                  on actual skills gaps.
-                </p>
-
-                <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300">
                   <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
-                    Mathematical Modeling & Chapman-Kolmogorov Theorem
+                    Observed transition calculation
                   </strong>
-                  <p className="leading-relaxed">
-                    The career transition network represents roles as states.
-                    The transition probability from state $i$ to state $j$ in a
-                    single epoch (1 year) is denoted as P_ij.
-                  </p>
-                  <p className="leading-relaxed">
-                    To personalize this progression, the base historical
-                    transition rate is adjusted by the employee&apos;s{" "}
-                    <strong>Skills Coverage Ratio</strong> for the target role:
-                  </p>
                   <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
-                    P&apos;_ij = P_ij &times; Skills_Coverage_Ratio(employee,
-                    role_j)
+                    P(role A → role B) = observed A-to-B changes ÷ all observed
+                    changes from A
                   </div>
-                  <p className="leading-relaxed">
-                    This is then normalized across all outgoing transitions from
-                    state $i$:
-                  </p>
-                  <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
-                    P&apos;&apos;_ij = P&apos;_ij / &sum;_k P&apos;_ik
-                  </div>
-                  <p className="leading-relaxed">
-                    To compute the transition probabilities over a{" "}
-                    <strong>3-year horizon</strong>, we apply the{" "}
-                    <strong>Chapman-Kolmogorov Equations</strong> by raising the
-                    transition probability matrix to the 3rd power:
-                  </p>
-                  <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
-                    P^(3) = P^3
-                  </div>
-                  <p className="leading-relaxed">
-                    The resulting values are the cumulative transition
-                    probabilities displayed in the visual career tracker.
+                  <p>
+                    Later steps multiply the observed transition matrix. Each
+                    step means the next recorded role change, not a fixed time
+                    period. The calculation does not adjust probabilities from
+                    skill coverage, predict promotion, or estimate when a move
+                    will happen. When history has no observed exits from the
+                    selected role, the result reports insufficient transitions.
                   </p>
                 </div>
-
-                <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
-                  <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-pink-300">
-                    Understanding Career Tracker Terminology
-                  </strong>
-                  <ul className="list-disc pl-4 space-y-2 text-[11px] leading-relaxed">
-                    <li>
-                      <strong>Active Career Tracker:</strong> The visualization
-                      workbench that loads an employee&apos;s profile and
-                      renders their career path transition graph showing nodes
-                      (roles) and connecting directional arrows.
-                    </li>
-                    <li>
-                      <strong>Transition Probability (% Prob.):</strong> The
-                      percentage displayed on each future role card represents
-                      the mathematical probability that the employee will occupy
-                      that role state at the end of the transition horizon (3
-                      years).
-                    </li>
-                    <li>
-                      <strong>Interactive Career Planning:</strong> If an
-                      employee&apos;s transition probability to a desired role
-                      (e.g., Lead Engineer) is low due to skill gaps, the
-                      workbench outlines the precise skills they must acquire.
-                      Once those skills are marked as acquired, the Skills
-                      Coverage Ratio increases, raising their transition
-                      probability and updating their career roadmap in
-                      real-time.
-                    </li>
-                  </ul>
-                </div>
+                <p className="text-amber-200 leading-relaxed">
+                  In the offline demo, role dates and sequences are generated
+                  synthetic data. The graph demonstrates how the calculation
+                  works; its transition rates do not describe a real employer
+                  and are not an individual career forecast. Review the data
+                  readiness counts and source records beside the result.
+                </p>
               </div>
             </div>
 
@@ -3653,15 +3304,12 @@ export const UserManualModal = ({
                       acting.
                     </p>
                     <p>
-                      The current optimization and Markov responses identify
-                      themselves as{" "}
-                      <code className="text-amber-300">
-                        synthetic_calibration_only
-                      </code>
-                      ; career transitions are not validated on observed career
-                      transitions. Never use a score as the sole basis for
-                      hiring, promotion, compensation, discipline, or
-                      termination.
+                      Team optimality applies to the mathematical objective and
+                      inputs, not to real-world job fit. Demo career transitions
+                      are generated and are not validated against an
+                      employer&apos;s actual history. Never use a demo score as
+                      the sole basis for hiring, promotion, compensation,
+                      discipline, or termination.
                     </p>
                   </div>
                 </div>
@@ -3721,15 +3369,15 @@ export const UserManualModal = ({
                       <li>
                         <strong>Team:</strong> add/remove required skills, set
                         budget and maximum roster size, run the solver, inspect
-                        annealing temperature/energy history, coverage, cost,
-                        salary-source ratio, and selected roster.
+                        solver status, coverage, salary units, cost, budget
+                        feasibility, and selected roster. The displayed chart is
+                        returned after solving, not live iteration progress.
                       </li>
                       <li>
-                        <strong>Attrition:</strong> search and sort the registry
-                        by hazard, name, tenure, or percentile; select a
-                        profile; adjust morale, salary increase, and
-                        assigned-skill load in the what-if sandbox; inspect
-                        survival, hazard, confidence band, and driver waterfall.
+                        <strong>Attrition:</strong> inspect the cohort survival
+                        curve, eligibility counts, departure count, and censor
+                        count. The endpoint does not return individual risk
+                        forecasts.
                       </li>
                       <li>
                         <strong>ONA:</strong> search, filter by department,
@@ -3738,10 +3386,10 @@ export const UserManualModal = ({
                         and graph metrics, then explain the observed topology.
                       </li>
                       <li>
-                        <strong>Career:</strong> select an employee, load the
-                        three-year horizon, inspect role possibilities and
-                        transition probabilities, then review each missing skill
-                        and its semantic difficulty.
+                        <strong>Career:</strong> select an employee, inspect the
+                        next observed role-change probabilities and history
+                        counts, then review whether the dated employee history
+                        supports those transitions.
                       </li>
                     </ul>
                   </div>
@@ -3756,9 +3404,10 @@ export const UserManualModal = ({
                         connectivity.
                       </li>
                       <li>
-                        Empty employee, skill, experience, or integration data
-                        produces an empty result or fallback fields. Fix the
-                        source data and re-run.
+                        Missing employee, skill, dated experience,
+                        collaboration, compensation, or outcome records produce
+                        an empty result or an unavailable/readiness status. Add
+                        valid source records and re-run.
                       </li>
                       <li>
                         Skill-match and team optimization require at least one
@@ -3766,13 +3415,9 @@ export const UserManualModal = ({
                         employees for the requested roster size.
                       </li>
                       <li>
-                        Missing salary is explicitly labeled as a role estimate.
-                        A recorded salary is preferred and the result exposes{" "}
-                        <code className="text-cyan-300">salary_source</code> and{" "}
-                        <code className="text-cyan-300">
-                          salary_record_ratio
-                        </code>
-                        .
+                        Team Assembly excludes employees without positive
+                        recorded compensation and matching currency and pay
+                        period. It does not invent role-based salaries.
                       </li>
                       <li>
                         Authentication, authorization, API, or network errors
@@ -3887,11 +3532,12 @@ export const UserManualModal = ({
                         Signal Discovery vs Human Triage
                       </strong>
                       <p className="text-slate-400 text-[11px] leading-relaxed">
-                        Aurelinx continually scans organizational metrics
-                        (morale, pay parity, workload) and flags risk signals.
-                        Rather than mutating employee records automatically,
-                        risk signals enter the <strong>Reviews Queue</strong> as
-                        planned review tickets (
+                        The Reviews Queue stores human-created review actions
+                        based on available profile fields and documented
+                        criteria. It does not continuously scan morale, pay
+                        parity, or workload or generate individual risk
+                        predictions. Review actions enter the queue as planned
+                        tickets (
                         <code className="text-cyan-300">status: planned</code>).
                         This gives HR Business Partners and managers full audit
                         control to investigate evidence before spending budget.
@@ -3923,16 +3569,15 @@ export const UserManualModal = ({
                   <div className="grid gap-3 md:grid-cols-3 text-xs text-slate-300">
                     <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-2">
                       <div className="text-[10px] font-bold text-rose-300 uppercase tracking-wider">
-                        A. Flight Risk Probability
+                        A. Attrition Model Readiness
                       </div>
                       <div className="text-xs font-mono text-slate-200 bg-slate-950 p-2 rounded-lg border border-white/5">
-                        HR = exp(β₁·Morale + β₂·PayGap + β₃·Workload)
+                        Observed employment duration + departure/censor status
                       </div>
                       <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Evaluates Cox Proportional Hazards survival regression.
-                        Combines sentiment drop, salary gap, and overtime hours
-                        to calculate exact flight risk probability percentage
-                        (e.g. <strong>78.4%</strong>).
+                        No employee probability is produced without observed
+                        departure and active-censoring outcomes and validation
+                        against held-out historical records.
                       </p>
                     </div>
 
@@ -4142,8 +3787,9 @@ export const UserManualModal = ({
                         Human-in-the-Loop Safeguards
                       </strong>
                       <p className="text-[11px] text-slate-400 leading-relaxed">
-                        AI flight risk signals serve strictly as decision
-                        support prompts. Aurelinx never alters employee
+                        Imported employee flags and descriptive analysis serve
+                        as evidence for human review; they are not individual
+                        flight-risk forecasts. Aurelinx does not alter employee
                         contracts, salaries, or roles automatically.
                         Administrative authorization is required for high-impact
                         actions.
@@ -4161,12 +3807,13 @@ export const UserManualModal = ({
                     </div>
                     <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-1">
                       <strong className="text-white block text-sm">
-                        Automated Signal Recalibration
+                        Source Data Refresh
                       </strong>
                       <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Risk probabilities and morale scores automatically
-                        update when new verified HRIS compensation data or
-                        communication sentiment snapshots are ingested.
+                        A sync updates mapped source fields only. It does not
+                        recalibrate an attrition model or infer sentiment from
+                        messages. Review provider sync results and rerun the
+                        analysis that uses the refreshed fields.
                       </p>
                     </div>
                   </div>
@@ -4262,11 +3909,11 @@ export const UserManualModal = ({
                       Signal Discovery vs Human Triage
                     </strong>
                     <p className="text-slate-400 text-[11px] leading-relaxed">
-                      Aurelinx continually scans organizational metrics (morale,
-                      pay parity, workload) and flags risk signals. Rather than
-                      mutating employee records automatically, risk signals
-                      enter the <strong>Reviews Queue</strong> as planned review
-                      tickets (
+                      The Reviews Queue stores human-created review actions
+                      based on available profile fields and documented criteria.
+                      It does not continuously scan morale, pay parity, or
+                      workload or generate individual risk predictions. Review
+                      actions enter the queue as planned tickets (
                       <code className="text-cyan-300">status: planned</code>).
                       This gives HR Business Partners and managers full audit
                       control to investigate evidence before spending budget.
@@ -4298,16 +3945,15 @@ export const UserManualModal = ({
                 <div className="grid gap-3 md:grid-cols-3 text-xs text-slate-300">
                   <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-2">
                     <div className="text-[10px] font-bold text-rose-300 uppercase tracking-wider">
-                      A. Flight Risk Probability
+                      A. Attrition Model Readiness
                     </div>
                     <div className="text-xs font-mono text-slate-200 bg-slate-950 p-2 rounded-lg border border-white/5">
-                      HR = exp(β₁·Morale + β₂·PayGap + β₃·Workload)
+                      Observed employment duration + departure/censor status
                     </div>
                     <p className="text-[11px] text-slate-400 leading-relaxed">
-                      Evaluates Cox Proportional Hazards survival regression.
-                      Combines sentiment drop, salary gap, and overtime hours to
-                      calculate exact flight risk probability percentage (e.g.{" "}
-                      <strong>78.4% Critical Risk</strong>).
+                      No employee probability is produced without observed
+                      departure and active-censoring outcomes and validation
+                      against held-out historical records.
                     </p>
                   </div>
 
@@ -4506,10 +4152,12 @@ export const UserManualModal = ({
                       Human-in-the-Loop Safeguards
                     </strong>
                     <p className="text-[11px] text-slate-400 leading-relaxed">
-                      AI flight risk signals serve strictly as decision support
-                      prompts. Aurelinx never alters employee contracts,
-                      salaries, or roles automatically. Administrative
-                      authorization is required for high-impact actions.
+                      Imported employee flags and descriptive analysis serve as
+                      evidence for human review; they are not individual
+                      flight-risk forecasts. Aurelinx does not alter employee
+                      contracts, salaries, or roles automatically.
+                      Administrative authorization is required for high-impact
+                      actions.
                     </p>
                   </div>
                   <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-1">
@@ -4524,12 +4172,13 @@ export const UserManualModal = ({
                   </div>
                   <div className="p-3 bg-slate-900/90 rounded-xl border border-white/10 space-y-1">
                     <strong className="text-white block text-sm">
-                      Automated Signal Recalibration
+                      Source Data Refresh
                     </strong>
                     <p className="text-[11px] text-slate-400 leading-relaxed">
-                      Risk probabilities and morale scores automatically update
-                      when new verified HRIS compensation data or communication
-                      sentiment snapshots are ingested.
+                      A sync updates mapped source fields only. It does not
+                      recalibrate an attrition model or infer sentiment from
+                      messages. Review provider sync results and rerun the
+                      analysis that uses the refreshed fields.
                     </p>
                   </div>
                 </div>
@@ -4710,32 +4359,39 @@ export const UserManualModal = ({
                 Data Ops &amp; Enterprise ➔ Risk &amp; Interventions Engine
               </div>
               <h2 className="text-2xl font-black text-white flex items-center gap-2">
-                <Brain className="text-rose-400 h-6 w-6" /> Explainable
-                Attrition Drivers Sub-Manual
+                <Brain className="text-rose-400 h-6 w-6" /> Attrition Evidence
+                and Readiness
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                SHAP feature attribution analysis identifying key drivers of
-                employee turnover.
+                The uploaded-data survival view estimates a cohort Kaplan-Meier
+                curve when employee durations, departure outcomes, and active
+                censoring records are usable. It does not calculate individual
+                employee forecasts or SHAP explanations.
               </p>
             </div>
             <div className="p-5 bg-slate-900/90 rounded-2xl border border-white/10 space-y-3 text-xs text-slate-300 shadow-xl">
-              <h3 className="font-bold text-white text-sm">
-                Top Risk Signal Categories:
-              </h3>
+              <h3 className="font-bold text-white text-sm">Required fields</h3>
               <ul className="list-disc pl-5 space-y-2 text-slate-400 leading-relaxed">
+                <li>Employment start date for each employee observation.</li>
                 <li>
-                  <strong>Overtime Stress &amp; Fatigue:</strong> Excess
-                  overtime hours above baseline.
+                  Departure date and departure flag for a known departure.
                 </li>
                 <li>
-                  <strong>Market Compensation Parity Disparity:</strong> Base
-                  salary &gt; 20% below market median.
+                  Observation/censor date and a false departure flag for an
+                  active employee.
                 </li>
                 <li>
-                  <strong>Sentiment &amp; Morale Drop:</strong> Significant drop
-                  in survey and communication NLP score.
+                  Positive duration and an explicit departure flag can be used
+                  when dates are unavailable.
                 </li>
               </ul>
+              <p>
+                The offline sample contains synthetic calendar dates and
+                benchmark-linked outcome labels. The report is a demonstration
+                of cohort survival calculations, not a forecast about a real
+                company or an employee. Review eligible, excluded, departure,
+                and censored counts in the result before interpretation.
+              </p>
             </div>
           </div>
         );
@@ -4769,15 +4425,14 @@ export const UserManualModal = ({
                   retrieve source records. Credentials are encrypted server-side
                   and never returned in connection responses. The pipeline
                   result reports bronze events, canonical upserts, and
-                  quarantined rows. HRIS records are also mirrored into the
-                  existing Directory/Dashboard read model by normalized email,
-                  so users see the same live workforce record across surfaces
-                  instead of a separate unorganized copy. Each profile exposes
-                  source provider, source type, last source update, external ID,
-                  validation status, and duplicate warnings. In production,
-                  recurring syncs and webhook retries are enqueued through
-                  Redis/RQ and run by the dedicated worker; the API process does
-                  not own the schedule.
+                  quarantined rows. HRIS employee records are also mirrored into
+                  the existing Directory/Dashboard read model by normalized
+                  email, and supported ATS candidate records are available to
+                  Talent Scout. Each profile exposes source provider, source
+                  type, last source update, external ID, validation status, and
+                  duplicate warnings. In production, recurring syncs and webhook
+                  retries are enqueued through Redis/RQ and run by the dedicated
+                  worker; the API process does not own the schedule.
                 </p>
               </div>
               <div className="rounded-lg border border-white/5 bg-white/5 p-3">
@@ -4814,6 +4469,111 @@ export const UserManualModal = ({
                   perfect.
                 </p>
               </div>
+            </div>
+            <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-4 text-xs text-slate-300 space-y-3">
+              <strong className="text-cyan-200 block text-sm">
+                Offline Intelligence Demo ZIP
+              </strong>
+              <p className="leading-relaxed">
+                To load the prepared demo, open Data Ops → Local Dataset Hub and
+                upload <code>aurelinx_offline_intelligence_bundle.zip</code>.
+                The ZIP contains eight CSV data files plus a README, provenance
+                file, and data quality report. The importer matches CSVs by
+                filename, imports parent employee/candidate records before their
+                skills and experience, and merges by stable identifiers. It
+                keeps existing records that are absent from the ZIP. The three
+                documentation files explain how the sample was built; they are
+                not imported tables.
+              </p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-lg border border-white/10 bg-black/25 p-3">
+                  <strong className="text-white block mb-1">
+                    Files and uses
+                  </strong>
+                  <ul className="list-disc pl-4 space-y-1 text-slate-300">
+                    <li>
+                      <code>employees_public.csv</code>: 1,470 employee
+                      profiles, synthetic indicators, annual EUR salary,
+                      employment dates, and outcome flags.
+                    </li>
+                    <li>
+                      <code>candidates_public.csv</code>: 14,999 candidate
+                      profiles, kept separate from employee retention and career
+                      history.
+                    </li>
+                    <li>
+                      <code>employee_skills_public.csv</code> and{" "}
+                      <code>candidate_skills_public.csv</code>: 16,025 employee
+                      and 164,111 candidate skill rows joined by email.
+                    </li>
+                    <li>
+                      <code>employee_experience_public.csv</code> and{" "}
+                      <code>candidate_experience_public.csv</code>: 2,422 dated
+                      employee and 14,999 candidate role rows; only employee
+                      roles feed Career Markov.
+                    </li>
+                    <li>
+                      <code>collaboration_events.csv</code>: dated
+                      employee-to-employee events used by ONA.
+                    </li>
+                    <li>
+                      <code>skill_aliases.csv</code>: reviewed name mappings;
+                      the demo file is header-only and adds no aliases.
+                    </li>
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/25 p-3">
+                  <strong className="text-white block mb-1">
+                    What the demo demonstrates
+                  </strong>
+                  <ul className="list-disc pl-4 space-y-1 text-slate-300">
+                    <li>
+                      Directory, Dashboard, Analytics, and Talent Scout read the
+                      imported employee and candidate profiles and their linked
+                      skill records.
+                    </li>
+                    <li>
+                      Career Markov counts dated employee role changes. A step
+                      means the next recorded role change, not a year or an
+                      individual promotion forecast.
+                    </li>
+                    <li>
+                      ONA computes graph measures from the included
+                      collaboration events; it does not infer ties from shared
+                      departments or skills.
+                    </li>
+                    <li>
+                      Retention displays a descriptive cohort survival curve
+                      from employment durations, departures, and censored active
+                      records. It does not predict individual attrition.
+                    </li>
+                    <li>
+                      Team Assembly uses compensation only when salary,
+                      currency, and pay period are present and consistent.
+                    </li>
+                    <li>
+                      Semantic matching checks uploaded names against the
+                      configured skill graph and approved aliases. The bundle
+                      report maps 25 of 170 distinct employee skill names; 145
+                      are unmapped and no aliases are supplied. Coverage can
+                      change with the app ontology.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <p className="text-amber-200 leading-relaxed">
+                <strong>Demo data warning:</strong> identities, role dates, role
+                sequences, collaboration events, compensation, sentiment, risk,
+                and retention indicators are synthetic or benchmark-linked demo
+                values. Salary is simulated annual EUR. The sample has 2,422
+                dated employee experience rows, 4,579 simulated collaboration
+                events, and 1,470 employee outcome labels. Of these, 1,426
+                positive-duration observations are eligible, including 221
+                departures and 1,205 censored observations; 44 zero-duration
+                rows are excluded. The survival report is descriptive only.
+                These values are for demonstrations and pipeline checks, not
+                company facts, market pay, or employment decisions.
+              </p>
             </div>
             <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-4 text-xs text-slate-300 leading-relaxed">
               <strong className="text-cyan-200">Operational sequence:</strong>{" "}
@@ -5000,11 +4760,13 @@ export const UserManualModal = ({
                 Registry
               </h2>
               <p className="text-slate-300 text-sm mt-2 leading-relaxed">
-                Configure inbound event delivery from external HRIS and
-                communication suites. The current connector surface receives
-                signed events; it does not log in to or pull data from vendor
-                APIs automatically. Secure delivery uses token headers and HMAC
-                payload signatures.
+                Data Ops supports provider API connections for configured
+                connectors and separate inbound webhooks. API connections pull
+                records when you run or schedule a sync; webhooks receive signed
+                events pushed by another system. A successful connection only
+                confirms access. Check the sync counts, mappings, quarantine,
+                and downstream records to confirm which data was actually
+                imported.
               </p>
             </div>
 
@@ -5022,8 +4784,9 @@ export const UserManualModal = ({
                     /api/v1/integrations/slack
                   </code>{" "}
                   <br />
-                  Ingests sentiment scores and message counts to dynamically
-                  adjust employee risk parameters.
+                  Accepts a precomputed sentiment score and message count for a
+                  matched employee. This endpoint does not analyze Slack text or
+                  automatically change the employee&apos;s risk flag.
                 </div>
                 <div className="p-2.5 bg-slate-950/40 rounded border border-white/5">
                   <strong className="text-white block mb-0.5">
@@ -5046,8 +4809,8 @@ export const UserManualModal = ({
                     /api/v1/integrations/jira
                   </code>{" "}
                   <br />
-                  Ingests ticket assignment collaborations to construct ONA
-                  coordinates.
+                  Records dated reporter-to-assignee events for ONA when both
+                  employees resolve inside the same tenant.
                 </div>
               </div>
             </div>
@@ -5202,16 +4965,19 @@ export const UserManualModal = ({
                 </strong>
                 <ul className="list-disc pl-4 space-y-1">
                   <li>
-                    <strong>Slack:</strong> accepts activity/sentiment signals
-                    such as employee email, sentiment score, and message count;
-                    successful processing updates the corresponding workforce
-                    signal.
+                    <strong>Slack:</strong> the API connector stores accessible
+                    message records as source evidence; it does not score
+                    message sentiment. The sentiment webhook accepts a score
+                    produced elsewhere, validates it from 0 to 1, and updates
+                    the stored score without changing the risk flag. Slack
+                    messages do not automatically create ONA edges.
                   </li>
                   <li>
-                    <strong>Jira:</strong> records project collaboration
-                    activity; successful logs can contribute to the Intelligence
-                    Center ONA network when employee emails are present in the
-                    event details.
+                    <strong>Jira:</strong> API sync can create a dated
+                    reporter-to-assignee collaboration event when both emails
+                    match employees in the tenant. Treat this as an issue-based
+                    proxy, not proof of direct communication. Jira may withhold
+                    email addresses depending on account permissions.
                   </li>
                   <li>
                     <strong>Workday:</strong> sends an{" "}
@@ -5220,8 +4986,11 @@ export const UserManualModal = ({
                     and skills;{" "}
                     <code className="text-cyan-300">action: hire</code> creates
                     a new record and other actions update an existing or newly
-                    initialized profile. Validate identifiers and mappings
-                    before using refreshed records in analytics.
+                    initialized profile. A live worker profile is not historical
+                    career data: Career Markov still needs dated employee role
+                    records. Lifecycle dates and compensation units must be
+                    returned by the configured source before retention or budget
+                    analyses can use them.
                   </li>
                 </ul>
               </div>

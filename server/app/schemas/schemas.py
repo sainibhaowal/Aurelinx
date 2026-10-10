@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,7 +18,7 @@ Ensures type safety and automatic documentation
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -42,7 +41,12 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+    refresh_token: str
     user_id: UUID
+
+
+class RefreshSessionRequest(BaseModel):
+    refresh_token: str = Field(..., min_length=32, max_length=256)
 
 
 class VerifyCodeRequest(BaseModel):
@@ -182,6 +186,9 @@ class ExperienceOut(BaseModel):
     position: str
     duration_years: float
     description: str
+    effective_start: datetime | None = None
+    effective_end: datetime | None = None
+    is_current: bool = False
     created_at: datetime
 
 
@@ -197,7 +204,15 @@ class EmployeeCreate(BaseModel):
     role: str = Field(..., min_length=1, max_length=100)
     sentiment_score: float | None = Field(default=0.5, ge=0.0, le=1.0)
     salary: int | None = None
+    salary_currency: str | None = Field(default=None, min_length=3, max_length=3)
+    salary_period: str | None = None
     join_date: datetime | None = None
+    employment_start_date: datetime | None = None
+    employment_end_date: datetime | None = None
+    employment_censor_date: datetime | None = None
+    employment_duration_years: float | None = Field(default=None, ge=0, le=80)
+    departure_event: bool | None = None
+    employment_status: Literal["active", "on_leave", "departed"] | None = None
     skills: list[SkillCreate] | None = []
     experiences: list[ExperienceCreate] | None = []
 
@@ -211,7 +226,15 @@ class EmployeeUpdate(BaseModel):
     sentiment_score: float | None = Field(None, ge=0.0, le=1.0)
     is_at_risk: bool | None = None
     salary: int | None = None
+    salary_currency: str | None = Field(default=None, min_length=3, max_length=3)
+    salary_period: str | None = None
     join_date: datetime | None = None
+    employment_start_date: datetime | None = None
+    employment_end_date: datetime | None = None
+    employment_censor_date: datetime | None = None
+    employment_duration_years: float | None = Field(default=None, ge=0, le=80)
+    departure_event: bool | None = None
+    employment_status: Literal["active", "on_leave", "departed"] | None = None
 
 
 class EmployeeOut(BaseModel):
@@ -226,7 +249,15 @@ class EmployeeOut(BaseModel):
     is_at_risk: bool
     retention_prob: float | None
     salary: int | None = None
+    salary_currency: str | None = None
+    salary_period: str | None = None
     join_date: datetime | None = None
+    employment_start_date: datetime | None = None
+    employment_end_date: datetime | None = None
+    employment_censor_date: datetime | None = None
+    employment_duration_years: float | None = None
+    departure_event: bool | None = None
+    employment_status: str | None = None
     skills: list[SkillOut] = []
     experiences: list[ExperienceOut] = []
     created_at: datetime
@@ -254,7 +285,15 @@ class EmployeeListOut(BaseModel):
     is_at_risk: bool
     retention_prob: float | None
     salary: int | None = None
+    salary_currency: str | None = None
+    salary_period: str | None = None
     join_date: datetime | None = None
+    employment_start_date: datetime | None = None
+    employment_end_date: datetime | None = None
+    employment_censor_date: datetime | None = None
+    employment_duration_years: float | None = None
+    departure_event: bool | None = None
+    employment_status: str | None = None
     created_at: datetime
     updated_at: datetime
     source_providers: list[str] = []
@@ -576,6 +615,12 @@ class AttritionExplainResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
     generated_at: datetime
     model_version: str
+    status: str = "insufficient_outcome_data"
+    message: str = (
+        "Observed employment departure and censoring outcomes are required "
+        "before individual attrition forecasts can be produced."
+    )
+    tenant_profile_count: int = 0
     items: list[AttritionExplainOut]
 
 
@@ -767,6 +812,11 @@ class RiskDriverDrilldownItem(BaseModel):
 class RiskDriverDrilldownResponse(BaseModel):
     factor: str
     generated_at: datetime
+    status: str = "insufficient_outcome_data"
+    message: str = (
+        "Validated attrition outcomes are unavailable; no employee risk "
+        "probabilities are returned."
+    )
     items: list[RiskDriverDrilldownItem]
 
 
@@ -852,9 +902,9 @@ class MLModelCardOut(BaseModel):
     model_name: str
     version: str
     status: str
-    pr_auc: float
-    calibration_error: float
-    fairness_gap: float
+    pr_auc: float | None
+    calibration_error: float | None
+    fairness_gap: float | None
     notes: str | None = None
     approved_by: str | None = None
     approved_at: datetime | None = None

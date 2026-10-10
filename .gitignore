@@ -154,6 +154,10 @@ desktop/src-tauri/target/
 desktop/node_modules/
 desktop/dist/
 
+# Local provider auth stores hold live secret keys — never commit these.
+server/opencode_auth.json
+**/opencode_auth.json
+
 # Versioned production runbook exception. Keep this after the broad Docs rule
 # above so Git's last matching rule does not hide the runbook.
 !Docs/

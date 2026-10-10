@@ -40,7 +40,9 @@ import {
   X,
 } from "lucide-react";
 import { UserManualButton } from "./UserManual";
-import { enterpriseAPI, leanAPI } from "../services/apiClient";
+import { enterpriseAPI, leanAPI, oauthAPI } from "../services/apiClient";
+import AgentActionsView from "./AgentActionsView";
+import PrivacyGovernanceView from "./PrivacyGovernanceView";
 
 const PROVIDER_SETUP = {
   jira: {
@@ -70,6 +72,61 @@ const PROVIDER_SETUP = {
     help: "Use the exact versioned workers URL and OAuth credentials from your Workday REST API Explorer.",
     basePlaceholder: "https://your-tenant.workday.com",
   },
+  greenhouse: {
+    label: "Greenhouse",
+    source_type: "ats",
+    auth_type: "api_key",
+    credentialLabel: "Harvest API key",
+    credentialKey: "api_key",
+    help: "Create a Greenhouse Harvest API key with only the scopes required for your approved ATS workflows.",
+    basePlaceholder: "https://harvest.greenhouse.io",
+  },
+  lever: {
+    label: "Lever",
+    source_type: "ats",
+    auth_type: "api_key",
+    credentialLabel: "Lever API key",
+    credentialKey: "api_key",
+    help: "Use a Lever API key scoped to the tenant and actions your organization has approved.",
+    basePlaceholder: "https://api.lever.co/v1",
+  },
+  bamboohr: {
+    label: "BambooHR",
+    source_type: "hris",
+    auth_type: "api_key",
+    credentialLabel: "BambooHR API key",
+    credentialKey: "api_key",
+    help: "Use a BambooHR API key and set the company subdomain in the connection base URL/options.",
+    basePlaceholder: "https://api.bamboohr.com/api/gateway.php/company",
+  },
+  hibob: {
+    label: "HiBob",
+    source_type: "hris",
+    auth_type: "api_key",
+    credentialLabel: "HiBob service token",
+    credentialKey: "service_user_token",
+    help: "Create a HiBob service user token with the minimum people and metadata scopes required.",
+    basePlaceholder: "https://api.hibob.com/v1",
+  },
+  successfactors: {
+    label: "SAP SuccessFactors",
+    source_type: "hris",
+    auth_type: "oauth2",
+    credentialLabel: "OAuth access token",
+    credentialKey: "access_token",
+    help: "Use the tenant OData base URL and OAuth credentials configured in SAP Identity Authentication.",
+    basePlaceholder: "https://api...successfactors.com",
+  },
+  teams: {
+    label: "Microsoft Teams",
+    source_type: "engagement",
+    auth_type: "oauth2",
+    credentialLabel: "Microsoft Graph access token",
+    credentialKey: "access_token",
+    help: "Grant only the Microsoft Graph permissions required for approved manager notifications.",
+    basePlaceholder:
+      "Microsoft Graph uses its secure API endpoint automatically",
+  },
 };
 
 const EnterpriseOpsView = () => {
@@ -79,13 +136,13 @@ const EnterpriseOpsView = () => {
 
   // Data States
   const [connections, setConnections] = useState([]);
+  const [providerPresets, setProviderPresets] = useState({});
   const [interventions, setInterventions] = useState([]);
   const [attrition, setAttrition] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [models, setModels] = useState([]);
   const [drifts, setDrifts] = useState([]);
   const [quarantine, setQuarantine] = useState([]);
-  const [modelTop, setModelTop] = useState([]);
   const [scenarioResult, setScenarioResult] = useState(null);
   const [, setScenarios] = useState([]);
   const [policies, setPolicies] = useState([]);
@@ -261,6 +318,8 @@ const EnterpriseOpsView = () => {
     base_url: "",
     account_email: "",
     api_token: "",
+    api_key: "",
+    service_user_token: "",
     bot_token: "",
     client_id: "",
     client_secret: "",
@@ -289,6 +348,8 @@ const EnterpriseOpsView = () => {
     candidate_skills: null,
     employee_experience: null,
     candidate_experience: null,
+    collaboration_events: null,
+    skill_aliases: null,
     bundle: null,
   });
 
@@ -484,6 +545,13 @@ const EnterpriseOpsView = () => {
     };
   }, []);
 
+  useEffect(() => {
+    enterpriseAPI
+      .listProviderPresets()
+      .then((result) => setProviderPresets(result?.providers || {}))
+      .catch(() => setProviderPresets({}));
+  }, []);
+
   const createConnection = async () => {
     const provider = connForm.provider.trim().toLowerCase();
     const setup = PROVIDER_SETUP[provider];
@@ -511,6 +579,15 @@ const EnterpriseOpsView = () => {
       return;
     }
     if (
+      ["greenhouse", "lever", "bamboohr", "hibob"].includes(provider) &&
+      !String(connForm.api_key || connForm.service_user_token || "").trim()
+    ) {
+      setConnectionFormError(
+        `${setup.label} requires its provider credential.`,
+      );
+      return;
+    }
+    if (
       provider === "workday" &&
       !connForm.access_token?.trim() &&
       (!connForm.client_id.trim() ||
@@ -527,6 +604,8 @@ const EnterpriseOpsView = () => {
       Object.entries({
         email: connForm.account_email,
         api_token: connForm.api_token,
+        api_key: connForm.api_key,
+        service_user_token: connForm.service_user_token,
         bot_token: connForm.bot_token,
         access_token: connForm.access_token,
         client_id: connForm.client_id,
@@ -547,7 +626,7 @@ const EnterpriseOpsView = () => {
       options.discover_path = connForm.workday_workers_path.trim();
     }
     try {
-      await enterpriseAPI.createConnection({
+      const created = await enterpriseAPI.createConnection({
         name: connForm.name.trim(),
         source_type: connForm.source_type,
         provider: connForm.provider.trim().toLowerCase(),
@@ -557,6 +636,34 @@ const EnterpriseOpsView = () => {
         options,
         base_url: connForm.base_url?.trim() || null,
       });
+      setConnectionFeedback((prev) => ({
+        ...prev,
+        [created.id]: "Saved. Verifying connection…",
+      }));
+      try {
+        await enterpriseAPI.verifyConnection(created.id);
+        await enterpriseAPI.discoverConnection(created.id);
+        setConnectionFeedback((prev) => ({
+          ...prev,
+          [created.id]: `Verified and discovered. Importing relevant records…`,
+        }));
+        const sync = await enterpriseAPI.triggerConnectionSync(created.id);
+        const imported =
+          sync?.records_imported ??
+          sync?.records_synced ??
+          sync?.count ??
+          "available";
+        setConnectionFeedback((prev) => ({
+          ...prev,
+          [created.id]: `Verified, discovered, and synced (${imported} records).`,
+        }));
+      } catch (verificationError) {
+        setConnectionFeedback((prev) => ({
+          ...prev,
+          [created.id]: `Saved, but verification failed: ${verificationError?.message || "provider error"}`,
+        }));
+      }
+      await loadAll();
     } catch (error) {
       setConnectionFormError(
         error?.message || "Connection could not be saved.",
@@ -680,13 +787,6 @@ const EnterpriseOpsView = () => {
         [connectionId]: `Sync failed: ${error?.message || "pipeline error"}`,
       }));
     }
-  };
-
-  const trainAndScore = async () => {
-    await leanAPI.trainModel();
-    const scored = await leanAPI.scoreModel(20);
-    setModelTop(scored.top || []);
-    await loadAll();
   };
 
   const runScenario = async () => {
@@ -1301,7 +1401,18 @@ const EnterpriseOpsView = () => {
                               provider,
                               source_type: setup?.source_type || "hris",
                               auth_type: setup?.auth_type || "api_key",
-                              base_url: provider === "slack" ? "" : p.base_url,
+                              base_url:
+                                providerPresets[provider]?.base_url ||
+                                {
+                                  slack: "https://slack.com/api",
+                                  greenhouse: "https://harvest.greenhouse.io",
+                                  lever: "https://api.lever.co/v1",
+                                  teams: "https://graph.microsoft.com/v1.0",
+                                  hibob: "https://api.hibob.com/v1",
+                                }[provider] ||
+                                (provider === "slack" ? "" : p.base_url),
+                              api_key: "",
+                              service_user_token: "",
                             }));
                           }}
                         >
@@ -1309,6 +1420,14 @@ const EnterpriseOpsView = () => {
                           <option value="jira">Jira</option>
                           <option value="slack">Slack</option>
                           <option value="workday">Workday</option>
+                          <option value="greenhouse">Greenhouse</option>
+                          <option value="lever">Lever</option>
+                          <option value="bamboohr">BambooHR</option>
+                          <option value="hibob">HiBob</option>
+                          <option value="successfactors">
+                            SAP SuccessFactors
+                          </option>
+                          <option value="teams">Microsoft Teams</option>
                         </PremiumSelect>
                         {connectionProvider && (
                           <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
@@ -1451,6 +1570,64 @@ const EnterpriseOpsView = () => {
                               }
                             />
                           </div>
+                        </div>
+                      )}
+                      {["successfactors", "teams"].includes(
+                        connectionProvider,
+                      ) && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                            {
+                              PROVIDER_SETUP[connectionProvider]
+                                ?.credentialLabel
+                            }
+                          </label>
+                          <input
+                            type="password"
+                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                            placeholder="OAuth access token: encrypted on the server"
+                            value={connForm.access_token}
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                access_token: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      )}
+                      {["greenhouse", "lever", "bamboohr", "hibob"].includes(
+                        connectionProvider,
+                      ) && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                            {
+                              PROVIDER_SETUP[connectionProvider]
+                                ?.credentialLabel
+                            }
+                          </label>
+                          <input
+                            type="password"
+                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                            placeholder="Stored encrypted on the server"
+                            value={
+                              connForm.api_key || connForm.service_user_token
+                            }
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                api_key: [
+                                  "greenhouse",
+                                  "lever",
+                                  "bamboohr",
+                                ].includes(p.provider)
+                                  ? e.target.value
+                                  : "",
+                                service_user_token:
+                                  p.provider === "hibob" ? e.target.value : "",
+                              }))
+                            }
+                          />
                         </div>
                       )}
                       {connectionProvider === "workday" && (
@@ -1630,6 +1807,32 @@ const EnterpriseOpsView = () => {
                               className="mt-3.5 pt-3 border-t border-white/5 flex flex-wrap gap-2 justify-end"
                               onClick={(e) => e.stopPropagation()}
                             >
+                              {["successfactors", "teams", "workday"].includes(
+                                String(c.provider || "").toLowerCase(),
+                              ) && (
+                                <button
+                                  className="px-3 h-8 rounded-lg border border-cyan-400/20 hover:bg-cyan-500/10 text-[10px] font-bold uppercase tracking-wider text-cyan-300 inline-flex items-center gap-1.5 transition-all"
+                                  onClick={async () => {
+                                    try {
+                                      const result = await oauthAPI.start(
+                                        c.provider,
+                                        c.id,
+                                      );
+                                      if (result?.authorization_url)
+                                        window.location.assign(
+                                          result.authorization_url,
+                                        );
+                                    } catch (error) {
+                                      setConnectionFeedback((prev) => ({
+                                        ...prev,
+                                        [c.id]: `OAuth start failed: ${error?.message || "provider error"}`,
+                                      }));
+                                    }
+                                  }}
+                                >
+                                  Connect with OAuth
+                                </button>
+                              )}
                               <button
                                 className="px-3 h-8 rounded-lg border border-emerald-400/20 hover:bg-emerald-500/10 text-[10px] font-bold uppercase tracking-wider text-emerald-300 inline-flex items-center gap-1.5 transition-all"
                                 onClick={async () => {
@@ -2099,7 +2302,7 @@ const EnterpriseOpsView = () => {
                     )}
                   </div>
 
-                  {/* 6 Individual CSV Upload Cards */}
+                  {/* Individual CSV Upload Cards */}
                   <div className="space-y-4">
                     <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold border-b border-white/5 pb-2">
                       Upload Individual CSV Schemas
@@ -2132,6 +2335,16 @@ const EnterpriseOpsView = () => {
                           "candidate_experience",
                           "Candidate Experience CSV",
                           "candidate_experience_public.csv",
+                        ],
+                        [
+                          "collaboration_events",
+                          "Collaboration Events CSV",
+                          "collaboration_events.csv",
+                        ],
+                        [
+                          "skill_aliases",
+                          "Reviewed Skill Aliases CSV",
+                          "skill_aliases.csv",
                         ],
                       ].map(([key, label, filename]) => (
                         <div
@@ -2205,6 +2418,55 @@ const EnterpriseOpsView = () => {
                                     ?.duplicate_rows ?? 0}
                                 </div>
                               </div>
+                              {(validationResults[key].metrics?.dated_rows !==
+                                undefined ||
+                                validationResults[key].metrics
+                                  ?.with_salary_units !== undefined ||
+                                validationResults[key].metrics
+                                  ?.with_employment_outcome_fields !==
+                                  undefined) && (
+                                <div className="mt-1 border-t border-white/5 pt-1 text-slate-400">
+                                  {validationResults[key].metrics
+                                    ?.dated_rows !== undefined && (
+                                    <div>
+                                      Career dates:{" "}
+                                      {
+                                        validationResults[key].metrics
+                                          .dated_rows
+                                      }{" "}
+                                      dated ·{" "}
+                                      {
+                                        validationResults[key].metrics
+                                          .undated_rows
+                                      }{" "}
+                                      undated
+                                    </div>
+                                  )}
+                                  {validationResults[key].metrics
+                                    ?.with_salary_units !== undefined && (
+                                    <div>
+                                      Compensation units:{" "}
+                                      {
+                                        validationResults[key].metrics
+                                          .with_salary_units
+                                      }{" "}
+                                      rows with salary, currency, and pay period
+                                    </div>
+                                  )}
+                                  {validationResults[key].metrics
+                                    ?.with_employment_outcome_fields !==
+                                    undefined && (
+                                    <div>
+                                      Survival outcomes:{" "}
+                                      {
+                                        validationResults[key].metrics
+                                          .with_employment_outcome_fields
+                                      }{" "}
+                                      complete dated outcomes
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -2439,49 +2701,67 @@ const EnterpriseOpsView = () => {
                                 {m.version}
                               </span>
                             </span>
-                            {getStatusBadge(m.status)}
+                            {getStatusBadge(
+                              m.model_name === "attrition_v1"
+                                ? "unvalidated"
+                                : m.status,
+                            )}
                           </div>
-                          <div className="grid grid-cols-3 gap-2 bg-slate-950/40 p-2.5 rounded-xl font-mono text-[9px] text-slate-400 my-3 border border-white/5">
-                            <div>
-                              PR-AUC:{" "}
-                              <span className="text-cyan-400 font-extrabold block text-xs">
-                                {m.pr_auc}
-                              </span>
+                          {m.model_name === "attrition_v1" ? (
+                            <div className="my-3 rounded-xl border border-amber-400/15 bg-amber-400/[0.04] p-2.5 text-[10px] text-amber-200/80">
+                              Validation metrics unavailable
                             </div>
-                            <div>
-                              Cal Error:{" "}
-                              <span className="text-cyan-400 font-extrabold block text-xs">
-                                {m.calibration_error}
-                              </span>
+                          ) : (
+                            <div className="grid grid-cols-3 gap-2 bg-slate-950/40 p-2.5 rounded-xl font-mono text-[9px] text-slate-400 my-3 border border-white/5">
+                              <div>
+                                PR-AUC:{" "}
+                                <span className="text-cyan-400 font-extrabold block text-xs">
+                                  {m.pr_auc ?? "N/A"}
+                                </span>
+                              </div>
+                              <div>
+                                Cal Error:{" "}
+                                <span className="text-cyan-400 font-extrabold block text-xs">
+                                  {m.calibration_error ?? "N/A"}
+                                </span>
+                              </div>
+                              <div>
+                                Fairness Gap:{" "}
+                                <span className="text-cyan-400 font-extrabold block text-xs">
+                                  {m.fairness_gap ?? "N/A"}
+                                </span>
+                              </div>
                             </div>
-                            <div>
-                              Fairness Gap:{" "}
-                              <span className="text-cyan-400 font-extrabold block text-xs">
-                                {m.fairness_gap}
-                              </span>
-                            </div>
+                          )}
+                        </div>
+                        {m.model_name === "attrition_v1" ? (
+                          <p className="mt-3 border-t border-white/5 pt-3 text-[10px] leading-4 text-amber-200/80">
+                            Historical heuristic metrics are hidden. This card
+                            cannot be approved or promoted without outcome-based
+                            validation.
+                          </p>
+                        ) : (
+                          <div className="flex gap-2 justify-end mt-4 pt-3 border-t border-white/5">
+                            <button
+                              onClick={() => approveModelCard(m.id)}
+                              className="px-3 h-8 rounded-lg bg-slate-950 border border-white/10 hover:border-cyan-400/30 text-[9px] text-slate-300 font-bold uppercase transition-all"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => promoteModelCard(m.id)}
+                              className="px-3 h-8 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-[9px] text-slate-950 font-extrabold uppercase transition-all shadow-md shadow-cyan-950/50"
+                            >
+                              Promote
+                            </button>
+                            <button
+                              onClick={() => rollbackModelCard(m.id)}
+                              className="px-3 h-8 rounded-lg bg-rose-500/15 border border-rose-500/30 hover:bg-rose-500/25 text-[9px] text-rose-400 font-bold uppercase transition-all"
+                            >
+                              Rollback
+                            </button>
                           </div>
-                        </div>
-                        <div className="flex gap-2 justify-end mt-4 pt-3 border-t border-white/5">
-                          <button
-                            onClick={() => approveModelCard(m.id)}
-                            className="px-3 h-8 rounded-lg bg-slate-950 border border-white/10 hover:border-cyan-400/30 text-[9px] text-slate-300 font-bold uppercase transition-all"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => promoteModelCard(m.id)}
-                            className="px-3 h-8 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-[9px] text-slate-950 font-extrabold uppercase transition-all shadow-md shadow-cyan-950/50"
-                          >
-                            Promote
-                          </button>
-                          <button
-                            onClick={() => rollbackModelCard(m.id)}
-                            className="px-3 h-8 rounded-lg bg-rose-500/15 border border-rose-500/30 hover:bg-rose-500/25 text-[9px] text-rose-400 font-bold uppercase transition-all"
-                          >
-                            Rollback
-                          </button>
-                        </div>
+                        )}
                       </div>
                     ))}
                     {!modelCards.length && (
@@ -2710,16 +2990,27 @@ const EnterpriseOpsView = () => {
                           Lean MLOps Deployment Center
                         </h2>
                         <span className="text-[10px] text-slate-400 font-mono block">
-                          Automated Model Training &amp; Prediction Pipeline
+                          Model registry · outcome-based attrition validation
+                          required
                         </span>
                       </div>
                     </div>
                     <button
-                      onClick={trainAndScore}
-                      className="h-9 px-5 rounded-xl bg-cyan-400 text-slate-950 hover:bg-cyan-300 text-xs font-extrabold uppercase tracking-wider transition-all shadow-lg shadow-cyan-950/50 active:scale-95 inline-flex items-center gap-2"
+                      type="button"
+                      disabled
+                      title="Observed departure and censoring history is required before training or scoring."
+                      className="h-9 px-5 rounded-xl border border-amber-400/20 bg-amber-400/5 text-amber-200 text-xs font-extrabold uppercase tracking-wider inline-flex items-center gap-2 cursor-not-allowed"
                     >
-                      <Zap size={14} /> Train &amp; Score Engine
+                      <Zap size={14} /> Awaiting outcome data
                     </button>
+                  </div>
+
+                  <div className="mb-5 rounded-lg border border-amber-400/20 bg-amber-400/[0.04] p-3 text-xs leading-5 text-amber-100/80">
+                    Attrition model training and employee scoring are disabled
+                    until this tenant has observed departures, active censoring
+                    dates, and a model that passes held-out validation and
+                    calibration checks. Existing profile-heuristic records are
+                    marked unvalidated and cannot produce employee forecasts.
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2728,7 +3019,7 @@ const EnterpriseOpsView = () => {
                       <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1 flex items-center justify-between">
                         <span>Algorithmic Models ({models.length})</span>
                         <span className="font-mono text-cyan-400">
-                          Production Instances
+                          Validation status
                         </span>
                       </div>
                       <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
@@ -2746,14 +3037,27 @@ const EnterpriseOpsView = () => {
                             <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono bg-slate-950/40 p-2 rounded-lg border border-white/5">
                               <span>
                                 Status:{" "}
-                                <strong className="text-emerald-400 uppercase">
-                                  {m.status}
+                                <strong
+                                  className={
+                                    m.model_name === "attrition_v1" ||
+                                    m.status === "unvalidated"
+                                      ? "text-amber-300 uppercase"
+                                      : "text-emerald-400 uppercase"
+                                  }
+                                >
+                                  {m.model_name === "attrition_v1"
+                                    ? "unvalidated"
+                                    : m.status}
                                 </strong>
                               </span>
                               <span>
-                                Risk Rate:{" "}
+                                Validation:{" "}
                                 <strong className="text-slate-100">
-                                  {m.metrics?.risk_rate ?? 0}
+                                  {m.model_name === "attrition_v1" ||
+                                  m.validation_status ===
+                                    "insufficient_outcome_data"
+                                    ? "unavailable"
+                                    : m.validation_status || "not reported"}
                                 </strong>
                               </span>
                             </div>
@@ -2762,39 +3066,18 @@ const EnterpriseOpsView = () => {
                       </div>
                     </div>
 
-                    {/* Scored employees Top risk preview */}
+                    {/* Forecast output remains unavailable until validation. */}
                     <div className="space-y-3">
                       <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1 flex items-center justify-between">
-                        <span>High-Risk Scoring Output (Top Preview)</span>
-                        <span className="font-mono text-rose-400">
-                          Priority Review
+                        <span>Employee survival forecasts</span>
+                        <span className="font-mono text-amber-300">
+                          Not validated
                         </span>
                       </div>
-                      <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
-                        {modelTop.map((r) => (
-                          <div
-                            key={r.employee_id}
-                            className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3.5 text-xs flex justify-between items-center text-left hover:border-rose-500/40 transition-all"
-                          >
-                            <div>
-                              <span className="font-bold text-slate-100 text-xs">
-                                {r.full_name}
-                              </span>
-                              <span className="text-[10px] text-slate-500 block font-mono mt-0.5">
-                                ID: {r.employee_id}
-                              </span>
-                            </div>
-                            <span className="px-3 py-1 rounded-xl text-[10px] font-extrabold bg-rose-500/15 text-rose-300 border border-rose-500/30 font-mono">
-                              Risk: {(r.risk_probability * 100).toFixed(1)}%
-                            </span>
-                          </div>
-                        ))}
-                        {!modelTop.length && (
-                          <div className="text-center py-10 rounded-xl border border-white/5 border-dashed bg-white/[0.01] text-slate-500 text-xs">
-                            Run 'Train &amp; Score Engine' to generate real-time
-                            risk predictions.
-                          </div>
-                        )}
+                      <div className="min-h-48 rounded-xl border border-white/5 border-dashed bg-white/[0.01] p-5 text-xs leading-5 text-slate-400 flex items-center justify-center text-center">
+                        No employee-level probability is displayed. Import
+                        tenant-scoped employment start and end/censor dates,
+                        then validate the survival model on held-out outcomes.
                       </div>
                     </div>
                   </div>
@@ -2807,6 +3090,7 @@ const EnterpriseOpsView = () => {
         {/* TAB 3: WORKFLOWS & RISK */}
         {activeTab === "workflows" && (
           <div className="space-y-6">
+            <AgentActionsView />
             {/* INTERACTIVE WORKFLOW MODALS OVERLAY */}
             {activeModal && selectedReview && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
@@ -4107,6 +4391,11 @@ const EnterpriseOpsView = () => {
                   icon: Shield,
                   badge: drRunbooks.length,
                 },
+                {
+                  id: "privacy_controls",
+                  label: "Privacy Controls",
+                  icon: Lock,
+                },
               ].map((st) => {
                 const Icon = st.icon;
                 const isActive = compSubTab === st.id;
@@ -4805,6 +5094,8 @@ const EnterpriseOpsView = () => {
                 </section>
               </div>
             )}
+
+            {compSubTab === "privacy_controls" && <PrivacyGovernanceView />}
           </div>
         )}
 

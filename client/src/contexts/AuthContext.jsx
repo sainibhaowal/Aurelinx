@@ -36,6 +36,91 @@ function readCachedUser() {
   }
 }
 
+function readTokenUser(token) {
+  try {
+    const payload = token?.split(".")[1];
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const normalized = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const decoded = decodeURIComponent(
+      Array.from(
+        atob(normalized),
+        (char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`,
+      ).join(""),
+    );
+    const claims = JSON.parse(decoded);
+    if (!claims.sub || !claims.email) return null;
+    return {
+      id: claims.sub,
+      email: claims.email,
+      full_name: claims.email,
+      is_admin: Boolean(claims.is_admin),
+      is_active: true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function readTokenExpiry(token) {
+  try {
+    const payload = token?.split(".")[1];
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const normalized = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const claims = JSON.parse(atob(normalized));
+    return Number.isFinite(claims.exp) ? claims.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredAuthToken() {
+  if (typeof window === "undefined") return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fragment = new URLSearchParams(
+      window.location.hash.replace(/^#/, ""),
+    );
+    const oauthParams = fragment.has("oauth_token") ? fragment : params;
+    const oauthToken = oauthParams.get("oauth_token");
+    const oauthRefresh = oauthParams.get("oauth_refresh");
+    if (oauthToken) {
+      localStorage.setItem("auth_token", oauthToken);
+      if (oauthRefresh)
+        localStorage.setItem("auth_refresh_token", oauthRefresh);
+      const email = oauthParams.get("oauth_email");
+      const fullName = oauthParams.get("oauth_name");
+      if (email) {
+        localStorage.setItem(
+          AUTH_USER_CACHE_KEY,
+          JSON.stringify({
+            email,
+            full_name: fullName || email,
+            is_active: true,
+          }),
+        );
+      }
+      ["oauth_token", "oauth_refresh", "oauth_email", "oauth_name"].forEach(
+        (key) => {
+          params.delete(key);
+          fragment.delete(key);
+        },
+      );
+      const query = params.toString();
+      const hash = fragment.toString();
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${query ? `?${query}` : ""}${hash ? `#${hash}` : ""}`,
+      );
+    }
+    return localStorage.getItem("auth_token");
+  } catch {
+    return null;
+  }
+}
+
 const postToParent = (message) => {
   if (typeof window === "undefined" || window === window.parent) return;
   const allowedOrigins = [
@@ -57,7 +142,7 @@ export const AuthProvider = ({ children }) => {
     if (typeof window === "undefined") {
       return null;
     }
-    return localStorage.getItem("auth_token");
+    return readStoredAuthToken();
   });
 
   const isEmbeddedIframe =
@@ -80,8 +165,15 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       if (token) {
         const cachedUser = readCachedUser();
-        if (cachedUser) {
-          setUser(cachedUser);
+        const initialUser = cachedUser || readTokenUser(token);
+        if (initialUser) {
+          setUser(initialUser);
+          if (!cachedUser) {
+            localStorage.setItem(
+              AUTH_USER_CACHE_KEY,
+              JSON.stringify(initialUser),
+            );
+          }
         }
         try {
           const userData = await resolveWithTimeout(authAPI.getCurrentUser());
@@ -89,16 +181,9 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(userData));
           setError(null);
         } catch (err) {
-          // Clear expired/invalid session and force login
-          if (err?.status === 401 || err?.status === 403) {
-            localStorage.removeItem("auth_token");
-            localStorage.removeItem(AUTH_USER_CACHE_KEY);
-            setToken(null);
-            setUser(null);
-            if (isEmbeddedIframe) {
-              postToParent({ type: "AURELINX_CLEAR_CREDS" });
-            }
-          }
+          // Keep the saved session and cached user during outages or
+          // authorization failures. A terminal refresh failure emits
+          // auth:expired and clears credentials in one place.
           setError(err);
         }
       }
@@ -109,6 +194,63 @@ export const AuthProvider = ({ children }) => {
 
     checkAuth();
   }, [resolveWithTimeout, token]);
+
+  // Renew before the access token expires so active sessions do not wait for
+  // an API request to fail with 401. Temporary network/API failures retain the
+  // current local session and retry; only a terminal refresh rejection clears it.
+  useEffect(() => {
+    if (!token || typeof window === "undefined") return undefined;
+    const refreshToken = localStorage.getItem("auth_refresh_token");
+    if (!refreshToken) return undefined;
+
+    let timer = null;
+    let stopped = false;
+    const expiresAt = readTokenExpiry(token);
+
+    const schedule = (delayMs) => {
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(refresh, delayMs);
+    };
+
+    const refresh = async () => {
+      if (stopped) return;
+      try {
+        const response = await authAPI.refreshSession(refreshToken);
+        if (stopped || !response?.access_token) return;
+        localStorage.setItem("auth_token", response.access_token);
+        window.dispatchEvent(new Event("auth:refreshed"));
+      } catch (err) {
+        if (stopped) return;
+        if (err?.status === 401 || err?.status === 403) {
+          window.dispatchEvent(new Event("auth:expired"));
+          return;
+        }
+        schedule(30_000);
+      }
+    };
+
+    const refreshIfNearExpiry = () => {
+      const currentExpiry = readTokenExpiry(localStorage.getItem("auth_token"));
+      if (currentExpiry && currentExpiry - Date.now() > 120_000) return;
+      schedule(0);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshIfNearExpiry();
+    };
+
+    const initialDelay = expiresAt
+      ? Math.max(1_000, expiresAt - Date.now() - 60_000)
+      : 25 * 60_000;
+    schedule(initialDelay);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      stopped = true;
+      if (timer) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [token]);
 
   // Sync credentials from parent window if inside Tauri iframe
   useEffect(() => {
@@ -124,6 +266,9 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem("auth_token", data.token);
           setToken(data.token);
           hasToken = true;
+        }
+        if (data.refreshToken) {
+          localStorage.setItem("auth_refresh_token", data.refreshToken);
         }
         if (data.user) {
           const userStr =
@@ -160,6 +305,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const handleAuthExpired = () => {
       localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_refresh_token");
+      localStorage.removeItem(AUTH_USER_CACHE_KEY);
       setToken(null);
       setUser(null);
       setError(null);
@@ -169,9 +316,43 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
+    const handleAuthRefreshed = () => {
+      setToken(localStorage.getItem("auth_token"));
+      if (isEmbeddedIframe) {
+        postToParent({
+          type: "AURELINX_SAVE_CREDS",
+          token: localStorage.getItem("auth_token"),
+          refreshToken: localStorage.getItem("auth_refresh_token"),
+          user: readCachedUser(),
+        });
+      }
+    };
+
+    const handleStorage = (event) => {
+      if (event.key === AUTH_USER_CACHE_KEY && event.newValue) {
+        setUser(readCachedUser());
+      }
+      if (event.key === "auth_token") {
+        setToken(event.newValue);
+        if (!event.newValue) {
+          localStorage.removeItem("auth_refresh_token");
+          setUser(null);
+          localStorage.removeItem(AUTH_USER_CACHE_KEY);
+        } else {
+          setUser(readCachedUser());
+        }
+      }
+    };
+
     window.addEventListener("auth:expired", handleAuthExpired);
-    return () => window.removeEventListener("auth:expired", handleAuthExpired);
-  }, []);
+    window.addEventListener("auth:refreshed", handleAuthRefreshed);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("auth:expired", handleAuthExpired);
+      window.removeEventListener("auth:refreshed", handleAuthRefreshed);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [isEmbeddedIframe]);
 
   const login = useCallback(
     async (email, password) => {
@@ -183,6 +364,9 @@ export const AuthProvider = ({ children }) => {
 
         // Save token
         localStorage.setItem("auth_token", response.access_token);
+        if (response.refresh_token) {
+          localStorage.setItem("auth_refresh_token", response.refresh_token);
+        }
         setToken(response.access_token);
 
         // Get user data
@@ -195,6 +379,7 @@ export const AuthProvider = ({ children }) => {
           postToParent({
             type: "AURELINX_SAVE_CREDS",
             token: response.access_token,
+            refreshToken: response.refresh_token,
             user: userData,
             savedCreds: { email, password },
           });
@@ -278,6 +463,9 @@ export const AuthProvider = ({ children }) => {
       try {
         const response = await authAPI.verifyLogin(email, code);
         localStorage.setItem("auth_token", response.access_token);
+        if (response.refresh_token) {
+          localStorage.setItem("auth_refresh_token", response.refresh_token);
+        }
         setToken(response.access_token);
 
         const userData = await resolveWithTimeout(authAPI.getCurrentUser());
@@ -288,6 +476,7 @@ export const AuthProvider = ({ children }) => {
           postToParent({
             type: "AURELINX_SAVE_CREDS",
             token: response.access_token,
+            refreshToken: response.refresh_token,
             user: userData,
             savedCreds: savedPassword
               ? { email, password: savedPassword }
@@ -321,6 +510,9 @@ export const AuthProvider = ({ children }) => {
         }
 
         localStorage.setItem("auth_token", response.access_token);
+        if (response.refresh_token) {
+          localStorage.setItem("auth_refresh_token", response.refresh_token);
+        }
         setToken(response.access_token);
         const userData = await resolveWithTimeout(authAPI.getCurrentUser());
         setUser(userData);
@@ -330,6 +522,7 @@ export const AuthProvider = ({ children }) => {
           postToParent({
             type: "AURELINX_SAVE_CREDS",
             token: response.access_token,
+            refreshToken: response.refresh_token,
             user: userData,
           });
         }
@@ -348,7 +541,12 @@ export const AuthProvider = ({ children }) => {
   );
 
   const logout = useCallback(() => {
+    const refreshToken = localStorage.getItem("auth_refresh_token");
+    if (refreshToken) {
+      authAPI.logout(refreshToken).catch(() => {});
+    }
     localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_refresh_token");
     localStorage.removeItem(AUTH_USER_CACHE_KEY);
     setToken(null);
     setUser(null);
