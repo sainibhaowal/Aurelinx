@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.7](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.6...v0.2.7) (2026-10-12)
+
+
+### Bug Fixes
+
+* align landing page claims with implementation ([8ed93be](https://github.com/sainibhaowal/Aurelinx/commit/8ed93be798aee4826d3bb177cfbf19b2e4a2445f))
+* harden intelligence and data workflows ([d90229f](https://github.com/sainibhaowal/Aurelinx/commit/d90229f0d53a5581924931990114c625a1c6d6e0))
+* persist intelligence and workflow state ([2ecb274](https://github.com/sainibhaowal/Aurelinx/commit/2ecb274f46122787dbc409c108a5d4f415e7da8f))
+* preserve workspace analysis state ([afc71b0](https://github.com/sainibhaowal/Aurelinx/commit/afc71b0d94cc60e942de981a500f40189b40209d))
+
+### [0.1.1](https://github.com/sainibhaowal/Aurelinx/compare/v0.1.0...v0.1.1) (2026-09-07)
+
 ### [0.2.6](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.5...v0.2.6) (2026-09-10)
 
 

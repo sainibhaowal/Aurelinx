@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # App Settings
     APP_NAME: str = "Aurelinx"
-    VERSION: str = "0.2.6"
+    VERSION: str = "0.2.7"
     DEBUG: bool | str = False
     ENVIRONMENT: str = "development"
     API_V1_STR: str = "/api/v1"
