@@ -612,11 +612,20 @@ async def refresh_session(
         select(AuthSessionTable).where(AuthSessionTable.token_hash == token_hash)
     ).first()
     now = datetime.utcnow()
-    if (
-        not auth_session
-        or auth_session.revoked_at
-        or (auth_session.expires_at is not None and auth_session.expires_at <= now)
-    ):
+    if not auth_session:
+        logger.warning("Refresh rejected: no matching auth session")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired. Please sign in again.",
+        )
+    if auth_session.revoked_at:
+        logger.warning("Refresh rejected: auth session is revoked")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired. Please sign in again.",
+        )
+    if auth_session.expires_at is not None and auth_session.expires_at <= now:
+        logger.warning("Refresh rejected: auth session is expired")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Session expired. Please sign in again.",
@@ -624,6 +633,7 @@ async def refresh_session(
 
     user = session.get(UserTable, auth_session.user_id)
     if not user or not user.is_active:
+        logger.warning("Refresh rejected: auth-session user is missing or inactive")
         auth_session.revoked_at = now
         session.commit()
         raise HTTPException(

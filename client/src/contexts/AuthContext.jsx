@@ -36,6 +36,18 @@ function readCachedUser() {
   }
 }
 
+function storeLoginSession(accessToken, refreshToken) {
+  if (typeof window === "undefined") return;
+  if (accessToken) localStorage.setItem("auth_token", accessToken);
+  // A new login replaces the credential pair as a unit. Leaving an older
+  // refresh token behind when a response omits one causes repeated 401s.
+  if (refreshToken) {
+    localStorage.setItem("auth_refresh_token", refreshToken);
+  } else {
+    localStorage.removeItem("auth_refresh_token");
+  }
+}
+
 function readTokenUser(token) {
   try {
     const payload = token?.split(".")[1];
@@ -86,9 +98,7 @@ function readStoredAuthToken() {
     const oauthToken = oauthParams.get("oauth_token");
     const oauthRefresh = oauthParams.get("oauth_refresh");
     if (oauthToken) {
-      localStorage.setItem("auth_token", oauthToken);
-      if (oauthRefresh)
-        localStorage.setItem("auth_refresh_token", oauthRefresh);
+      storeLoginSession(oauthToken, oauthRefresh);
       const email = oauthParams.get("oauth_email");
       const fullName = oauthParams.get("oauth_name");
       if (email) {
@@ -263,12 +273,9 @@ export const AuthProvider = ({ children }) => {
       if (data.type === "AURELINX_SEND_CREDS") {
         let hasToken = false;
         if (data.token) {
-          localStorage.setItem("auth_token", data.token);
+          storeLoginSession(data.token, data.refreshToken);
           setToken(data.token);
           hasToken = true;
-        }
-        if (data.refreshToken) {
-          localStorage.setItem("auth_refresh_token", data.refreshToken);
         }
         if (data.user) {
           const userStr =
@@ -363,10 +370,7 @@ export const AuthProvider = ({ children }) => {
         const response = await authAPI.login(email, password);
 
         // Save token
-        localStorage.setItem("auth_token", response.access_token);
-        if (response.refresh_token) {
-          localStorage.setItem("auth_refresh_token", response.refresh_token);
-        }
+        storeLoginSession(response.access_token, response.refresh_token);
         setToken(response.access_token);
 
         // Get user data
@@ -462,10 +466,7 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       try {
         const response = await authAPI.verifyLogin(email, code);
-        localStorage.setItem("auth_token", response.access_token);
-        if (response.refresh_token) {
-          localStorage.setItem("auth_refresh_token", response.refresh_token);
-        }
+        storeLoginSession(response.access_token, response.refresh_token);
         setToken(response.access_token);
 
         const userData = await resolveWithTimeout(authAPI.getCurrentUser());
@@ -509,10 +510,7 @@ export const AuthProvider = ({ children }) => {
           return { success: true, status: "pending" };
         }
 
-        localStorage.setItem("auth_token", response.access_token);
-        if (response.refresh_token) {
-          localStorage.setItem("auth_refresh_token", response.refresh_token);
-        }
+        storeLoginSession(response.access_token, response.refresh_token);
         setToken(response.access_token);
         const userData = await resolveWithTimeout(authAPI.getCurrentUser());
         setUser(userData);
