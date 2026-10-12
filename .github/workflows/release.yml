@@ -13,11 +13,6 @@ on:
           - patch
           - minor
           - major
-      build_desktop:
-        description: 'Build desktop installers (slow; leave off for web/API releases)'
-        required: true
-        default: false
-        type: boolean
   push:
     tags:
       - 'v*'
@@ -215,9 +210,6 @@ jobs:
     name: Build & Attach Desktop Binaries
     runs-on: ${{ matrix.os }}
     needs: [build-and-publish]
-    # Rust/Tauri packaging is deliberately opt-in. Normal releases serve the
-    # web application and deploy containers without waiting for desktop builds.
-    if: github.event_name == 'workflow_dispatch' && inputs.build_desktop
     strategy:
       fail-fast: false
       matrix:
