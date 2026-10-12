@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.8](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.7...v0.2.8) (2026-10-12)
+
+
+### Features
+
+* complete end-to-end intelligence and reliability improvements ([8b62d29](https://github.com/sainibhaowal/Aurelinx/commit/8b62d29d33eedd953da4d898d4004c2f7da59c20))
+
 ### [0.2.7](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.6...v0.2.7) (2026-10-12)
 
 
