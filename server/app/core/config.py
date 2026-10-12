@@ -15,6 +15,7 @@
 import os
 
 from dotenv import load_dotenv
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
@@ -86,6 +87,12 @@ class Settings(BaseSettings):
 
     # Vector Search
     EMBEDDING_MODEL: str = "text-embedding-3-small"
+    # Skill embeddings are opt-in: enabling them sends skill labels (not
+    # employee/candidate profiles) to the configured embedding endpoint.
+    SEMANTIC_SKILL_EMBEDDINGS_ENABLED: bool = False
+    SEMANTIC_SKILL_EMBEDDING_API_BASE_URL: str = "https://api.openai.com/v1"
+    SEMANTIC_SKILL_EMBEDDING_API_KEY: SecretStr | None = None
+    SEMANTIC_SKILL_MIN_COSINE_SIMILARITY: float = Field(default=0.82, ge=0.0, le=1.0)
 
     # OAuth Settings
     GOOGLE_CLIENT_ID: str | None = None

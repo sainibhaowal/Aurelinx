@@ -2,7 +2,7 @@
 name = "aurelinx-backend"
 version = "0.2.7"
 description = "Aurelinx Autonomous Management Intelligence Platform Backend"
-authors = [{ name = "Ravinder Singh", email = "redacted@example.invalid" }]
+authors = [{ name = "Ravinder Singh" }]
 license = { text = "Apache-2.0" }
 readme = "README.md"
 requires-python = ">=3.11"

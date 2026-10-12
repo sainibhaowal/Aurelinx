@@ -5,6 +5,7 @@
 Pipeline: normalize -> known? -> authorize (role/tenant) -> validate args
 -> run with timeout -> verify mutations -> wrap envelope -> audit -> record step.
 """
+
 from .dispatch import audit_log, clear_audit_log, dispatch_many, dispatch_tool
 from .guards import (
     KNOWN_PREFIXES,

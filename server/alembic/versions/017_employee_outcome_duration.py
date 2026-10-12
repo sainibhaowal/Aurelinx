@@ -22,7 +22,9 @@ def upgrade() -> None:
             "employeetable",
             sa.Column("employment_duration_years", sa.Float(), nullable=True),
         )
-    indexes = {item["name"] for item in sa.inspect(op.get_bind()).get_indexes("employeetable")}
+    indexes = {
+        item["name"] for item in sa.inspect(op.get_bind()).get_indexes("employeetable")
+    }
     if "ix_employeetable_employment_duration_years" not in indexes:
         op.create_index(
             "ix_employeetable_employment_duration_years",
@@ -39,6 +41,9 @@ def downgrade() -> None:
             "ix_employeetable_employment_duration_years",
             table_name="employeetable",
         )
-    columns = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("employeetable")}
+    columns = {
+        column["name"]
+        for column in sa.inspect(op.get_bind()).get_columns("employeetable")
+    }
     if "employment_duration_years" in columns:
         op.drop_column("employeetable", "employment_duration_years")

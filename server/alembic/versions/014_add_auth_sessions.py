@@ -25,7 +25,9 @@ def upgrade() -> None:
             sa.Column("last_used_at", sa.DateTime(), nullable=False),
         )
         op.create_index("ix_auth_sessions_user_id", "auth_sessions", ["user_id"])
-        op.create_index("ix_auth_sessions_token_hash", "auth_sessions", ["token_hash"], unique=True)
+        op.create_index(
+            "ix_auth_sessions_token_hash", "auth_sessions", ["token_hash"], unique=True
+        )
         op.create_index("ix_auth_sessions_expires_at", "auth_sessions", ["expires_at"])
 
 

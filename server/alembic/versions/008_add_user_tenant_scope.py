@@ -11,7 +11,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("users", sa.Column("tenant_id", sa.String(128), nullable=False, server_default="default"))
+    op.add_column(
+        "users",
+        sa.Column(
+            "tenant_id", sa.String(128), nullable=False, server_default="default"
+        ),
+    )
     op.create_index("ix_users_tenant_id", "users", ["tenant_id"])
 
 

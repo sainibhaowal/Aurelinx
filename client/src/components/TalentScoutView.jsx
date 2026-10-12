@@ -34,6 +34,7 @@ import { UserManualButton } from "./UserManual";
 import { analysisAPI, candidatesAPI } from "../services/apiClient";
 import PremiumSelect from "./PremiumSelect";
 import { usePersistentState } from "../services/workspacePersistence";
+import { getExplanationProviderConfig } from "../services/explanationProviderConfig";
 
 const MarkdownRenderer = ({ children }) => (
   <ReactMarkdown
@@ -210,27 +211,8 @@ const TalentScoutView = () => {
   }, [loading, scoutRun?.startedAt]);
 
   const handleSearch = async () => {
-    let config = {};
-    try {
-      const configRaw = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
-      config = configRaw ? JSON.parse(configRaw) : {};
-    } catch {
-      config = {};
-    }
-
-    const activeProvider = (config.activeProvider || "lmstudio").toLowerCase();
-    const providerConfig = config[activeProvider] || {};
-    const activeKey = providerConfig.key || null;
-    const selectedModel =
-      providerConfig.selectedModel || config.lmstudio?.selectedModel || null;
-    const baseUrl =
-      providerConfig.endpoint ||
-      providerConfig.base_url ||
-      (activeProvider === "lmstudio"
-        ? "http://127.0.0.1:1234/v1"
-        : activeProvider === "opencode"
-          ? "https://opencode.ai/zen/v1"
-          : null);
+    const { provider, key, baseUrl, model } = getExplanationProviderConfig();
+    const activeProvider = (provider || "lmstudio").toLowerCase();
 
     setLoading(true);
     const startedAt = Date.now();
@@ -248,9 +230,9 @@ const TalentScoutView = () => {
       const data = await analysisAPI.analyzeTalent(
         `Analyze this hiring need: ${query}. Use the database to find the best conceptual matches. Provide a summary of WHY they fit.`,
         activeProvider,
-        activeKey,
+        key,
         baseUrl,
-        selectedModel,
+        model,
       );
       setScoutRun({
         startedAt,

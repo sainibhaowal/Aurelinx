@@ -1,6 +1,7 @@
 # Copyright 2026 Ravinder Singh
 # Licensed under the Apache License, Version 2.0 (the "License");
 """Guards: normalization, limits, arg validation, SQL guard, injection wrap."""
+
 from __future__ import annotations
 
 import difflib

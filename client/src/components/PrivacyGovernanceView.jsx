@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Lock, RefreshCw } from "lucide-react";
 import { privacyAPI } from "../services/apiClient";
 
-export default function PrivacyGovernanceView() {
+export default function PrivacyGovernanceView({ isAdmin = false }) {
   const [data, setData] = useState({
     consents: [],
     retention: [],
@@ -13,7 +13,7 @@ export default function PrivacyGovernanceView() {
   const [error, setError] = useState("");
   const [busyConsent, setBusyConsent] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -34,11 +34,11 @@ export default function PrivacyGovernanceView() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    load();
-  }, []);
+    if (isAdmin) load();
+  }, [isAdmin, load]);
 
   const withdraw = async (id) => {
     setBusyConsent(id);
@@ -52,6 +52,20 @@ export default function PrivacyGovernanceView() {
       setBusyConsent(null);
     }
   };
+
+  if (!isAdmin) {
+    return (
+      <section className="rounded-2xl border border-amber-400/20 bg-[#06101e]/80 p-5">
+        <h3 className="text-sm font-extrabold uppercase tracking-wider text-amber-200 flex items-center gap-2">
+          <Lock size={15} /> Administrator access required
+        </h3>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">
+          Privacy governance records contain tenant compliance data and are
+          available only to workspace administrators.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-2xl border border-cyan-500/20 bg-[#06101e]/80 p-5 space-y-5">

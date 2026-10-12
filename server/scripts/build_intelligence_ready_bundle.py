@@ -22,8 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_DIR = ROOT / "Docs/datasets/production_sample_20260725"
 IBM_SOURCE = ROOT / "Docs/datasets/raw/ibm_hr_attrition.csv"
-OUTPUT_DIR = ROOT / "Docs/datasets/production_sample_20260725_intelligence_bundle"
-ZIP_PATH = ROOT / "Docs/datasets/aurelinx_offline_intelligence_bundle.zip"
+OUTPUT_DIR = ROOT / "Docs/datasets/production_sample_20260725_career_demo"
+ZIP_PATH = ROOT / "Docs/datasets/aurelinx_offline_career_markov_demo.zip"
 AS_OF_DATE = date(2026, 10, 10)
 RNG_SEED = 20260725
 
@@ -86,6 +86,40 @@ ROLE_LADDERS = {
         "Field Services Specialist",
         "Compliance Lead",
     ],
+}
+# Plausible specialist/lead roles that create alternate routes between the
+# source ladder roles. They are generated only as synthetic demo history, never
+# added to the employee's current profile. This prevents the uploaded demo
+# transition matrix from being a single deterministic ladder.
+CAREER_BRIDGES = {
+    ("Sales", 0): "Strategic Sales Representative",
+    ("Sales", 1): "Enterprise Account Executive",
+    ("Sales", 2): "Key Account Manager",
+    ("Engineering & IT", 0): "Infrastructure Engineer",
+    ("Engineering & IT", 1): "Platform Engineer",
+    ("Engineering & IT", 2): "Cloud Architecture Lead",
+    ("Finance & Accounting", 0): "Financial Reporting Analyst",
+    ("Finance & Accounting", 1): "Senior Financial Analyst",
+    ("Finance & Accounting", 2): "Accounting Manager",
+    ("Human Resources", 0): "Talent Acquisition Partner",
+    ("Human Resources", 1): "HR Business Partner",
+    ("Human Resources", 2): "People Programs Lead",
+    ("Operations", 0): "Logistics Analyst",
+    ("Operations", 1): "Continuous Improvement Manager",
+    ("Operations", 2): "Regional Operations Lead",
+    ("Customer Support", 0): "Customer Experience Specialist",
+    ("Customer Support", 1): "Customer Success Partner",
+    ("Research & Development", 0): "Research Laboratory Associate",
+    ("Research & Development", 1): "Applied Research Scientist",
+    ("Research & Development", 2): "Principal Research Scientist",
+    ("Marketing", 0): "Campaign Specialist",
+    ("Marketing", 1): "Demand Generation Strategist",
+    ("Marketing", 2): "Marketing Strategy Manager",
+    ("Product Management", 0): "Product Operations Analyst",
+    ("Product Management", 1): "Product Owner",
+    ("Product Management", 2): "Product Strategy Lead",
+    ("Healthcare & Services", 0): "Clinical Services Specialist",
+    ("Healthcare & Services", 1): "Service Delivery Manager",
 }
 SALARY_BANDS_EUR = {
     "Sales": (38_000, 112_000),
@@ -171,6 +205,46 @@ def _salary_eur(employee: dict[str, str], tenure: float, seed: int) -> int:
     return int(round(base * variation * tenure_adjustment / 1000) * 1000)
 
 
+def _career_transition_quality(rows: list[dict[str, object]]) -> dict[str, int]:
+    histories: dict[str, list[dict[str, object]]] = {}
+    for row in rows:
+        email = str(row.get("email") or "").strip().casefold()
+        if email:
+            histories.setdefault(email, []).append(row)
+    transition_counts: dict[str, Counter[str]] = {}
+    for history in histories.values():
+        ordered = sorted(history, key=lambda row: str(row.get("effective_start") or ""))
+        for previous, following in zip(ordered[:-1], ordered[1:], strict=True):
+            source = str(previous.get("position") or "").strip()
+            target = str(following.get("position") or "").strip()
+            if source and target and source.casefold() != target.casefold():
+                transition_counts.setdefault(source, Counter())[target] += 1
+    return {
+        "employee_histories_with_multiple_roles": sum(
+            len(history) > 1 for history in histories.values()
+        ),
+        "observed_role_changes": sum(
+            sum(targets.values()) for targets in transition_counts.values()
+        ),
+        "distinct_role_states_in_transitions": len(
+            {
+                role
+                for source, targets in transition_counts.items()
+                for role in (source, *targets.keys())
+            }
+        ),
+        "distinct_transition_pairs": sum(
+            len(targets) for targets in transition_counts.values()
+        ),
+        "roles_with_multiple_observed_next_roles": sum(
+            len(targets) > 1 for targets in transition_counts.values()
+        ),
+        "roles_with_only_one_observed_next_role": sum(
+            len(targets) == 1 for targets in transition_counts.values()
+        ),
+    }
+
+
 def _career_rows(
     employees: list[dict[str, str]],
     experience_by_email: dict[str, dict[str, str]],
@@ -191,9 +265,23 @@ def _career_rows(
             ladder.index(employee["role"]) if employee["role"] in ladder else 0
         )
         move_count = min(current_index, 3, int(tenure // 3.5))
-        positions = ladder[current_index - move_count : current_index] + [
-            employee["role"]
-        ]
+        positions = ladder[current_index - move_count : current_index + 1]
+        # Add a generated specialist or lead assignment on roughly one third
+        # of eligible career moves. A stable per-person/per-stage seed keeps
+        # the bundle reproducible while providing observed variation in the
+        # demo transition matrix.
+        routed_positions = [positions[0]] if positions else [employee["role"]]
+        first_ladder_index = current_index - move_count
+        for offset, next_role in enumerate(positions[1:]):
+            source_index = first_ladder_index + offset
+            bridge = CAREER_BRIDGES.get((employee["department"], source_index))
+            if (
+                bridge is not None
+                and random.Random(RNG_SEED + index * 31 + source_index).random() < 0.35
+            ):
+                routed_positions.append(bridge)
+            routed_positions.append(next_role)
+        positions = routed_positions
         role_count = len(positions)
         total_days = max(0, (end - start).days)
         if role_count == 1:
@@ -573,6 +661,10 @@ def main() -> None:
             ),
             "career_transitions_supported": True,
             "sequences_are_synthetic": True,
+            "transition_quality": _career_transition_quality(
+                dated_employee_experiences
+            ),
+            "transition_interpretation": "Counts and proportions describe generated demo career sequences only; they are not observed Aurelinx or industry mobility rates.",
         },
         "collaboration": {
             "event_rows": len(collaboration_events),
@@ -614,6 +706,7 @@ def main() -> None:
                 "outcome_source": IBM_SOURCE.relative_to(ROOT).as_posix(),
                 "outcome_source_sha256": sha256(IBM_SOURCE),
                 "synthetic_identity_notice": "This bundle is synthetic demo data. The pseudonymous profiles originate from the public Aurelinx sample; IBM HR Attrition outcome labels are linked by the documented row relationship; all calendar dates, role sequences, collaboration events, and EUR salary values are simulated. No records describe real Aurelinx employees.",
+                "career_history_method": "Role paths are generated from department career ladders with deterministic optional specialist/lead assignments to create multiple observed transitions in the demo matrix. This is synthetic workflow data, not observed employee mobility.",
                 "as_of_date": AS_OF_DATE.isoformat(),
                 "generation_seed": RNG_SEED,
                 "prohibited_interpretations": [
@@ -637,6 +730,7 @@ def main() -> None:
         "This production-shaped sample is designed to exercise the Aurelinx employee, candidate, skills, career, ONA, survival, and team budget workflows.\n"
         "All records are synthetic/demo data. IBM public benchmark outcome labels are linked to pseudonymous sample employees by the source builder's documented row order.\n"
         "Calendar dates, role sequences, employee collaboration events, and annual EUR compensation are deterministically simulated so the workflows have complete, coherent input fields.\n"
+        "Career paths include deterministic alternate specialist/lead routes. Career Markov displays empirical counts from these generated paths; those probabilities demonstrate the product and are not observed workforce mobility rates.\n"
         "These generated dates, career moves, relationships, and salaries are not actual observations, market compensation, or validated individual forecasts. Use them for product demonstrations and pipeline checks, not employment decisions.\n"
         "Candidate records remain separate and do not receive employee attrition outcomes or collaboration events. Original source CSVs in production_sample_20260725 are never modified.\n"
         "Bundle import merges rows and preserves records absent from the ZIP. Review DATA_QUALITY_REPORT.json and PROVENANCE.json before use.\n",

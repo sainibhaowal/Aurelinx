@@ -24,7 +24,7 @@
     "fastapi",
     "vite"
   ],
-  "author": "Ravinder Singh <redacted@example.invalid> (https://github.com/sainibhaowal)",
+  "author": "Ravinder Singh (https://github.com/sainibhaowal)",
   "license": "Apache-2.0",
   "devDependencies": {
     "standard-version": "^9.5.0"

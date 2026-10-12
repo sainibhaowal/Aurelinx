@@ -39,11 +39,31 @@ def upgrade() -> None:
         sa.Column("raw_event_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-    for column in ("tenant_id", "employee_email", "provider", "source_type", "external_id", "evidence_type", "observed_at"):
-        op.create_index(f"ix_integration_evidence_{column}", "integration_evidence", [column])
+    for column in (
+        "tenant_id",
+        "employee_email",
+        "provider",
+        "source_type",
+        "external_id",
+        "evidence_type",
+        "observed_at",
+    ):
+        op.create_index(
+            f"ix_integration_evidence_{column}", "integration_evidence", [column]
+        )
 
 
 def downgrade() -> None:
-    for column in ("observed_at", "evidence_type", "external_id", "source_type", "provider", "employee_email", "tenant_id"):
-        op.drop_index(f"ix_integration_evidence_{column}", table_name="integration_evidence")
+    for column in (
+        "observed_at",
+        "evidence_type",
+        "external_id",
+        "source_type",
+        "provider",
+        "employee_email",
+        "tenant_id",
+    ):
+        op.drop_index(
+            f"ix_integration_evidence_{column}", table_name="integration_evidence"
+        )
     op.drop_table("integration_evidence")

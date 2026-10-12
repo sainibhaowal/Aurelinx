@@ -1,6 +1,7 @@
 # Copyright 2026 Ravinder Singh
 # Licensed under the Apache License, Version 2.0 (the "License");
 """Governed dispatch: authorize -> validate -> timeout -> envelope -> audit (B2-B7)."""
+
 from __future__ import annotations
 
 import asyncio

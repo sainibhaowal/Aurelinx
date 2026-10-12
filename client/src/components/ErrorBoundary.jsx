@@ -41,9 +41,61 @@ class ErrorBoundary extends React.Component {
       error,
       errorInfo,
     });
+
+    const staleChunkError =
+      error?.name === "ChunkLoadError" ||
+      /Loading chunk \d+ failed|ChunkLoadError/i.test(error?.message || "");
+    if (staleChunkError && typeof window !== "undefined") {
+      const chunkId = error?.message?.match(/Loading chunk (\d+) failed/)?.[1];
+      if (chunkId) {
+        try {
+          const recoveryKey = `aurelinx_chunk_recovery_${chunkId}`;
+          if (!window.sessionStorage.getItem(recoveryKey)) {
+            window.sessionStorage.setItem(recoveryKey, "1");
+            window.location.reload();
+          }
+        } catch {
+          // Keep the recovery button available if browser storage is disabled.
+        }
+      }
+    }
   }
 
   handleRetry = () => {
+    const staleChunkError =
+      this.state.error?.name === "ChunkLoadError" ||
+      /Loading chunk \d+ failed|ChunkLoadError/i.test(
+        this.state.error?.message || "",
+      );
+    if (staleChunkError && typeof window !== "undefined") {
+      const chunkId =
+        this.state.error?.message?.match(/Loading chunk (\d+) failed/)?.[1] ||
+        "unknown";
+      const recoveryKey = `aurelinx_chunk_recovery_${chunkId}`;
+      try {
+        if (!window.sessionStorage.getItem(recoveryKey)) {
+          window.sessionStorage.setItem(recoveryKey, "1");
+          window.location.reload();
+          return;
+        }
+      } catch {
+        window.location.reload();
+        return;
+      }
+    }
+
+    // A stale client chunk can still be mounted after a deployment or an
+    // interrupted Fast Refresh update. Remounting the same chunk repeats the
+    // ReferenceError, so reload the document only for this known stale-hook
+    // failure. Other errors keep the existing in-place retry behavior.
+    const staleSessionHookError =
+      this.state.error?.name === "ReferenceError" &&
+      /useSessionState is not defined/.test(this.state.error?.message || "");
+    if (staleSessionHookError && typeof window !== "undefined") {
+      window.location.reload();
+      return;
+    }
+
     const { retryCount } = this.state;
     if (retryCount < 3) {
       this.setState({
@@ -98,7 +150,19 @@ class ErrorBoundary extends React.Component {
               className="w-full px-4 py-2.5 rounded-xl bg-primary hover:bg-emerald-400 disabled:bg-white/10 disabled:text-white/40 text-[#04100b] font-extrabold uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 cursor-pointer"
             >
               <RefreshCw size={16} />
-              {retryCount >= 3 ? "Max retries reached" : "Try again"}
+              {retryCount >= 3
+                ? "Max retries reached"
+                : error?.name === "ChunkLoadError" ||
+                    /Loading chunk \d+ failed|ChunkLoadError/i.test(
+                      error?.message || "",
+                    )
+                  ? "Reload app"
+                  : error?.name === "ReferenceError" &&
+                      /useSessionState is not defined/.test(
+                        error?.message || "",
+                      )
+                    ? "Reload app"
+                    : "Try again"}
             </button>
 
             {retryCount > 0 && (

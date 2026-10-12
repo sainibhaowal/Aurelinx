@@ -1433,6 +1433,7 @@ const App = () => {
                         >
                           <EnterpriseOpsView
                             active={activeTab === "enterprise"}
+                            isAdmin={Boolean(user?.is_admin)}
                           />
                         </Suspense>
                       </div>

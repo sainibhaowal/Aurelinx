@@ -8,6 +8,14 @@ from datetime import datetime
 from typing import Any
 
 
+def _datetime_text(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return (
+        value.isoformat() if value.utcoffset() is not None else f"{value.isoformat()}Z"
+    )
+
+
 def build_ona_graph(
     employees: list[Any], events: list[dict[str, Any]], *, window_days: int
 ) -> dict[str, Any]:
@@ -17,6 +25,11 @@ def build_ona_graph(
     valid_records = 0
     excluded_records = 0
     latest_event: datetime | None = None
+    earliest_event: datetime | None = None
+    event_type_totals: dict[str, int] = {}
+    pair_event_types: dict[tuple[str, str], dict[str, int]] = {}
+    pair_first_seen: dict[tuple[str, str], datetime] = {}
+    pair_last_seen: dict[tuple[str, str], datetime] = {}
 
     for event in events:
         source = str(event.get("reporter_id") or "")
@@ -32,14 +45,57 @@ def build_ona_graph(
         adjacency[source][target] = adjacency[source].get(target, 0) + record_count
         adjacency[target][source] = adjacency[target].get(source, 0) + record_count
         valid_records += record_count
+        event_type = (
+            str(event.get("event_type") or "collaboration").strip() or "collaboration"
+        )
+        event_type_totals[event_type] = (
+            event_type_totals.get(event_type, 0) + record_count
+        )
+        pair_key: tuple[str, str] = (
+            (source, target) if source < target else (target, source)
+        )
+        types_for_pair = pair_event_types.setdefault(pair_key, {})
+        types_for_pair[event_type] = types_for_pair.get(event_type, 0) + record_count
         occurred_at = event.get("occurred_at")
-        if isinstance(occurred_at, datetime) and (
-            latest_event is None or occurred_at > latest_event
-        ):
-            latest_event = occurred_at
+        first_occurred_at = event.get("first_occurred_at") or occurred_at
+        last_occurred_at = event.get("last_occurred_at") or occurred_at
+        if isinstance(first_occurred_at, datetime):
+            earliest_event = (
+                min(earliest_event, first_occurred_at)
+                if earliest_event
+                else first_occurred_at
+            )
+            pair_first_seen[pair_key] = min(
+                pair_first_seen.get(pair_key, first_occurred_at), first_occurred_at
+            )
+        if isinstance(last_occurred_at, datetime):
+            latest_event = (
+                max(latest_event, last_occurred_at)
+                if latest_event
+                else last_occurred_at
+            )
+            pair_last_seen[pair_key] = max(
+                pair_last_seen.get(pair_key, last_occurred_at), last_occurred_at
+            )
 
     n = len(ids)
     degree = {node: len(adjacency[node]) for node in ids}
+    component_sizes: list[int] = []
+    visited: set[str] = set()
+    for root in ids:
+        if root in visited:
+            continue
+        visited.add(root)
+        pending = [root]
+        component_size = 0
+        while pending:
+            current = pending.pop()
+            component_size += 1
+            for neighbor in adjacency[current]:
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    pending.append(neighbor)
+        component_sizes.append(component_size)
     # PageRank over the undirected observed co-participation graph. Dangling
     # probability is redistributed uniformly; stop on convergence.
     pagerank = dict.fromkeys(ids, 1 / n if n else 0.0)
@@ -150,6 +206,30 @@ def build_ona_graph(
         "legal": "#3b82f6",
         "human resources": "#ec4899",
     }
+    extra_palette = (
+        "#f97316",
+        "#c084fc",
+        "#84cc16",
+        "#fb7185",
+        "#38bdf8",
+        "#facc15",
+        "#2dd4bf",
+        "#a3e635",
+        "#e879f9",
+        "#60a5fa",
+        "#fb923c",
+        "#4ade80",
+    )
+
+    def color_for_department(department: str) -> str:
+        normalized = department.casefold()
+        if normalized in palette:
+            return palette[normalized]
+        stable_hash = sum(
+            (index + 1) * ord(character) for index, character in enumerate(normalized)
+        )
+        return extra_palette[stable_hash % len(extra_palette)]
+
     nodes = []
     for node in ids:
         employee = employee_by_id[node]
@@ -159,9 +239,7 @@ def build_ona_graph(
                 "name": employee.full_name,
                 "department": departments[node],
                 "role": employee.role or "Team Member",
-                "department_color": palette.get(
-                    departments[node].casefold(), "#10b981"
-                ),
+                "department_color": color_for_department(departments[node]),
                 "degree": degree[node],
                 "pagerank": pagerank[node],
                 "pagerank_relative": (
@@ -193,6 +271,7 @@ def build_ona_graph(
         for target in ids[index + 1 :]:
             count = adjacency[source].get(target, 0)
             if count:
+                pair_key = (source, target) if source < target else (target, source)
                 links.append(
                     {
                         "source": source,
@@ -200,6 +279,23 @@ def build_ona_graph(
                         "record_count": count,
                         "weight": count / max_record_count if max_record_count else 0.0,
                         "channel": "uploaded_collaboration_event",
+                        "event_types": [
+                            {"type": event_type, "count": type_count}
+                            for event_type, type_count in sorted(
+                                pair_event_types.get(pair_key, {}).items(),
+                                key=lambda item: (-item[1], item[0].casefold()),
+                            )
+                        ],
+                        "first_occurred_at": (
+                            _datetime_text(pair_first_seen[pair_key])
+                            if pair_key in pair_first_seen
+                            else None
+                        ),
+                        "last_occurred_at": (
+                            _datetime_text(pair_last_seen[pair_key])
+                            if pair_key in pair_last_seen
+                            else None
+                        ),
                         "is_cross_dept": departments[source].casefold()
                         != departments[target].casefold(),
                     }
@@ -213,7 +309,12 @@ def build_ona_graph(
         "metrics": {
             "node_count": n,
             "link_count": len(links),
+            "isolated_node_count": sum(value == 0 for value in degree.values()),
+            "component_count": len(component_sizes),
+            "largest_component_size": max(component_sizes, default=0),
+            "average_degree": (2 * len(links) / n) if n else 0.0,
             "represented_record_count": valid_records,
+            "event_type_breakdown": dict(sorted(event_type_totals.items())),
             "excluded_record_count": excluded_records,
             "graph_density": len(links) / possible_edges if possible_edges else 0.0,
             "cross_dept_ratio": cross_dept_links / len(links) if links else 0.0,
@@ -238,9 +339,8 @@ def build_ona_graph(
             "clustering_definition": "fraction of possible neighbor-neighbor ties that are observed",
             "ei_index_definition": "(external department ties - internal department ties) / all observed ties; null when degree is zero",
             "window_days": window_days,
-            "latest_represented_record_at": (
-                f"{latest_event.isoformat()}Z" if latest_event else None
-            ),
+            "latest_represented_record_at": (_datetime_text(latest_event)),
+            "earliest_represented_record_at": (_datetime_text(earliest_event)),
             "time_basis": "collaboration_events.occurred_at (source event time)",
             "status": "available" if links else "insufficient_evidence",
         },

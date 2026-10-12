@@ -20,15 +20,12 @@ def test_privacy_routes_are_registered_and_require_authentication():
 
 
 def test_privacy_route_contract_is_complete():
-    routes = {(route.path, tuple(sorted(route.methods or []))) for route in app.routes}
-    assert ("/api/v1/actions/capabilities", ("GET",)) in routes
-    assert ("/api/v1/privacy/consents", ("GET",)) in routes
-    assert ("/api/v1/privacy/consents", ("POST",)) in routes
-    assert ("/api/v1/privacy/consents/{consent_id}/withdraw", ("POST",)) in routes
-    assert ("/api/v1/privacy/retention", ("GET",)) in routes
-    assert ("/api/v1/privacy/retention", ("POST",)) in routes
-    assert ("/api/v1/privacy/sensitive-fields", ("GET",)) in routes
-    assert ("/api/v1/privacy/sensitive-fields", ("POST",)) in routes
+    paths = app.openapi()["paths"]
+    assert "get" in paths["/api/v1/actions/capabilities"]
+    assert {"get", "post"} <= paths["/api/v1/privacy/consents"].keys()
+    assert "post" in paths["/api/v1/privacy/consents/{consent_id}/withdraw"]
+    assert {"get", "post"} <= paths["/api/v1/privacy/retention"].keys()
+    assert {"get", "post"} <= paths["/api/v1/privacy/sensitive-fields"].keys()
 
 
 def test_sensitive_policy_response_decodes_stored_roles():

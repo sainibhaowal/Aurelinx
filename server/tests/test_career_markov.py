@@ -76,6 +76,7 @@ def test_career_path_endpoint_uses_tenant_uploaded_employee_experience():
             datetime(2025, 1, 1),
             datetime(2025, 12, 31),
             False,
+            "Synthetic demo career record for Software Engineer; generated for workflow demonstration.",
         ),
         (
             "other@example.test",
@@ -83,6 +84,7 @@ def test_career_path_endpoint_uses_tenant_uploaded_employee_experience():
             datetime(2025, 1, 3),
             datetime(2025, 12, 31),
             False,
+            "Uploaded experience",
         ),
         (
             "selected@example.test",
@@ -90,6 +92,7 @@ def test_career_path_endpoint_uses_tenant_uploaded_employee_experience():
             datetime(2026, 1, 1),
             None,
             True,
+            "Synthetic demo career record for Senior Software Engineer; generated for workflow demonstration.",
         ),
         (
             "other@example.test",
@@ -97,6 +100,7 @@ def test_career_path_endpoint_uses_tenant_uploaded_employee_experience():
             datetime(2026, 1, 3),
             None,
             True,
+            "Uploaded experience",
         ),
     ]
 
@@ -136,6 +140,8 @@ def test_career_path_endpoint_uses_tenant_uploaded_employee_experience():
     assert result["model_status"] == "exploratory_observed_transitions"
     assert result["observed_transition_count"] == 2
     assert result["current_employee_observed_transitions"] == 1
+    assert result["career_history_provenance"] == "mixed_uploaded_and_synthetic_demo"
+    assert result["synthetic_demo_role_record_count"] == 2
     assert (
         result["career_progression_markov"][0]["possibilities"][0][
             "transition_probability"

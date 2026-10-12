@@ -54,6 +54,26 @@ const nextConfig = {
           },
         ],
       },
+      {
+        // Ensure a newly deployed app document doesn't keep an old webpack
+        // runtime that points at chunks from a previous build.
+        source: "/app/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-store, max-age=0, must-revalidate",
+          },
+        ],
+      },
+      {
+        source: "/",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-store, max-age=0, must-revalidate",
+          },
+        ],
+      },
     ];
   },
   async rewrites() {

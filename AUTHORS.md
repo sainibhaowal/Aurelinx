@@ -89,7 +89,7 @@ If you create a derivative work:
 
 ## Project Contact
 
-- **Lead Creator & Maintainer**: Ravinder Singh (redacted@example.invalid)
+- **Lead Creator & Maintainer**: Ravinder Singh
 - **GitHub**: https://github.com/sainibhaowal/Aurelinx
 - **Issues & Discussions**: https://github.com/sainibhaowal/Aurelinx/issues
 

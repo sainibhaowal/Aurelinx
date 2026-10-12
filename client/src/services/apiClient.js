@@ -29,7 +29,7 @@ const REQUEST_TIMEOUT = 15000;
 const LONG_REQUEST_TIMEOUT = 60000;
 
 // Max retries for failed requests
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 4;
 const RETRY_DELAY = 1000; // 1 second
 let refreshInFlight = null;
 const inFlightReadRequests = new Map();
@@ -313,29 +313,64 @@ async function consumeEventStream(response, handlers = {}, signal = null) {
 }
 
 async function streamRequest(url, handlers = {}, signal = null) {
-  const token = getStoredAuthToken();
+  let token = getStoredAuthToken();
   if (!token) {
     const err = new Error("Authentication required");
     err.status = 401;
     throw err;
   }
 
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      signal,
-    });
+  const tenantId =
+    typeof window !== "undefined" ? localStorage.getItem("tenant_id") : null;
+  let retryCount = 0;
+  let attemptedAuthRefresh = false;
 
-    return consumeEventStream(response, handlers, signal);
-  } catch (error) {
-    if (error?.name === "AbortError") {
-      return false;
+  while (!signal?.aborted) {
+    try {
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        Accept: "text/event-stream",
+        "Cache-Control": "no-cache",
+      };
+      if (tenantId) headers["X-Tenant-ID"] = tenantId;
+      const response = await fetch(url, {
+        method: "GET",
+        headers,
+        cache: "no-store",
+        signal,
+      });
+      if (!response.ok && [401, 403].includes(response.status)) {
+        await consumeEventStream(response, handlers, signal);
+      }
+      await consumeEventStream(response, handlers, signal);
+      if (signal?.aborted) return false;
+      throw new Error("The live data stream closed unexpectedly.");
+    } catch (error) {
+      if (error?.name === "AbortError" || signal?.aborted) return false;
+      if (error?.status === 401 && !attemptedAuthRefresh) {
+        attemptedAuthRefresh = true;
+        token = await refreshAccessToken();
+        continue;
+      }
+      if ([401, 403].includes(error?.status)) throw error;
+
+      const delayMs = Math.min(1000 * 2 ** retryCount, 15000);
+      retryCount += 1;
+      await new Promise((resolve) => {
+        let timer;
+        const finish = () => {
+          clearTimeout(timer);
+          signal?.removeEventListener("abort", finish);
+          resolve();
+        };
+        timer = setTimeout(finish, delayMs);
+        signal?.addEventListener("abort", finish, { once: true });
+        if (signal?.aborted) finish();
+      });
     }
-    throw error;
   }
+
+  return false;
 }
 
 /**
@@ -925,6 +960,7 @@ export const intelligenceAPI = {
     model = null,
     signal = null,
     authRetry = false,
+    onStatus = null,
   ) => {
     const token = getStoredAuthToken();
     if (!token) {
@@ -965,6 +1001,7 @@ export const intelligenceAPI = {
         model,
         signal,
         true,
+        onStatus,
       );
     }
     if (!response.ok) {
@@ -982,12 +1019,17 @@ export const intelligenceAPI = {
       throw error;
     }
 
-    return consumeEventStream(
+    let streamError = null;
+    const completed = await consumeEventStream(
       response,
       {
         chunk: (data) => onToken?.(data?.text || ""),
+        status: (data) => onStatus?.(data?.message || ""),
         error: (data) => {
-          throw new Error(
+          // Read through the server's terminal frame before rejecting. Throwing
+          // from inside the SSE reader closes a healthy HTTP 200 response early
+          // and browsers report it as incomplete chunked encoding.
+          streamError = new Error(
             data?.message ||
               "The AI provider could not complete the explanation.",
           );
@@ -995,6 +1037,8 @@ export const intelligenceAPI = {
       },
       signal,
     );
+    if (streamError) throw streamError;
+    return completed;
   },
 };
 

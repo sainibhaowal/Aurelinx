@@ -231,7 +231,7 @@ The logo used in this README is sourced from [client/public/aurelinx-logo-final-
 
 **Ravinder Singh**
 - GitHub: [@sainibhaowal](https://github.com/sainibhaowal)
-- Contact: redacted@example.invalid
+- Contact: [GitHub Discussions](https://github.com/sainibhaowal/Aurelinx/discussions)
 
 ## License
 

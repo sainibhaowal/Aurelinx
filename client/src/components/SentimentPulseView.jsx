@@ -55,12 +55,27 @@ const SentimentPulseView = () => {
     const controller = new AbortController();
     setLoading(true);
     setStreamError(null);
+    let receivedLiveSnapshot = false;
+
+    // Keep the view useful if the live stream is reconnecting or blocked by a
+    // transient network issue; the report endpoint uses the same tenant scope.
+    analysisAPI
+      .getSentimentReport()
+      .then((report) => {
+        if (!active || receivedLiveSnapshot) return;
+        setData(report);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Sentiment report fallback failed", error);
+      });
 
     analysisAPI
       .streamSentiment(
         {
           sentiment: (payload) => {
             if (!active) return;
+            receivedLiveSnapshot = true;
             setData(payload);
             setLoading(false);
             setStreamConnected(true);

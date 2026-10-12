@@ -1,6 +1,7 @@
 # Copyright 2026 Ravinder Singh
 # Licensed under the Apache License, Version 2.0 (the "License");
 """30 regression tests for the frontier agent package (A+B fixes)."""
+
 from __future__ import annotations
 
 import asyncio

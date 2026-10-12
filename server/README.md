@@ -14,7 +14,7 @@ The backend of the **Aurelinx Executive Talent Intelligence Platform**: a FastAP
 | Migrations | Alembic |
 | Vector search | Qdrant |
 | Cache / queues | Redis 7 (+ RQ background workers) |
-| Auth | JWT (python-jose), bcrypt / Argon2 password hashing |
+| Auth | JWT (PyJWT), bcrypt / Argon2 password hashing |
 | Rate limiting | SlowAPI |
 | Testing | pytest + pytest-asyncio |
 | Linting / format | Ruff + Black (configured in `pyproject.toml`) |

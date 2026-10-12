@@ -29,6 +29,6 @@ See [GOVERNANCE.md](GOVERNANCE.md#adding-maintainers) for criteria and process.
 
 ## Contact
 
-- **Lead Maintainer**: redacted@example.invalid
+- **Lead Maintainer**: [@sainibhaowal](https://github.com/sainibhaowal)
 - **GitHub**: [@sainibhaowal](https://github.com/sainibhaowal)
-- **Security**: redacted@example.invalid (see SECURITY.md)
+- **Security**: [GitHub Security Advisories](https://github.com/sainibhaowal/Aurelinx/security/advisories/new) (see SECURITY.md)

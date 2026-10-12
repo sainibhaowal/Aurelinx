@@ -129,11 +129,14 @@ services:
       - ./.env.production
     environment:
       HOSTNAME: "0.0.0.0"
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:5000}
     depends_on:
       api:
         condition: service_healthy
     ports:
       - "${WEB_PORT:-3100}:3000"
+    volumes:
+      - web_static_assets:/app/.next/static
     healthcheck:
       test: [ "CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"" ]
       interval: 15s
@@ -145,3 +148,4 @@ volumes:
   redis_data:
   qdrant_data:
   chat_uploads:
+  web_static_assets:

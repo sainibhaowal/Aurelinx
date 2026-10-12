@@ -21,8 +21,9 @@ import logging
 import os
 from datetime import datetime, timedelta
 
+import jwt
 from fastapi import Depends, Header, HTTPException, status
-from jose import JWTError, jwt
+from jwt.exceptions import InvalidTokenError as JWTError
 from passlib.context import CryptContext
 from pydantic import BaseModel
 

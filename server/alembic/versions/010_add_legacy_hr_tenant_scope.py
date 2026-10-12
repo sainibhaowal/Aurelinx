@@ -12,7 +12,12 @@ depends_on = None
 
 def upgrade() -> None:
     for table in ("skills", "experiences", "employeetable", "candidatetable"):
-        op.add_column(table, sa.Column("tenant_id", sa.String(128), nullable=False, server_default="default"))
+        op.add_column(
+            table,
+            sa.Column(
+                "tenant_id", sa.String(128), nullable=False, server_default="default"
+            ),
+        )
         op.create_index(f"ix_{table}_tenant_id", table, ["tenant_id"])
 
 
