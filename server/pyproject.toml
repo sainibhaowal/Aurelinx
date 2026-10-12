@@ -1,6 +1,6 @@
 [project]
 name = "aurelinx-backend"
-version = "0.2.8"
+version = "0.2.9"
 description = "Aurelinx Autonomous Management Intelligence Platform Backend"
 authors = [{ name = "Ravinder Singh" }]
 license = { text = "Apache-2.0" }
