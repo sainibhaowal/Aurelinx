@@ -477,21 +477,25 @@ const htmlContent = `<!DOCTYPE html>
 
       if (data.type === "AURELINX_GET_CREDS") {
         const token = localStorage.getItem("auth_token");
+        const refreshToken = localStorage.getItem("auth_refresh_token");
         const user = localStorage.getItem("auth_user");
         const savedCreds = localStorage.getItem("saved_creds");
         
         event.source.postMessage({
           type: "AURELINX_SEND_CREDS",
           token: token || null,
+          refreshToken: refreshToken || null,
           user: user || null,
           savedCreds: savedCreds ? JSON.parse(savedCreds) : null
         }, event.origin);
       } else if (data.type === "AURELINX_SAVE_CREDS") {
         if (data.token) localStorage.setItem("auth_token", data.token);
+        if (data.refreshToken) localStorage.setItem("auth_refresh_token", data.refreshToken);
         if (data.user) localStorage.setItem("auth_user", typeof data.user === "string" ? data.user : JSON.stringify(data.user));
         if (data.savedCreds) localStorage.setItem("saved_creds", JSON.stringify(data.savedCreds));
       } else if (data.type === "AURELINX_CLEAR_CREDS") {
         localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_refresh_token");
         localStorage.removeItem("auth_user");
       } else if (data.type === "AURELINX_AUTH_USER") {
         if (window.__TAURI__ && window.__TAURI__.core) {

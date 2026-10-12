@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Cpu,
@@ -21,7 +21,6 @@ import {
   GitBranch,
   Users,
   Zap,
-  DollarSign,
   Play,
   Briefcase,
   Search,
@@ -47,6 +46,7 @@ import {
   tierColor,
   tierBg,
 } from "../utils/survivalModel";
+import { usePersistentState } from "../services/workspacePersistence";
 import AIExplanationPanel from "./AIExplanationPanel";
 
 const MobileSplitPane = ({
@@ -242,6 +242,14 @@ const SKILL_GRAPH_COORDS = {
   "Product Management": { x: 840, y: 380, category: "management" },
   Agile: { x: 790, y: 480, category: "management" },
   Scrum: { x: 890, y: 480, category: "management" },
+
+  // Sales & customer-facing skills
+  Sales: { x: 420, y: 405, category: "sales" },
+  "Business Development": { x: 530, y: 405, category: "sales" },
+  "Account Management": { x: 670, y: 405, category: "sales" },
+  CRM: { x: 420, y: 465, category: "sales" },
+  Negotiation: { x: 530, y: 465, category: "sales" },
+  "Customer Success": { x: 670, y: 465, category: "sales" },
 };
 
 const SKILL_GRAPH_LINKS = [
@@ -318,7 +326,23 @@ const SKILL_GRAPH_LINKS = [
   { source: "Product Management", target: "Agile", weight: 0.2 },
   { source: "Agile", target: "Scrum", weight: 0.1 },
   { source: "Scrum", target: "Agile", weight: 0.05 },
+  { source: "Sales", target: "Business Development", weight: 0.15 },
+  { source: "Sales", target: "Account Management", weight: 0.15 },
+  { source: "Sales", target: "Negotiation", weight: 0.2 },
+  { source: "Sales", target: "CRM", weight: 0.1 },
+  { source: "Sales", target: "Customer Success", weight: 0.2 },
+  { source: "Business Development", target: "Lead Generation", weight: 0.15 },
+  { source: "Business Development", target: "Partnerships", weight: 0.15 },
+  { source: "Account Management", target: "Customer Success", weight: 0.15 },
+  { source: "Negotiation", target: "Communication", weight: 0.15 },
+  { source: "CRM", target: "Salesforce", weight: 0.1 },
+  { source: "CRM", target: "HubSpot", weight: 0.1 },
+  { source: "Customer Success", target: "Communication", weight: 0.15 },
 ];
+
+// Share identical in-flight reads so React Strict Mode's development effect
+// replay does not send each initial intelligence request twice.
+const intelligenceReadsInFlight = new Map();
 
 // Custom local apiClient hook since we want robust, fail-safe calls
 const apiCall = async (url, method = "GET", body = null) => {
@@ -333,67 +357,234 @@ const apiCall = async (url, method = "GET", body = null) => {
   if (body) config.body = JSON.stringify(body);
 
   const API_BASE = API_BASE_URL;
-  const response = await fetch(`${API_BASE}/api/v1/intelligence${url}`, config);
+  const requestUrl = `${API_BASE}/api/v1/intelligence${url}`;
+  const canShareRead = method.toUpperCase() === "GET";
+  const requestKey = canShareRead
+    ? `${requestUrl}:${headers.Authorization || "anonymous"}`
+    : null;
+
+  if (requestKey && intelligenceReadsInFlight.has(requestKey)) {
+    return intelligenceReadsInFlight.get(requestKey);
+  }
+
+  const request = (async () => {
+    const response = await fetch(requestUrl, config);
+    if (!response.ok) {
+      const responseText = (await response.text()).trim();
+      let message = responseText;
+      try {
+        const payload = JSON.parse(responseText);
+        message = payload?.detail || payload?.message || responseText;
+        if (typeof message !== "string") message = JSON.stringify(message);
+      } catch {
+        // Keep plain-text server errors readable below.
+      }
+      if (message.length > 600) message = `${message.slice(0, 600)}…`;
+      throw new Error(message || `API request failed (${response.status})`);
+    }
+    return response.json();
+  })();
+
+  if (requestKey) intelligenceReadsInFlight.set(requestKey, request);
+  try {
+    return await request;
+  } finally {
+    if (requestKey && intelligenceReadsInFlight.get(requestKey) === request) {
+      intelligenceReadsInFlight.delete(requestKey);
+    }
+  }
+};
+
+const apiCallWithProgress = async (url, body, onProgress) => {
+  const headers = { "Content-Type": "application/json" };
+  const token = localStorage.getItem("auth_token") || "";
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/intelligence${url}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(errorText || "API Call Failed");
   }
-  return response.json();
+  if (!response.body) throw new Error("Progress stream is unavailable.");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let results = null;
+  const handleFrame = (frame) => {
+    const data = frame
+      .split("\n")
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trim())
+      .join("\n");
+    if (!data) return;
+    const event = JSON.parse(data);
+    if (event.type === "error") throw new Error(event.message);
+    onProgress(event);
+    if (event.type === "complete") results = event.results;
+  };
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() || "";
+      frames.forEach(handleFrame);
+      if (done) break;
+    }
+    if (buffer.trim()) handleFrame(buffer);
+  } finally {
+    reader.releaseLock();
+  }
+  if (!results)
+    throw new Error("The matching stream ended before results arrived.");
+  return results;
 };
 
-const IntelligenceCenterView = () => {
-  const [activeSubTab, setActiveSubTab] = useState("skill-match");
-  const [graphExpanded, setGraphExpanded] = useState(false);
+const IntelligenceCenterView = ({ active = true }) => {
+  const [activeSubTab, setActiveSubTab] = usePersistentState(
+    "active-subtab",
+    "skill-match",
+  );
+  const [graphExpanded, setGraphExpanded] = usePersistentState(
+    "graph-expanded",
+    false,
+  );
   const [mobileActivePane, setMobileActivePane] = useState("left");
+  const [resultRevisions, setResultRevisions] = usePersistentState(
+    "result-revisions",
+    { skill: 0, team: 0, attrition: 0, ona: 0, career: 0 },
+  );
+  const markResultUpdated = (result) =>
+    setResultRevisions((current) => ({
+      ...current,
+      [result]: current[result] + 1,
+    }));
 
   // 1. Skill Match State
-  const [matchSkillsInput, setMatchSkillsInput] = useState([
-    { name: "React", level: 4 },
-    { name: "FastAPI", level: 3 },
-  ]);
-  const [newSkillName, setNewSkillName] = useState("");
-  const [newSkillLevel, setNewSkillLevel] = useState(3);
-  const [matchResults, setMatchResults] = useState([]);
+  const [matchSkillsInput, setMatchSkillsInput] = usePersistentState(
+    "match-skills",
+    [
+      { name: "React", level: 4 },
+      { name: "FastAPI", level: 3 },
+    ],
+  );
+  const [newSkillName, setNewSkillName] = usePersistentState(
+    "new-skill-name",
+    "",
+  );
+  const [newSkillLevel, setNewSkillLevel] = usePersistentState(
+    "new-skill-level",
+    3,
+  );
+  const [matchResults, setMatchResults] = usePersistentState(
+    "match-results",
+    [],
+  );
   const [matchingLoading, setMatchingLoading] = useState(false);
-  const [skillMatchStatus, setSkillMatchStatus] = useState("idle");
-  const [activeMatchEmployeeId, setActiveMatchEmployeeId] = useState(null);
+  const [skillMatchStatus, setSkillMatchStatus] = useState(() =>
+    matchResults.length > 0 ? "complete" : "idle",
+  );
+  const [skillMatchProgress, setSkillMatchProgress] = useState({
+    phase: "idle",
+    message: "",
+    completed: 0,
+    total: 0,
+  });
+  const [activeMatchEmployeeId, setActiveMatchEmployeeId] = usePersistentState(
+    "active-match-employee",
+    null,
+  );
 
   // 2. Team Optimize State
-  const [teamBudget, setTeamBudget] = useState(300000);
-  const [teamSize, setTeamSize] = useState(3);
-  const [teamSkillsInput, setTeamSkillsInput] = useState([
-    { name: "React", level: 4 },
-    { name: "Python", level: 3 },
-    { name: "AWS", level: 3 },
-  ]);
-  const [optimizedTeam, setOptimizedTeam] = useState(null);
+  const [teamBudget, setTeamBudget] = usePersistentState("team-budget", 300000);
+  const [teamSize, setTeamSize] = usePersistentState("team-size", 3);
+  const [teamSkillsInput, setTeamSkillsInput] = usePersistentState(
+    "team-skills",
+    [
+      { name: "React", level: 4 },
+      { name: "Python", level: 3 },
+      { name: "AWS", level: 3 },
+    ],
+  );
+  const [optimizedTeam, setOptimizedTeam] = usePersistentState(
+    "optimized-team",
+    null,
+  );
   const [optimizingLoading, setOptimizingLoading] = useState(false);
+  const [teamOptimizeError, setTeamOptimizeError] = useState("");
 
-  // Simulated Annealing Visualizer State
+  // Team solver result state
   const [, setAnnealingStep] = useState(0);
-  const [annealingTemp, setAnnealingTemp] = useState(10.0);
-  const [annealingHistory, setAnnealingHistory] = useState([]);
-  const [annealingStatus, setAnnealingStatus] = useState("idle"); // idle, running, complete
+  const [annealingHistory, setAnnealingHistory] = usePersistentState(
+    "team-search-history",
+    [],
+  );
+  const [annealingStatus, setAnnealingStatus] = useState(() =>
+    optimizedTeam ? "complete" : "idle",
+  ); // idle, running, complete
 
   // 3. Attrition State
-  const [attritionData, setAttritionData] = useState([]);
-  const [populationStats, setPopulationStats] = useState(null);
-  const [selectedAttritionEmp, setSelectedAttritionEmp] = useState(null);
+  const [attritionData, setAttritionData] = usePersistentState(
+    "attrition-result",
+    [],
+  );
+  const [populationStats, setPopulationStats] = usePersistentState(
+    "attrition-population-stats",
+    null,
+  );
+  const [attritionModel, setAttritionModel] = usePersistentState(
+    "attrition-model-metadata",
+    null,
+  );
+  const [survivalCurve, setSurvivalCurve] = usePersistentState(
+    "attrition-survival-curve",
+    [],
+  );
+  const [selectedAttritionEmp, setSelectedAttritionEmp] = usePersistentState(
+    "selected-attrition-employee",
+    null,
+  );
   const [attritionLoading, setAttritionLoading] = useState(false);
-  const [attritionSearch, setAttritionSearch] = useState("");
-  const [attritionSort, setAttritionSort] = useState("hazard"); // hazard | name | tenure | percentile
-  const [attritionSortDesc, setAttritionSortDesc] = useState(true);
+  const [attritionError, setAttritionError] = useState("");
+  const [attritionSearch, setAttritionSearch] = usePersistentState(
+    "attrition-search",
+    "",
+  );
+  const [attritionSort, setAttritionSort] = usePersistentState(
+    "attrition-sort",
+    "hazard",
+  ); // hazard | name | tenure | percentile
+  const [attritionSortDesc, setAttritionSortDesc] = usePersistentState(
+    "attrition-sort-desc",
+    true,
+  );
 
-  // Cox Simulator Parameters Sandbox
-  const [moraleSlider, setMoraleSlider] = useState(0.8);
-  const [salarySlider, setSalarySlider] = useState(0.0); // 0% to 50% increase
-  const [workloadSlider, setWorkloadSlider] = useState(3); // skills count
+  // Legacy fixed-formula scenario controls; not a trained survival model.
+  const [moraleSlider, setMoraleSlider] = usePersistentState(
+    "attrition-morale-slider",
+    0.8,
+  );
+  const [salarySlider, setSalarySlider] = usePersistentState(
+    "attrition-salary-slider",
+    0.0,
+  ); // 0% to 50% increase
+  const [workloadSlider, setWorkloadSlider] = usePersistentState(
+    "attrition-workload-slider",
+    3,
+  ); // skills count
   const [hoveredSurvMonth, setHoveredSurvMonth] = useState(null);
   const [hoveredHazMonth, setHoveredHazMonth] = useState(null);
   const [hoveredAnnealIndex, setHoveredAnnealIndex] = useState(null);
 
-  // Live Cox recomputation — pure function of (employee, levers), so the
-  // graph is guaranteed to change when the employee or any slider moves.
+  // Legacy scenario calculations. These are never exposed as forecasts unless
+  // a validated, outcome-trained model is supplied by the server.
   const attritionBaseline = useMemo(() => {
     if (!selectedAttritionEmp || !populationStats) return null;
     return computeSurvival(
@@ -418,7 +609,8 @@ const IntelligenceCenterView = () => {
     populationStats,
   ]);
 
-  // Sandbox covariate vector (for value display in SHAP rows)
+  // Legacy scenario covariates. Forecasts remain hidden unless a validated
+  // outcome-trained model is explicitly available from the server.
   const attritionCovs = useMemo(() => {
     if (!selectedAttritionEmp) return null;
     return buildCovariates(selectedAttritionEmp.levers, {
@@ -479,23 +671,38 @@ const IntelligenceCenterView = () => {
     });
     return sorted;
   }, [attritionData, attritionSearch, attritionSort, attritionSortDesc]); // 4. ONA State
-  const [onaData, setOnaData] = useState({ nodes: [], links: [], metrics: {} });
-  const [onaLoading, setOnaLoading] = useState(false);
-  const [selectedOnaNode, setSelectedOnaNode] = useState(null);
-  const [onaColorMode, setOnaColorMode] = useState("department"); // "department" | "pagerank" | "betweenness" | "silo"
-  const [onaDeptFilter, setOnaDeptFilter] = useState("all");
-  const [onaSearchQuery, setOnaSearchQuery] = useState("");
-  const [onaCamera, setOnaCamera] = useState({
-    yaw: 0.1,
-    pitch: -0.32,
-    scale: 1.0,
-    panX: 0,
-    panY: 0,
+  const [onaData, setOnaData] = usePersistentState("ona-result", {
+    nodes: [],
+    links: [],
+    metrics: {},
   });
+  const [onaLoading, setOnaLoading] = useState(false);
+  const [onaError, setOnaError] = useState("");
+  const [selectedOnaNode, setSelectedOnaNode] = usePersistentState(
+    "selected-ona-node",
+    null,
+  );
+  const [onaColorMode, setOnaColorMode] = usePersistentState(
+    "ona-color-mode",
+    "department",
+  ); // "department" | "pagerank" | "betweenness" | "silo"
+  const [onaDeptFilter, setOnaDeptFilter] = usePersistentState(
+    "ona-department-filter",
+    "all",
+  );
+  const [onaSearchQuery, setOnaSearchQuery] = usePersistentState(
+    "ona-search",
+    "",
+  );
+  const [intelligenceReadiness, setIntelligenceReadiness] = usePersistentState(
+    "intelligence-readiness",
+    null,
+  );
 
   const topInfluencers = useMemo(() => {
     if (!onaData?.nodes?.length) return [];
     return [...onaData.nodes]
+      .filter((node) => (node.degree || 0) > 0)
       .sort((a, b) => (b.influence_pagerank || 0) - (a.influence_pagerank || 0))
       .slice(0, 4);
   }, [onaData]);
@@ -503,6 +710,7 @@ const IntelligenceCenterView = () => {
   const topBridgeBrokers = useMemo(() => {
     if (!onaData?.nodes?.length) return [];
     return [...onaData.nodes]
+      .filter((node) => (node.degree || 0) > 0)
       .sort((a, b) => (b.bridge_betweenness || 0) - (a.bridge_betweenness || 0))
       .slice(0, 4);
   }, [onaData]);
@@ -517,7 +725,7 @@ const IntelligenceCenterView = () => {
         if (targetNode)
           neighbors.push({
             node: targetNode,
-            weight: l.weight,
+            weight: l.record_count ?? l.weight,
             channel: l.channel,
             isCross: l.is_cross_dept,
           });
@@ -526,7 +734,7 @@ const IntelligenceCenterView = () => {
         if (sourceNode)
           neighbors.push({
             node: sourceNode,
-            weight: l.weight,
+            weight: l.record_count ?? l.weight,
             channel: l.channel,
             isCross: l.is_cross_dept,
           });
@@ -543,17 +751,40 @@ const IntelligenceCenterView = () => {
   }, [onaData]);
 
   // 5. Career Path State
-  const [careerEmployees, setCareerEmployees] = useState([]);
-  const [selectedCareerEmpId, setSelectedCareerEmpId] = useState("");
-  const [careerPathData, setCareerPathData] = useState(null);
+  const [careerEmployees, setCareerEmployees] = usePersistentState(
+    "career-employees",
+    [],
+  );
+  const [careerEmployeeScopeTruncated, setCareerEmployeeScopeTruncated] =
+    useState(false);
+  const [selectedCareerEmpId, setSelectedCareerEmpId] = usePersistentState(
+    "selected-career-employee",
+    "",
+  );
+  const [careerPathData, setCareerPathData] = usePersistentState(
+    "career-path-result",
+    null,
+  );
   const [careerLoading, setCareerLoading] = useState(false);
+  const [careerError, setCareerError] = useState("");
+  const careerRequestRef = useRef(0);
 
   // Load basic initial data
   useEffect(() => {
+    if (!active) return undefined;
     fetchAttrition();
     fetchOna();
     fetchCareerEmployees();
-  }, []);
+    apiCall("/data-readiness")
+      .then(setIntelligenceReadiness)
+      .catch((err) =>
+        console.warn(
+          "Unable to load Intelligence data readiness:",
+          err?.message,
+        ),
+      );
+    return undefined;
+  }, [active]);
 
   // Sync sliders to the selected employee's recorded baseline values
   useEffect(() => {
@@ -568,16 +799,55 @@ const IntelligenceCenterView = () => {
   async function fetchAttrition() {
     try {
       setAttritionLoading(true);
+      setAttritionError("");
       const data = await apiCall("/attrition-hazard");
-      const employees = data.employees || [];
+      setSurvivalCurve(
+        Array.isArray(data.survival_curve) ? data.survival_curve : [],
+      );
+      const model = data.model || {
+        status: "insufficient_outcome_data",
+        message:
+          "No validated survival-model status was returned; individual forecasts are unavailable.",
+      };
+      // Never render employee risk values from an unvalidated/legacy API
+      // response. A model must explicitly report holdout evaluation and
+      // acceptable calibration before the UI presents forecasts.
+      const forecastsValidated =
+        model.status === "validated" &&
+        model.validation?.holdout_evaluated === true &&
+        model.validation?.calibration_passed === true;
+      const employees = forecastsValidated ? data.employees || [] : [];
+      const selectedEmployeeId =
+        selectedAttritionEmp?.employee_id || selectedAttritionEmp?.id;
+      const nextSelectedEmployee =
+        employees.find(
+          (employee) =>
+            (employee.employee_id || employee.id) === selectedEmployeeId,
+        ) ||
+        employees[0] ||
+        null;
       setAttritionData(employees);
-      setPopulationStats(data.population || null);
-      if (employees.length > 0) {
-        setSelectedAttritionEmp(employees[0]);
-      }
-      setAttritionLoading(false);
+      setPopulationStats(forecastsValidated ? data.population || null : null);
+      setAttritionModel(
+        forecastsValidated
+          ? model
+          : model.status === "insufficient_outcome_data" ||
+              model.status === "cohort_descriptive"
+            ? model
+            : {
+                ...model,
+                status: "insufficient_outcome_data",
+                message:
+                  "The survival model has not passed required validation. Individual forecasts are unavailable.",
+              },
+      );
+      markResultUpdated("attrition");
+      setSelectedAttritionEmp(nextSelectedEmployee);
     } catch (err) {
-      console.error(err);
+      setAttritionError(
+        err?.message || "Unable to load attrition model status.",
+      );
+    } finally {
       setAttritionLoading(false);
     }
   }
@@ -585,14 +855,20 @@ const IntelligenceCenterView = () => {
   async function fetchOna() {
     try {
       setOnaLoading(true);
+      setOnaError("");
       const data = await apiCall("/ona?limit=120");
       setOnaData(data);
+      markResultUpdated("ona");
       if (data.nodes && data.nodes.length > 0) {
-        setSelectedOnaNode(data.nodes[0]);
+        const selectedNodeId = selectedOnaNode?.id;
+        setSelectedOnaNode(
+          data.nodes.find((node) => node.id === selectedNodeId) ||
+            data.nodes[0],
+        );
       }
       setOnaLoading(false);
     } catch (err) {
-      console.error(err);
+      setOnaError(err?.message || "Unable to load the collaboration network.");
       setOnaLoading(false);
     }
   }
@@ -623,35 +899,44 @@ const IntelligenceCenterView = () => {
 
   async function fetchCareerEmployees() {
     try {
-      const API_BASE = API_BASE_URL;
-      const token = localStorage.getItem("auth_token") || "";
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await fetch(`${API_BASE}/api/v1/employees`, {
-        headers,
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCareerEmployees(data);
-        if (data.length > 0) {
-          setSelectedCareerEmpId(data[0].id);
-          loadCareerPath(data[0].id);
-        }
+      setCareerError("");
+      const data = await apiCall("/career-path-employees?limit=10000");
+      const employees = Array.isArray(data?.employees) ? data.employees : [];
+      setCareerEmployees(employees);
+      setCareerEmployeeScopeTruncated(Boolean(data?.employee_scope_truncated));
+      if (employees.length > 0) {
+        setSelectedCareerEmpId(employees[0].id);
+        loadCareerPath(employees[0].id);
       }
     } catch (err) {
-      console.error(err);
+      setCareerError(err?.message || "Unable to load employee profiles.");
     }
   }
 
   async function loadCareerPath(empId) {
-    if (!empId) return;
+    const requestId = ++careerRequestRef.current;
+    if (!empId) {
+      setCareerPathData(null);
+      setCareerError("");
+      setCareerLoading(false);
+      return;
+    }
     try {
       setCareerLoading(true);
+      setCareerError("");
+      setCareerPathData(null);
       const data = await apiCall(`/career-path/${empId}`);
+      if (requestId !== careerRequestRef.current) return;
       setCareerPathData(data);
-      setCareerLoading(false);
+      markResultUpdated("career");
     } catch (err) {
-      console.error(err);
-      setCareerLoading(false);
+      if (requestId === careerRequestRef.current) {
+        setCareerError(
+          err?.message || "Unable to calculate career transition history.",
+        );
+      }
+    } finally {
+      if (requestId === careerRequestRef.current) setCareerLoading(false);
     }
   }
 
@@ -674,11 +959,33 @@ const IntelligenceCenterView = () => {
     try {
       setMatchingLoading(true);
       setSkillMatchStatus("running");
-      setMobileActivePane("right");
-      const results = await apiCall("/skill-match", "POST", {
-        target_skills: matchSkillsInput,
+      setSkillMatchProgress({
+        phase: "connecting",
+        message: "Connecting to the matching service…",
+        completed: 0,
+        total: 0,
       });
+      setMatchResults([]);
+      setActiveMatchEmployeeId(null);
+      setMobileActivePane("right");
+      const results = await apiCallWithProgress(
+        "/skill-match/stream",
+        { target_skills: matchSkillsInput },
+        (event) => {
+          if (event.type === "progress" || event.type === "complete") {
+            setSkillMatchProgress({
+              phase: event.phase || event.type,
+              message:
+                event.message ||
+                (event.type === "complete" ? "Results are ready." : ""),
+              completed: event.completed || 0,
+              total: event.total || 0,
+            });
+          }
+        },
+      );
       setMatchResults(results);
+      markResultUpdated("skill");
       if (results.length > 0) {
         setActiveMatchEmployeeId(results[0].employee_id);
       }
@@ -687,19 +994,24 @@ const IntelligenceCenterView = () => {
     } catch (err) {
       console.error(err);
       setSkillMatchStatus("error");
+      setSkillMatchProgress((progress) => ({
+        ...progress,
+        phase: "error",
+        message: err.message || "Skill matching failed. Please try again.",
+      }));
       setMatchingLoading(false);
     }
   };
 
-  // 2. Team Optimize Actions (Simulated Annealing Live Simulation)
+  // 2. Team Optimize Actions
   const triggerTeamOptimize = async () => {
     if (teamSkillsInput.length === 0) return;
     try {
+      setTeamOptimizeError("");
       setOptimizingLoading(true);
       setAnnealingStatus("running");
       setMobileActivePane("right");
       setAnnealingStep(0);
-      setAnnealingTemp(10.0);
       setAnnealingHistory([]);
 
       const results = await apiCall("/team-optimize", "POST", {
@@ -709,31 +1021,24 @@ const IntelligenceCenterView = () => {
       });
 
       const history = results.optimization_history || [];
-      const stepsCount = history.length;
-      const simulationSteps = Math.min(25, stepsCount);
-
-      let currentSimIndex = 0;
-      const intervalId = setInterval(() => {
-        if (currentSimIndex >= simulationSteps) {
-          clearInterval(intervalId);
-          setOptimizedTeam(results);
-          setAnnealingStep(stepsCount);
-          setAnnealingTemp(history[stepsCount - 1]?.temperature || 0.1);
-          setAnnealingHistory(history);
-          setAnnealingStatus("complete");
-          setOptimizingLoading(false);
-        } else {
-          const stepData =
-            history[currentSimIndex] || history[history.length - 1];
-          setAnnealingStep(stepData.step);
-          setAnnealingTemp(stepData.temperature);
-          setAnnealingHistory(history.slice(0, currentSimIndex + 1));
-
-          currentSimIndex++;
-        }
-      }, 90);
+      setOptimizedTeam(results);
+      markResultUpdated("team");
+      setAnnealingStep(results.total_search_nodes || 0);
+      setAnnealingHistory(history);
+      setAnnealingStatus("complete");
+      setOptimizingLoading(false);
     } catch (err) {
       console.error(err);
+      let message =
+        err.message ||
+        "Team optimization failed. Please review the inputs and try again.";
+      try {
+        const parsed = JSON.parse(message);
+        message = typeof parsed.detail === "string" ? parsed.detail : message;
+      } catch {
+        // Keep the original network or parsing error.
+      }
+      setTeamOptimizeError(message);
       setOptimizingLoading(false);
       setAnnealingStatus("idle");
     }
@@ -770,9 +1075,9 @@ const IntelligenceCenterView = () => {
               Intelligence Center
             </h1>
             <p className="text-slate-400 text-[11px] sm:text-xs leading-relaxed max-w-3xl">
-              Aurelinx state-of-the-art decision workbench. Powered by graph
-              theory, combinatorial solvers, survival models, and Markov
-              transition matrices.
+              Workforce analysis from uploaded tenant data: semantic skill
+              matching, constrained team optimization, observed survival,
+              collaboration networks, and dated role transitions.
             </p>
           </div>
           <UserManualButton
@@ -821,6 +1126,37 @@ const IntelligenceCenterView = () => {
           </button>
         ))}
       </div>
+
+      {intelligenceReadiness && (
+        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-slate-950/40 px-3 py-2 text-[9px] font-mono text-slate-400">
+          <span className="font-bold uppercase tracking-wider text-slate-300">
+            Uploaded data
+          </span>
+          <span>{intelligenceReadiness.records?.employees ?? 0} employees</span>
+          <span>
+            {intelligenceReadiness.records?.candidates ?? 0} candidates
+          </span>
+          <span>
+            {intelligenceReadiness.career_markov?.dated_employee_role_records ??
+              0}{" "}
+            dated career roles
+          </span>
+          <span>
+            {intelligenceReadiness.ona?.dated_collaboration_events ?? 0}{" "}
+            collaboration events
+          </span>
+          <span>
+            {intelligenceReadiness.attrition?.usable_duration_outcomes ?? 0}{" "}
+            survival observations
+          </span>
+          <span>
+            Skill graph coverage:{" "}
+            {intelligenceReadiness.semantic_skill_graph?.coverage_ratio == null
+              ? "unavailable"
+              : `${Math.round(intelligenceReadiness.semantic_skill_graph.coverage_ratio * 100)}%`}
+          </span>
+        </div>
+      )}
 
       {/* TABS CONTAINER */}
       <div className="relative flex-1 flex flex-col min-h-0 lg:overflow-hidden">
@@ -960,49 +1296,95 @@ const IntelligenceCenterView = () => {
                             className="pt-2 border-t border-white/10"
                             aria-live="polite"
                           >
-                            <div className="mb-3 flex items-center justify-between gap-3">
+                            <div className="mb-2 flex items-start justify-between gap-3">
                               <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                                Solver request status
+                                Live solver status
                               </span>
                               <span
-                                className={`text-[10px] font-medium ${skillMatchStatus === "error" ? "text-rose-300" : skillMatchStatus === "complete" ? "text-emerald-300" : "text-cyan-300"}`}
+                                className={`max-w-[65%] text-right text-[10px] font-medium leading-relaxed ${skillMatchStatus === "error" ? "text-rose-300" : skillMatchStatus === "complete" ? "text-emerald-300" : "text-cyan-300"}`}
                               >
-                                {skillMatchStatus === "error"
-                                  ? "Request failed"
-                                  : skillMatchStatus === "complete"
-                                    ? `${matchResults.length} matches returned`
-                                    : "Processing on server"}
+                                {skillMatchProgress.message}
                               </span>
                             </div>
-                            <div className="mb-3 h-1 overflow-hidden rounded-full bg-white/10">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${skillMatchStatus === "error" ? "w-full bg-rose-400" : skillMatchStatus === "complete" ? "w-full bg-emerald-400" : "w-2/3 animate-pulse bg-cyan-300"}`}
-                              />
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 text-[9px]">
-                              {[
-                                "Requirements validated",
-                                "Adjacency solver",
-                                "Matches rendered",
-                              ].map((label, index) => {
-                                const reached =
-                                  skillMatchStatus === "complete" ||
-                                  (skillMatchStatus === "running" &&
-                                    index < 2) ||
-                                  (skillMatchStatus === "error" && index < 2);
-                                return (
+                            {(() => {
+                              const isScoring =
+                                skillMatchProgress.phase === "matching" &&
+                                skillMatchProgress.total > 0;
+                              const isComplete =
+                                skillMatchStatus === "complete";
+                              const hasProfileCounts =
+                                skillMatchProgress.total > 0;
+                              const isError = skillMatchStatus === "error";
+                              const isDeterminate =
+                                isScoring ||
+                                isComplete ||
+                                (isError && hasProfileCounts);
+                              const progressValue = isComplete
+                                ? 100
+                                : hasProfileCounts
+                                  ? Math.min(
+                                      100,
+                                      (skillMatchProgress.completed /
+                                        skillMatchProgress.total) *
+                                        100,
+                                    )
+                                  : 0;
+
+                              return (
+                                <>
                                   <div
-                                    key={label}
-                                    className={`flex items-center gap-1.5 ${reached ? "text-slate-200" : "text-slate-600"}`}
+                                    className="mb-2 h-1.5 overflow-hidden rounded-full bg-white/10"
+                                    role="progressbar"
+                                    aria-label="Skill matching progress"
+                                    aria-valuemin={
+                                      isDeterminate ? 0 : undefined
+                                    }
+                                    aria-valuemax={
+                                      isDeterminate ? 100 : undefined
+                                    }
+                                    aria-valuenow={
+                                      isDeterminate
+                                        ? Math.round(progressValue)
+                                        : undefined
+                                    }
+                                    aria-valuetext={
+                                      isDeterminate
+                                        ? `${Math.round(progressValue)} percent`
+                                        : skillMatchProgress.message
+                                    }
                                   >
-                                    <span
-                                      className={`h-1.5 w-1.5 rounded-full ${reached ? (skillMatchStatus === "error" && index === 1 ? "bg-rose-300" : "bg-cyan-300") : "bg-white/15"}`}
+                                    <div
+                                      className={`h-full rounded-full ${isError ? "bg-rose-400" : isComplete ? "bg-emerald-400" : "bg-cyan-300"} ${isDeterminate ? "transition-[width] duration-200 ease-out" : skillMatchStatus === "running" ? "skill-match-indeterminate" : ""}`}
+                                      style={{
+                                        width: isDeterminate
+                                          ? `${progressValue}%`
+                                          : skillMatchStatus === "running"
+                                            ? "34%"
+                                            : "0%",
+                                      }}
                                     />
-                                    {label}
                                   </div>
-                                );
-                              })}
-                            </div>
+                                  <div className="flex items-center justify-between gap-2 text-[9px] text-slate-500">
+                                    <span>
+                                      {isScoring
+                                        ? `Scored ${skillMatchProgress.completed.toLocaleString()} of ${skillMatchProgress.total.toLocaleString()} profiles`
+                                        : isComplete
+                                          ? `Evaluated ${skillMatchProgress.total.toLocaleString()} profiles · ${matchResults.length} top matches shown`
+                                          : skillMatchStatus === "error"
+                                            ? hasProfileCounts
+                                              ? `Stopped after scoring ${skillMatchProgress.completed.toLocaleString()} of ${skillMatchProgress.total.toLocaleString()} profiles`
+                                              : "Matching stopped before profile scoring began"
+                                            : "Waiting for server progress"}
+                                    </span>
+                                    {isDeterminate && (
+                                      <span className="shrink-0 font-mono text-slate-300">
+                                        {Math.round(progressValue)}%
+                                      </span>
+                                    )}
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
@@ -1082,14 +1464,24 @@ const IntelligenceCenterView = () => {
                                           key={idx}
                                           className="rounded-xl border border-white/5 bg-slate-950 p-3 md:p-4"
                                         >
-                                          <div className="flex items-center justify-between mb-2 md:mb-3 border-b border-white/5 pb-2">
-                                            <div className="text-xs md:text-sm font-bold text-white">
+                                          <div className="flex flex-wrap items-start justify-between gap-2 mb-2 md:mb-3 border-b border-white/5 pb-2">
+                                            <div className="min-w-0 flex-1 break-words text-xs md:text-sm font-bold text-white">
                                               Target Skill:{" "}
                                               {detail.target_skill} (L
                                               {detail.target_level})
+                                              {detail.canonical_target_skill &&
+                                                detail.canonical_target_skill.toLowerCase() !==
+                                                  detail.target_skill.toLowerCase() && (
+                                                  <span className="block pt-1 text-[10px] font-medium text-cyan-300">
+                                                    Interpreted as{" "}
+                                                    {
+                                                      detail.canonical_target_skill
+                                                    }
+                                                  </span>
+                                                )}
                                             </div>
                                             <span
-                                              className={`text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 md:px-2.5 md:py-1 rounded border ${
+                                              className={`shrink-0 max-w-full whitespace-normal text-center text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 md:px-2.5 md:py-1 rounded border ${
                                                 detail.status === "Perfect"
                                                   ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
                                                   : detail.status ===
@@ -1133,9 +1525,9 @@ const IntelligenceCenterView = () => {
                                                 )}
                                               </>
                                             ) : (
-                                              <span className="text-rose-400 font-mono text-[10px] md:text-[11px]">
-                                                No transition path discovered.
-                                                Distance: Infinite.
+                                              <span className="min-w-0 break-words text-rose-300 text-[10px] md:text-[11px] leading-relaxed">
+                                                {detail.unmatched_reason ||
+                                                  "No recorded employee skill connects to this target."}
                                               </span>
                                             )}
                                           </div>
@@ -1337,15 +1729,18 @@ const IntelligenceCenterView = () => {
                   targetSkills: matchSkillsInput,
                   matchResults: matchResults,
                   activeMatchEmployeeId: activeMatchEmployeeId,
+                  uploadedDataReadiness:
+                    intelligenceReadiness?.semantic_skill_graph,
                 }}
                 buttonText="Explain with AI"
-                autoRefresh={true}
-                disabled={matchResults.length === 0}
+                autoRun
+                autoRunKey={`${resultRevisions.skill}:${activeMatchEmployeeId || "none"}`}
+                disabled={skillMatchStatus !== "complete"}
               />
             </motion.div>
           )}
 
-          {/* TAB 2: OPTIMAL TEAM ASSEMBLY (SIMULATED ANNEALING) */}
+          {/* TAB 2: OPTIMAL TEAM ASSEMBLY (EXACT MILP) */}
           {activeSubTab === "team-builder" && (
             <motion.div
               key="team-builder"
@@ -1382,23 +1777,22 @@ const IntelligenceCenterView = () => {
                       <div className="space-y-3 px-5 pt-4 pb-2 shrink-0">
                         <div>
                           <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                            Budget Cap (CFO Limit)
+                            Budget Cap (recorded compensation units)
                           </label>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
                             <input
                               type="number"
                               value={teamBudget}
                               onChange={(e) =>
                                 setTeamBudget(Number(e.target.value))
                               }
-                              className="w-full rounded-xl border border-white/10 bg-slate-950/80 py-2 pl-9 pr-3 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
+                              className="w-full rounded-xl border border-white/10 bg-slate-950/80 py-2 pl-3 pr-3 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
                             />
                           </div>
                         </div>
                         <div>
                           <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                            Max Team Size
+                            Team Size (fixed)
                           </label>
                           <input
                             type="number"
@@ -1505,8 +1899,8 @@ const IntelligenceCenterView = () => {
                         >
                           <Play size={14} />{" "}
                           {optimizingLoading
-                            ? "Simulated Annealing Run..."
-                            : "Find Mathematically Perfect Team"}
+                            ? "Proving the optimal team..."
+                            : "Optimize Team"}
                         </button>
                       </div>
                     </div>
@@ -1519,31 +1913,52 @@ const IntelligenceCenterView = () => {
                         Optimization Assembly Results
                       </h3>
                       <span className="text-[10px] text-slate-500">
-                        Metropolis Hastings Simulated Annealing
+                        Exact MILP search · no time cutoff
                       </span>
                     </div>
 
                     <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar space-y-4">
-                      {/* ANNEALING STATUS ACTIVE PANEL */}
+                      {annealingStatus === "complete" && optimizedTeam && (
+                        <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/5 px-3 py-2 text-[10px] leading-relaxed text-slate-300">
+                          {optimizedTeam.optimality_proven
+                            ? "Optimality proven for the recorded candidates and scoring rules."
+                            : "The solver did not prove optimality; no team is presented as optimal."}{" "}
+                          The selected team satisfies the hard budget cap. The
+                          chart shows the final measured team result.
+                          Compensation uses stored employee record units;
+                          currency and pay period are not defined in the data.{" "}
+                          {optimizedTeam.source_scope
+                            ?.excluded_missing_compensation_count > 0 &&
+                            String(
+                              optimizedTeam.source_scope
+                                .excluded_missing_compensation_count,
+                            ) +
+                              " employees without positive recorded compensation were excluded."}
+                        </div>
+                      )}
+                      {teamOptimizeError && (
+                        <div
+                          role="alert"
+                          className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-200"
+                        >
+                          {teamOptimizeError}
+                        </div>
+                      )}
+
+                      {/* SERVER SEARCH STATUS */}
                       {annealingStatus === "running" && (
                         <div className="py-12 flex flex-col items-center justify-center space-y-6">
                           <div className="text-center">
                             <div className="text-xs font-mono text-primary uppercase tracking-[0.2em] mb-2 animate-pulse">
-                              Running Simulated Annealing Model
+                              Searching this tenant until optimality is proven
                             </div>
                             <div className="text-3xl font-black text-white font-mono">
-                              Temp: {annealingTemp.toFixed(2)}K
+                              Larger datasets can take longer to solve
                             </div>
                           </div>
 
-                          {/* Temperature cooling gauge */}
-                          <div className="w-64 h-4 bg-white/5 rounded-full overflow-hidden border border-white/10 relative p-0.5">
-                            <div
-                              className="h-full rounded-full transition-all duration-75 bg-gradient-to-r from-rose-500 via-amber-500 to-indigo-500"
-                              style={{
-                                width: `${(annealingTemp / 10.0) * 100}%`,
-                              }}
-                            />
+                          <div className="w-64 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-full w-1/3 rounded-full bg-indigo-400 animate-pulse" />
                           </div>
                         </div>
                       )}
@@ -1581,8 +1996,8 @@ const IntelligenceCenterView = () => {
                             const coverages = history.map(
                               (h) => Number(h.coverage) || 0,
                             );
-                            const temps = history.map(
-                              (h) => Number(h.temperature) || 0,
+                            const hasTemperature = history.some((h) =>
+                              Number.isFinite(Number(h.temperature)),
                             );
                             const costs = history.map(
                               (h) => Number(h.cost) || 0,
@@ -1641,7 +2056,8 @@ const IntelligenceCenterView = () => {
                             const covTicks = [0, 25, 50, 75, 100];
                             const tmpTicks = [10, 5, 0];
 
-                            const xPos = (i) => (i / Math.max(n - 1, 1)) * 100;
+                            const xPos = (i) =>
+                              n === 1 ? 50 : (i / (n - 1)) * 100;
                             const yScaler = (lo, hi) => (v) => {
                               const r = hi - lo || 1;
                               return (
@@ -1668,25 +2084,15 @@ const IntelligenceCenterView = () => {
                               x: xPos(i),
                               y: yC(c),
                             }));
-                            const tPts = temps.map((t, i) => ({
-                              x: xPos(i),
-                              y: yT(t),
-                            }));
-
                             const globalBest = Math.max(...energies);
                             const bestIndex = energies.indexOf(globalBest);
-                            const finalIsBest = bestIndex === n - 1;
                             /* coverage area is rendered as a smooth closed path in JSX */
                             const budgetY = yK(budgetCap);
 
-                            const fmtMoney = (v) => {
-                              const num = Number(v) || 0;
-                              if (num >= 1e6)
-                                return `$${(num / 1e6).toFixed(2)}M`;
-                              if (num >= 1e3)
-                                return `$${(num / 1e3).toFixed(0)}k`;
-                              return `$${num.toFixed(0)}`;
-                            };
+                            const fmtCompensation = (v) =>
+                              Number(v || 0).toLocaleString(undefined, {
+                                maximumFractionDigits: 0,
+                              });
 
                             const stepAt = (frac) =>
                               steps[Math.round((n - 1) * frac)] ?? steps[n - 1];
@@ -1710,7 +2116,8 @@ const IntelligenceCenterView = () => {
                               }
                               return d;
                             };
-                            const barW = Math.max(0.85, (100 / n) * 0.8);
+                            const barW =
+                              n === 1 ? 4 : Math.max(0.85, (100 / n) * 0.8);
                             const hovered = hoveredAnnealIndex;
 
                             return (
@@ -1719,19 +2126,15 @@ const IntelligenceCenterView = () => {
                                 <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-slate-400 mb-3">
                                   <span className="flex items-center gap-1">
                                     <span className="h-0.5 w-3 rounded bg-teal-400" />
-                                    Energy E(x)
+                                    Final coverage score
                                   </span>
                                   <span className="flex items-center gap-1">
                                     <span className="h-0.5 w-3 rounded border-t border-dashed border-emerald-400" />
-                                    Best-so-far E*
+                                    Selected team score
                                   </span>
                                   <span className="flex items-center gap-1">
                                     <span className="h-0.5 w-3 rounded bg-indigo-400" />
                                     Coverage %
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <span className="h-0.5 w-3 rounded bg-amber-400" />
-                                    Temperature
                                   </span>
                                   <span className="flex items-center gap-1">
                                     <span className="h-0.5 w-3 rounded border-t border-dashed border-rose-400" />
@@ -1999,7 +2402,7 @@ const IntelligenceCenterView = () => {
                                     </div>
                                   </div>
 
-                                  {/* ===== SUB CHART: Team Cost vs Budget Cap + Temperature ===== */}
+                                  {/* ===== SUB CHART: Team Cost vs Budget Cap ===== */}
                                   <div className="relative mt-3 h-32 w-full rounded-lg border border-white/10 bg-slate-950/80 overflow-hidden">
                                     {/* Cost tick labels (left) */}
                                     {costTicks.map((t) => (
@@ -2008,19 +2411,20 @@ const IntelligenceCenterView = () => {
                                         className="absolute left-1 -translate-y-1/2 z-10 pointer-events-none text-[10px] font-mono text-slate-400 bg-slate-900/75 px-1 rounded"
                                         style={{ top: `${yK(t)}%` }}
                                       >
-                                        {fmtMoney(t)}
+                                        {fmtCompensation(t)}
                                       </span>
                                     ))}
                                     {/* Temperature tick labels (right) */}
-                                    {tmpTicks.map((t) => (
-                                      <span
-                                        key={`tt-${t}`}
-                                        className="absolute right-1 -translate-y-1/2 z-10 pointer-events-none text-[10px] font-mono text-amber-300/80 bg-slate-950/75 px-1 rounded"
-                                        style={{ top: `${yT(t)}%` }}
-                                      >
-                                        T {t}
-                                      </span>
-                                    ))}
+                                    {hasTemperature &&
+                                      tmpTicks.map((t) => (
+                                        <span
+                                          key={`tt-${t}`}
+                                          className="absolute right-1 -translate-y-1/2 z-10 pointer-events-none text-[10px] font-mono text-amber-300/80 bg-slate-950/75 px-1 rounded"
+                                          style={{ top: `${yT(t)}%` }}
+                                        >
+                                          T {t}
+                                        </span>
+                                      ))}
                                     <div className="ml-14 mr-11 h-full relative">
                                       <svg
                                         className="h-full w-full overflow-hidden"
@@ -2132,27 +2536,6 @@ const IntelligenceCenterView = () => {
                                           />
                                         ))}
 
-                                        {/* Temperature curve (smooth cubic bezier) */}
-                                        <path
-                                          d={smoothPath(tPts)}
-                                          fill="none"
-                                          stroke="#fbbf24"
-                                          strokeWidth="4.5"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          opacity="0.16"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-                                        <path
-                                          d={smoothPath(tPts)}
-                                          fill="none"
-                                          stroke="#fbbf24"
-                                          strokeWidth="1.6"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-
                                         {/* Crosshair on hover */}
                                         {hovered !== null && (
                                           <line
@@ -2199,25 +2582,19 @@ const IntelligenceCenterView = () => {
                                         >
                                           <div className="font-bold text-teal-300 flex items-center justify-between gap-1 border-b border-white/10 pb-1">
                                             <span className="flex items-center gap-1">
-                                              Step #
+                                              Search nodes:
                                               {history[hovered].step ?? hovered}
                                             </span>
                                             {hovered === bestIndex && (
                                               <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30 font-semibold">
-                                                Optimal Best
+                                                Best team
                                               </span>
                                             )}
                                           </div>
                                           <div className="text-slate-300 flex justify-between gap-3">
-                                            <span>Temperature:</span>
-                                            <strong className="text-amber-300 font-mono">
-                                              {Number(
-                                                history[hovered].temperature,
-                                              ).toFixed(3)}
-                                            </strong>
-                                          </div>
-                                          <div className="text-slate-300 flex justify-between gap-3">
-                                            <span>Energy E(x):</span>
+                                            <span>
+                                              Mean coverage objective:
+                                            </span>
                                             <strong className="text-teal-300 font-mono">
                                               {Number(
                                                 history[hovered].energy,
@@ -2225,7 +2602,7 @@ const IntelligenceCenterView = () => {
                                             </strong>
                                           </div>
                                           <div className="text-slate-300 flex justify-between gap-3">
-                                            <span>Best-so-far E*:</span>
+                                            <span>Selected team score:</span>
                                             <strong className="text-emerald-400 font-mono">
                                               {Number(
                                                 history[hovered].best_energy ??
@@ -2245,7 +2622,7 @@ const IntelligenceCenterView = () => {
                                           <div className="text-slate-300 flex justify-between gap-3 border-t border-white/5 pt-1">
                                             <span>Team Cost:</span>
                                             <strong className="text-cyan-300 font-mono">
-                                              {fmtMoney(
+                                              {fmtCompensation(
                                                 history[hovered].cost ?? 0,
                                               )}
                                             </strong>
@@ -2255,33 +2632,16 @@ const IntelligenceCenterView = () => {
                                     })()}
                                 </div>
 
-                                {/* X-Axis Step Ticks (real step numbers) */}
-                                <div className="ml-14 mr-11 mt-2 flex justify-between items-center text-[10px] font-mono text-slate-400 border-t border-white/10 pt-2">
-                                  <span className="flex flex-col items-center">
-                                    <span className="text-slate-300 font-bold">
-                                      Step {stepAt(0)}
-                                    </span>
-                                    <span className="text-[9px] text-slate-500">
-                                      Initial
-                                    </span>
-                                  </span>
-                                  <span className="flex flex-col items-center">
-                                    <span>Step {stepAt(0.25)}</span>
-                                  </span>
-                                  <span className="flex flex-col items-center">
-                                    <span>Step {stepAt(0.5)}</span>
-                                  </span>
-                                  <span className="flex flex-col items-center">
-                                    <span>Step {stepAt(0.75)}</span>
-                                  </span>
+                                {/* Final result is a single measured point, not an invented iteration trace. */}
+                                <div className="ml-14 mr-11 mt-2 flex justify-center items-center text-[10px] font-mono text-slate-400 border-t border-white/10 pt-2">
                                   <span className="flex flex-col items-center">
                                     <span className="text-emerald-300 font-bold">
-                                      Step {stepAt(1)}
+                                      Final result · {stepAt(1)} search nodes
                                     </span>
-                                    <span className="text-[9px] text-emerald-400/80">
-                                      {finalIsBest
-                                        ? "Final · Optimal"
-                                        : "Final"}
+                                    <span className="text-[9px] text-slate-500">
+                                      {optimizedTeam.optimality_proven
+                                        ? "Optimality proven"
+                                        : "Proof unavailable"}
                                     </span>
                                   </span>
                                 </div>
@@ -2300,12 +2660,11 @@ const IntelligenceCenterView = () => {
                                   members)
                                 </div>
                                 <div className="text-[10px] font-mono text-cyan-300 font-bold">
-                                  Total: $
-                                  {(
-                                    (optimizedTeam.metrics?.total_cost || 0) /
-                                    1000
-                                  ).toFixed(0)}
-                                  k
+                                  Total:{" "}
+                                  {Number(
+                                    optimizedTeam.metrics?.total_cost || 0,
+                                  ).toLocaleString()}{" "}
+                                  units
                                 </div>
                               </div>
                               <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
@@ -2325,11 +2684,10 @@ const IntelligenceCenterView = () => {
                                       </div>
                                       <div className="text-right shrink-0">
                                         <div className="text-xs font-mono font-bold text-emerald-400">
-                                          $
-                                          {(
-                                            (emp.estimated_cost || 0) / 1000
-                                          ).toFixed(0)}
-                                          k
+                                          {Number(
+                                            emp.estimated_cost || 0,
+                                          ).toLocaleString()}{" "}
+                                          units
                                         </div>
                                         <div className="text-[8px] uppercase tracking-wider text-slate-500">
                                           {emp.salary_source ===
@@ -2386,9 +2744,9 @@ const IntelligenceCenterView = () => {
                         <div className="py-12 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-4 text-xs text-slate-400 leading-relaxed">
                           Configure target skills, budget constraint, and click{" "}
                           <span className="font-semibold text-cyan-300">
-                            Find Mathematically Perfect Team
+                            Optimize Team
                           </span>{" "}
-                          to execute Simulated Annealing optimization.
+                          to search this tenant's recorded employee data.
                         </div>
                       )}
                     </div>
@@ -2402,10 +2760,12 @@ const IntelligenceCenterView = () => {
                   budget: teamBudget,
                   teamSize: teamSize,
                   optimizedTeam: optimizedTeam,
+                  uploadedDataReadiness: intelligenceReadiness?.team_assembly,
                 }}
                 buttonText="Explain with AI"
-                autoRefresh={true}
-                disabled={!optimizedTeam}
+                autoRun
+                autoRunKey={resultRevisions.team}
+                disabled={!optimizedTeam || optimizingLoading}
               />
             </motion.div>
           )}
@@ -2422,8 +2782,8 @@ const IntelligenceCenterView = () => {
               <MobileSplitPane
                 activePane={mobileActivePane}
                 setActivePane={setMobileActivePane}
-                leftTitle="Employee Hazard Registry"
-                rightTitle="Survival Breakdown"
+                leftTitle="Attrition Model Readiness"
+                rightTitle="Forecast Readiness"
                 leftIcon={<Users size={14} />}
                 rightIcon={<TrendingUp size={14} />}
                 leftWidthClass="lg:w-[320px] xl:w-[340px]"
@@ -2431,68 +2791,117 @@ const IntelligenceCenterView = () => {
                   <div className="premium-card h-auto lg:h-full p-4 md:p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col overflow-hidden">
                     <div className="flex items-center justify-between shrink-0 border-b border-white/5 pb-2 mb-3">
                       <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
-                        Employee Hazard Registry
+                        Attrition Model Readiness
                       </h3>
                       <span className="text-[9px] font-mono text-slate-500">
-                        {attritionData.length} profiles · Cox PH
+                        {attritionModel?.status === "ready"
+                          ? `${attritionData.length} outcome-validated profiles`
+                          : attritionModel?.status === "cohort_descriptive"
+                            ? `${attritionModel.eligible_observation_count} observed durations`
+                            : "Outcome history required"}
                       </span>
                     </div>
 
-                    {/* Search + sort controls */}
-                    <div className="shrink-0 space-y-2 mb-3">
-                      <div className="relative">
-                        <Search
-                          size={12}
-                          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
-                        />
-                        <input
-                          type="text"
-                          value={attritionSearch}
-                          onChange={(e) => setAttritionSearch(e.target.value)}
-                          placeholder="Search name, role, department..."
-                          className="w-full rounded-lg border border-white/10 bg-slate-950/70 pl-7 pr-2 py-1.5 text-[10px] text-white placeholder:text-slate-600 outline-none focus:border-indigo-400/50"
-                        />
+                    {/* Search + sort controls appear only when a validated model is available. */}
+                    {attritionModel?.status === "ready" && (
+                      <div className="shrink-0 space-y-2 mb-3">
+                        <div className="relative">
+                          <Search
+                            size={12}
+                            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
+                          />
+                          <input
+                            type="text"
+                            value={attritionSearch}
+                            onChange={(e) => setAttritionSearch(e.target.value)}
+                            placeholder="Search name, role, department..."
+                            className="w-full rounded-lg border border-white/10 bg-slate-950/70 pl-7 pr-2 py-1.5 text-[10px] text-white placeholder:text-slate-600 outline-none focus:border-indigo-400/50"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {[
+                            { key: "hazard", label: "Risk" },
+                            { key: "name", label: "Name" },
+                            { key: "tenure", label: "Tenure" },
+                            { key: "percentile", label: "Pct" },
+                          ].map((opt) => (
+                            <button
+                              key={opt.key}
+                              type="button"
+                              onClick={() => {
+                                if (attritionSort === opt.key) {
+                                  setAttritionSortDesc(!attritionSortDesc);
+                                } else {
+                                  setAttritionSort(opt.key);
+                                  setAttritionSortDesc(true);
+                                }
+                              }}
+                              className={`flex-1 rounded-lg border px-1.5 py-1 text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                                attritionSort === opt.key
+                                  ? "border-indigo-400/50 bg-indigo-500/10 text-indigo-300"
+                                  : "border-white/10 bg-white/[0.03] text-slate-500 hover:text-slate-300"
+                              }`}
+                            >
+                              {opt.label}
+                              {attritionSort === opt.key &&
+                                (attritionSortDesc ? " ↓" : " ↑")}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        {[
-                          { key: "hazard", label: "Risk" },
-                          { key: "name", label: "Name" },
-                          { key: "tenure", label: "Tenure" },
-                          { key: "percentile", label: "Pct" },
-                        ].map((opt) => (
-                          <button
-                            key={opt.key}
-                            type="button"
-                            onClick={() => {
-                              if (attritionSort === opt.key) {
-                                setAttritionSortDesc(!attritionSortDesc);
-                              } else {
-                                setAttritionSort(opt.key);
-                                setAttritionSortDesc(true);
-                              }
-                            }}
-                            className={`flex-1 rounded-lg border px-1.5 py-1 text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                              attritionSort === opt.key
-                                ? "border-indigo-400/50 bg-indigo-500/10 text-indigo-300"
-                                : "border-white/10 bg-white/[0.03] text-slate-500 hover:text-slate-300"
-                            }`}
-                          >
-                            {opt.label}
-                            {attritionSort === opt.key &&
-                              (attritionSortDesc ? " ↓" : " ↑")}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    )}
 
                     <div className="space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
                       {attritionLoading ? (
                         <div className="text-xs text-slate-500 text-center py-8">
-                          Loading hazard computations...
+                          Loading attrition model readiness...
                         </div>
                       ) : visibleAttrition.length === 0 ? (
-                        <div className="text-xs text-slate-600 text-center py-8">
-                          No profiles match this search.
+                        <div className="text-xs text-slate-400 text-center py-8 space-y-2">
+                          {attritionError ? (
+                            <>
+                              <p>{attritionError}</p>
+                              <button
+                                type="button"
+                                onClick={fetchAttrition}
+                                className="rounded-md border border-white/10 px-3 py-1 text-slate-200 hover:border-indigo-400/50"
+                              >
+                                Retry
+                              </button>
+                            </>
+                          ) : attritionModel?.status ===
+                            "cohort_descriptive" ? (
+                            <>
+                              <p className="font-semibold text-cyan-200">
+                                Cohort evidence available
+                              </p>
+                              <p>
+                                {attritionModel.observed_departure_count}{" "}
+                                recorded departures and{" "}
+                                {attritionModel.right_censored_count}{" "}
+                                right-censored employees. These describe the
+                                uploaded cohort; they do not rank individual
+                                employees.
+                              </p>
+                            </>
+                          ) : attritionModel?.status ===
+                            "insufficient_outcome_data" ? (
+                            <>
+                              <p className="font-semibold text-amber-200">
+                                Forecasts are unavailable
+                              </p>
+                              <p>
+                                This tenant has{" "}
+                                {attritionModel.tenant_profile_count} employee
+                                profiles. Add employment start dates, departure
+                                dates with departure_event=true, and censor
+                                dates with departure_event=false to calculate a
+                                cohort survival curve.
+                              </p>
+                            </>
+                          ) : (
+                            <p>No profiles match this search.</p>
+                          )}
                         </div>
                       ) : (
                         visibleAttrition.map((emp) => {
@@ -2554,14 +2963,11 @@ const IntelligenceCenterView = () => {
                         <div className="flex items-center justify-between border-b border-white/5 pb-3 gap-3">
                           <div className="min-w-0">
                             <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                              Survival Hazard Breakdown & Simulation Sandbox
+                              Observed Attrition Survival Analysis
                             </div>
                             <div className="mt-1 text-[9px] uppercase tracking-wider text-amber-300 truncate">
-                              Cox Proportional Hazards ·{" "}
-                              {selectedAttritionEmp.model_version ||
-                                "cox-ph-industry-v2"}{" "}
-                              · calibrated to industry tenure-attrition
-                              benchmarks
+                              {attritionModel?.status ||
+                                "Model status unavailable"}
                             </div>
                             <h3 className="text-xl font-extrabold text-white mt-1 truncate">
                               {selectedAttritionEmp.full_name}
@@ -2690,7 +3096,8 @@ const IntelligenceCenterView = () => {
                             <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
                               <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
                                 <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                                  12-Month Survival Curve S(t) · Cox PH
+                                  12-Month Survival Scenario · Unvalidated
+                                  Formula
                                 </div>
                                 <span className="text-xs font-bold text-indigo-400">
                                   End Projection Survival:{" "}
@@ -2720,7 +3127,7 @@ const IntelligenceCenterView = () => {
                                       background: "rgba(129,140,248,0.25)",
                                     }}
                                   />
-                                  95% Model Band
+                                  Unvalidated illustrative range
                                 </span>
                                 <span className="flex items-center gap-1.5">
                                   <span className="w-4 h-[3px] rounded-full border-t border-dashed border-slate-400" />
@@ -2849,7 +3256,7 @@ const IntelligenceCenterView = () => {
                                           />
                                         )}
 
-                                        {/* Employee 95% CI band */}
+                                        {/* Legacy formula range, not a confidence interval. */}
                                         <path
                                           fill="rgba(129,140,248,0.18)"
                                           stroke="none"
@@ -3083,7 +3490,7 @@ const IntelligenceCenterView = () => {
                                         </strong>
                                       </div>
                                       <div className="text-slate-400 flex justify-between">
-                                        <span>95% CI</span>
+                                        <span>Illustrative range</span>
                                         <strong className="text-indigo-300 font-mono">
                                           {(
                                             attritionSim.forecast[
@@ -3400,11 +3807,11 @@ const IntelligenceCenterView = () => {
                             <div className="rounded-xl border border-white/5 bg-slate-950/60 p-4">
                               <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
                                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                                  Flight Risk Mitigation Simulator
+                                  Profile Scenario Controls (not a forecast)
                                 </h4>
                                 <div className="flex items-center gap-2">
                                   <span className="text-[8px] font-mono text-slate-500">
-                                    live Cox PH recompute
+                                    fixed formula recalculation
                                   </span>
                                   <button
                                     type="button"
@@ -3496,7 +3903,9 @@ const IntelligenceCenterView = () => {
 
                                 <div>
                                   <div className="flex justify-between text-[9px] text-slate-400 mb-1">
-                                    <span>Skill Load (assigned skills)</span>
+                                    <span>
+                                      Assigned Skill Count (not workload)
+                                    </span>
                                     <span className="text-amber-400">
                                       {workloadSlider} skills
                                     </span>
@@ -3599,7 +4008,7 @@ const IntelligenceCenterView = () => {
                             </div>
                           </div>
 
-                          {/* Right: SHAP / Feature Contributions */}
+                          {/* Right: fixed-formula scenario contributions */}
                           <div className="space-y-4">
                             <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
                               <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-1">
@@ -3672,14 +4081,14 @@ const IntelligenceCenterView = () => {
                             <div className="space-y-3">
                               <div className="flex items-center justify-between">
                                 <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
-                                  Baseline Covariates (SHAP Explainability)
+                                  Fixed Formula Contributions (not SHAP)
                                 </div>
                                 <span className="text-[8px] font-mono text-slate-600">
                                   live with sandbox
                                 </span>
                               </div>
 
-                              {/* SHAP waterfall */}
+                              {/* Formula contribution waterfall */}
                               {attritionSim && (
                                 <div className="rounded-xl border border-white/5 bg-slate-950 p-3">
                                   <div className="text-[8px] font-mono text-slate-500 text-center mb-1.5">
@@ -3814,10 +4223,107 @@ const IntelligenceCenterView = () => {
                           </div>
                         </div>
                       </div>
+                    ) : attritionModel?.status === "cohort_descriptive" ? (
+                      <div className="mx-auto my-auto w-full max-w-3xl rounded-xl border border-cyan-400/20 bg-slate-950/50 p-5">
+                        <div className="text-sm font-bold text-cyan-200">
+                          Observed workforce survival
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-slate-300">
+                          Kaplan–Meier cohort estimate from uploaded employment
+                          dates. It describes this dataset and does not predict
+                          an individual employee’s outcome.
+                        </p>
+                        {survivalCurve.length > 1 && (
+                          <div className="mt-4 h-52 rounded-lg border border-white/10 bg-slate-950 p-3">
+                            <svg
+                              viewBox="0 0 100 100"
+                              preserveAspectRatio="none"
+                              className="h-full w-full"
+                              role="img"
+                              aria-label="Observed workforce survival curve"
+                            >
+                              {[0, 25, 50, 75, 100].map((v) => (
+                                <line
+                                  key={v}
+                                  x1="0"
+                                  x2="100"
+                                  y1={100 - v}
+                                  y2={100 - v}
+                                  stroke="rgba(255,255,255,.09)"
+                                  strokeDasharray="2 2"
+                                />
+                              ))}
+                              <path
+                                fill="none"
+                                stroke="#22d3ee"
+                                strokeWidth="1.5"
+                                vectorEffect="non-scaling-stroke"
+                                d={survivalCurve.reduce((path, point) => {
+                                  const maxMonth = Math.max(
+                                    1,
+                                    survivalCurve[survivalCurve.length - 1]
+                                      .tenure_month,
+                                  );
+                                  const x =
+                                    (point.tenure_month / maxMonth) * 100;
+                                  const y =
+                                    100 - point.survival_probability * 100;
+                                  return `${path} H ${x} V ${y}`;
+                                }, "M 0 0")}
+                              />
+                            </svg>
+                            <div className="mt-1 flex justify-between text-[9px] font-mono text-slate-500">
+                              <span>0 months</span>
+                              <span>
+                                {survivalCurve[
+                                  survivalCurve.length - 1
+                                ].tenure_month.toFixed(1)}{" "}
+                                months observed
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-slate-400">
+                          <span>
+                            {attritionModel.eligible_observation_count} valid
+                            durations
+                          </span>
+                          <span>
+                            {attritionModel.observed_departure_count} departures
+                          </span>
+                          <span>
+                            {attritionModel.right_censored_count} censored
+                            records
+                          </span>
+                          <span>
+                            {attritionModel.excluded_missing_start_count +
+                              attritionModel.excluded_missing_outcome_or_censor_count +
+                              attritionModel.excluded_invalid_date_order_count}{" "}
+                            excluded records
+                          </span>
+                        </div>
+                      </div>
                     ) : (
-                      <div className="text-slate-400 text-sm py-20 text-center">
-                        Select an employee from the left panel to review
-                        attrition survival analytics.
+                      <div className="mx-auto my-auto max-w-xl rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-6 text-center">
+                        <div className="text-sm font-bold text-amber-200">
+                          {attritionError
+                            ? "Attrition data could not be loaded"
+                            : "Validated survival forecasts are not available"}
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-slate-300">
+                          {attritionError ||
+                            attritionModel?.message ||
+                            "Observed employment durations and departure outcomes are required before this system can estimate attrition risk."}
+                        </p>
+                        {attritionError && (
+                          <button
+                            type="button"
+                            onClick={fetchAttrition}
+                            className="mt-4 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white hover:border-indigo-400/50"
+                          >
+                            Retry
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -3826,18 +4332,14 @@ const IntelligenceCenterView = () => {
               <AIExplanationPanel
                 subtab="attrition"
                 context={{
-                  selectedEmployee: selectedAttritionEmp,
-                  populationStats: populationStats,
-                  baseline: attritionBaseline,
-                  simulation: attritionSim,
-                  covariates: attritionCovs,
-                  moraleSlider: moraleSlider,
-                  salarySlider: salarySlider,
-                  workloadSlider: workloadSlider,
+                  model: attritionModel,
+                  survivalCurve,
+                  uploadedDataReadiness: intelligenceReadiness?.attrition,
                 }}
                 buttonText="Explain with AI"
-                autoRefresh={true}
-                disabled={!selectedAttritionEmp}
+                autoRun
+                autoRunKey={`${resultRevisions.attrition}:${selectedAttritionEmp?.employee_id || "population"}:${moraleSlider}:${salarySlider}:${workloadSlider}`}
+                disabled={!attritionModel || attritionLoading}
               />
             </motion.div>
           )}
@@ -3867,7 +4369,7 @@ const IntelligenceCenterView = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">
-                              3D Enterprise Network Space
+                              Observed Collaboration Network
                             </h3>
                             <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-[8.5px] font-mono font-bold text-cyan-300">
                               {onaData?.nodes?.length || 0} Nodes ·{" "}
@@ -3875,8 +4377,17 @@ const IntelligenceCenterView = () => {
                             </span>
                           </div>
                           <p className="mt-0.5 text-[9.5px] text-slate-400">
-                            Multi-cluster 3D orbital physics · PageRank
-                            influence · Brandes betweenness bridges
+                            Uploaded collaboration events ·{" "}
+                            {onaData?.metrics?.window_days || 90}-day window ·
+                            relative centrality
+                          </p>
+                          <p className="mt-0.5 text-[8.5px] text-slate-500">
+                            {onaData?.metrics?.employee_scope_truncated
+                              ? "Employee scope is capped; displayed centrality is relative to this subset. · "
+                              : ""}
+                            {onaData?.metrics?.latest_represented_record_at
+                              ? `Latest represented record: ${new Date(onaData.metrics.latest_represented_record_at).toLocaleDateString()}`
+                              : "No qualifying event in this window"}
                           </p>
                         </div>
 
@@ -3922,12 +4433,20 @@ const IntelligenceCenterView = () => {
                               size={14}
                               className="animate-spin text-cyan-400"
                             />
-                            Resolving 3D enterprise topology & Brandes paths...
+                            Calculating centrality from uploaded collaboration
+                            events...
+                          </div>
+                        ) : onaError ? (
+                          <div className="max-w-xl px-6 text-center text-xs text-rose-300 break-words">
+                            {onaError}
                           </div>
                         ) : !onaData?.nodes?.length ? (
                           <div className="text-slate-400 text-xs flex flex-col items-center gap-2 px-6 text-center">
                             <Users size={16} className="text-cyan-400/60" />
-                            No collaboration network available yet.
+                            No qualifying uploaded collaboration events were
+                            found for this tenant and time window. Employee
+                            profiles alone are not treated as evidence of
+                            collaboration.
                           </div>
                         ) : (
                           <OnaGraph3DCanvas
@@ -3941,7 +4460,6 @@ const IntelligenceCenterView = () => {
                               setSelectedOnaNode(node);
                               setMobileActivePane("right");
                             }}
-                            onCameraChange={setOnaCamera}
                             onColorModeChange={setOnaColorMode}
                           />
                         )}
@@ -3975,7 +4493,7 @@ const IntelligenceCenterView = () => {
                           </h3>
                           <div className="text-[9.5px] text-slate-400 uppercase mt-0.5 tracking-wider">
                             {selectedOnaNode.role} ·{" "}
-                            {selectedOnaNode.degree || 0} Direct Ties
+                            {selectedOnaNode.degree || 0} Observed Ties
                           </div>
                         </div>
 
@@ -3984,7 +4502,7 @@ const IntelligenceCenterView = () => {
                           {/* PageRank Centrality */}
                           <div className="rounded-xl border border-white/5 bg-slate-950/80 p-3">
                             <div className="text-[8.5px] uppercase tracking-widest text-slate-500 font-bold">
-                              PageRank (Influence)
+                              PageRank (Relative)
                             </div>
                             <div className="text-2xl font-black font-mono text-amber-300 mt-0.5">
                               {(
@@ -4005,7 +4523,7 @@ const IntelligenceCenterView = () => {
                           {/* Betweenness Centrality */}
                           <div className="rounded-xl border border-white/5 bg-slate-950/80 p-3">
                             <div className="text-[8.5px] uppercase tracking-widest text-slate-500 font-bold">
-                              Betweenness (Bridges)
+                              Betweenness (Relative)
                             </div>
                             <div className="text-2xl font-black font-mono text-cyan-300 mt-0.5">
                               {(
@@ -4026,7 +4544,7 @@ const IntelligenceCenterView = () => {
                           {/* Closeness Centrality */}
                           <div className="rounded-xl border border-white/5 bg-slate-950/80 p-3">
                             <div className="text-[8.5px] uppercase tracking-widest text-slate-500 font-bold">
-                              Closeness (Diffusion)
+                              Closeness (Relative)
                             </div>
                             <div className="text-2xl font-black font-mono text-indigo-300 mt-0.5">
                               {(
@@ -4052,19 +4570,23 @@ const IntelligenceCenterView = () => {
                             </div>
                             <div
                               className={`text-2xl font-black font-mono mt-0.5 ${
-                                (selectedOnaNode.ei_silo_index || 0) > 0
-                                  ? "text-emerald-300"
-                                  : "text-rose-400"
+                                selectedOnaNode.ei_silo_index == null
+                                  ? "text-slate-500"
+                                  : selectedOnaNode.ei_silo_index > 0
+                                    ? "text-emerald-300"
+                                    : "text-rose-400"
                               }`}
                             >
-                              {(selectedOnaNode.ei_silo_index || 0) > 0
-                                ? `+${selectedOnaNode.ei_silo_index}`
-                                : selectedOnaNode.ei_silo_index}
+                              {selectedOnaNode.ei_silo_index == null
+                                ? "—"
+                                : selectedOnaNode.ei_silo_index > 0
+                                  ? `+${selectedOnaNode.ei_silo_index.toFixed(2)}`
+                                  : selectedOnaNode.ei_silo_index.toFixed(2)}
                             </div>
                             <div className="text-[8px] text-slate-500 mt-1 uppercase truncate">
-                              {(selectedOnaNode.ei_silo_index || 0) > 0
-                                ? "Cross-Dept Spanner"
-                                : "Dept Siloed"}
+                              {selectedOnaNode.ei_silo_index == null
+                                ? "No observed ties"
+                                : "Observed tie department mix"}
                             </div>
                           </div>
                         </div>
@@ -4073,11 +4595,11 @@ const IntelligenceCenterView = () => {
                         <div className="rounded-xl border border-white/5 bg-slate-950/70 p-3.5 space-y-2">
                           <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
                             <span className="text-[9px] uppercase tracking-widest font-bold text-cyan-300">
-                              Active Collaborators (
+                              Recorded Co-Participants (
                               {selectedNodeNeighbors.length})
                             </span>
                             <span className="text-[8px] text-slate-500 font-mono">
-                              Weight / Tie
+                              Imported Events
                             </span>
                           </div>
                           {selectedNodeNeighbors.length === 0 ? (
@@ -4109,7 +4631,8 @@ const IntelligenceCenterView = () => {
                                         </span>
                                       )}
                                       <span className="text-[9.5px] font-mono font-bold text-cyan-300">
-                                        {(weight * 100).toFixed(0)}%
+                                        {weight}{" "}
+                                        {weight === 1 ? "record" : "records"}
                                       </span>
                                     </div>
                                   </button>
@@ -4123,7 +4646,7 @@ const IntelligenceCenterView = () => {
                           {/* Influencers */}
                           <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3 space-y-1.5">
                             <span className="text-[8.5px] uppercase tracking-widest font-bold text-amber-300 block border-b border-white/5 pb-1">
-                              Top Influencers
+                              Highest PageRank (Relative)
                             </span>
                             {topInfluencers.slice(0, 3).map((node) => (
                               <button
@@ -4147,7 +4670,7 @@ const IntelligenceCenterView = () => {
                           {/* Bridge Brokers */}
                           <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3 space-y-1.5">
                             <span className="text-[8.5px] uppercase tracking-widest font-bold text-cyan-300 block border-b border-white/5 pb-1">
-                              Key Bridge Brokers
+                              Highest Betweenness (Relative)
                             </span>
                             {topBridgeBrokers.slice(0, 3).map((node) => (
                               <button
@@ -4172,14 +4695,18 @@ const IntelligenceCenterView = () => {
                         {/* Network Topology Summary Footer */}
                         <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] text-slate-500 font-mono">
                           <span>
-                            Density: {onaData?.metrics?.graph_density || "0.08"}{" "}
+                            Density:{" "}
+                            {(onaData?.metrics?.graph_density ?? 0).toFixed(3)}{" "}
                             · Cross-Dept:{" "}
                             {(
-                              (onaData?.metrics?.cross_dept_ratio || 0.42) * 100
+                              (onaData?.metrics?.cross_dept_ratio ?? 0) * 100
                             ).toFixed(0)}
                             %
                           </span>
-                          <span>Brandes + PageRank</span>
+                          <span>
+                            {onaData?.metrics?.represented_record_count || 0}{" "}
+                            represented records
+                          </span>
                         </div>
                       </>
                     ) : (
@@ -4193,18 +4720,19 @@ const IntelligenceCenterView = () => {
               <AIExplanationPanel
                 subtab="ona"
                 context={{
-                  nodes: onaData?.nodes || [],
-                  links: onaData?.links || [],
+                  graphMetrics: onaData?.metrics || {},
+                  uploadedDataReadiness: intelligenceReadiness?.ona,
+                  nodeCount: onaData?.nodes?.length || 0,
+                  linkCount: onaData?.links?.length || 0,
+                  topInfluencers,
+                  topBridgeBrokers,
                   selectedNode: selectedOnaNode,
-                  camera: onaCamera,
-                  departments: availableDepts,
-                  metrics: onaData?.metrics || {},
+                  selectedNodeNeighbors,
                 }}
                 buttonText="Explain with AI"
-                autoRefresh={false}
-                disabled={
-                  !onaData || !onaData.nodes || onaData.nodes.length === 0
-                }
+                autoRun
+                autoRunKey={`${resultRevisions.ona}:${selectedOnaNode?.id || "none"}`}
+                disabled={onaLoading || resultRevisions.ona === 0}
               />
             </motion.div>
           )}
@@ -4222,7 +4750,7 @@ const IntelligenceCenterView = () => {
                 activePane={mobileActivePane}
                 setActivePane={setMobileActivePane}
                 leftTitle="Employee Profile"
-                rightTitle="Transition Horizon"
+                rightTitle="Recorded Role Changes"
                 leftIcon={<Users size={14} />}
                 rightIcon={<Sparkles size={14} />}
                 leftWidthClass="lg:w-[300px] xl:w-[320px]"
@@ -4255,16 +4783,28 @@ const IntelligenceCenterView = () => {
                           </PremiumSelect>
                         </div>
 
+                        {careerEmployeeScopeTruncated && (
+                          <p className="mt-2 text-[9px] text-amber-300">
+                            Employee selector is capped at 10,000 tenant
+                            profiles.
+                          </p>
+                        )}
+                        {careerError && (
+                          <p className="mt-2 text-[9px] text-rose-300">
+                            {careerError}
+                          </p>
+                        )}
+
                         {careerPathData && (
                           <div className="rounded-xl border border-white/5 bg-slate-950 p-4">
                             <div className="text-[9px] uppercase tracking-widest text-slate-500 mb-1">
-                              Starting Node
+                              Current Recorded Role
                             </div>
                             <div className="text-sm font-black text-white">
                               {careerPathData.current_role}
                             </div>
                             <div className="text-[9px] text-indigo-400 uppercase mt-0.5">
-                              Markov Chain State
+                              Start state for observed transition matrix
                             </div>
                           </div>
                         )}
@@ -4276,96 +4816,177 @@ const IntelligenceCenterView = () => {
                   <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 h-auto lg:h-full lg:overflow-y-auto">
                     <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
                       <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
-                        Markov Career Transition Horizon
+                        Observed Markov Role Changes
                       </h3>
                       <span className="text-[10px] text-slate-500">
-                        {careerPathData?.model_version || "markov-career-v1"} ·
-                        modeled probabilities
+                        {careerPathData?.model_status ===
+                        "exploratory_observed_transitions"
+                          ? "Observed sample · not a validated forecast"
+                          : "Empirical history required"}
                       </span>
                     </div>
 
                     {careerLoading ? (
                       <div className="text-xs text-slate-500 text-center py-20">
-                        Matrix Multiplications under calculations...
+                        Loading tenant role history and calculating observed
+                        transitions…
                       </div>
                     ) : careerPathData ? (
-                      <div className="space-y-8 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/5 z-0">
-                        {careerPathData.career_progression_markov.map(
-                          (step, idx) => (
-                            <div key={idx} className="relative pl-10 z-10">
-                              {/* Dot indicator */}
-                              <div className="absolute left-2.5 top-1.5 h-3 w-3 rounded-full border border-indigo-400 bg-slate-950 z-20 flex items-center justify-center">
-                                <div className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
-                              </div>
+                      <div className="space-y-5">
+                        <div className="rounded-lg border border-indigo-400/20 bg-indigo-950/20 p-3 text-[10px] text-slate-300">
+                          <div>
+                            {careerPathData.message ||
+                              `Empirical matrix: ${careerPathData.observed_transition_count} observed role changes across ${careerPathData.history_employee_count} people. Each step means the next recorded role change; no time-to-promotion estimate is available.`}
+                          </div>
+                          <div className="mt-1 text-slate-500">
+                            Uploaded experience records:{" "}
+                            {careerPathData.source_record_count} · dated roles:{" "}
+                            {careerPathData.dated_role_record_count} · undated
+                            roles excluded:{" "}
+                            {careerPathData.undated_experience_record_count} ·
+                            history:{" "}
+                            {careerPathData.history_coverage_start
+                              ? new Date(
+                                  careerPathData.history_coverage_start,
+                                ).toLocaleDateString()
+                              : "—"}{" "}
+                            to{" "}
+                            {careerPathData.history_coverage_end
+                              ? new Date(
+                                  careerPathData.history_coverage_end,
+                                ).toLocaleDateString()
+                              : "—"}{" "}
+                            · this employee’s observed changes:{" "}
+                            {
+                              careerPathData.current_employee_observed_transitions
+                            }
+                          </div>
+                          {careerPathData.records_without_idempotency_key >
+                            0 && (
+                            <div className="mt-1 text-amber-300">
+                              {careerPathData.records_without_idempotency_key}{" "}
+                              source records lacked idempotency keys; exact
+                              replay deduplication is not guaranteed.
+                            </div>
+                          )}
+                        </div>
 
-                              <div className="mb-2">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
-                                  {step.projected_time_horizon} Horizon
-                                </span>
-                              </div>
+                        {careerPathData.model_status ===
+                        "exploratory_observed_transitions" ? (
+                          <div className="space-y-8 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/5 z-0">
+                            {careerPathData.career_progression_markov.map(
+                              (step, idx) => (
+                                <div key={idx} className="relative pl-10 z-10">
+                                  {/* Dot indicator */}
+                                  <div className="absolute left-2.5 top-1.5 h-3 w-3 rounded-full border border-indigo-400 bg-slate-950 z-20 flex items-center justify-center">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                                  </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {step.possibilities.map((pos, pIdx) => (
-                                  <div
-                                    key={pIdx}
-                                    className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between"
-                                  >
-                                    <div className="flex justify-between items-start mb-3">
-                                      <div>
-                                        <div className="font-bold text-white text-sm">
-                                          {pos.role}
-                                        </div>
-                                        <div className="text-[9px] text-slate-500 mt-0.5 uppercase">
-                                          Target Transition State
-                                        </div>
-                                      </div>
-                                      <span className="text-[10px] font-black text-cyan-300 bg-cyan-400/5 border border-cyan-400/10 px-2 py-0.5 rounded">
-                                        {(
-                                          pos.transition_probability * 100
-                                        ).toFixed(0)}
-                                        % Prob.
-                                      </span>
-                                    </div>
+                                  <div className="mb-2">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
+                                      {step.projected_time_horizon}
+                                    </span>
+                                    <span className="ml-2 text-[9px] text-slate-500">
+                                      Unmodeled mass:{" "}
+                                      {(
+                                        step.unmodeled_probability_mass * 100
+                                      ).toFixed(1)}
+                                      %
+                                    </span>
+                                  </div>
 
-                                    {/* Skill gaps */}
-                                    {pos.skill_gaps.length > 0 ? (
-                                      <div className="space-y-1.5 border-t border-white/5 pt-2.5">
-                                        <div className="text-[8px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-                                          Required skill transitions
-                                        </div>
-                                        {pos.skill_gaps.map((gap, gIdx) => (
-                                          <div
-                                            key={gIdx}
-                                            className="flex justify-between items-center text-[9px] border-b border-white/5 pb-1"
-                                          >
-                                            <span className="text-slate-400">
-                                              {gap.skill}
-                                            </span>
-                                            <span
-                                              className={`font-mono text-[9px] ${gap.difficulty.includes("Easy") ? "text-emerald-400" : gap.difficulty.includes("Medium") ? "text-amber-400" : "text-rose-400"}`}
-                                            >
-                                              {gap.difficulty}
-                                            </span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <div className="border-t border-white/5 pt-2.5 text-[9px] text-emerald-400">
-                                        ✓ Zero skill nodes missing for
-                                        transition.
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {step.possibilities.length === 0 && (
+                                      <div className="text-[10px] text-slate-500">
+                                        No further role changes can be estimated
+                                        from the observed history.
                                       </div>
                                     )}
+                                    {step.possibilities.map((pos, pIdx) => (
+                                      <div
+                                        key={pIdx}
+                                        className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between"
+                                      >
+                                        <div className="flex justify-between items-start mb-3">
+                                          <div>
+                                            <div className="font-bold text-white text-sm">
+                                              {pos.role}
+                                            </div>
+                                            <div className="text-[9px] text-slate-500 mt-0.5 uppercase">
+                                              Target Transition State
+                                            </div>
+                                          </div>
+                                          <span className="text-[10px] font-black text-cyan-300 bg-cyan-400/5 border border-cyan-400/10 px-2 py-0.5 rounded">
+                                            {(
+                                              pos.transition_probability * 100
+                                            ).toFixed(0)}
+                                            {step.step_number === 1
+                                              ? "% of observed changes"
+                                              : "% modeled share"}
+                                          </span>
+                                        </div>
+                                        {step.step_number === 1 && (
+                                          <div className="mb-2 text-[9px] text-slate-500">
+                                            Observed{" "}
+                                            {pos.observed_transition_count} of{" "}
+                                            {pos.observations_from_current_role}{" "}
+                                            changes from this role
+                                          </div>
+                                        )}
+
+                                        {/* Skill gaps */}
+                                        {pos.skill_requirements_status ===
+                                        "not_configured" ? (
+                                          <div className="border-t border-white/5 pt-2.5 text-[9px] text-slate-500">
+                                            No configured skill checklist for
+                                            this role; gap status is
+                                            unavailable.
+                                          </div>
+                                        ) : pos.skill_gaps.length > 0 ? (
+                                          <div className="space-y-1.5 border-t border-white/5 pt-2.5">
+                                            <div className="text-[8px] uppercase tracking-wider text-slate-500 font-bold mb-1">
+                                              Missing from recorded profile ·
+                                              configured framework
+                                            </div>
+                                            {pos.skill_gaps.map((gap, gIdx) => (
+                                              <div
+                                                key={`${pos.role}-${gap}-${gIdx}`}
+                                                className="text-[9px] text-slate-400 border-b border-white/5 pb-1"
+                                              >
+                                                {gap}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div className="border-t border-white/5 pt-2.5 text-[9px] text-slate-400">
+                                            No missing exact skill names in the
+                                            configured framework; this framework
+                                            is not tenant-validated.
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
-                              </div>
-                            </div>
-                          ),
+                                </div>
+                              ),
+                            )}
+                          </div>
+                        ) : (
+                          <div className="rounded-lg border border-amber-400/20 bg-amber-950/15 p-4 text-xs text-amber-200">
+                            {careerPathData.message ||
+                              "No dated uploaded employee role changes are available from this employee’s current role. No probabilities are shown."}
+                          </div>
                         )}
+                      </div>
+                    ) : careerError ? (
+                      <div className="text-xs text-rose-300 text-center py-16">
+                        {careerError}
                       </div>
                     ) : (
                       <div className="text-slate-400 text-sm py-16 text-center">
-                        Select an employee tracking profile to evaluate Markov
-                        Career progression path mapping.
+                        {careerEmployees.length === 0
+                          ? "No employee profiles are available in this tenant."
+                          : "Select an employee profile to inspect recorded role-transition history."}
                       </div>
                     )}
                   </div>
@@ -4374,13 +4995,14 @@ const IntelligenceCenterView = () => {
               <AIExplanationPanel
                 subtab="career-path"
                 context={{
-                  employees: careerEmployees,
                   selectedEmployeeId: selectedCareerEmpId,
                   careerPathData: careerPathData,
+                  uploadedDataReadiness: intelligenceReadiness?.career_markov,
                 }}
                 buttonText="Explain with AI"
-                autoRefresh={false}
-                disabled={!careerPathData}
+                autoRun
+                autoRunKey={`${resultRevisions.career}:${selectedCareerEmpId}`}
+                disabled={!careerPathData || careerLoading}
               />
             </motion.div>
           )}

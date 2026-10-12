@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +23,7 @@ Lean Enterprise v1 APIs:
 
 import asyncio
 import csv
+import hashlib
 import io
 import json
 import threading
@@ -37,6 +37,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from sqlmodel import Session, select
 
+from app.core.data_policy import is_active_employee
 from app.core.security import (
     TokenData,
     get_current_user,
@@ -48,6 +49,7 @@ from app.models.database import (
     CandidateTable,
     CanonicalCandidateTable,
     CanonicalEmployeeTable,
+    CollaborationEventTable,
     CompliancePolicyTable,
     ConnectorFieldMappingTable,
     ConnectorSyncJobTable,
@@ -58,8 +60,7 @@ from app.models.database import (
     ForecastScenarioTable,
     GoldMetricSnapshotTable,
     IntegrationConnectionTable,
-    InterventionOutcomeTable,
-    InterventionTable,
+    IntegrationEvidenceTable,
     MLDriftSnapshotTable,
     MLModelCardTable,
     MLModelRegistryTable,
@@ -67,6 +68,7 @@ from app.models.database import (
     QuarantineEventTable,
     RawEventTable,
     ReleaseGateTable,
+    SkillAliasTable,
     SkillTable,
     engine,
     get_session,
@@ -91,6 +93,7 @@ from app.schemas.schemas import (
     ReleaseGateOut,
 )
 from app.services.connectors.factory import get_connector
+from app.services.connectors.secrets import open_credentials
 
 router = APIRouter(prefix="/lean", tags=["lean-enterprise"])
 _SCHEDULER_TASK: asyncio.Task | None = None
@@ -101,6 +104,8 @@ _BUNDLE_FILE_NAMES = {
     "candidate_skills": "candidate_skills_public.csv",
     "employee_experience": "employee_experience_public.csv",
     "candidate_experience": "candidate_experience_public.csv",
+    "collaboration_events": "collaboration_events.csv",
+    "skill_aliases": "skill_aliases.csv",
 }
 _IMPORT_JOB_LOCK = threading.Lock()
 _IMPORT_JOBS: dict[str, dict[str, Any]] = {}
@@ -156,10 +161,45 @@ def _validate_payload(payload: dict[str, Any], required_fields: list[str]) -> li
     return missing
 
 
+def _apply_connector_mappings(
+    db: Session, connection_id: UUID, tenant_id: str, payload: dict[str, Any]
+) -> dict[str, Any]:
+    """Apply registered deterministic transforms to a source row."""
+    mappings = db.exec(
+        select(ConnectorFieldMappingTable)
+        .where(ConnectorFieldMappingTable.connection_id == connection_id)
+        .where(ConnectorFieldMappingTable.tenant_id == tenant_id)
+    ).all()
+    if not mappings:
+        return payload
+    mapped = dict(payload)
+    for mapping in mappings:
+        if mapping.source_field not in payload:
+            continue
+        value = payload[mapping.source_field]
+        rule = (mapping.transform_rule or "").strip().lower()
+        if rule == "trim" and isinstance(value, str):
+            value = value.strip()
+        elif rule == "lower" and isinstance(value, str):
+            value = value.lower()
+        elif rule == "upper" and isinstance(value, str):
+            value = value.upper()
+        elif rule == "to_float":
+            value = float(value)
+        elif rule == "to_bool":
+            value = str(value).strip().lower() in {"1", "true", "yes", "y"}
+        elif rule == "iso_date" and value:
+            value = datetime.fromisoformat(
+                str(value).replace("Z", "+00:00")
+            ).isoformat()
+        mapped[mapping.canonical_field] = value
+    return mapped
+
+
 def _build_quality_score(
     rows: list[dict[str, Any]],
     required_fields: list[str],
-    unique_field: str = "email",
+    unique_field: str | None = "email",
 ) -> dict[str, Any]:
     total_rows = len(rows)
     if total_rows == 0:
@@ -185,13 +225,17 @@ def _build_quality_score(
             missing_required_fields += len(missing)
             if len(issue_samples) < 5:
                 issue_samples.append(f"Row {idx + 1}: missing {', '.join(missing)}")
-        value = str(row.get(unique_field) or "").strip().lower()
+        value = (
+            str(row.get(unique_field) or "").strip().lower()
+            if unique_field
+            else json.dumps(row, sort_keys=True, ensure_ascii=False, default=str)
+        )
         if value:
             if value in seen_values:
                 duplicate_rows += 1
                 if len(issue_samples) < 5:
                     issue_samples.append(
-                        f"Row {idx + 1}: duplicate {unique_field} '{value}'"
+                        f"Row {idx + 1}: duplicate {unique_field or 'entire record'} '{value[:80]}'"
                     )
             else:
                 seen_values.add(value)
@@ -292,11 +336,26 @@ async def get_data_summary(
     current_user: TokenData = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
+    tenant_id = str(current_user.tenant_id or "default")
     return {
-        "employees": len(db.exec(select(EmployeeTable)).all()),
-        "candidates": len(db.exec(select(CandidateTable)).all()),
-        "skills": len(db.exec(select(SkillTable)).all()),
-        "experience": len(db.exec(select(ExperienceTable)).all()),
+        "employees": len(
+            db.exec(
+                select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
+            ).all()
+        ),
+        "candidates": len(
+            db.exec(
+                select(CandidateTable).where(CandidateTable.tenant_id == tenant_id)
+            ).all()
+        ),
+        "skills": len(
+            db.exec(select(SkillTable).where(SkillTable.tenant_id == tenant_id)).all()
+        ),
+        "experience": len(
+            db.exec(
+                select(ExperienceTable).where(ExperienceTable.tenant_id == tenant_id)
+            ).all()
+        ),
     }
 
 
@@ -317,6 +376,7 @@ def _audit(
     db.add(
         AuditLogTable(
             user_id=user_uuid,
+            tenant_id=current_user.tenant_id,
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
@@ -372,24 +432,17 @@ def _fairness_summary(
     )
 
 
-def _analytics_snapshot(db: Session) -> dict[str, Any]:
-    rows = db.exec(select(CanonicalEmployeeTable)).all()
-    if not rows:
-        rows = [
-            CanonicalEmployeeTable(
-                tenant_id="default",
-                provider="local_fallback",
-                external_id=str(r.id),
-                full_name=r.full_name,
-                email=r.email,
-                department=r.department,
-                role=r.role,
-                sentiment_score=r.sentiment_score,
-                retention_prob=r.retention_prob,
-                is_at_risk=r.is_at_risk,
-            )
-            for r in db.exec(select(EmployeeTable)).all()
-        ]
+def _analytics_snapshot(db: Session, tenant_id: str) -> dict[str, Any]:
+    # EmployeeTable is the tenant-owned read model shared by uploaded bundles
+    # and HRIS sync. Canonical connector rows may be incomplete/stale, so use
+    # this authoritative tenant scope for workspace metrics.
+    rows = [
+        employee
+        for employee in db.exec(
+            select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
+        ).all()
+        if is_active_employee(employee)
+    ]
     total = len(rows)
     at_risk = len([r for r in rows if r.is_at_risk])
     at_risk_pct = round((at_risk / total) * 100, 1) if total else 0.0
@@ -447,16 +500,24 @@ def _analytics_snapshot(db: Session) -> dict[str, Any]:
 
 
 def _model_card_out(card: MLModelCardTable) -> MLModelCardOut:
+    is_unvalidated_attrition = card.model_name == "attrition_v1"
     return MLModelCardOut(
         id=card.id,
         tenant_id=card.tenant_id,
         model_name=card.model_name,
         version=card.version,
-        status=card.status,
-        pr_auc=card.pr_auc,
-        calibration_error=card.calibration_error,
-        fairness_gap=card.fairness_gap,
-        notes=card.notes,
+        status="unvalidated" if is_unvalidated_attrition else card.status,
+        pr_auc=None if is_unvalidated_attrition else card.pr_auc,
+        calibration_error=(
+            None if is_unvalidated_attrition else card.calibration_error
+        ),
+        fairness_gap=None if is_unvalidated_attrition else card.fairness_gap,
+        notes=(
+            "Historical profile-based metrics are not valid model validation. "
+            "Observed departure and censoring outcomes are required."
+            if is_unvalidated_attrition
+            else card.notes
+        ),
         approved_by=card.approved_by,
         approved_at=card.approved_at,
         created_at=card.created_at,
@@ -526,6 +587,39 @@ def _first_value(data: dict[str, Any], keys: list[str], default: Any = None) -> 
     return default
 
 
+def _parse_optional_datetime(value: Any, field_name: str) -> datetime | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None) if value.tzinfo else value
+    text_value = str(value).strip()
+    if not text_value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text_value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid {field_name}; use an ISO date or datetime.",
+        ) from exc
+    return parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+
+
+def _parse_optional_bool(value: Any, field_name: str) -> bool | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().casefold()
+    if normalized in {"1", "true", "yes", "y", "active", "current"}:
+        return True
+    if normalized in {"0", "false", "no", "n", "inactive", "former"}:
+        return False
+    raise HTTPException(
+        status_code=422, detail=f"Invalid {field_name}; use true or false."
+    )
+
+
 def _load_csv_rows(file_path: Path) -> list[dict[str, Any]]:
     with file_path.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
@@ -582,6 +676,170 @@ def _parse_employee_row(row: dict[str, Any]) -> dict[str, Any]:
         row, ["retention_prob", "retention_probability", "retention"], None
     )
     retention_prob = float(retention_prob) if retention_prob not in [None, ""] else None
+    salary_value = _first_value(row, ["salary", "annual_salary", "compensation"], None)
+    try:
+        salary = int(float(salary_value)) if salary_value not in (None, "") else None
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(
+            status_code=422, detail="salary must be a numeric amount."
+        ) from exc
+    if salary is not None and salary < 0:
+        raise HTTPException(status_code=422, detail="salary cannot be negative.")
+    salary_currency = (
+        str(_first_value(row, ["salary_currency", "currency"], "") or "")
+        .strip()
+        .upper()
+        or None
+    )
+    if salary_currency and (len(salary_currency) != 3 or not salary_currency.isalpha()):
+        raise HTTPException(
+            status_code=422,
+            detail="salary_currency must be a three-letter currency code.",
+        )
+    salary_period = (
+        str(
+            _first_value(
+                row, ["salary_period", "pay_period", "compensation_period"], ""
+            )
+            or ""
+        )
+        .strip()
+        .casefold()
+        or None
+    )
+    if salary_period:
+        salary_period = {
+            "year": "annual",
+            "yearly": "annual",
+            "per_year": "annual",
+            "month": "monthly",
+            "per_month": "monthly",
+            "hour": "hourly",
+            "per_hour": "hourly",
+        }.get(salary_period, salary_period)
+        if salary_period not in {"annual", "monthly", "weekly", "hourly"}:
+            raise HTTPException(
+                status_code=422,
+                detail="salary_period must be annual, monthly, weekly, or hourly.",
+            )
+    employment_duration_raw = _first_value(
+        row,
+        ["employment_duration_years", "tenure_years", "years_at_company"],
+        None,
+    )
+    try:
+        employment_duration_years = (
+            float(employment_duration_raw)
+            if employment_duration_raw not in (None, "")
+            else None
+        )
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="employment_duration_years must be numeric.",
+        ) from exc
+    if (
+        employment_duration_years is not None
+        and not 0 <= employment_duration_years <= 80
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="employment_duration_years must be between 0 and 80.",
+        )
+    join_date = _parse_optional_datetime(
+        _first_value(
+            row, ["employment_start_date", "hire_date", "join_date", "start_date"], None
+        ),
+        "employment_start_date",
+    )
+    employment_end_date = _parse_optional_datetime(
+        _first_value(
+            row,
+            ["employment_end_date", "termination_date", "end_date", "departure_date"],
+            None,
+        ),
+        "employment_end_date",
+    )
+    employment_censor_date = _parse_optional_datetime(
+        _first_value(
+            row, ["employment_censor_date", "censor_date", "observed_through"], None
+        ),
+        "employment_censor_date",
+    )
+    departure_event = _parse_optional_bool(
+        _first_value(
+            row, ["departure_event", "is_departed", "terminated", "left_company"], None
+        ),
+        "departure_event",
+    )
+    employment_status_raw = (
+        str(
+            _first_value(row, ["employment_status", "worker_status", "status"], "")
+            or ""
+        )
+        .strip()
+        .casefold()
+    )
+    employment_status = {
+        "current": "active",
+        "employed": "active",
+        "on leave": "on_leave",
+        "on_leave": "on_leave",
+        "inactive": "departed",
+        "terminated": "departed",
+        "former": "departed",
+        "left": "departed",
+    }.get(employment_status_raw, employment_status_raw) or None
+    if employment_status and employment_status not in {
+        "active",
+        "on_leave",
+        "departed",
+    }:
+        raise HTTPException(
+            status_code=422,
+            detail="employment_status must be active, on_leave, or departed.",
+        )
+    if departure_event is True and employment_status not in (None, "departed"):
+        raise HTTPException(
+            status_code=422,
+            detail="departure_event=true conflicts with an active employment_status.",
+        )
+    if departure_event is False and employment_status == "departed":
+        raise HTTPException(
+            status_code=422,
+            detail="departure_event=false conflicts with employment_status=departed.",
+        )
+    if departure_event is True:
+        employment_status = "departed"
+    if employment_end_date and departure_event is False:
+        raise HTTPException(
+            status_code=422,
+            detail="A row with employment_end_date cannot mark departure_event false.",
+        )
+    # Preserve zero-duration source outcomes as raw imported data. The survival
+    # estimator excludes zero duration because event ordering is undefined at
+    # that point, but rejecting the whole employee row would lose valid source
+    # attributes and make bundle imports fail on benchmark records.
+    duration_available = employment_duration_years is not None
+    if departure_event is True and not employment_end_date and not duration_available:
+        raise HTTPException(
+            status_code=422,
+            detail="departure_event=true requires employment_end_date or a nonnegative employment_duration_years.",
+        )
+    if departure_event is False and employment_end_date:
+        raise HTTPException(
+            status_code=422,
+            detail="departure_event=false must use employment_censor_date, not employment_end_date.",
+        )
+    if (
+        departure_event is False
+        and not employment_censor_date
+        and not duration_available
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="departure_event=false requires employment_censor_date or a nonnegative employment_duration_years.",
+        )
     external_id = str(
         _first_value(
             row, ["external_id", "id", "employee_id"], email or full_name or "local"
@@ -600,6 +858,15 @@ def _parse_employee_row(row: dict[str, Any]) -> dict[str, Any]:
         "sentiment_score": sentiment_score,
         "is_at_risk": is_at_risk,
         "retention_prob": retention_prob,
+        "salary": salary,
+        "salary_currency": salary_currency,
+        "salary_period": salary_period,
+        "join_date": join_date,
+        "employment_duration_years": employment_duration_years,
+        "employment_end_date": employment_end_date,
+        "employment_censor_date": employment_censor_date,
+        "departure_event": departure_event,
+        "employment_status": employment_status,
         "external_id": external_id or email,
     }
 
@@ -652,14 +919,28 @@ def _parse_candidate_row(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _import_rows_for_kind(
-    db: Session, tenant_id: str, kind: str, rows: list[dict[str, Any]]
+    db: Session,
+    tenant_id: str,
+    kind: str,
+    rows: list[dict[str, Any]],
+    *,
+    preserve_existing: bool = False,
 ) -> int:
     imported = 0
     if kind == "employees":
         existing_employees = {
             row.email.lower(): row
-            for row in db.exec(select(EmployeeTable)).all()
+            for row in db.exec(
+                select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
+            ).all()
             if row.email
+        }
+        employee_tenant_by_email = {
+            str(email).casefold(): owner_tenant
+            for email, owner_tenant in db.exec(
+                select(EmployeeTable.email, EmployeeTable.tenant_id)
+            ).all()
+            if email
         }
         existing_canonical = {
             row.external_id: row
@@ -672,14 +953,63 @@ def _import_rows_for_kind(
         for row in rows:
             parsed = _parse_employee_row(row)
             existing = existing_employees.get(parsed["email"])
+            if (
+                existing is None
+                and parsed["email"].casefold() in employee_tenant_by_email
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="An employee with this email belongs to a different tenant; the import row was not applied.",
+                )
             if existing:
-                existing.full_name = parsed["full_name"]
-                existing.department = parsed["department"]
-                existing.role = parsed["role"]
-                existing.sentiment_score = parsed["sentiment_score"]
-                existing.is_at_risk = parsed["is_at_risk"]
-                existing.retention_prob = parsed["retention_prob"]
-                existing.updated_at = datetime.utcnow()
+                if not preserve_existing:
+                    existing.full_name = parsed["full_name"]
+                    existing.department = parsed["department"]
+                    existing.role = parsed["role"]
+                    existing.sentiment_score = parsed["sentiment_score"]
+                    existing.is_at_risk = parsed["is_at_risk"]
+                    existing.retention_prob = parsed["retention_prob"]
+                if parsed["salary"] is not None and (
+                    not preserve_existing or existing.salary is None
+                ):
+                    existing.salary = parsed["salary"]
+                if parsed["salary_currency"] and (
+                    not preserve_existing or existing.salary_currency is None
+                ):
+                    existing.salary_currency = parsed["salary_currency"]
+                if parsed["salary_period"] and (
+                    not preserve_existing or existing.salary_period is None
+                ):
+                    existing.salary_period = parsed["salary_period"]
+                if parsed["join_date"] is not None and (
+                    not preserve_existing or existing.employment_start_date is None
+                ):
+                    existing.join_date = parsed["join_date"]
+                    existing.employment_start_date = parsed["join_date"]
+                if parsed["employment_end_date"] is not None and (
+                    not preserve_existing or existing.employment_end_date is None
+                ):
+                    existing.employment_end_date = parsed["employment_end_date"]
+                if parsed["employment_censor_date"] is not None and (
+                    not preserve_existing or existing.employment_censor_date is None
+                ):
+                    existing.employment_censor_date = parsed["employment_censor_date"]
+                if parsed["employment_duration_years"] is not None and (
+                    not preserve_existing or existing.employment_duration_years is None
+                ):
+                    existing.employment_duration_years = parsed[
+                        "employment_duration_years"
+                    ]
+                if parsed["departure_event"] is not None and (
+                    not preserve_existing or existing.departure_event is None
+                ):
+                    existing.departure_event = parsed["departure_event"]
+                if parsed["employment_status"] and (
+                    not preserve_existing or existing.employment_status is None
+                ):
+                    existing.employment_status = parsed["employment_status"]
+                if not preserve_existing:
+                    existing.updated_at = datetime.utcnow()
                 db.add(existing)
             else:
                 existing = EmployeeTable(
@@ -690,21 +1020,33 @@ def _import_rows_for_kind(
                     sentiment_score=parsed["sentiment_score"],
                     is_at_risk=parsed["is_at_risk"],
                     retention_prob=parsed["retention_prob"],
+                    salary=parsed.get("salary"),
+                    salary_currency=parsed["salary_currency"],
+                    salary_period=parsed["salary_period"],
+                    join_date=parsed["join_date"] or datetime.utcnow(),
+                    employment_start_date=parsed["join_date"],
+                    employment_end_date=parsed["employment_end_date"],
+                    employment_censor_date=parsed["employment_censor_date"],
+                    employment_duration_years=parsed["employment_duration_years"],
+                    departure_event=parsed["departure_event"],
+                    employment_status=parsed["employment_status"],
+                    tenant_id=tenant_id,
                 )
                 db.add(existing)
                 existing_employees[parsed["email"]] = existing
 
             canonical = existing_canonical.get(parsed["external_id"])
             if canonical:
-                canonical.full_name = parsed["full_name"]
-                canonical.email = parsed["email"]
-                canonical.department = parsed["department"]
-                canonical.role = parsed["role"]
-                canonical.sentiment_score = parsed["sentiment_score"]
-                canonical.retention_prob = parsed["retention_prob"]
-                canonical.is_at_risk = parsed["is_at_risk"]
-                canonical.updated_at = datetime.utcnow()
-                db.add(canonical)
+                if not preserve_existing:
+                    canonical.full_name = parsed["full_name"]
+                    canonical.email = parsed["email"]
+                    canonical.department = parsed["department"]
+                    canonical.role = parsed["role"]
+                    canonical.sentiment_score = parsed["sentiment_score"]
+                    canonical.retention_prob = parsed["retention_prob"]
+                    canonical.is_at_risk = parsed["is_at_risk"]
+                    canonical.updated_at = datetime.utcnow()
+                    db.add(canonical)
             else:
                 canonical = CanonicalEmployeeTable(
                     tenant_id=tenant_id,
@@ -724,8 +1066,17 @@ def _import_rows_for_kind(
     elif kind == "candidates":
         existing_candidates = {
             row.email.lower(): row
-            for row in db.exec(select(CandidateTable)).all()
+            for row in db.exec(
+                select(CandidateTable).where(CandidateTable.tenant_id == tenant_id)
+            ).all()
             if row.email
+        }
+        candidate_tenant_by_email = {
+            str(email).casefold(): owner_tenant
+            for email, owner_tenant in db.exec(
+                select(CandidateTable.email, CandidateTable.tenant_id)
+            ).all()
+            if email
         }
         existing_canonical = {
             row.external_id: row
@@ -738,13 +1089,31 @@ def _import_rows_for_kind(
         for row in rows:
             parsed = _parse_candidate_row(row)
             existing = existing_candidates.get(parsed["email"])
+            if (
+                existing is None
+                and parsed["email"].casefold() in candidate_tenant_by_email
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="A candidate with this email belongs to a different tenant; the import row was not applied.",
+                )
             if existing:
-                existing.full_name = parsed["full_name"]
-                existing.department = parsed["department"]
-                existing.role = parsed["role"]
-                existing.sentiment_score = parsed["sentiment_score"]
-                existing.match_score = parsed["match_score"]
-                existing.updated_at = datetime.utcnow()
+                if not preserve_existing:
+                    existing.full_name = parsed["full_name"]
+                    existing.department = parsed["department"]
+                    existing.role = parsed["role"]
+                    existing.sentiment_score = parsed["sentiment_score"]
+                    existing.match_score = parsed["match_score"]
+                    existing.updated_at = datetime.utcnow()
+                else:
+                    if not existing.full_name:
+                        existing.full_name = parsed["full_name"]
+                    if not existing.department:
+                        existing.department = parsed["department"]
+                    if not existing.role:
+                        existing.role = parsed["role"]
+                    if existing.match_score is None:
+                        existing.match_score = parsed["match_score"]
                 db.add(existing)
             else:
                 existing = CandidateTable(
@@ -754,19 +1123,21 @@ def _import_rows_for_kind(
                     role=parsed["role"],
                     sentiment_score=parsed["sentiment_score"],
                     match_score=parsed["match_score"],
+                    tenant_id=tenant_id,
                 )
                 db.add(existing)
                 existing_candidates[parsed["email"]] = existing
 
             canonical = existing_canonical.get(parsed["external_id"])
             if canonical:
-                canonical.full_name = parsed["full_name"]
-                canonical.email = parsed["email"]
-                canonical.department = parsed["department"]
-                canonical.role = parsed["role"]
-                canonical.match_score = parsed["match_score"]
-                canonical.updated_at = datetime.utcnow()
-                db.add(canonical)
+                if not preserve_existing:
+                    canonical.full_name = parsed["full_name"]
+                    canonical.email = parsed["email"]
+                    canonical.department = parsed["department"]
+                    canonical.role = parsed["role"]
+                    canonical.match_score = parsed["match_score"]
+                    canonical.updated_at = datetime.utcnow()
+                    db.add(canonical)
             else:
                 canonical = CanonicalCandidateTable(
                     tenant_id=tenant_id,
@@ -784,12 +1155,27 @@ def _import_rows_for_kind(
     elif kind in {"employee_skills", "candidate_skills"}:
         owner_lookup = {}
         if kind == "employee_skills":
-            owners = db.exec(select(EmployeeTable)).all()
+            owners = db.exec(
+                select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
+            ).all()
             owner_lookup = {row.email.lower(): row.id for row in owners if row.email}
         else:
-            owners = db.exec(select(CandidateTable)).all()
+            owners = db.exec(
+                select(CandidateTable).where(CandidateTable.tenant_id == tenant_id)
+            ).all()
             owner_lookup = {row.email.lower(): row.id for row in owners if row.email}
         batch = []
+        existing_skills = db.exec(
+            select(SkillTable).where(SkillTable.tenant_id == tenant_id)
+        ).all()
+        existing_by_owner_name = {
+            (
+                row.employee_id or row.candidate_id,
+                " ".join(row.name.casefold().split()),
+            ): row
+            for row in existing_skills
+            if row.name and (row.employee_id or row.candidate_id)
+        }
         for row in rows:
             name = str(_first_value(row, ["name", "skill", "skill_name"], "")).strip()
             level = int(float(_first_value(row, ["level", "proficiency"], 3) or 3))
@@ -808,36 +1194,116 @@ def _import_rows_for_kind(
                 owner_id = owner_lookup.get(owner_email)
                 if not owner_id:
                     continue
-                batch.append(
-                    SkillTable(
-                        name=name, level=max(1, min(5, level)), employee_id=owner_id
-                    )
+                existing_skill = existing_by_owner_name.get(
+                    (owner_id, " ".join(name.casefold().split()))
                 )
+                if existing_skill:
+                    if not preserve_existing:
+                        existing_skill.level = max(1, min(5, level))
+                        batch.append(existing_skill)
+                else:
+                    skill = SkillTable(
+                        name=name,
+                        level=max(1, min(5, level)),
+                        employee_id=owner_id,
+                        tenant_id=tenant_id,
+                    )
+                    existing_by_owner_name[
+                        (owner_id, " ".join(name.casefold().split()))
+                    ] = skill
+                    batch.append(skill)
             else:
                 owner_id = owner_lookup.get(owner_email)
                 if not owner_id:
                     continue
-                batch.append(
-                    SkillTable(
-                        name=name, level=max(1, min(5, level)), candidate_id=owner_id
-                    )
+                existing_skill = existing_by_owner_name.get(
+                    (owner_id, " ".join(name.casefold().split()))
                 )
+                if existing_skill:
+                    if not preserve_existing:
+                        existing_skill.level = max(1, min(5, level))
+                        batch.append(existing_skill)
+                else:
+                    skill = SkillTable(
+                        name=name,
+                        level=max(1, min(5, level)),
+                        candidate_id=owner_id,
+                        tenant_id=tenant_id,
+                    )
+                    existing_by_owner_name[
+                        (owner_id, " ".join(name.casefold().split()))
+                    ] = skill
+                    batch.append(skill)
             imported += 1
         if batch:
             db.add_all(batch)
     elif kind in {"employee_experience", "candidate_experience"}:
         owner_lookup = {}
         if kind == "employee_experience":
-            owners = db.exec(select(EmployeeTable)).all()
+            owners = db.exec(
+                select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
+            ).all()
             owner_lookup = {row.email.lower(): row.id for row in owners if row.email}
         else:
-            owners = db.exec(select(CandidateTable)).all()
+            owners = db.exec(
+                select(CandidateTable).where(CandidateTable.tenant_id == tenant_id)
+            ).all()
             owner_lookup = {row.email.lower(): row.id for row in owners if row.email}
         batch = []
+        existing_experiences = db.exec(
+            select(ExperienceTable).where(ExperienceTable.tenant_id == tenant_id)
+        ).all()
+        existing_experience_by_key = {
+            row.source_record_key: row
+            for row in existing_experiences
+            if row.source_record_key
+        }
+        existing_experience_signatures = {
+            (
+                row.employee_id or row.candidate_id,
+                row.company.casefold().strip(),
+                row.position.casefold().strip(),
+                row.duration_years,
+                row.description.casefold().strip(),
+                row.effective_start,
+                row.effective_end,
+                row.is_current,
+            )
+            for row in existing_experiences
+        }
         for row in rows:
             company = str(_first_value(row, ["company", "organization"], "")).strip()
             position = str(_first_value(row, ["position", "role", "title"], "")).strip()
             description = str(_first_value(row, ["description", "summary"], "")).strip()
+            effective_start = _parse_optional_datetime(
+                _first_value(
+                    row, ["effective_start", "start_date", "position_start_date"], None
+                ),
+                "experience effective_start",
+            )
+            effective_end = _parse_optional_datetime(
+                _first_value(
+                    row, ["effective_end", "end_date", "position_end_date"], None
+                ),
+                "experience effective_end",
+            )
+            is_current = bool(
+                _parse_optional_bool(
+                    _first_value(row, ["is_current", "current"], None),
+                    "experience is_current",
+                )
+                or False
+            )
+            if effective_start and effective_end and effective_end < effective_start:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Experience effective_end must not precede effective_start.",
+                )
+            if is_current and effective_end:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Current experience rows must not include effective_end.",
+                )
             duration_years = float(
                 _first_value(row, ["duration_years", "years"], 0) or 0
             )
@@ -856,26 +1322,276 @@ def _import_rows_for_kind(
                 owner_id = owner_lookup.get(owner_email)
                 if not owner_id:
                     continue
-                batch.append(
-                    ExperienceTable(
-                        company=company,
-                        position=position,
-                        duration_years=duration_years,
-                        description=description,
-                        employee_id=owner_id,
-                    )
+                signature = (
+                    owner_id,
+                    company.casefold(),
+                    position.casefold(),
+                    duration_years,
+                    description.casefold(),
+                    effective_start,
+                    effective_end,
+                    is_current,
                 )
+                if preserve_existing and signature in existing_experience_signatures:
+                    continue
+                source_record_key = str(
+                    _first_value(
+                        row, ["external_record_id", "experience_id", "record_id"], ""
+                    )
+                    or ""
+                ).strip()
+                if source_record_key and not source_record_key.startswith(
+                    "employee_experience:"
+                ):
+                    source_record_key = f"employee_experience:{source_record_key}"
+                if not source_record_key:
+                    key_payload = "|".join(
+                        (
+                            owner_email,
+                            company.casefold(),
+                            position.casefold(),
+                            effective_start.isoformat() if effective_start else "",
+                            effective_end.isoformat() if effective_end else "",
+                            str(duration_years),
+                            description,
+                        )
+                    )
+                    source_record_key = hashlib.sha256(
+                        key_payload.encode("utf-8")
+                    ).hexdigest()
+                experience = existing_experience_by_key.get(
+                    source_record_key
+                ) or ExperienceTable(
+                    company=company,
+                    position=position,
+                    duration_years=duration_years,
+                    description=description,
+                    employee_id=owner_id,
+                    tenant_id=tenant_id,
+                    source_record_key=source_record_key,
+                )
+                existing_experience_by_key[source_record_key] = experience
+                existing_experience_signatures.add(signature)
+                experience.company = company
+                experience.position = position
+                experience.duration_years = duration_years
+                experience.description = description
+                experience.employee_id = owner_id
+                experience.effective_start = effective_start
+                experience.effective_end = effective_end
+                experience.is_current = is_current
+                batch.append(experience)
             else:
                 owner_id = owner_lookup.get(owner_email)
                 if not owner_id:
                     continue
+                signature = (
+                    owner_id,
+                    company.casefold(),
+                    position.casefold(),
+                    duration_years,
+                    description.casefold(),
+                    effective_start,
+                    effective_end,
+                    is_current,
+                )
+                if preserve_existing and signature in existing_experience_signatures:
+                    continue
+                source_record_key = str(
+                    _first_value(
+                        row, ["external_record_id", "experience_id", "record_id"], ""
+                    )
+                    or ""
+                ).strip()
+                if source_record_key and not source_record_key.startswith(
+                    "candidate_experience:"
+                ):
+                    source_record_key = f"candidate_experience:{source_record_key}"
+                if not source_record_key:
+                    key_payload = "|".join(
+                        (
+                            "candidate",
+                            owner_email,
+                            company.casefold(),
+                            position.casefold(),
+                            effective_start.isoformat() if effective_start else "",
+                            effective_end.isoformat() if effective_end else "",
+                            str(duration_years),
+                            description,
+                        )
+                    )
+                    source_record_key = hashlib.sha256(
+                        key_payload.encode("utf-8")
+                    ).hexdigest()
+                experience = existing_experience_by_key.get(
+                    source_record_key
+                ) or ExperienceTable(
+                    company=company,
+                    position=position,
+                    duration_years=duration_years,
+                    description=description,
+                    candidate_id=owner_id,
+                    tenant_id=tenant_id,
+                    source_record_key=source_record_key,
+                )
+                existing_experience_by_key[source_record_key] = experience
+                existing_experience_signatures.add(signature)
+                experience.company = company
+                experience.position = position
+                experience.duration_years = duration_years
+                experience.description = description
+                experience.candidate_id = owner_id
+                experience.effective_start = effective_start
+                experience.effective_end = effective_end
+                experience.is_current = is_current
+                batch.append(experience)
+            imported += 1
+        if batch:
+            db.add_all(batch)
+    elif kind == "collaboration_events":
+        employees = db.exec(
+            select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
+        ).all()
+        employee_by_email = {
+            str(row.email or "").strip().casefold(): row
+            for row in employees
+            if row.email
+        }
+        existing_ids = set(
+            db.exec(
+                select(CollaborationEventTable.external_event_id).where(
+                    CollaborationEventTable.tenant_id == tenant_id,
+                    CollaborationEventTable.source == "uploaded_csv",
+                )
+            ).all()
+        )
+        batch = []
+        for row in rows:
+            email_a = (
+                str(
+                    _first_value(
+                        row,
+                        [
+                            "employee_a_email",
+                            "employee_email",
+                            "source_email",
+                            "reporter_email",
+                        ],
+                        "",
+                    )
+                    or ""
+                )
+                .strip()
+                .casefold()
+            )
+            email_b = (
+                str(
+                    _first_value(
+                        row,
+                        [
+                            "employee_b_email",
+                            "counterparty_email",
+                            "target_email",
+                            "assignee_email",
+                        ],
+                        "",
+                    )
+                    or ""
+                )
+                .strip()
+                .casefold()
+            )
+            person_a, person_b = employee_by_email.get(email_a), employee_by_email.get(
+                email_b
+            )
+            if not person_a or not person_b or person_a.id == person_b.id:
+                continue
+            occurred_at = _parse_optional_datetime(
+                _first_value(
+                    row, ["occurred_at", "event_time", "timestamp", "date"], None
+                ),
+                "collaboration occurred_at",
+            )
+            if occurred_at is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Every collaboration event requires occurred_at.",
+                )
+            event_type = str(
+                _first_value(
+                    row, ["event_type", "interaction_type", "type"], "collaboration"
+                )
+                or "collaboration"
+            ).strip()[:80]
+            external_id = str(
+                _first_value(row, ["external_event_id", "event_id", "id"], "") or ""
+            ).strip()
+            if not external_id:
+                canonical = "|".join(
+                    (
+                        *sorted((email_a, email_b)),
+                        event_type.casefold(),
+                        occurred_at.isoformat(),
+                    )
+                )
+                external_id = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+            if external_id in existing_ids:
+                continue
+            existing_ids.add(external_id)
+            batch.append(
+                CollaborationEventTable(
+                    tenant_id=tenant_id,
+                    source="uploaded_csv",
+                    external_event_id=external_id,
+                    employee_a_id=person_a.id,
+                    employee_b_id=person_b.id,
+                    event_type=event_type,
+                    occurred_at=occurred_at,
+                )
+            )
+            imported += 1
+        if batch:
+            db.add_all(batch)
+    elif kind == "skill_aliases":
+        aliases = {
+            row.alias_key: row
+            for row in db.exec(
+                select(SkillAliasTable).where(SkillAliasTable.tenant_id == tenant_id)
+            ).all()
+        }
+        batch = []
+        for row in rows:
+            alias = str(
+                _first_value(row, ["alias", "skill", "skill_name"], "") or ""
+            ).strip()
+            canonical = str(
+                _first_value(row, ["canonical_skill", "canonical", "mapped_skill"], "")
+                or ""
+            ).strip()
+            if not alias or not canonical:
+                continue
+            alias_key = " ".join(alias.casefold().split())
+            approved = bool(
+                _parse_optional_bool(
+                    _first_value(row, ["approved", "reviewed"], None),
+                    "skill alias approved",
+                )
+                or False
+            )
+            item = aliases.get(alias_key)
+            if item:
+                item.alias = alias
+                item.canonical_skill = canonical
+                item.approved = approved
+                db.add(item)
+            else:
                 batch.append(
-                    ExperienceTable(
-                        company=company,
-                        position=position,
-                        duration_years=duration_years,
-                        description=description,
-                        candidate_id=owner_id,
+                    SkillAliasTable(
+                        tenant_id=tenant_id,
+                        alias=alias,
+                        alias_key=alias_key,
+                        canonical_skill=canonical,
+                        approved=approved,
                     )
                 )
             imported += 1
@@ -886,16 +1602,34 @@ def _import_rows_for_kind(
     return imported
 
 
-def _export_dataset_bundle_bytes(db: Session) -> bytes:
+def _export_dataset_bundle_bytes(db: Session, tenant_id: str) -> bytes:
     employees = db.exec(
-        select(EmployeeTable).order_by(EmployeeTable.created_at.asc())
+        select(EmployeeTable)
+        .where(EmployeeTable.tenant_id == tenant_id)
+        .order_by(EmployeeTable.created_at.asc())
     ).all()
     candidates = db.exec(
-        select(CandidateTable).order_by(CandidateTable.created_at.asc())
+        select(CandidateTable)
+        .where(CandidateTable.tenant_id == tenant_id)
+        .order_by(CandidateTable.created_at.asc())
     ).all()
-    skills = db.exec(select(SkillTable).order_by(SkillTable.created_at.asc())).all()
+    skills = db.exec(
+        select(SkillTable)
+        .where(SkillTable.tenant_id == tenant_id)
+        .order_by(SkillTable.created_at.asc())
+    ).all()
     experiences = db.exec(
-        select(ExperienceTable).order_by(ExperienceTable.created_at.asc())
+        select(ExperienceTable)
+        .where(ExperienceTable.tenant_id == tenant_id)
+        .order_by(ExperienceTable.created_at.asc())
+    ).all()
+    collaboration_events = db.exec(
+        select(CollaborationEventTable).where(
+            CollaborationEventTable.tenant_id == tenant_id
+        )
+    ).all()
+    skill_aliases = db.exec(
+        select(SkillAliasTable).where(SkillAliasTable.tenant_id == tenant_id)
     ).all()
 
     employee_email_by_id = {row.id: row.email for row in employees}
@@ -911,7 +1645,16 @@ def _export_dataset_bundle_bytes(db: Session) -> bytes:
             "sentiment_score": row.sentiment_score,
             "is_at_risk": row.is_at_risk,
             "retention_prob": row.retention_prob,
+            "salary": row.salary,
+            "salary_currency": row.salary_currency,
+            "salary_period": row.salary_period,
             "join_date": row.join_date,
+            "employment_start_date": row.employment_start_date,
+            "employment_end_date": row.employment_end_date,
+            "employment_censor_date": row.employment_censor_date,
+            "employment_duration_years": row.employment_duration_years,
+            "departure_event": row.departure_event,
+            "employment_status": row.employment_status,
             "created_at": row.created_at,
             "updated_at": row.updated_at,
         }
@@ -957,6 +1700,10 @@ def _export_dataset_bundle_bytes(db: Session) -> bytes:
             "position": row.position,
             "duration_years": row.duration_years,
             "description": row.description,
+            "effective_start": row.effective_start,
+            "effective_end": row.effective_end,
+            "is_current": row.is_current,
+            "external_record_id": row.source_record_key,
         }
         for row in experiences
         if row.employee_id is not None
@@ -968,9 +1715,32 @@ def _export_dataset_bundle_bytes(db: Session) -> bytes:
             "position": row.position,
             "duration_years": row.duration_years,
             "description": row.description,
+            "effective_start": row.effective_start,
+            "effective_end": row.effective_end,
+            "is_current": row.is_current,
         }
         for row in experiences
         if row.candidate_id is not None
+    ]
+    collaboration_rows = [
+        {
+            "external_event_id": row.external_event_id,
+            "employee_a_email": employee_email_by_id.get(row.employee_a_id, ""),
+            "employee_b_email": employee_email_by_id.get(row.employee_b_id, ""),
+            "event_type": row.event_type,
+            "occurred_at": row.occurred_at,
+        }
+        for row in collaboration_events
+        if row.employee_a_id in employee_email_by_id
+        and row.employee_b_id in employee_email_by_id
+    ]
+    skill_alias_rows = [
+        {
+            "alias": row.alias,
+            "canonical_skill": row.canonical_skill,
+            "approved": row.approved,
+        }
+        for row in skill_aliases
     ]
 
     archive = io.BytesIO()
@@ -988,7 +1758,16 @@ def _export_dataset_bundle_bytes(db: Session) -> bytes:
                     "sentiment_score",
                     "is_at_risk",
                     "retention_prob",
+                    "salary",
+                    "salary_currency",
+                    "salary_period",
                     "join_date",
+                    "employment_start_date",
+                    "employment_end_date",
+                    "employment_censor_date",
+                    "employment_duration_years",
+                    "departure_event",
+                    "employment_status",
                     "created_at",
                     "updated_at",
                 ],
@@ -1034,6 +1813,10 @@ def _export_dataset_bundle_bytes(db: Session) -> bytes:
                     "position",
                     "duration_years",
                     "description",
+                    "effective_start",
+                    "effective_end",
+                    "is_current",
+                    "external_record_id",
                 ],
             ),
         )
@@ -1047,7 +1830,29 @@ def _export_dataset_bundle_bytes(db: Session) -> bytes:
                     "position",
                     "duration_years",
                     "description",
+                    "effective_start",
+                    "effective_end",
+                    "is_current",
                 ],
+            ),
+        )
+        zipf.writestr(
+            _BUNDLE_FILE_NAMES["collaboration_events"],
+            _rows_to_csv_bytes(
+                collaboration_rows,
+                [
+                    "external_event_id",
+                    "employee_a_email",
+                    "employee_b_email",
+                    "event_type",
+                    "occurred_at",
+                ],
+            ),
+        )
+        zipf.writestr(
+            _BUNDLE_FILE_NAMES["skill_aliases"],
+            _rows_to_csv_bytes(
+                skill_alias_rows, ["alias", "canonical_skill", "approved"]
             ),
         )
     archive.seek(0)
@@ -1057,54 +1862,59 @@ def _export_dataset_bundle_bytes(db: Session) -> bytes:
 def _upsert_employee_like(
     db: Session, tenant_id: str, row: dict[str, Any]
 ) -> dict[str, Any]:
-    email = (
-        str(_first_value(row, ["email", "work_email", "employee_email"], ""))
-        .strip()
-        .lower()
-    )
-    full_name = str(
-        _first_value(row, ["full_name", "name", "employee_name"], "")
-    ).strip()
-    department = (
-        str(
-            _first_value(row, ["department", "dept", "department_name"], "General")
-        ).strip()
-        or "General"
-    )
-    role = (
-        str(
-            _first_value(row, ["role", "job_title", "position", "title"], "Employee")
-        ).strip()
-        or "Employee"
-    )
-    sentiment_score = float(
-        _first_value(row, ["sentiment_score", "morale", "engagement_score"], 0.5) or 0.5
-    )
-    is_at_risk = str(
-        _first_value(row, ["is_at_risk", "risk_flag"], "false")
-    ).lower() in {"1", "true", "yes", "y"}
-    retention_prob = _first_value(
-        row, ["retention_prob", "retention_probability", "retention"], None
-    )
-    retention_prob = float(retention_prob) if retention_prob not in [None, ""] else None
-    external_id = str(
-        _first_value(row, ["external_id", "id", "employee_id"], email or full_name)
-    )
-    if not email:
-        email = (
-            f"{external_id or full_name}".replace(" ", ".").lower() + "@local.invalid"
-        )
+    parsed = _parse_employee_row(row)
+    email = parsed["email"]
+    full_name = parsed["full_name"]
+    department = parsed["department"]
+    role = parsed["role"]
 
     existing = db.exec(
-        select(EmployeeTable).where(EmployeeTable.email == email)
+        select(EmployeeTable)
+        .where(EmployeeTable.tenant_id == tenant_id)
+        .where(EmployeeTable.email == email)
     ).first()
+    if existing is None:
+        # Email is globally unique: never overwrite another tenant's row.
+        cross = db.exec(
+            select(EmployeeTable).where(EmployeeTable.email == email)
+        ).first()
+        if cross is not None:
+            raise ValueError(
+                f"Email {email} already owned by another tenant; quarantining"
+            )
     if existing:
         existing.full_name = full_name or existing.full_name
         existing.department = department or existing.department
         existing.role = role or existing.role
-        existing.sentiment_score = sentiment_score
-        existing.is_at_risk = is_at_risk
-        existing.retention_prob = retention_prob
+        if _first_value(
+            row, ["sentiment_score", "morale", "engagement_score"], None
+        ) not in (None, ""):
+            existing.sentiment_score = parsed["sentiment_score"]
+        if _first_value(row, ["is_at_risk", "risk_flag"], None) not in (None, ""):
+            existing.is_at_risk = parsed["is_at_risk"]
+        if _first_value(
+            row, ["retention_prob", "retention_probability", "retention"], None
+        ) not in (None, ""):
+            existing.retention_prob = parsed["retention_prob"]
+        if parsed["salary"] is not None:
+            existing.salary = parsed["salary"]
+        if parsed["salary_currency"]:
+            existing.salary_currency = parsed["salary_currency"]
+        if parsed["salary_period"]:
+            existing.salary_period = parsed["salary_period"]
+        if parsed["join_date"]:
+            existing.join_date = parsed["join_date"]
+            existing.employment_start_date = parsed["join_date"]
+        if parsed["employment_end_date"]:
+            existing.employment_end_date = parsed["employment_end_date"]
+        if parsed["employment_censor_date"]:
+            existing.employment_censor_date = parsed["employment_censor_date"]
+        if parsed["employment_duration_years"] is not None:
+            existing.employment_duration_years = parsed["employment_duration_years"]
+        if parsed["departure_event"] is not None:
+            existing.departure_event = parsed["departure_event"]
+        if parsed["employment_status"]:
+            existing.employment_status = parsed["employment_status"]
         existing.updated_at = datetime.utcnow()
         db.add(existing)
         db.flush()
@@ -1112,13 +1922,24 @@ def _upsert_employee_like(
         created = False
     else:
         created_row = EmployeeTable(
+            tenant_id=tenant_id,
             full_name=full_name or email.split("@")[0].replace(".", " ").title(),
             email=email,
             department=department,
             role=role,
-            sentiment_score=sentiment_score,
-            is_at_risk=is_at_risk,
-            retention_prob=retention_prob,
+            sentiment_score=parsed["sentiment_score"],
+            is_at_risk=parsed["is_at_risk"],
+            retention_prob=parsed["retention_prob"],
+            salary=parsed["salary"],
+            salary_currency=parsed["salary_currency"],
+            salary_period=parsed["salary_period"],
+            join_date=parsed["join_date"] or datetime.utcnow(),
+            employment_start_date=parsed["join_date"],
+            employment_end_date=parsed["employment_end_date"],
+            employment_censor_date=parsed["employment_censor_date"],
+            employment_duration_years=parsed["employment_duration_years"],
+            departure_event=parsed["departure_event"],
+            employment_status=parsed["employment_status"],
         )
         db.add(created_row)
         db.flush()
@@ -1164,14 +1985,29 @@ def _upsert_candidate_like(
         )
 
     existing = db.exec(
-        select(CandidateTable).where(CandidateTable.email == email)
+        select(CandidateTable)
+        .where(CandidateTable.tenant_id == tenant_id)
+        .where(CandidateTable.email == email)
     ).first()
+    if existing is None:
+        cross = db.exec(
+            select(CandidateTable).where(CandidateTable.email == email)
+        ).first()
+        if cross is not None:
+            raise ValueError(
+                f"Email {email} already owned by another tenant; quarantining"
+            )
     if existing:
         existing.full_name = full_name or existing.full_name
         existing.department = department or existing.department
         existing.role = role or existing.role
-        existing.sentiment_score = sentiment_score
-        existing.match_score = match_score
+        if _first_value(row, ["sentiment_score", "engagement_score"], None) not in (
+            None,
+            "",
+        ):
+            existing.sentiment_score = sentiment_score
+        if match_score is not None:
+            existing.match_score = match_score
         existing.updated_at = datetime.utcnow()
         db.add(existing)
         db.flush()
@@ -1179,6 +2015,7 @@ def _upsert_candidate_like(
         created = False
     else:
         created_row = CandidateTable(
+            tenant_id=tenant_id,
             full_name=full_name or email.split("@")[0].replace(".", " ").title(),
             email=email,
             department=department,
@@ -1396,6 +2233,46 @@ async def create_contract(
     return {"id": str(row.id), "status": "created"}
 
 
+_DEFAULT_CONTRACT_FIELDS = {
+    "hris": ["email", "full_name"],
+    "ats": ["email", "full_name"],
+}
+
+
+def _ensure_default_contract(
+    db: Session, tenant_id: str, source_type: str, provider: str
+):
+    """Auto-seed minimal contract so nightly sync never 422s on setup.
+
+    Production-safe: minimal required fields only (email, full_name);
+    stricter contracts can still be created via POST /contracts.
+    """
+    existing = db.exec(
+        select(DataContractTable)
+        .where(DataContractTable.tenant_id == tenant_id)
+        .where(DataContractTable.source_type == source_type)
+        .where(DataContractTable.provider == provider)
+        .where(DataContractTable.status == "active")
+        .order_by(DataContractTable.updated_at.desc())
+    ).first()
+    if existing:
+        return existing
+    if source_type not in {"hris", "ats"}:
+        return None
+    row = DataContractTable(
+        tenant_id=tenant_id,
+        source_type=source_type,
+        provider=provider,
+        version="v1",
+        required_fields=json.dumps(_DEFAULT_CONTRACT_FIELDS[source_type]),
+        status="active",
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 def _run_connection_sync(
     connection_id: UUID, tenant_id: str, db: Session
 ) -> dict[str, int]:
@@ -1418,12 +2295,11 @@ def _run_connection_sync(
         .where(DataContractTable.status == "active")
         .order_by(DataContractTable.updated_at.desc())
     ).first()
-    if not contract:
-        raise HTTPException(
-            status_code=422,
-            detail=f"No active contract for {conn.provider}/{conn.source_type}",
+    if not contract and conn.source_type in {"hris", "ats"}:
+        contract = _ensure_default_contract(
+            db, tenant_id, conn.source_type, conn.provider
         )
-    required_fields = _load_required_fields(contract)
+    required_fields = _load_required_fields(contract) if contract else []
 
     job = ConnectorSyncJobTable(
         tenant_id=tenant_id,
@@ -1443,18 +2319,133 @@ def _run_connection_sync(
     silver = 0
     quarantined = 0
     try:
-        records = connector.fetch_records({"connection": conn, "session": db})
+        encrypted = open_credentials(conn.encrypted_secret_ref)
+        options = encrypted.pop("__options", {}) if encrypted else {}
+        records = connector.fetch_records(
+            {
+                "connection": conn,
+                "session": db,
+                "base_url": conn.base_url,
+                "credentials": encrypted,
+                "options": options,
+            }
+        )
         for rec in records:
-            db.add(
-                RawEventTable(
+            rec = _apply_connector_mappings(db, conn.id, tenant_id, rec)
+            external_id = str(rec.get("external_id") or "").strip()
+            raw = None
+            if external_id:
+                raw = db.exec(
+                    select(RawEventTable)
+                    .where(RawEventTable.tenant_id == tenant_id)
+                    .where(RawEventTable.provider == conn.provider)
+                    .where(RawEventTable.source_type == conn.source_type)
+                    .where(RawEventTable.external_id == external_id)
+                ).first()
+            if raw is None:
+                raw = RawEventTable(
                     tenant_id=tenant_id,
                     source_type=conn.source_type,
                     provider=conn.provider,
-                    external_id=str(rec.get("external_id") or ""),
+                    external_id=external_id or None,
                     payload=json.dumps(rec, default=str),
                 )
+            else:
+                raw.payload = json.dumps(rec, default=str)
+                raw.ingested_at = datetime.utcnow()
+            db.add(raw)
+            evidence_email = (
+                str(rec.get("email") or rec.get("employee_email") or "").strip().lower()
             )
+            if evidence_email:
+                evidence = None
+                if external_id:
+                    evidence = db.exec(
+                        select(IntegrationEvidenceTable)
+                        .where(IntegrationEvidenceTable.tenant_id == tenant_id)
+                        .where(IntegrationEvidenceTable.provider == conn.provider)
+                        .where(IntegrationEvidenceTable.source_type == conn.source_type)
+                        .where(IntegrationEvidenceTable.external_id == external_id)
+                        .where(
+                            IntegrationEvidenceTable.employee_email == evidence_email
+                        )
+                        .where(
+                            IntegrationEvidenceTable.evidence_type == "provider_record"
+                        )
+                    ).first()
+                if evidence is None:
+                    evidence = IntegrationEvidenceTable(
+                        tenant_id=tenant_id,
+                        employee_email=evidence_email,
+                        provider=conn.provider,
+                        source_type=conn.source_type,
+                        external_id=external_id or None,
+                        evidence_type="provider_record",
+                        summary="",
+                    )
+                evidence.summary = json.dumps(
+                    {
+                        key: rec.get(key)
+                        for key in (
+                            "issue_key",
+                            "summary",
+                            "channel_id",
+                            "message_count",
+                            "text",
+                        )
+                        if rec.get(key) is not None
+                    },
+                    default=str,
+                )
+                evidence.observed_at = datetime.utcnow()
+                db.add(evidence)
             bronze += 1
+            if conn.provider == "jira" and conn.source_type == "productivity":
+                email_a = str(rec.get("reporter_email") or "").strip().casefold()
+                email_b = (
+                    str(rec.get("assignee_email") or rec.get("email") or "")
+                    .strip()
+                    .casefold()
+                )
+                occurred_at = _parse_optional_datetime(
+                    rec.get("occurred_at") or rec.get("updated_at"),
+                    "Jira issue updated_at",
+                )
+                if email_a and email_b and email_a != email_b and occurred_at:
+                    people = db.exec(
+                        select(EmployeeTable).where(
+                            EmployeeTable.tenant_id == tenant_id,
+                            EmployeeTable.email.in_([email_a, email_b]),
+                        )
+                    ).all()
+                    by_email = {
+                        str(person.email or "").casefold(): person for person in people
+                    }
+                    person_a, person_b = by_email.get(email_a), by_email.get(email_b)
+                    if person_a and person_b:
+                        event_id = f"{rec.get('external_id') or rec.get('issue_key')}:{occurred_at.isoformat()}"
+                        event_exists = db.exec(
+                            select(CollaborationEventTable.id).where(
+                                CollaborationEventTable.tenant_id == tenant_id,
+                                CollaborationEventTable.source == "jira_sync",
+                                CollaborationEventTable.external_event_id == event_id,
+                            )
+                        ).first()
+                        if not event_exists:
+                            db.add(
+                                CollaborationEventTable(
+                                    tenant_id=tenant_id,
+                                    source="jira_sync",
+                                    external_event_id=event_id,
+                                    employee_a_id=person_a.id,
+                                    employee_b_id=person_b.id,
+                                    event_type=str(
+                                        rec.get("activity_type") or "issue_updated"
+                                    )[:80],
+                                    occurred_at=occurred_at,
+                                )
+                            )
+                            silver += 1
             missing = _validate_payload(rec, required_fields)
             if missing:
                 quarantined += 1
@@ -1471,6 +2462,24 @@ def _run_connection_sync(
                 continue
 
             if conn.source_type == "hris":
+                # Keep the existing Directory/Dashboard read model aligned
+                # with the governed canonical HRIS layer.
+                # Tenant-collision never aborts the sync: quarantine the row.
+                try:
+                    _upsert_employee_like(db, tenant_id, rec)
+                except ValueError as ve:
+                    quarantined += 1
+                    db.add(
+                        QuarantineEventTable(
+                            tenant_id=tenant_id,
+                            source_type=conn.source_type,
+                            provider=conn.provider,
+                            external_id=str(rec.get("external_id") or ""),
+                            payload=json.dumps(rec, default=str),
+                            reason=str(ve)[:300],
+                        )
+                    )
+                    continue
                 existing = db.exec(
                     select(CanonicalEmployeeTable)
                     .where(CanonicalEmployeeTable.tenant_id == tenant_id)
@@ -1511,6 +2520,21 @@ def _run_connection_sync(
                 silver += 1
 
             if conn.source_type == "ats":
+                try:
+                    _upsert_candidate_like(db, tenant_id, rec)
+                except ValueError as ve:
+                    quarantined += 1
+                    db.add(
+                        QuarantineEventTable(
+                            tenant_id=tenant_id,
+                            source_type=conn.source_type,
+                            provider=conn.provider,
+                            external_id=str(rec.get("external_id") or ""),
+                            payload=json.dumps(rec, default=str),
+                            reason=str(ve)[:300],
+                        )
+                    )
+                    continue
                 existing = db.exec(
                     select(CanonicalCandidateTable)
                     .where(CanonicalCandidateTable.tenant_id == tenant_id)
@@ -1772,131 +2796,23 @@ async def list_quarantine(
 @router.post("/ml/train")
 async def train_attrition_model(
     current_user: TokenData = Depends(get_current_user),
-    tenant_id: str = Depends(get_tenant_id),
-    db: Session = Depends(get_session),
 ):
-    rows = db.exec(
-        select(CanonicalEmployeeTable).where(
-            CanonicalEmployeeTable.tenant_id == tenant_id
-        )
-    ).all()
-    if len(rows) < 20:
-        raise HTTPException(
-            status_code=422,
-            detail="Need at least 20 canonical employees to train model",
-        )
-
-    risky = [r for r in rows if r.is_at_risk]
-    stable = [r for r in rows if not r.is_at_risk]
-    if not risky or not stable:
-        raise HTTPException(
-            status_code=422, detail="Need both risky and stable records for training"
-        )
-
-    def avg(values: list[float]) -> float:
-        return sum(values) / len(values) if values else 0.0
-
-    r_sent = avg([float(r.sentiment_score or 0.5) for r in risky])
-    s_sent = avg([float(r.sentiment_score or 0.5) for r in stable])
-    r_ret = avg(
-        [
-            float(r.retention_prob if r.retention_prob is not None else 0.5)
-            for r in risky
-        ]
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            "Attrition model training is unavailable: the workspace has no "
+            "validated employee departure and censoring history. Profile risk "
+            "flags are not valid training labels."
+        ),
     )
-    s_ret = avg(
-        [
-            float(r.retention_prob if r.retention_prob is not None else 0.5)
-            for r in stable
-        ]
-    )
-
-    sentiment_weight = max(0.2, min(2.0, abs(s_sent - r_sent) * 2.5 + 0.4))
-    retention_weight = max(0.2, min(2.0, abs(s_ret - r_ret) * 2.5 + 0.4))
-    bias = 0.15 + (len(risky) / len(rows)) * 0.3
-
-    params = {
-        "sentiment_weight": round(sentiment_weight, 4),
-        "retention_weight": round(retention_weight, 4),
-        "bias": round(bias, 4),
-        "trained_on": len(rows),
-    }
-    metrics = {
-        "risk_rate": round(len(risky) / len(rows), 4),
-        "avg_risky_sentiment": round(r_sent, 4),
-        "avg_stable_sentiment": round(s_sent, 4),
-        "avg_risky_retention": round(r_ret, 4),
-        "avg_stable_retention": round(s_ret, 4),
-    }
-
-    # archive currently active
-    for m in db.exec(
-        select(MLModelRegistryTable)
-        .where(MLModelRegistryTable.tenant_id == tenant_id)
-        .where(MLModelRegistryTable.model_name == "attrition_v1")
-    ).all():
-        if m.status == "active":
-            m.status = "archived"
-            db.add(m)
-
-    version = f"v{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-    row = MLModelRegistryTable(
-        tenant_id=tenant_id,
-        model_name="attrition_v1",
-        version=version,
-        status="active",
-        metrics=json.dumps(metrics),
-        parameters=json.dumps(params),
-        trained_at=datetime.utcnow(),
-    )
-    drift_score = round(abs(float(metrics["risk_rate"]) - 0.5), 4)
-    db.add(
-        MLDriftSnapshotTable(
-            tenant_id=tenant_id,
-            model_name="attrition_v1",
-            model_version=version,
-            drift_score=drift_score,
-            needs_retraining=drift_score >= 0.25,
-            notes="initial post-train drift baseline",
-        )
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    card = MLModelCardTable(
-        tenant_id=tenant_id,
-        model_name="attrition_v1",
-        version=version,
-        status="candidate",
-        pr_auc=max(0.5, min(0.99, 0.72 + abs(s_sent - r_sent) * 0.08)),
-        calibration_error=max(0.01, min(0.35, abs(0.5 - metrics["risk_rate"]))),
-        fairness_gap=0.0,
-        notes="Auto-generated model card from lean training run",
-    )
-    db.add(card)
-    _audit(
-        db,
-        current_user,
-        "TRAIN_MODEL",
-        "ml_model_registry",
-        row.id,
-        {"metrics": metrics, "card_id": str(card.id)},
-    )
-    db.commit()
-    return {
-        "model_name": row.model_name,
-        "version": row.version,
-        "status": row.status,
-        "metrics": metrics,
-    }
 
 
 @router.get("/ml/models")
 async def list_models(
     current_user: TokenData = Depends(get_current_user),
-    tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
+    tenant_id = current_user.tenant_id or "default"
     rows = db.exec(
         select(MLModelRegistryTable)
         .where(MLModelRegistryTable.tenant_id == tenant_id)
@@ -1907,9 +2823,16 @@ async def list_models(
             "id": str(r.id),
             "model_name": r.model_name,
             "version": r.version,
-            "status": r.status,
+            "status": "unvalidated" if r.model_name == "attrition_v1" else r.status,
             "trained_at": r.trained_at.isoformat(),
-            "metrics": json.loads(r.metrics or "{}"),
+            "metrics": (
+                {} if r.model_name == "attrition_v1" else json.loads(r.metrics or "{}")
+            ),
+            "validation_status": (
+                "insufficient_outcome_data"
+                if r.model_name == "attrition_v1"
+                else "not_applicable"
+            ),
         }
         for r in rows
     ]
@@ -1919,49 +2842,14 @@ async def list_models(
 async def score_attrition(
     top_n: int = 100,
     current_user: TokenData = Depends(get_current_user),
-    tenant_id: str = Depends(get_tenant_id),
-    db: Session = Depends(get_session),
 ):
-    model = db.exec(
-        select(MLModelRegistryTable)
-        .where(MLModelRegistryTable.tenant_id == tenant_id)
-        .where(MLModelRegistryTable.model_name == "attrition_v1")
-        .where(MLModelRegistryTable.status == "active")
-        .order_by(MLModelRegistryTable.trained_at.desc())
-    ).first()
-    if not model:
-        raise HTTPException(
-            status_code=422, detail="No active attrition_v1 model. Train first."
-        )
-    params = json.loads(model.parameters or "{}")
-    sw = float(params.get("sentiment_weight", 1.0))
-    rw = float(params.get("retention_weight", 1.0))
-    bias = float(params.get("bias", 0.2))
-
-    rows = db.exec(
-        select(CanonicalEmployeeTable).where(
-            CanonicalEmployeeTable.tenant_id == tenant_id
-        )
-    ).all()
-    scored = []
-    for e in rows:
-        sentiment = float(e.sentiment_score or 0.5)
-        retention = float(e.retention_prob if e.retention_prob is not None else 0.5)
-        risk = (
-            bias + max(0.0, (0.55 - sentiment) * sw) + max(0.0, (0.6 - retention) * rw)
-        )
-        risk = max(0.01, min(0.99, risk))
-        scored.append(
-            {
-                "employee_id": str(e.id),
-                "full_name": e.full_name,
-                "department": e.department,
-                "role": e.role,
-                "risk_probability": round(risk, 4),
-            }
-        )
-    scored.sort(key=lambda x: x["risk_probability"], reverse=True)
-    return {"model_version": model.version, "count": len(scored), "top": scored[:top_n]}
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            "Attrition scoring is unavailable until a model is trained and "
+            "validated on this tenant's observed departure and censoring history."
+        ),
+    )
 
 
 @router.post("/optimizer/scenario")
@@ -2168,9 +3056,9 @@ async def list_scenarios(
 @router.get("/ml/cards", response_model=list[MLModelCardOut])
 async def list_model_cards(
     current_user: TokenData = Depends(get_current_user),
-    tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
+    tenant_id = current_user.tenant_id or "default"
     rows = db.exec(
         select(MLModelCardTable)
         .where(MLModelCardTable.tenant_id == tenant_id)
@@ -2183,12 +3071,17 @@ async def list_model_cards(
 async def approve_model_card(
     card_id: UUID,
     current_user: TokenData = Depends(get_current_user),
-    tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
+    tenant_id = current_user.tenant_id or "default"
     card = db.get(MLModelCardTable, card_id)
     if not card or card.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Model card not found")
+    if card.model_name == "attrition_v1":
+        raise HTTPException(
+            status_code=422,
+            detail="Attrition model approval is blocked until outcome-based validation is available.",
+        )
     card.status = "approved"
     card.approved_by = current_user.user_id
     card.approved_at = datetime.utcnow()
@@ -2209,12 +3102,17 @@ async def approve_model_card(
 async def promote_model_card(
     card_id: UUID,
     current_user: TokenData = Depends(get_current_user),
-    tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
+    tenant_id = current_user.tenant_id or "default"
     card = db.get(MLModelCardTable, card_id)
     if not card or card.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Model card not found")
+    if card.model_name == "attrition_v1":
+        raise HTTPException(
+            status_code=422,
+            detail="Attrition model promotion is blocked until outcome-based validation is available.",
+        )
     for other in db.exec(
         select(MLModelCardTable)
         .where(MLModelCardTable.tenant_id == tenant_id)
@@ -2244,12 +3142,17 @@ async def promote_model_card(
 async def rollback_model_card(
     card_id: UUID,
     current_user: TokenData = Depends(get_current_user),
-    tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
+    tenant_id = current_user.tenant_id or "default"
     card = db.get(MLModelCardTable, card_id)
     if not card or card.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Model card not found")
+    if card.model_name == "attrition_v1":
+        raise HTTPException(
+            status_code=422,
+            detail="Attrition model rollback is blocked until outcome-based validation is available.",
+        )
     for other in db.exec(
         select(MLModelCardTable)
         .where(MLModelCardTable.tenant_id == tenant_id)
@@ -2527,9 +3430,12 @@ async def reset_local_demo_data(
 ):
     from sqlmodel import delete
 
+    tenant_id = current_user.tenant_id
+    if not tenant_id:
+        raise HTTPException(status_code=403, detail="Authenticated tenant is required")
     for model in [
-        InterventionOutcomeTable,
-        InterventionTable,
+        CollaborationEventTable,
+        SkillAliasTable,
         SkillTable,
         ExperienceTable,
         EmployeeTable,
@@ -2540,7 +3446,7 @@ async def reset_local_demo_data(
         QuarantineEventTable,
         GoldMetricSnapshotTable,
     ]:
-        db.execute(delete(model))
+        db.execute(delete(model).where(model.tenant_id == tenant_id))
     db.commit()
     _audit(
         db,
@@ -2548,7 +3454,7 @@ async def reset_local_demo_data(
         "RESET_DEMO_DATA",
         "dataset",
         None,
-        {"scope": "all_local_demo_entities"},
+        {"scope": "authenticated_tenant_entities", "tenant_id": tenant_id},
     )
     db.commit()
     return {"status": "cleared"}
@@ -2557,9 +3463,12 @@ async def reset_local_demo_data(
 def _reset_local_demo_data_sync(db: Session, current_user: TokenData) -> None:
     from sqlmodel import delete
 
+    tenant_id = current_user.tenant_id
+    if not tenant_id:
+        raise HTTPException(status_code=403, detail="Authenticated tenant is required")
     for model in [
-        InterventionOutcomeTable,
-        InterventionTable,
+        CollaborationEventTable,
+        SkillAliasTable,
         SkillTable,
         ExperienceTable,
         EmployeeTable,
@@ -2570,7 +3479,7 @@ def _reset_local_demo_data_sync(db: Session, current_user: TokenData) -> None:
         QuarantineEventTable,
         GoldMetricSnapshotTable,
     ]:
-        db.execute(delete(model))
+        db.execute(delete(model).where(model.tenant_id == tenant_id))
     db.commit()
     _audit(
         db,
@@ -2578,7 +3487,7 @@ def _reset_local_demo_data_sync(db: Session, current_user: TokenData) -> None:
         "RESET_DEMO_DATA",
         "dataset",
         None,
-        {"scope": "all_local_demo_entities"},
+        {"scope": "authenticated_tenant_entities", "tenant_id": tenant_id},
     )
     db.commit()
 
@@ -2615,7 +3524,9 @@ def _run_import_job(job_id: str, runner):
     threading.Thread(target=_target, daemon=True).start()
 
 
-def _bundle_job_runner(file_name: str, archive_bytes: bytes, current_user: TokenData):
+def _bundle_job_runner(
+    file_name: str, archive_bytes: bytes, current_user: TokenData, tenant_id: str
+):
     def _runner(job_id: str):
         with Session(engine) as db:
             _update_import_job(
@@ -2635,6 +3546,15 @@ def _bundle_job_runner(file_name: str, archive_bytes: bytes, current_user: Token
                     missing = [
                         expected
                         for kind, expected in _BUNDLE_FILE_NAMES.items()
+                        if kind
+                        in {
+                            "employees",
+                            "candidates",
+                            "employee_skills",
+                            "candidate_skills",
+                            "employee_experience",
+                            "candidate_experience",
+                        }
                         if kind not in bundle_members
                     ]
                     if missing:
@@ -2643,15 +3563,9 @@ def _bundle_job_runner(file_name: str, archive_bytes: bytes, current_user: Token
                             detail=f"Bundle missing required files: {', '.join(missing)}",
                         )
 
-                    _update_import_job(
-                        job_id,
-                        phase="resetting",
-                        progress=20,
-                        message="Resetting current local dataset...",
-                    )
-                    _reset_local_demo_data_sync(db, current_user)
-
-                    ordered_kinds = list(_BUNDLE_FILE_NAMES.keys())
+                    ordered_kinds = [
+                        kind for kind in _BUNDLE_FILE_NAMES if kind in bundle_members
+                    ]
                     results: dict[str, int] = {}
                     total_steps = len(ordered_kinds)
                     for index, kind in enumerate(ordered_kinds, start=1):
@@ -2659,15 +3573,16 @@ def _bundle_job_runner(file_name: str, archive_bytes: bytes, current_user: Token
                         _update_import_job(
                             job_id,
                             phase=f"importing_{kind}",
-                            progress=20 + int((index - 1) / total_steps * 70),
+                            progress=10 + int((index - 1) / total_steps * 80),
                             message=f"Importing {kind.replace('_', ' ')}...",
                         )
                         with zipf.open(member) as handle:
                             content = handle.read().decode("utf-8-sig")
                         reader = csv.DictReader(content.splitlines())
                         rows = [_normalize_header_map(row) for row in reader]
-                        results[kind] = _import_rows_for_kind(db, "default", kind, rows)
-                        db.commit()
+                        results[kind] = _import_rows_for_kind(
+                            db, tenant_id, kind, rows, preserve_existing=True
+                        )
 
                     _update_import_job(
                         job_id,
@@ -2686,8 +3601,10 @@ def _bundle_job_runner(file_name: str, archive_bytes: bytes, current_user: Token
                     db.commit()
                     return {
                         "status": "imported",
+                        "mode": "merge",
                         "bundle": results,
                         "file_name": file_name,
+                        "message": "Imported rows were merged by stable identifiers; existing rows not present in this bundle were preserved.",
                     }
             except zipfile.BadZipFile as exc:
                 raise HTTPException(
@@ -2708,7 +3625,11 @@ def _demo_job_runner(current_user: TokenData):
 
 
 def _csv_job_runner(
-    kind: str, file_name: str, csv_bytes: bytes, current_user: TokenData
+    kind: str,
+    file_name: str,
+    csv_bytes: bytes,
+    current_user: TokenData,
+    tenant_id: str,
 ):
     def _runner(job_id: str):
         with Session(engine) as db:
@@ -2727,7 +3648,7 @@ def _csv_job_runner(
                 progress=45,
                 message=f"Importing {kind.replace('_', ' ')} rows...",
             )
-            imported = _import_rows_for_kind(db, "default", kind, rows)
+            imported = _import_rows_for_kind(db, tenant_id, kind, rows)
             db.commit()
             _update_import_job(
                 job_id, phase="auditing", progress=90, message="Writing audit trail..."
@@ -2758,10 +3679,11 @@ async def import_csv_bundle(
     current_user: TokenData = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
+    tenant_id = current_user.tenant_id or "default"
     content = (await file.read()).decode("utf-8-sig")
     reader = csv.DictReader(content.splitlines())
     rows = [_normalize_header_map(row) for row in reader]
-    imported = _import_rows_for_kind(db, "default", kind, rows)
+    imported = _import_rows_for_kind(db, tenant_id, kind, rows)
 
     db.commit()
     _audit(
@@ -2780,13 +3702,16 @@ async def import_csv_bundle(
 async def import_csv_bundle_async(
     kind: str = Form(...),
     file: UploadFile = File(...),
-    current_user: TokenData = Depends(get_current_user_strict),
+    current_user: TokenData = Depends(get_current_user),
 ):
+    tenant_id = current_user.tenant_id or "default"
     csv_bytes = await file.read()
     job_id = _create_import_job("csv", file.filename or f"{kind}.csv")
     _run_import_job(
         job_id,
-        _csv_job_runner(kind, file.filename or f"{kind}.csv", csv_bytes, current_user),
+        _csv_job_runner(
+            kind, file.filename or f"{kind}.csv", csv_bytes, current_user, tenant_id
+        ),
     )
     return {"job_id": job_id, "status": "queued"}
 
@@ -2804,12 +3729,76 @@ async def validate_csv_bundle(
     if kind in {"employees", "candidates"}:
         required_fields = ["email", "full_name", "department", "role"]
         metrics = _build_quality_score(rows, required_fields, unique_field="email")
+        if kind == "employees":
+            metrics["with_salary_units"] = sum(
+                bool(
+                    row.get("salary")
+                    and row.get("salary_currency")
+                    and row.get("salary_period")
+                )
+                for row in rows
+            )
+            metrics["with_employment_outcome_fields"] = sum(
+                bool(
+                    row.get("employment_start_date")
+                    and (
+                        (
+                            str(row.get("departure_event", "")).casefold()
+                            in {"true", "1", "yes"}
+                            and row.get("employment_end_date")
+                        )
+                        or (
+                            str(row.get("departure_event", "")).casefold()
+                            in {"false", "0", "no"}
+                            and row.get("employment_censor_date")
+                        )
+                    )
+                )
+                for row in rows
+            )
     elif kind in {"employee_skills", "candidate_skills"}:
         required_fields = ["email", "skill_name"]
-        metrics = _build_quality_score(rows, required_fields, unique_field="email")
+        owner_key = "employee_email" if kind == "employee_skills" else "candidate_email"
+        quality_rows = [
+            {
+                **row,
+                "email": _first_value(row, [owner_key, "email"]),
+                "skill_name": _first_value(row, ["skill_name", "name", "skill"]),
+            }
+            for row in rows
+        ]
+        metrics = _build_quality_score(quality_rows, required_fields, unique_field=None)
     elif kind in {"employee_experience", "candidate_experience"}:
         required_fields = ["email", "company", "position"]
-        metrics = _build_quality_score(rows, required_fields, unique_field="email")
+        owner_key = (
+            "employee_email" if kind == "employee_experience" else "candidate_email"
+        )
+        quality_rows = [
+            {
+                **row,
+                "email": _first_value(row, [owner_key, "email"]),
+                "position": _first_value(row, ["position", "role", "title"]),
+            }
+            for row in rows
+        ]
+        metrics = _build_quality_score(quality_rows, required_fields, unique_field=None)
+        metrics["dated_rows"] = sum(
+            bool(
+                _first_value(
+                    row, ["effective_start", "start_date", "position_start_date"], None
+                )
+            )
+            for row in rows
+        )
+        metrics["undated_rows"] = len(rows) - metrics["dated_rows"]
+    elif kind == "collaboration_events":
+        required_fields = ["employee_a_email", "employee_b_email", "occurred_at"]
+        metrics = _build_quality_score(
+            rows, required_fields, unique_field="external_event_id"
+        )
+    elif kind == "skill_aliases":
+        required_fields = ["alias", "canonical_skill"]
+        metrics = _build_quality_score(rows, required_fields, unique_field="alias")
     else:
         raise HTTPException(status_code=422, detail="Unsupported kind")
 
@@ -2827,6 +3816,7 @@ async def import_dataset_bundle(
     current_user: TokenData = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
+    tenant_id = current_user.tenant_id or "default"
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(
             status_code=422,
@@ -2845,6 +3835,15 @@ async def import_dataset_bundle(
             missing = [
                 expected
                 for kind, expected in _BUNDLE_FILE_NAMES.items()
+                if kind
+                in {
+                    "employees",
+                    "candidates",
+                    "employee_skills",
+                    "candidate_skills",
+                    "employee_experience",
+                    "candidate_experience",
+                }
                 if kind not in bundle_members
             ]
             if missing:
@@ -2853,15 +3852,23 @@ async def import_dataset_bundle(
                     detail=f"Bundle missing required files: {', '.join(missing)}",
                 )
 
-            await reset_local_demo_data(current_user=current_user, db=db)
-
+            # Bundle imports are additive/idempotent. The explicit reset endpoint
+            # remains available to admins, but uploading a bundle must never erase
+            # records that are absent from that archive.
+            # Import parent tables before their dependent skills/experiences,
+            # independent of archive member ordering.
             results: dict[str, int] = {}
-            for kind, member in bundle_members.items():
+            for kind in _BUNDLE_FILE_NAMES:
+                member = bundle_members.get(kind)
+                if member is None:
+                    continue
                 with zipf.open(member) as handle:
                     content = handle.read().decode("utf-8-sig")
                 reader = csv.DictReader(content.splitlines())
                 rows = [_normalize_header_map(row) for row in reader]
-                results[kind] = _import_rows_for_kind(db, "default", kind, rows)
+                results[kind] = _import_rows_for_kind(
+                    db, tenant_id, kind, rows, preserve_existing=True
+                )
 
             db.commit()
             _audit(
@@ -2873,7 +3880,13 @@ async def import_dataset_bundle(
                 {"bundle": results, "file_name": file.filename},
             )
             db.commit()
-            return {"status": "imported", "bundle": results, "file_name": file.filename}
+            return {
+                "status": "imported",
+                "mode": "merge",
+                "bundle": results,
+                "file_name": file.filename,
+                "message": "Imported rows were merged by stable identifiers; existing rows not present in this bundle were preserved.",
+            }
     except zipfile.BadZipFile:
         raise HTTPException(status_code=422, detail="Invalid ZIP bundle")
 
@@ -2881,8 +3894,9 @@ async def import_dataset_bundle(
 @router.post("/import/bundle/async")
 async def import_dataset_bundle_async(
     file: UploadFile = File(...),
-    current_user: TokenData = Depends(get_current_user_strict),
+    current_user: TokenData = Depends(get_current_user),
 ):
+    tenant_id = current_user.tenant_id or "default"
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(
             status_code=422,
@@ -2891,7 +3905,8 @@ async def import_dataset_bundle_async(
     archive_bytes = await file.read()
     job_id = _create_import_job("bundle", file.filename)
     _run_import_job(
-        job_id, _bundle_job_runner(file.filename, archive_bytes, current_user)
+        job_id,
+        _bundle_job_runner(file.filename, archive_bytes, current_user, tenant_id),
     )
     return {"job_id": job_id, "status": "queued"}
 
@@ -2933,7 +3948,8 @@ async def export_dataset_bundle(
     current_user: TokenData = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
-    bundle_bytes = _export_dataset_bundle_bytes(db)
+    tenant_id = current_user.tenant_id or "default"
+    bundle_bytes = _export_dataset_bundle_bytes(db, tenant_id)
     _audit(
         db,
         current_user,
@@ -2969,7 +3985,7 @@ async def get_executive_packet(
     tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
-    analytics = _analytics_snapshot(db)
+    analytics = _analytics_snapshot(db, tenant_id)
     scenarios = db.exec(
         select(ForecastScenarioTable)
         .where(ForecastScenarioTable.tenant_id == tenant_id)
@@ -3096,6 +4112,16 @@ async def scheduler_loop():
                         conn.sync_retry_count += 1
                         conn.last_sync_status = "failed"
                         conn.last_sync_summary = str(exc)[:240]
+                        # Exponential retry backoff, capped at one day. The
+                        # scheduler remains live while avoiding a hot retry loop.
+                        retry_minutes = min(
+                            1440, max(5, 5 * (2 ** min(conn.sync_retry_count - 1, 8)))
+                        )
+                        conn.next_sync_at = datetime.utcnow() + timedelta(
+                            minutes=retry_minutes
+                        )
+                        if conn.sync_retry_count >= 8:
+                            conn.status = "error"
                         conn.updated_at = datetime.utcnow()
                         db.add(conn)
                         db.commit()

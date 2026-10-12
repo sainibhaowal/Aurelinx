@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -50,124 +50,120 @@ import { APP_VERSION } from "../config/version";
 ───────────────────────────────────────── */
 const simulatorScenarios = [
   {
-    name: "Workday HRIS Attrition Event",
-    source: "Workday HRIS Ingest Sync",
-    tag: "HRIS",
+    name: "Example employee event",
+    source: "Synthetic HRIS payload",
+    tag: "EXAMPLE",
     tagColor: "#6ee7b7",
     payload: {
-      email: "elena.rodriguez@aurelinx.io",
+      email: "sample.employee@example.invalid",
       department: "Engineering",
-      morale: 0.32,
-      retention_prob: 0.45,
-      external_id: "WD-89241",
+      external_id: "DEMO-EMP-001",
       region: "us-east",
     },
     steps: [
       {
-        title: "Bronze Raw Event Ingest",
-        desc: "Workday API sync scheduler triggers extraction. Raw JSON record is captured and saved securely to RawEventTable for compliance audit.",
-        log: "INFO: Sync job captured external record WD-89241. Writing raw payload to RawEventTable. Size: 284 bytes.",
+        title: "Receive source event",
+        desc: "Example: a configured source sends an employee event to Aurelinx. This walkthrough uses synthetic data and does not call a live integration.",
+        log: "EXAMPLE: Synthetic employee event received by the demo sequence.",
       },
       {
-        title: "Silver Data Contract Gate",
-        desc: 'Validates raw payload against DataContractTable schema. Schema matches active definition: "email" and "morale" fields validated.',
-        log: "SUCCESS: Data contract for WD-89241 is valid. Quality score: 1.00. Upserting canonical employee.",
+        title: "Validate mapped fields",
+        desc: "Example: incoming fields can be checked against the configured source mapping before records are imported.",
+        log: "EXAMPLE: Required-field check passed in the illustrative sequence.",
       },
       {
-        title: "Gold Explainable AI Inference",
-        desc: "Aurelinx Ruleboost ML model scores the employee. Morale score of 0.32 evaluates to a high exit probability of 84% (is_at_risk=True).",
-        log: "ML_ENGINE: Inferred exit risk for WD-89241 is 84.15%. Flagged is_at_risk = True.",
+        title: "Review available analysis",
+        desc: "Aurelinx provides workforce analysis from available records. This demo does not score a real person or produce a validated individual attrition forecast.",
+        log: "EXAMPLE: No real employee score was calculated.",
       },
       {
-        title: "Regional Compliance Policy Gate",
-        desc: "Policy packs evaluate the high risk trigger. Action requires Multi-Party Admin Authorization key to reveal sensitive PII morale metadata.",
-        log: 'POLICY_GATE: Action "PII_MORALE_EXPORT" requires multi-party approval under policy "Regional Privacy Pact (us-east)".',
+        title: "Check action permissions",
+        desc: "Governed actions can apply role and approval checks. Specific controls depend on workspace configuration.",
+        log: "EXAMPLE: Policy review step shown; no approval or policy evaluation was executed.",
       },
       {
-        title: "Active Retention Intervention",
-        desc: "Aurelinx automatically queues a high-priority 30-day retention loop, mapping owner assignment, estimated retention cost, and target ROI.",
-        log: "TASK_QUEUE: Created active retention intervention task #INT-3029. Owner: HR Director US. Cost: $4,500.",
+        title: "Create an intervention",
+        desc: "Interventions can be created and tracked by authorized users. This demo does not create a task or estimate realized ROI.",
+        log: "EXAMPLE: No intervention was created.",
       },
     ],
   },
   {
-    name: "Greenhouse ATS PM Candidate Ingest",
-    source: "Greenhouse ATS Webhook",
-    tag: "ATS",
+    name: "Example candidate event",
+    source: "Synthetic ATS payload",
+    tag: "EXAMPLE",
     tagColor: "#6ee7b7",
     payload: {
-      email: "marcus.vance@talenthub.com",
+      email: "sample.candidate@example.invalid",
       role: "Principal Product Manager",
       department: "Product Management",
-      match_score: 0.89,
-      external_id: "GH-8902",
+      external_id: "DEMO-CAND-001",
       region: "global",
     },
     steps: [
       {
-        title: "Bronze Raw Event Ingest",
-        desc: "Webhook triggers application event ingestion. Raw applicant info parsed and appended to RawEventTable for historical validation.",
-        log: "INFO: Ingested applicant webhook event GH-8902. Appended raw record.",
+        title: "Receive source event",
+        desc: "Example: a configured ATS source sends a candidate event. The payload shown here is synthetic; this walkthrough does not contact an ATS.",
+        log: "EXAMPLE: Synthetic candidate event received by the demo sequence.",
       },
       {
-        title: "Silver Data Contract Gate",
-        desc: "Verifies required recruiter mappings. Schema checks pass, matching all essential candidate table definitions.",
-        log: "SUCCESS: Data contract check passed for GH-8902. Quality Score: 0.98. Synchronized.",
+        title: "Validate mapped fields",
+        desc: "Example: source fields can be checked against configured mappings before candidate data is imported.",
+        log: "EXAMPLE: Mapping check passed in the illustrative sequence.",
       },
       {
-        title: "Gold Explainable AI Inference",
-        desc: "Match score engine infers fit alignment. MARCUS evaluates at 89% suitability ratio matching core department PM specs.",
-        log: "ML_ENGINE: Suitability score evaluated at 89% matching canonical role PM.",
+        title: "Review available analysis",
+        desc: "Talent Scout ranks candidate profiles against the search criteria and available skill evidence. This demo shows no real match score.",
+        log: "EXAMPLE: No candidate ranking was calculated.",
       },
       {
-        title: "Regional Compliance Policy Gate",
-        desc: "No compliance restrictions or blocked parameters detected. Automatically validated for recruitment workspace deployment.",
-        log: "POLICY_GATE: Candidate sync verified. Security release gate status: APPROVED.",
+        title: "Check access and policy",
+        desc: "Workspace access and data handling depend on the configured roles and policies.",
+        log: "EXAMPLE: No compliance or access decision was evaluated.",
       },
       {
-        title: "Active Recruitment Sync",
-        desc: "Synchronizes Marcus Vance to active talent pool directory. Sync completed cleanly across silver candidate registries.",
-        log: "DATABASE: Candidate row inserted into CanonicalCandidateTable. Triggering sync alert.",
+        title: "Manage the profile",
+        desc: "Authorized users can manage candidate records in the workspace. This illustrative sequence does not write to a database.",
+        log: "EXAMPLE: No candidate record was created or changed.",
       },
     ],
   },
   {
-    name: "Quarantine Anomalous Event Ingest",
-    source: "Legacy Payroll CSV Upload",
-    tag: "ERR",
+    name: "Example invalid record",
+    source: "Synthetic malformed payload",
+    tag: "EXAMPLE",
     tagColor: "#f87171",
     payload: {
       email: "",
       department: "Operations",
-      morale: 0.9,
-      external_id: "ERR-88912",
+      external_id: "DEMO-INVALID-001",
       region: "eu-west",
     },
     steps: [
       {
-        title: "Bronze Raw Event Ingest",
-        desc: "Batch ingest parses external legacy payroll spreadsheet. Ingests raw payroll fields.",
-        log: "WARNING: Captured legacy event batch ERR-88912. Raw record size: 142 bytes.",
+        title: "Receive source event",
+        desc: "Example: an incoming record is missing a required field. The payload is synthetic and is not a payroll record.",
+        log: "EXAMPLE: Synthetic malformed record received by the demo sequence.",
       },
       {
-        title: "Silver Data Contract Gate",
-        desc: 'SCHEMA DRIFT ERROR DETECTED: Required field "email" is blank or missing. Execution immediately halted to avoid data corruption!',
-        log: 'CRITICAL: Data contract failed. Field "email" is blank. Writing record to QuarantineEventTable.',
+        title: "Validate mapped fields",
+        desc: "Example: validation can reject an incomplete record before import. Actual requirements depend on source mapping.",
+        log: "EXAMPLE: Missing-field validation shown; no source record was quarantined.",
       },
       {
-        title: "Gold AI Scoring (HALTED)",
-        desc: "Model scoring is bypassed and quarantined. System prevents AI models from running on corrupt or malformed inputs.",
-        log: "ML_ENGINE: Execution bypassed. Record is quarantined.",
+        title: "Skip analysis after validation",
+        desc: "The illustrative sequence skips analysis after validation fails.",
+        log: "EXAMPLE: No model was run and no record was quarantined.",
       },
       {
-        title: "Regional Compliance Policy Gate",
-        desc: "Generates security compliance alert log. Quarantined record triggers automatic notification to administrator dashboard.",
-        log: "SECURITY: Logged quarantine event. Alert: Missing Identity Signature on region eu-west.",
+        title: "Review operational handling",
+        desc: "Operational alerts depend on the configured integration and workspace behavior.",
+        log: "EXAMPLE: No security alert was sent.",
       },
       {
-        title: "Administrative Action Queue",
-        desc: "Locks anomalous item in secure Quarantine Registry. Requires manual review or data mapping adjustments to unlock sync pipeline.",
-        log: "QUARANTINE: Secured record ERR-88912 in quarantine registry. Reason: Missing Identity PII.",
+        title: "Resolve the mapping issue",
+        desc: "An administrator can review source-mapping issues in the connected workspace.",
+        log: "EXAMPLE: No record was stored or locked.",
       },
     ],
   },
@@ -177,73 +173,73 @@ const PLATFORM_MODULES = [
   {
     icon: Database,
     accent: "#6ee7b7",
-    title: "Bronze → Silver → Gold Ingest Pipelines",
-    body: "Secure webhook syncs capture events from Slack, Jira, and Workday. System logs validate data schemas in real-time, quarantine structural anomalies to the integrity queue, and sync records transactionally.",
-    tags: ["X-API-Key Ingestion", "HMAC-SHA256 Signatures", "Quarantine Logs"],
+    title: "Data ingestion & integrations",
+    body: "Accepts records through configured integrations and ingestion endpoints. Source availability, field mapping, and sync behavior depend on each workspace’s credentials and configuration.",
+    tags: ["Connector setup", "Webhook endpoints", "Import validation"],
   },
   {
     icon: Cpu,
     accent: "#a78bfa",
-    title: "Explainable ML Registry & Model Cards",
-    body: "Calculates predictive retention probabilities on tenant-isolated records. Features validation diagnostics including PR-AUC scores, calibration error metrics, and model training snapshots.",
-    tags: ["PR-AUC Calibration", "Model Drift log", "Drift retrain snapshots"],
+    title: "Workforce analysis & model governance",
+    body: "Provides workforce and cohort analysis with model-card and drift records. Individual attrition forecasts are withheld unless outcome data and required validation are available.",
+    tags: ["Outcome-based validation", "Model-card records", "Drift snapshots"],
   },
   {
     icon: Lock,
     accent: "#6ee7b7",
-    title: "Regional Compliance Policy Gates",
-    body: "Enforces regional compliance protocols. Administrative operations trigger approval requirement gates, audit log entries, and require manual override verification.",
-    tags: ["Compliance Policy Packs", "Approval Gates", "Audit Event Logs"],
+    title: "Governed actions & audit records",
+    body: "Supports role-controlled actions, approval workflows, and audit records. The controls applied depend on the action and workspace configuration.",
+    tags: ["Role-based access", "Approval workflows", "Audit records"],
   },
   {
     icon: Workflow,
     accent: "#fbbf24",
-    title: "Active Retention Interventions Hub",
-    body: "Enables organizational leaders to configure and track 30/60/90-day retention loop tasks, measuring recovery cost estimates and turnover mitigation ROI.",
-    tags: ["Outcome Tracker", "Recovery Costs", "Turnover ROI Metrics"],
+    title: "Retention interventions",
+    body: "Lets authorized users create and track intervention records. Cost and outcome fields are operational inputs; the workspace does not claim measured retention ROI without outcome evidence.",
+    tags: [
+      "Intervention records",
+      "Owner and status tracking",
+      "Outcome fields",
+    ],
   },
   {
     icon: BrainCircuit,
     accent: "#f43f5e",
-    title: "Multi-Step Agentic Workflow Chat",
-    body: "Features a live ReAct orchestration loop with interactive status transitions (Think ➔ Plan ➔ Explore ➔ Modify ➔ Verify ➔ Complete). Directly translates natural language queries into secure database read/write actions.",
+    title: "Workflow chat & governed tools",
+    body: "Uses workflow tools to answer questions from available workspace records and perform permitted actions. Write and delete operations follow role checks and approval rules.",
     tags: [
-      "Interactive State Tracker",
-      "Dynamic SQL Mutations",
-      "Context Trace Inspector",
+      "Workflow progress",
+      "Permission-checked actions",
+      "Approval tracking",
     ],
   },
   {
     icon: Search,
     accent: "#2dd4bf",
-    title: "Semantic Talent Scout Matchmaker",
-    body: "Enables conceptual candidate matchmaking using description prompts. Employs a hybrid scoring algorithm indexing roles, departments, skill hierarchies, and matched coordinates.",
+    title: "Talent Scout",
+    body: "Searches and ranks available profiles against role and skill criteria. Results depend on the profiles and skill evidence present in the workspace.",
     tags: [
-      "Conceptual Skill Search",
-      "Typewriter Token Streaming",
-      "Talent Profile Modal",
+      "Role and skill search",
+      "Evidence-based ranking",
+      "Profile inspection",
     ],
   },
   {
     icon: BarChart3,
     accent: "#10b981",
-    title: "Sentiment Intelligence & Morale Analytics",
-    body: "Monitors organizational health and burnout risk indices in real-time. Computes leadership trust, morale velocities, and burnout levels using streaming Server-Sent Events (SSE).",
-    tags: [
-      "burnout risk vector",
-      "morale velocity trends",
-      "live SSE analytics",
-    ],
+    title: "Sentiment & workforce analytics",
+    body: "Summarizes available sentiment and workforce signals. Streaming endpoints deliver results to the workspace; coverage and freshness depend on the source data provided.",
+    tags: ["Sentiment summaries", "Workforce indicators", "Streamed updates"],
   },
   {
     icon: Network,
     accent: "#ec4899",
     title: "Organizational Network Analysis (ONA)",
-    body: "Maps employee pull request reviews and collaborations onto an interactive ONA graph. Computes influence scores using PageRank, Brandes Betweenness centrality, and Dijkstra skill pathways.",
+    body: "Builds an interactive graph from observed collaboration events and reports descriptive measures including PageRank, betweenness, closeness, and clustering. These measures describe the supplied graph, not employee performance.",
     tags: [
       "PageRank Centrality",
-      "Spring-Physics Physics",
-      "Dijkstra skill distances",
+      "Observed collaboration ties",
+      "Department and date filters",
     ],
   },
 ];
@@ -258,34 +254,34 @@ const MATH_PILLARS = [
     applied: "Semantic Talent Scout",
   },
   {
-    title: "Optimal Team Assembly (Simulated Annealing)",
-    formula: "P = exp(ΔE / T) | T_k = T_0 · α^k",
+    title: "Team Assembly (MILP optimization)",
+    formula: "Integer optimization under skill, size, and budget constraints",
     accent: "#fbbf24",
-    desc: "Searches the vast combinatorics space of employee-skill pairings using a stochastic simulated annealing engine. Constrained by strict budget caps, maximum team size limits, and role-skill density matrices.",
-    highlight: "Metropolis-Hastings Solver",
+    desc: "Selects a team using a mixed-integer linear optimization model with skill coverage, team-size, and budget constraints. The report includes solver status and whether optimality was proven.",
+    highlight: "HiGHS mixed-integer solver",
     applied: "Team Assembly Sandbox",
   },
   {
-    title: "Attrition Sandbox & Cox Hazards",
-    formula: "h(t) = h₀(t) · exp(Σ βᵢ·Xᵢ)",
+    title: "Attrition Survival Readiness",
+    formula: "employment duration + observed outcome",
     accent: "#ef4444",
-    desc: "Estimates cumulative baseline hazards across double-Gaussian peak tenures. Integrates SHAP-covariate weights (morale, salary ratio, workload fatigue) to compute dynamic hazard multipliers and flight risk mitigation paths.",
-    highlight: "Proportional Hazards Regression",
-    applied: "Attrition Risk Scoring",
+    desc: "Checks tenant-scoped employment durations and observed departure/censoring outcomes. Individual forecasts remain unavailable until historical outcomes are connected and the model is validated.",
+    highlight: "Observed-outcome survival analysis",
+    applied: "Model data readiness",
   },
   {
     title: "Organizational Network Analysis (ONA)",
     formula: "PR(u) = (1−d)/N + d · Σ (PR(v) / L(v))",
     accent: "#ec4899",
-    desc: "Maps pull request reviews, collaboration commits, and communication telemetry weights onto an interactive organizational interaction graph. Computes influence via PageRank and bridge-strength via Betweenness.",
+    desc: "Builds an undirected graph from observed co-participation events. PageRank, normalized betweenness, corrected closeness, and clustering describe graph structure; event count indicates tie strength.",
     highlight: "Brandes Betweenness Centrality",
     applied: "ONA Influence Graph",
   },
   {
-    title: "Markov Career Path Horizons",
+    title: "Observed Career Transitions",
     formula: "P⁽ⁿ⁾ = Pⁿ | Σᵢ Pᵢⱼ = 1",
     accent: "#a78bfa",
-    desc: "Models internal role transitions as a discrete-time Markov chain. Projects state probability matrices over a 3-year horizon, scaling step velocity dynamically with employee skills coverage ratios.",
+    desc: "Estimates next-role-change frequencies from dated role histories. Each step is an observed role change; the data does not support a time-based or individual promotion forecast.",
     highlight: "Chapman-Kolmogorov Projection",
     applied: "Career Path Simulator",
   },
@@ -299,6 +295,30 @@ const spotlightMove = (e) => {
   const rect = e.currentTarget.getBoundingClientRect();
   e.currentTarget.style.setProperty("--mx", `${e.clientX - rect.left}px`);
   e.currentTarget.style.setProperty("--my", `${e.clientY - rect.top}px`);
+};
+
+// Scroll to a landing section inside the custom scroll container.
+// Plain hash anchors only scroll the window, which never moves here
+// (the page scrolls #landing-scroll-root), so nav uses this instead.
+const scrollToLandingSection = (index) => {
+  const el = document.getElementById(`section-${index}`);
+  if (!el) return;
+  const root = document.getElementById("landing-scroll-root");
+  if (root) {
+    const top =
+      el.getBoundingClientRect().top -
+      root.getBoundingClientRect().top +
+      root.scrollTop -
+      88; /* clear the sticky pill nav */
+    root.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  } else {
+    el.scrollIntoView({ behavior: "smooth" });
+  }
+  try {
+    window.history.replaceState(null, "", `#section-${index}`);
+  } catch {
+    /* non-fatal: hash sync is cosmetic */
+  }
 };
 
 const AuroraBlob = ({ color, className = "", size = 480, delay = "0s" }) => (
@@ -318,11 +338,11 @@ const GradientWord = ({ children }) => (
   <span className="gradient-headline">{children}</span>
 );
 
-const CountUp = ({
+const CountUp = memo(function CountUp({
   value,
   format = (v) => v.toLocaleString(),
   duration = 950,
-}) => {
+}) {
   const [display, setDisplay] = React.useState(0);
   const ref = React.useRef(null);
   const started = React.useRef(false);
@@ -351,22 +371,22 @@ const CountUp = ({
   }, [value, duration]);
 
   return <span ref={ref}>{format(display)}</span>;
-};
+});
 
 /* ─────────────────────────────────────────
    HELPER COMPONENTS
 ───────────────────────────────────────── */
 const GlassCard = ({ children, className = "", style = {}, delay = 0 }) => (
   <motion.div
-    initial={{ opacity: 0, y: 30 }}
-    whileInView={{ opacity: 1, y: 0 }}
+    initial={{ opacity: 0, y: 26, scale: 0.985 }}
+    whileInView={{ opacity: 1, y: 0, scale: 1 }}
     viewport={{ once: true, amount: 0.12 }}
-    transition={{ duration: 0.6, delay, ease: [0.16, 1, 0.3, 1] }}
+    transition={{ duration: 0.65, delay, ease: [0.16, 1, 0.3, 1] }}
     whileHover={{
       y: -4,
       transition: { type: "spring", stiffness: 350, damping: 25 },
     }}
-    className={`group relative rounded-[22px] luxe-card ${className}`}
+    className={`group spotlight-card relative luxe-card landing-radius-panel ${className}`}
     style={{
       background:
         "linear-gradient(160deg, rgba(52,122,86,0.14), rgba(4,16,11,0.55) 55%), rgba(255,255,255,0.025)",
@@ -375,7 +395,6 @@ const GlassCard = ({ children, className = "", style = {}, delay = 0 }) => (
       WebkitBackdropFilter: "blur(16px) saturate(130%)",
       boxShadow:
         "inset 0 1px 0 0 rgba(255,255,255,0.05), 0 20px 60px rgba(2,10,6,0.55)",
-      willChange: "transform, opacity",
       ...style,
     }}
     onMouseMove={spotlightMove}
@@ -385,7 +404,11 @@ const GlassCard = ({ children, className = "", style = {}, delay = 0 }) => (
 );
 
 const SectionLabel = ({ children }) => (
-  <p
+  <motion.p
+    initial={{ opacity: 0, y: 12 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, amount: 0.6 }}
+    transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
     className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.25em]"
     style={{
       background: "rgba(110,231,183,0.07)",
@@ -402,13 +425,19 @@ const SectionLabel = ({ children }) => (
       }}
     />
     {children}
-  </p>
+  </motion.p>
 );
 
 const SectionHeading = ({ children }) => (
-  <h2 className="mt-5 text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[1.05] tracking-tight text-white [text-shadow:0_0_40px_rgba(110,231,183,0.15)]">
+  <motion.h2
+    initial={{ opacity: 0, y: 16 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, amount: 0.6 }}
+    transition={{ duration: 0.55, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+    className="mt-5 text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[1.05] tracking-tight text-white [text-shadow:0_0_40px_rgba(110,231,183,0.15)]"
+  >
     {children}
-  </h2>
+  </motion.h2>
 );
 
 const Tag = ({ children, accent = null }) => (
@@ -436,32 +465,34 @@ const TICKER_PALETTE = [
   "#a78bfa",
 ];
 
-const Ticker = ({ items, className = "" }) => (
-  <div className={`ticker-mask ${className}`} aria-hidden="true">
-    <div className="ticker-track items-center">
-      {[0, 1].map((dup) => (
-        <div key={dup} className="flex items-center gap-10 pr-10">
-          {items.map((item, i) => (
-            <span
-              key={`${dup}-${i}`}
-              className="flex items-center gap-3 whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "rgba(148,163,184,0.55)" }}
-            >
+const Ticker = memo(function Ticker({ items, className = "" }) {
+  return (
+    <div className={`ticker-mask ${className}`} aria-hidden="true">
+      <div className="ticker-track items-center">
+        {[0, 1].map((dup) => (
+          <div key={dup} className="flex items-center gap-10 pr-10">
+            {items.map((item, i) => (
               <span
-                className="h-1 w-1 rounded-full"
-                style={{
-                  background: TICKER_PALETTE[i % TICKER_PALETTE.length],
-                  boxShadow: `0 0 6px ${TICKER_PALETTE[i % TICKER_PALETTE.length]}80`,
-                }}
-              />
-              {item}
-            </span>
-          ))}
-        </div>
-      ))}
+                key={`${dup}-${i}`}
+                className="flex items-center gap-3 whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "rgba(148,163,184,0.55)" }}
+              >
+                <span
+                  className="h-1 w-1 rounded-full"
+                  style={{
+                    background: TICKER_PALETTE[i % TICKER_PALETTE.length],
+                    boxShadow: `0 0 6px ${TICKER_PALETTE[i % TICKER_PALETTE.length]}80`,
+                  }}
+                />
+                {item}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+});
 
 /* ─────────────────────────────────────────
    WAVEFORM (audio-style live bars)
@@ -588,7 +619,7 @@ const HeroOrb = ({ sreStatus, pingLatency, onEnterWorkspace }) => {
           className="text-[9px] font-bold uppercase tracking-wider"
           style={{ color: "rgba(226,232,240,0.85)" }}
         >
-          SRE Gateway · {ok ? "Operational" : sreStatus}
+          API health · {ok ? "Responding" : sreStatus}
           {pingLatency ? ` · ${pingLatency}ms` : ""}
         </span>
       </motion.div>
@@ -710,7 +741,12 @@ const CONNECTOR_PALETTE = [
   "#a78bfa",
 ];
 
-const ConnectorTile = ({ name, type, status, index = 0 }) => {
+const ConnectorTile = memo(function ConnectorTile({
+  name,
+  type,
+  status,
+  index = 0,
+}) {
   const statusStyle = {
     active: {
       color: "#6ee7b7",
@@ -732,6 +768,11 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
       bg: "rgba(110,231,183,0.06)",
       border: "rgba(110,231,183,0.2)",
     },
+    "setup required": {
+      color: "#cbd5e1",
+      bg: "rgba(148,163,184,0.06)",
+      border: "rgba(148,163,184,0.18)",
+    },
   };
   const s = statusStyle[String(status).toLowerCase()] || statusStyle.supported;
   const accent = CONNECTOR_PALETTE[index % CONNECTOR_PALETTE.length];
@@ -752,8 +793,8 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
         transition: { type: "spring", stiffness: 400, damping: 25 },
       }}
       onMouseMove={spotlightMove}
-      className="group spotlight-card luxe-card relative overflow-hidden rounded-[18px] px-5 py-5 border border-white/10 bg-white/[0.02] hover:border-white/15 transition-colors duration-300 shadow-xl"
-      style={{ willChange: "transform, opacity", "--card-accent": accent }}
+      className="group spotlight-card luxe-card landing-radius-tile relative overflow-hidden px-5 py-5 border border-white/10 bg-white/[0.02] shadow-xl"
+      style={{ "--card-accent": accent }}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -773,10 +814,7 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
             </span>
           </div>
           <div>
-            <div
-              className="text-sm font-semibold text-white transition-colors duration-200 group-hover:text-white"
-              style={{ color: accent }}
-            >
+            <div className="text-sm font-semibold" style={{ color: accent }}>
               {name}
             </div>
             <div
@@ -800,7 +838,7 @@ const ConnectorTile = ({ name, type, status, index = 0 }) => {
       </div>
     </motion.div>
   );
-};
+});
 
 /* ─────────────────────────────────────────
    SLIDER FILL (gradient progress thumb track)
@@ -1103,6 +1141,132 @@ const LuxeScrollbar = () => {
 };
 
 /* ─────────────────────────────────────────
+   STATIC SHOWCASE DATA (module scope)
+   Hoisted out of the component so memoized cards keep referentially
+   stable props — simulator ticks and ROI slider drags then skip
+   reconciling these subtrees instead of re-rendering the whole page.
+   The landing page never reads the tenant's live registries
+   (public-facing surface must expose nothing).
+───────────────────────────────────────── */
+const LANDING_TICKER_ITEMS = [
+  "Workday",
+  "Greenhouse",
+  "Lever",
+  "SAP SuccessFactors",
+  "BambooHR",
+  "HiBob",
+  "Slack",
+  "Microsoft Teams",
+  "Jira",
+  "REST API & Webhooks",
+  "Workspace-configured integrations",
+  "Role-based approvals",
+  "Observed workforce analysis",
+];
+
+const LANDING_CONNECTORS = [
+  {
+    name: "Workday",
+    type: "HRIS connector option",
+    status: "SETUP REQUIRED",
+  },
+  {
+    name: "Greenhouse",
+    type: "ATS connector option",
+    status: "SETUP REQUIRED",
+  },
+  {
+    name: "Lever",
+    type: "ATS connector option",
+    status: "SETUP REQUIRED",
+  },
+  {
+    name: "SAP SuccessFactors",
+    type: "HRIS connector option",
+    status: "SETUP REQUIRED",
+  },
+  {
+    name: "BambooHR",
+    type: "HRIS connector option",
+    status: "SETUP REQUIRED",
+  },
+  {
+    name: "HiBob",
+    type: "HRIS connector option",
+    status: "SETUP REQUIRED",
+  },
+  {
+    name: "Slack",
+    type: "Engagement connector option",
+    status: "SETUP REQUIRED",
+  },
+  {
+    name: "Microsoft Teams",
+    type: "Productivity connector option",
+    status: "SETUP REQUIRED",
+  },
+  {
+    name: "Jira",
+    type: "Productivity connector option",
+    status: "SETUP REQUIRED",
+  },
+];
+
+const LANDING_FALLBACK_RUNBOOKS = [
+  {
+    name: "Recovery runbooks",
+    env: "Workspace-specific",
+    rto: null,
+    rpo: null,
+    note: "Aurelinx can store runbook details. Recovery objectives and drill results must be configured and verified in your environment.",
+    status: "Configure in workspace",
+  },
+  {
+    name: "Recovery drills",
+    env: "Workspace-specific",
+    rto: null,
+    rpo: null,
+    note: "Record drill outcomes after testing your own deployment. The public landing page does not claim tested recovery times.",
+    status: "Results not shown",
+  },
+];
+
+const LANDING_FALLBACK_PROCUREMENT = [
+  {
+    title: "Security controls",
+    type: "Workspace artifact",
+    ver: "Example",
+    status: "Configure in workspace",
+    notes:
+      "Store and track security review artifacts. This sample is not an audit result or certification.",
+  },
+  {
+    title: "Data protection review",
+    type: "Workspace artifact",
+    ver: "Example",
+    status: "Configure in workspace",
+    notes:
+      "Record your organization’s assessment and evidence in the workspace.",
+  },
+  {
+    title: "Security questionnaire",
+    type: "Workspace artifact",
+    ver: "Example",
+    status: "Configure in workspace",
+    notes:
+      "Aurelinx does not claim a completed questionnaire or independent control attestation.",
+  },
+  {
+    title: "Service objectives",
+    type: "Workspace artifact",
+    ver: "Example",
+    status: "Configure in workspace",
+    notes:
+      "Define and verify service objectives for your deployment; no SLA is represented here.",
+  },
+];
+
+/* ─────────────────────────────────────────
    MAIN COMPONENT
 ───────────────────────────────────────── */
 const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
@@ -1125,7 +1289,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
   const [activeModule, setActiveModule] = useState(0);
   const [manualOpen, setManualOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
-  const [subscribed, setSubscribed] = useState(false);
+
   const simSectionRef = useRef(null);
 
   useEffect(() => {
@@ -1137,8 +1301,14 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         const isHealthy =
           healthCheck?.status === "healthy" || healthCheck?.status === "ok";
         if (active) {
-          setPingLatency(Date.now() - t0);
-          setSreStatus(isHealthy ? "operational" : "degraded");
+          if (isHealthy) setPingLatency(Date.now() - t0);
+          setSreStatus(
+            isHealthy
+              ? "operational"
+              : healthCheck?.status === "offline"
+                ? "offline"
+                : "degraded",
+          );
         }
       } catch {
         if (active) setSreStatus("offline");
@@ -1158,7 +1328,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
     setSimActiveStep(0);
     const scenario = simulatorScenarios[selectedScenarioIdx];
     setSimLogs([
-      `[${new Date().toLocaleTimeString()}] INGEST_TRIGGER: Starting pipeline run for "${scenario.name}"...`,
+      `[${new Date().toLocaleTimeString()}] DEMO: Starting illustrative sequence for "${scenario.name}"...`,
     ]);
     let step = 0;
     const interval = setInterval(() => {
@@ -1174,7 +1344,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         setIsSimulating(false);
         setSimLogs((prev) => [
           ...prev,
-          `[${new Date().toLocaleTimeString()}] PIPELINE_SUCCESS: Run complete. Security clearance: VERIFIED.`,
+          `[${new Date().toLocaleTimeString()}] DEMO_COMPLETE: Sequence finished. No integration was called and no workspace data changed.`,
         ]);
       }
     }, 1800);
@@ -1185,7 +1355,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
     setSelectedScenarioIdx(idx);
     setSimActiveStep(0);
     setSimLogs([
-      `[${new Date().toLocaleTimeString()}] INGEST_STANDBY: Scenario changed. Pipeline ready for execution.`,
+      `[${new Date().toLocaleTimeString()}] DEMO_READY: Example selected. No live job is queued.`,
     ]);
   };
 
@@ -1208,88 +1378,6 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
     return () => obs.disconnect();
   }, []);
 
-  /* Static connector showcase — the landing page never reads the tenant's
-     live connection registry (public-facing surface must expose nothing) */
-  const displayConnectors = [
-    {
-      name: "Workday HRIS API",
-      type: "Core Employee DB",
-      status: "ACTIVE",
-    },
-    {
-      name: "Greenhouse ATS",
-      type: "Candidate Pipeline",
-      status: "SUPPORTED",
-    },
-    {
-      name: "SAP SuccessFactors",
-      type: "Performance Analytics",
-      status: "SUPPORTED",
-    },
-    {
-      name: "Oracle HCM Cloud",
-      type: "Workforce Planning",
-      status: "SUPPORTED",
-    },
-    { name: "BambooHR", type: "Directory Sync", status: "SUPPORTED" },
-    {
-      name: "ADP Workforce",
-      type: "Compensation Mapping",
-      status: "SUPPORTED",
-    },
-  ];
-
-  /* ── Fallback compliance data ── */
-  const fallbackRunbooks = [
-    {
-      name: "Core Database Recovery",
-      env: "production",
-      rto: 15,
-      rpo: 5,
-      note: "Daily SRE backups mirroring the primary PostgreSQL cluster across active instances.",
-      status: "validated",
-    },
-    {
-      name: "API Server Recovery",
-      env: "production",
-      rto: 5,
-      rpo: 0,
-      note: "FastAPI health-check ping and autoscaling trigger protocols.",
-      status: "validated",
-    },
-  ];
-  const fallbackProcurement = [
-    {
-      title: "SOC 2 Type II Security Inquest",
-      type: "Compliance",
-      ver: "2026.1",
-      status: "approved",
-      notes:
-        "Continuous SRE log analysis auditing data gates and schema isolation boundaries.",
-    },
-    {
-      title: "Standard GDPR DPA Addendum",
-      type: "Legal",
-      ver: "v4",
-      status: "enforced",
-      notes: "Guarantees absolute tenant default isolation database schemas.",
-    },
-    {
-      title: "CAIQ Security Questionnaire",
-      type: "Assessment",
-      ver: "v2",
-      status: "compliant",
-      notes: "100% compliance mapping across raw, silver, and gold pipelines.",
-    },
-    {
-      title: "MSA API Service Level Agreement",
-      type: "Contract",
-      ver: "2026.2",
-      status: "signed",
-      notes: "99.95% API uptime guaranteed under secondary local sync modes.",
-    },
-  ];
-
   /* ROI computations */
   const departures = Math.round((calcWorkforce * calcTurnover) / 100);
   const costToday = departures * calcSalary * 1.5;
@@ -1298,23 +1386,6 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
   const afterCost = costToday - savings;
   const afterPct =
     costToday > 0 ? Math.max(0, (afterCost / costToday) * 100) : 0;
-
-  /* Capability ticker items */
-  const tickerItems = [
-    "Workday HRIS",
-    "Greenhouse ATS",
-    "SAP SuccessFactors",
-    "Oracle HCM Cloud",
-    "BambooHR",
-    "ADP Workforce",
-    "Slack Morale Pipeline",
-    "Jira PR Telemetry",
-    "REST API & Webhooks",
-    "Bronze → Silver → Gold",
-    "Policy Release Gates",
-    "Retention Intervention Loops",
-    "Explainable ML Model Cards",
-  ];
 
   /* Illustrative risk pattern (decorative narrative visual) */
   const RISK_SIGNAL = [
@@ -1365,7 +1436,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         <NeonParticlesWave />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-[1800px] px-4 sm:px-6 lg:px-10">
+      <div className="landing-scale-90 relative z-10 mx-auto max-w-[1800px] px-4 sm:px-6 lg:px-10">
         {/* ══════════ NAV ══════════ */}
         <header className="sticky top-4 z-50 mb-4 pt-4">
           <div
@@ -1378,10 +1449,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           >
             {/* Logo */}
             <div
-              onClick={() => {
-                const el = document.getElementById("section-0");
-                if (el) el.scrollIntoView({ behavior: "smooth" });
-              }}
+              onClick={() => scrollToLandingSection(0)}
               className="flex items-center gap-3 select-none cursor-pointer hover:opacity-80 transition-opacity"
               title="Scroll to Top"
             >
@@ -1418,6 +1486,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             <nav
               className="hidden items-center gap-7 text-[11px] font-semibold uppercase tracking-widest lg:flex"
               style={{ color: "rgba(148,163,184,0.6)" }}
+              aria-label="Landing sections"
             >
               {[
                 "Overview",
@@ -1427,13 +1496,14 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 "Connectors",
                 "Compliance",
               ].map((item, i) => (
-                <a
+                <button
                   key={item}
-                  href={`#section-${i}`}
-                  className="transition-colors hover:text-white"
+                  type="button"
+                  onClick={() => scrollToLandingSection(i)}
+                  className="uppercase tracking-widest transition-colors hover:text-white cursor-pointer"
                 >
                   {item}
-                </a>
+                </button>
               ))}
             </nav>
 
@@ -1452,7 +1522,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <span>Download App</span>
               </button>
 
-              {/* SRE ping (REAL) */}
+              {/* Public API health ping */}
               <div
                 className="hidden md:flex items-center gap-2 rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest"
                 style={{
@@ -1532,7 +1602,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             >
               <SectionLabel>
                 <Activity className="h-3.5 w-3.5" />
-                Live workforce analytics &amp; policy governance
+                Workforce analysis &amp; governed workflows
               </SectionLabel>
             </motion.div>
 
@@ -1554,9 +1624,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-6 max-w-[580px] text-base leading-relaxed"
               style={{ color: "rgba(148,163,184,0.7)" }}
             >
-              Aurelinx unifies live workforce analytics, AI agent governance,
-              and automated risk parameters into a high-precision executive
-              control panel.
+              Aurelinx brings employee and candidate records, workforce
+              analysis, and governed operational workflows into one workspace.
+              Results reflect the data and integrations configured by your
+              organization.
             </motion.p>
 
             <motion.div
@@ -1638,9 +1709,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-7 flex flex-wrap items-center justify-center gap-2"
             >
               {[
-                ["Live PostgreSQL Sync", null],
-                ["Policy Release Gates", "#6ee7b7"],
-                ["Explainable ML Model Cards", "#a78bfa"],
+                ["Workspace data and analytics", null],
+                ["Role-based actions", "#6ee7b7"],
+                ["Model governance records", "#a78bfa"],
               ].map(([label, accent]) => (
                 <Tag key={label} accent={accent}>
                   {label}
@@ -1648,7 +1719,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               ))}
             </motion.div>
 
-            {/* HONEST LIVE STATUS LINE (real SRE + real data source) */}
+            {/* Public API health status; this does not represent every subsystem. */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -1664,7 +1735,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       sreStatus === "operational" ? "#6ee7b7" : "#f87171",
                   }}
                 />
-                Gateway {sreStatus}
+                API {sreStatus}
                 {pingLatency ? ` · ${pingLatency}ms` : ""}
               </span>
               <span className="opacity-40">·</span>
@@ -1687,7 +1758,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             className="mt-10 border-y border-white/5 py-1"
             aria-hidden="true"
           >
-            <Ticker items={tickerItems} />
+            <Ticker items={LANDING_TICKER_ITEMS} />
           </div>
 
           {/* Scroll hint */}
@@ -1725,16 +1796,17 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <AlertTriangle className="h-3.5 w-3.5" /> The Cost of Silence
               </SectionLabel>
               <h2 className="mt-5 text-[clamp(1.9rem,3.5vw,2.8rem)] font-extrabold leading-[1.08] tracking-tight text-white">
-                Attrition never sends a <GradientWord>memo</GradientWord>.
+                Workforce changes can be{" "}
+                <GradientWord>hard to see</GradientWord>.
               </h2>
               <p
                 className="mt-5 max-w-[540px] text-sm leading-relaxed"
                 style={{ color: "rgba(148,163,184,0.65)" }}
               >
-                Risk signals drift through sentiment, engagement, and workload
-                data for weeks before a resignation lands. Spreadsheets and
-                quarterly reviews catch it after the exit interview — when the
-                cost is already sunk.
+                Workforce decisions often draw on records spread across systems.
+                Aurelinx brings available employee, candidate, and operational
+                information into a workspace for review. The example chart is
+                illustrative, not observed employee data.
               </p>
 
               <div className="mt-8 space-y-4">
@@ -1743,19 +1815,19 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     icon: Zap,
                     accent: "#6ee7b7",
                     title: "Detect early",
-                    desc: "Morale, retention probability, and burnout vectors scored continuously — not quarterly.",
+                    desc: "Review sentiment and workforce indicators from available records. Coverage and freshness depend on configured data sources.",
                   },
                   {
                     icon: ShieldCheck,
                     accent: "#6ee7b7",
                     title: "Act with control",
-                    desc: "Policy gates govern every sensitive action, with approval chains and full audit trails.",
+                    desc: "Role checks, approval workflows, and audit records are available for supported actions; requirements depend on the operation and workspace setup.",
                   },
                   {
                     icon: TrendingUp,
                     accent: "#a78bfa",
                     title: "Recover the value",
-                    desc: "30/60/90-day retention loops with tracked costs and measurable ROI.",
+                    desc: "Create and track intervention records. Outcomes and return on investment require organization-specific evidence.",
                   },
                 ].map(({ icon: Icon, accent, title, desc }) => (
                   <div
@@ -1815,7 +1887,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   className="text-[10px] font-black uppercase tracking-[0.24em]"
                   style={{ color: "rgba(148,163,184,0.4)" }}
                 >
-                  What you miss before the resignation
+                  Example signal pattern
                 </div>
                 <Tag>Illustrative pattern</Tag>
               </div>
@@ -1862,13 +1934,13 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 className="mt-3 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "rgba(148,163,184,0.35)" }}
               >
-                <span>Months before exit</span>
+                <span>Illustrative periods</span>
                 <span className="flex items-center gap-1.5">
                   <span
                     className="h-1.5 w-1.5 rounded-full"
                     style={{ background: "#f43f5e" }}
                   />
-                  signal spike
+                  example signal
                 </span>
               </div>
 
@@ -1890,9 +1962,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   className="mt-2 text-xs leading-relaxed"
                   style={{ color: "rgba(226,232,240,0.75)" }}
                 >
-                  Sentiment and morale drift are measurable weeks before exit.
-                  Aurelinx scores them continuously and surfaces the signal —
-                  before it becomes a goodbye.
+                  Available sentiment and workforce records can reveal patterns
+                  worth reviewing. Results depend on the data supplied and do
+                  not guarantee advance notice of an employee departure.
                 </p>
               </div>
             </div>
@@ -1909,7 +1981,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           {/* Header */}
           <div className="mx-auto max-w-[700px] text-center">
             <SectionLabel>
-              <Activity className="h-3.5 w-3.5" /> Continuous Ingest Sync
+              <Activity className="h-3.5 w-3.5" /> Illustrative walkthrough
             </SectionLabel>
             <SectionHeading>
               Interactive <GradientWord>Ingestion Pipeline</GradientWord>{" "}
@@ -1919,10 +1991,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
-              Aurelinx pipelines continuously sync files and API endpoints,
-              curate them into Silver SQL tables, score exit risks, check
-              security policies, and trigger retention interventions. Select a
-              scenario and trace its journey.
+              This client-side walkthrough uses synthetic example records. It
+              does not contact an integration, score a person, evaluate a live
+              policy, or write to your workspace. Select an example to see the
+              kinds of steps a configured workflow may involve.
             </p>
           </div>
 
@@ -2042,7 +2114,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     color: "rgba(148,163,184,0.5)",
                   }}
                 >
-                  sync: live_production_tenant
+                  DEMO ONLY · NO LIVE CONNECTION
                 </span>
               </div>
 
@@ -2061,13 +2133,13 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   }}
                 />
 
-                {["Bronze", "Silver", "Gold", "Gate", "Action"].map(
+                {["Receive", "Validate", "Analyze", "Review", "Act"].map(
                   (name, i) => {
                     const isActive = i === simActiveStep;
                     const isDone = i < simActiveStep;
                     const isErrScenario =
                       simulatorScenarios[selectedScenarioIdx].name.includes(
-                        "Quarantine",
+                        "invalid",
                       );
                     const isErr = isErrScenario && isDone && i >= 1;
 
@@ -2171,7 +2243,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       className="h-3.5 w-3.5"
                       style={{ color: "#6ee7b7" }}
                     />
-                    SRE logs console
+                    Illustrative event log
                   </div>
                   <span
                     className="h-2 w-2 animate-pulse rounded-full"
@@ -2214,7 +2286,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
           </div>
         </section>
 
-        {/* ══════════ LIVE METRICS BAND (REAL DATA ONLY) ══════════ */}
+        {/* ══════════ WORKSPACE DATA PRIVACY ══════════ */}
         <section
           className="py-20"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
@@ -2231,9 +2303,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
               This page is public-facing and never touches your workspace data.
-              Real-time retention, risk, and morale gauges render only inside
-              your authenticated workspace — zero tenant data is exposed here,
-              by design.
+              This public page does not load tenant records. Workspace views use
+              the data available to the signed-in organization; some analyses
+              require specific source and validation evidence.
             </p>
           </div>
 
@@ -2257,9 +2329,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     className="mt-2 mx-auto max-w-[520px] text-sm leading-relaxed"
                     style={{ color: "rgba(148,163,184,0.6)" }}
                   >
-                    Retention, risk, and morale gauges stream in your private
-                    workspace only. This public page ships zero tenant data —
-                    nothing here is fetched from your company, by design.
+                    Your organization's records are not shown here. In the
+                    workspace, available analysis depends on configured data
+                    sources, permissions, and data quality.
                   </p>
                 </div>
                 <button
@@ -2297,21 +2369,29 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
-              Mathematically-grounded solvers and simulation parameters powering
-              advanced workforce optimizations, career projection pathways, and
-              retention sandbox analytics. Select a pillar to explore it.
+              Explore the methods used by specific analyses. Outputs describe
+              the available records and stated constraints; they are not
+              automatically validated forecasts of future outcomes.
             </p>
           </div>
 
           <div className="mx-auto mt-12 grid max-w-[1500px] gap-5 lg:grid-cols-[340px_1fr]">
             {/* Pillar selector */}
-            <div className="space-y-2.5">
+            <div className="space-y-2.5 landing-selector-strip">
               {MATH_PILLARS.map((pillar, idx) => (
-                <button
+                <motion.button
                   key={pillar.title}
                   type="button"
+                  initial={{ opacity: 0, x: -14 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true, amount: 0.4 }}
+                  transition={{
+                    duration: 0.45,
+                    delay: idx * 0.06,
+                    ease: [0.16, 1, 0.3, 1],
+                  }}
                   onClick={() => setActivePillar(idx)}
-                  className="w-full rounded-[18px] p-4 text-left transition-all duration-200 select-none"
+                  className="w-full landing-radius-tile p-4 text-left transition-colors duration-200 select-none"
                   style={{
                     background:
                       idx === activePillar
@@ -2346,7 +2426,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       </span>
                     </span>
                   </div>
-                </button>
+                </motion.button>
               ))}
             </div>
 
@@ -2459,24 +2539,32 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
-              Aurelinx converts raw talent inputs, risk indicators, and
-              compliance gate parameters into a beautifully unified, highly
-              dense control panel. Explore each module.
+              Explore workspace features for talent search, workforce analysis,
+              integrations, and governed operations. Availability depends on
+              configured data and permissions.
             </p>
           </div>
 
           <div className="mx-auto mt-12 grid max-w-[1500px] gap-5 lg:grid-cols-[300px_1fr]">
             {/* Module selector */}
-            <div className="space-y-2">
+            <div className="space-y-2 landing-selector-strip">
               {PLATFORM_MODULES.map((mod, idx) => {
                 const Icon = mod.icon;
                 const isActive = idx === activeModule;
                 return (
-                  <button
+                  <motion.button
                     key={mod.title}
                     type="button"
+                    initial={{ opacity: 0, x: -14 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, amount: 0.4 }}
+                    transition={{
+                      duration: 0.45,
+                      delay: idx * 0.05,
+                      ease: [0.16, 1, 0.3, 1],
+                    }}
                     onClick={() => setActiveModule(idx)}
-                    className="w-full rounded-[16px] p-3.5 text-left transition-all duration-200 select-none"
+                    className="w-full landing-radius-tile p-3.5 text-left transition-colors duration-200 select-none"
                     style={{
                       background: isActive
                         ? `${mod.accent}0d`
@@ -2513,7 +2601,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                         </span>
                       </span>
                     </div>
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
@@ -2626,19 +2714,21 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               <Gauge className="h-3.5 w-3.5" /> Value Realization
             </SectionLabel>
             <SectionHeading>
-              Interactive <GradientWord>Turnover ROI</GradientWord> Calculator
+              Interactive <GradientWord>Turnover Scenario</GradientWord>{" "}
+              Estimator
             </SectionHeading>
             <p
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
-              Benchmark model based on industry research: employee replacement
-              costs (recruiting, onboarding, productivity lag) average{" "}
+              Illustrative calculation using the inputs below. It assumes
+              replacement costs of{" "}
               <span className="text-cyan-300 font-semibold">
                 1.5x base salary
               </span>{" "}
-              (SHRM / Gallup). Adjust the variables and watch the forecast
-              update live.
+              and the target turnover reduction you select. It is not a measured
+              Aurelinx outcome, customer-specific forecast, or guarantee of
+              savings.
             </p>
           </div>
 
@@ -2714,8 +2804,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     style={sliderFill(5, 45, calcTurnover)}
                   />
                   <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                    <span>5% (Healthy)</span>
-                    <span>45% (High Attrition)</span>
+                    <span>5%</span>
+                    <span>45%</span>
                   </div>
                 </div>
 
@@ -2745,8 +2835,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     )}
                   />
                   <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                    <span>10% (Conservative)</span>
-                    <span>50% (Ambitious)</span>
+                    <span>10% target</span>
+                    <span>50% target</span>
                   </div>
                 </div>
 
@@ -2765,16 +2855,16 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       className="h-3.5 w-3.5"
                       style={{ color: "#6ee7b7" }}
                     />
-                    How the model works
+                    How this estimate is calculated
                   </div>
                   <p
                     className="mt-2 text-[11px] leading-relaxed"
                     style={{ color: "rgba(148,163,184,0.6)" }}
                   >
-                    Annual departures × 1.5× salary = total attrition cost.
-                    Aurelinx retention loops (30/60/90-day interventions) are
-                    modeled to recover a share of those departures, which is
-                    your direct savings.
+                    Estimated departures = workforce × turnover rate. Estimated
+                    replacement cost = departures × salary × 1.5. The savings
+                    scenario applies your selected reduction target to those
+                    assumptions; it does not predict actual results.
                   </p>
                 </div>
               </div>
@@ -2784,7 +2874,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <div>
                   <div className="flex items-center justify-between mb-6">
                     <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">
-                      AURELINX IMPACT FORECAST
+                      ILLUSTRATIVE SCENARIO ESTIMATE
                     </div>
                     <span
                       className="rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest"
@@ -2794,14 +2884,14 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                         color: "#6ee7b7",
                       }}
                     >
-                      Updates live
+                      Recalculates from inputs
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 mb-6">
                     <div>
                       <div className="text-xs text-slate-400 mb-1">
-                        Annual Departures
+                        Estimated annual departures
                       </div>
                       <div className="text-xl font-bold text-white font-mono">
                         {departures}{" "}
@@ -2812,7 +2902,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     </div>
                     <div>
                       <div className="text-xs text-slate-400 mb-1">
-                        Retained via Aurelinx
+                        Scenario reduction
                       </div>
                       <div className="text-xl font-bold text-emerald-400 font-mono">
                         +{retainedCount}{" "}
@@ -2828,7 +2918,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     <div>
                       <div className="flex justify-between items-center text-xs mb-1.5">
                         <span className="text-slate-400">
-                          Current annual attrition cost
+                          Estimated baseline replacement cost
                         </span>
                         <span className="font-mono text-rose-400 font-bold">
                           ${costToday.toLocaleString()}
@@ -2848,7 +2938,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     <div>
                       <div className="flex justify-between items-center text-xs mb-1.5">
                         <span className="text-slate-400">
-                          With Aurelinx retention loops
+                          After target turnover reduction
                         </span>
                         <span className="font-mono text-emerald-400 font-bold">
                           ${afterCost.toLocaleString()}
@@ -2870,18 +2960,16 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   <div className="border-t border-white/5 pt-5 mt-6 space-y-4">
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-slate-400">
-                        Cost Per Exit (1.5x Multiplier)
+                        Assumed replacement cost per exit (1.5×)
                       </span>
                       <span className="font-bold text-slate-300 font-mono">
                         ${(calcSalary * 1.5).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-400">
-                        Avg Retention Loop Cost
-                      </span>
+                      <span className="text-slate-400">Intervention cost</span>
                       <span className="font-bold text-slate-300 font-mono">
-                        $4,500 / intervention
+                        Not included
                       </span>
                     </div>
                   </div>
@@ -2889,7 +2977,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
                 <div className="mt-8 border-t border-white/10 pt-6">
                   <div className="text-xs text-emerald-400 font-bold uppercase tracking-widest mb-1">
-                    ESTIMATED NET ANNUAL SAVINGS
+                    ILLUSTRATIVE SAVINGS SCENARIO
                   </div>
                   <div
                     className="text-4xl sm:text-5xl font-black text-white font-mono tracking-tight"
@@ -2903,9 +2991,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     />
                   </div>
                   <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
-                    *Savings projection based on standard organizational
-                    replacement cost indexes (SHRM, Gallup). Net returns vary by
-                    department role specificity.
+                    *Scenario math only: based on the entered assumptions and a
+                    fixed 1.5× salary replacement-cost multiplier. Actual costs,
+                    retention outcomes, and savings will differ.
                   </p>
                 </div>
               </div>
@@ -2928,15 +3016,16 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
-              Ingest, reconcile, and sync workforce records from your primary
-              HRIS, ATS, and directory systems with live validation.
+              Connector options are implemented in the repository. Each tenant
+              must configure credentials, verify access, and choose its own
+              synchronization settings before a source is connected.
             </p>
           </div>
 
           <div className="mt-12 mx-auto max-w-[1600px]">
-            <Ticker items={tickerItems} className="mb-8" />
+            <Ticker items={LANDING_TICKER_ITEMS} className="mb-8" />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {displayConnectors.slice(0, 6).map((c, i) => (
+              {LANDING_CONNECTORS.map((c, i) => (
                 <ConnectorTile key={`${c.name}-${i}`} {...c} />
               ))}
             </div>
@@ -2951,20 +3040,20 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
         >
           <div className="mx-auto max-w-[700px] text-center">
             <SectionLabel>
-              <ShieldCheck className="h-3.5 w-3.5" /> SRE &amp; Security
-              Compliance
+              <ShieldCheck className="h-3.5 w-3.5" /> Operations &amp;
+              Governance Records
             </SectionLabel>
             <SectionHeading>
-              System Specifications &amp;{" "}
-              <GradientWord>Audit Readiness</GradientWord>
+              Workspace <GradientWord>Operations Records</GradientWord>
             </SectionHeading>
             <p
               className="mt-5 text-sm leading-relaxed"
               style={{ color: "rgba(148,163,184,0.6)" }}
             >
-              Review technical metrics, CAIQ compliance packs, disaster recovery
-              profiles, and model drifts fetched directly from the Aurelinx
-              APIs.
+              Aurelinx can store tenant-specific recovery runbooks, procurement
+              artifacts, model cards, and drift snapshots. The examples below
+              are placeholders; they are not API results, audit evidence, or
+              certifications.
             </p>
           </div>
 
@@ -3013,11 +3102,12 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       className="mb-4 text-xs"
                       style={{ color: "rgba(148,163,184,0.5)" }}
                     >
-                      Representative disaster recovery runbook registry — your
-                      workspace holds the live runbooks for your own tenant.
+                      Example interface only. Runbooks, recovery objectives, and
+                      drill results are tenant-specific and are not shown or
+                      verified on this public page.
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      {fallbackRunbooks.map((rb, i) => (
+                      {LANDING_FALLBACK_RUNBOOKS.map((rb, i) => (
                         <div
                           key={i}
                           className="rounded-[16px] p-4"
@@ -3033,9 +3123,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                             <span
                               className="rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-widest"
                               style={{
-                                background: "rgba(110,231,183,0.08)",
-                                border: "1px solid rgba(110,231,183,0.2)",
-                                color: "#6ee7b7",
+                                background: "rgba(148,163,184,0.06)",
+                                border: "1px solid rgba(148,163,184,0.18)",
+                                color: "#cbd5e1",
                               }}
                             >
                               {rb.status}
@@ -3060,8 +3150,18 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                               color: "rgba(148,163,184,0.5)",
                             }}
                           >
-                            <span>RTO: {rb.rto} mins</span>
-                            <span>RPO: {rb.rpo} mins</span>
+                            <span>
+                              RTO:{" "}
+                              {rb.rto == null
+                                ? "Not reported"
+                                : `${rb.rto} mins`}
+                            </span>
+                            <span>
+                              RPO:{" "}
+                              {rb.rpo == null
+                                ? "Not reported"
+                                : `${rb.rpo} mins`}
+                            </span>
                           </div>
                         </div>
                       ))}
@@ -3076,11 +3176,12 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       className="mb-4 text-xs"
                       style={{ color: "rgba(148,163,184,0.5)" }}
                     >
-                      Representative compliance artifact library — your
-                      workspace holds the signed documents for your tenant.
+                      Example artifact types only. The cards below are not
+                      signed documents, completed assessments, or independent
+                      compliance findings.
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      {fallbackProcurement.map((pa, i) => (
+                      {LANDING_FALLBACK_PROCUREMENT.map((pa, i) => (
                         <div
                           key={i}
                           className="rounded-[16px] p-4"
@@ -3096,9 +3197,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                             <span
                               className="rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-widest"
                               style={{
-                                background: "rgba(110,231,183,0.08)",
-                                border: "1px solid rgba(110,231,183,0.2)",
-                                color: "#6ee7b7",
+                                background: "rgba(148,163,184,0.06)",
+                                border: "1px solid rgba(148,163,184,0.18)",
+                                color: "#cbd5e1",
                               }}
                             >
                               {pa.status}
@@ -3129,29 +3230,30 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       className="mb-4 text-xs"
                       style={{ color: "rgba(148,163,184,0.5)" }}
                     >
-                      Illustrative model-card monitoring excerpts — live drift
-                      and calibration metrics render inside your workspace only.
+                      Model validation and drift data are tenant-specific. No
+                      validated model performance scores are claimed or shown in
+                      this public example.
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
                       {[
                         {
-                          title: "Model Drift Monitoring",
-                          status: "healthy",
-                          sub: "Model Name: attrition_v1",
+                          title: "Drift snapshots",
+                          status: "Workspace data",
+                          sub: "Values depend on stored snapshots",
                           rows: [
-                            ["Drift score baseline", "0.0815"],
-                            ["Calibration error", "0.024"],
-                            ["Retraining Status", "Not Needed"],
+                            ["Drift score", "Not shown"],
+                            ["Calibration error", "Not shown"],
+                            ["Snapshot status", "Tenant-specific"],
                           ],
                         },
                         {
-                          title: "Active Model Card Specifications",
-                          status: "approved",
-                          sub: "Champion Version: attrition_v1_champion",
+                          title: "Model card records",
+                          status: "Validation required",
+                          sub: "Approval depends on outcome validation",
                           rows: [
-                            ["PR-AUC accuracy", "0.94"],
-                            ["Fairness discrepancy gap", "0.04"],
-                            ["Calibration Score", "99.8% Compliant"],
+                            ["Predictive performance", "Not claimed"],
+                            ["Fairness evaluation", "Requires evidence"],
+                            ["Model approval", "Validation-gated"],
                           ],
                         },
                       ].map((card, i) => (
@@ -3170,9 +3272,9 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                             <span
                               className="rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-widest"
                               style={{
-                                background: "rgba(110,231,183,0.08)",
-                                border: "1px solid rgba(110,231,183,0.2)",
-                                color: "#6ee7b7",
+                                background: "rgba(148,163,184,0.06)",
+                                border: "1px solid rgba(148,163,184,0.18)",
+                                color: "#cbd5e1",
                               }}
                             >
                               {card.status}
@@ -3236,15 +3338,15 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <CheckCircle2 className="h-3.5 w-3.5" /> Ready when you are
               </SectionLabel>
               <h2 className="mt-6 text-[clamp(1.9rem,4vw,3rem)] font-extrabold leading-[1.08] tracking-tight text-white">
-                See your workforce <GradientWord>clearly</GradientWord> — no
-                blind spots.
+                Bring workforce signals into{" "}
+                <GradientWord>one view</GradientWord>.
               </h2>
               <p
                 className="mx-auto mt-5 max-w-[560px] text-sm leading-relaxed"
                 style={{ color: "rgba(148,163,184,0.7)" }}
               >
-                Connect your HRIS and stream real-time attrition, morale, and
-                policy telemetry into one calm, sharp control panel.
+                Configure your data sources, then review available workforce
+                analysis and governed actions in one workspace.
               </p>
               <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
                 <button
@@ -3321,8 +3423,7 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   Ready to see your workforce clearly?
                 </h4>
                 <p className="text-xs text-slate-400">
-                  Launch the workspace console or configure enterprise webhook
-                  gateways in seconds.
+                  Open the workspace or review integration settings.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
@@ -3344,7 +3445,11 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                         sreStatus === "operational" ? "#6ee7b7" : "#f87171",
                     }}
                   />
-                  All systems operational
+                  {sreStatus === "operational"
+                    ? "API responding"
+                    : sreStatus === "degraded"
+                      ? "API degraded"
+                      : "API unavailable"}
                   {pingLatency ? ` · ${pingLatency}ms` : ""}
                 </div>
                 <button
@@ -3392,15 +3497,15 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       AURELINX
                     </div>
                     <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                      Management OS · v4.4
+                      Management OS · v{APP_VERSION}
                     </div>
                   </div>
                 </div>
 
                 <p className="max-w-[360px] text-xs leading-relaxed text-slate-400">
-                  Autonomous talent intelligence and HRIS ingestion middleware
-                  for security-conscious enterprise teams — real-time attrition,
-                  morale, and policy telemetry in one calm, sharp control panel.
+                  Workforce and talent analysis with configurable integrations
+                  and governed operational workflows. Results depend on the
+                  records and evidence available in each workspace.
                 </p>
 
                 {/* Socials */}
@@ -3427,55 +3532,15 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                         <BrandIcon name={name} />
                       </a>
                     ) : (
-                      <button
+                      <span
                         key={name}
-                        type="button"
                         title={label}
-                        onClick={onOpenEnterprise}
-                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-500 transition-all duration-200 hover:border-cyan-400/40 hover:text-cyan-300 hover:shadow-[0_0_12px_rgba(52,211,153,0.2)]"
+                        aria-hidden="true"
+                        className="flex h-8 w-8 cursor-default items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-600"
                       >
                         <BrandIcon name={name} />
-                      </button>
+                      </span>
                     ),
-                  )}
-                </div>
-
-                {/* Newsletter */}
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                    Product updates
-                  </div>
-                  {subscribed ? (
-                    <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-2.5 text-xs text-emerald-300">
-                      <CheckCircle2 size={14} />
-                      Subscribed — product updates on the way.
-                    </div>
-                  ) : (
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        setSubscribed(true);
-                      }}
-                      className="mt-2.5 flex gap-2"
-                    >
-                      <input
-                        type="email"
-                        required
-                        placeholder="Work email"
-                        className="h-9 w-full min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-3 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400/50"
-                      />
-                      <button
-                        type="submit"
-                        className="btn-shine h-9 flex-none rounded-lg px-4 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
-                        style={{
-                          background:
-                            "linear-gradient(100deg, #34d399 0%, #a3e635 100%)",
-                          color: "#020a07",
-                        }}
-                      >
-                        Subscribe
-                      </button>
-                    </form>
                   )}
                 </div>
               </div>
@@ -3484,62 +3549,32 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
               <div className="grid grid-cols-2 gap-10 sm:grid-cols-4 lg:col-span-8">
                 <FooterColumn title="Product">
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-0");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(0)}>
                       Platform Overview
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-1");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(1)}>
                       Ingest Pipeline
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-2");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(2)}>
                       Math Engine
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-3");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(3)}>
                       Platform Modules
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-4");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(4)}>
                       Connectors
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-5");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(5)}>
                       Compliance &amp; Audit
                     </FooterLink>
                   </li>
@@ -3547,32 +3582,22 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
 
                 <FooterColumn title="Solutions">
                   <li>
-                    <FooterLink onClick={onEnterWorkspace}>
-                      Enterprise Suite
-                    </FooterLink>
-                  </li>
-                  <li>
-                    <FooterLink onClick={onEnterWorkspace}>
+                    <FooterLink onClick={() => scrollToLandingSection(1)}>
                       Attrition Analytics
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink onClick={onEnterWorkspace}>
+                    <FooterLink onClick={() => scrollToLandingSection(2)}>
                       Talent Intelligence
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink onClick={onOpenEnterprise}>
+                    <FooterLink onClick={() => scrollToLandingSection(5)}>
                       Data Governance
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-5");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(5)}>
                       Security &amp; Policy
                     </FooterLink>
                   </li>
@@ -3584,28 +3609,15 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                       Documentation
                     </FooterLink>
                   </li>
+
                   <li>
-                    <FooterLink onClick={onOpenEnterprise}>
-                      API Reference
-                    </FooterLink>
-                  </li>
-                  <li>
-                    <FooterLink
-                      onClick={() => {
-                        const el = document.getElementById("section-0");
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
-                      }}
-                    >
+                    <FooterLink onClick={() => scrollToLandingSection(0)}>
                       System Status
                     </FooterLink>
                   </li>
+
                   <li>
-                    <FooterLink onClick={onEnterWorkspace}>
-                      Changelog
-                    </FooterLink>
-                  </li>
-                  <li>
-                    <FooterLink href="mailto:redacted@example.invalid">
+                    <FooterLink href="https://github.com/sainibhaowal/Aurelinx/issues">
                       Support
                     </FooterLink>
                   </li>
@@ -3625,19 +3637,8 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                     </FooterLink>
                   </li>
                   <li>
-                    <FooterLink onClick={onOpenEnterprise}>Careers</FooterLink>
-                  </li>
-                  <li>
-                    <FooterLink onClick={onEnterWorkspace}>Blog</FooterLink>
-                  </li>
-                  <li>
-                    <FooterLink href="mailto:redacted@example.invalid">
+                    <FooterLink href="https://github.com/sainibhaowal">
                       Contact
-                    </FooterLink>
-                  </li>
-                  <li>
-                    <FooterLink onClick={onOpenEnterprise}>
-                      Press Kit
                     </FooterLink>
                   </li>
                 </FooterColumn>
@@ -3651,11 +3652,11 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
             >
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                 {[
-                  ["SOC 2 Type II", "#6ee7b7"],
-                  ["GDPR Compliant", "#6ee7b7"],
-                  ["EU AI Act Ready", "#a78bfa"],
-                  ["Zero-Knowledge Isolation", null],
-                  ["HMAC-SHA256 Signatures", null],
+                  ["Tenant-scoped APIs", "#6ee7b7"],
+                  ["Role-based access", "#6ee7b7"],
+                  ["Approval workflows", "#a78bfa"],
+                  ["Audit records", null],
+                  ["Integration verification", null],
                 ].map(([label, accent]) => (
                   <span
                     key={label}
@@ -3678,8 +3679,10 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                   color: "rgba(148,163,184,0.6)",
                 }}
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
-                System Status: Operational (
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${sreStatus === "operational" ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" : "bg-red-400"}`}
+                />
+                API Health: {sreStatus} (
                 {pingLatency ? `${pingLatency}ms` : "checking…"})
               </div>
             </div>
@@ -3690,22 +3693,6 @@ const LandingPage = ({ onEnterWorkspace, onOpenEnterprise }) => {
                 <span>
                   &copy; {new Date().getFullYear()} Aurelinx Inc. All rights
                   reserved.
-                </span>
-                <span className="opacity-40">•</span>
-                <span className="cursor-default hover:text-slate-300">
-                  Privacy Policy
-                </span>
-                <span className="opacity-40">•</span>
-                <span className="cursor-default hover:text-slate-300">
-                  Terms of Service
-                </span>
-                <span className="opacity-40">•</span>
-                <span className="cursor-default hover:text-slate-300">
-                  Security
-                </span>
-                <span className="opacity-40">•</span>
-                <span className="cursor-default hover:text-slate-300">
-                  Cookies
                 </span>
               </div>
               <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider">

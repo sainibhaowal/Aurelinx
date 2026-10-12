@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PremiumSelect from "./PremiumSelect";
 import {
   Link2,
@@ -27,7 +27,6 @@ import {
   Activity,
   Shield,
   Layers,
-  Play,
   Clock,
   ArrowRight,
   CheckCircle2,
@@ -41,44 +40,200 @@ import {
   X,
 } from "lucide-react";
 import { UserManualButton } from "./UserManual";
-import { enterpriseAPI, leanAPI } from "../services/apiClient";
+import { enterpriseAPI, leanAPI, oauthAPI } from "../services/apiClient";
+import AgentActionsView from "./AgentActionsView";
+import PrivacyGovernanceView from "./PrivacyGovernanceView";
+import {
+  deleteWorkspaceFile,
+  loadWorkspaceFile,
+  saveWorkspaceFile,
+  usePersistentState,
+} from "../services/workspacePersistence";
 
-const EnterpriseOpsView = () => {
+const PROVIDER_SETUP = {
+  jira: {
+    label: "Jira",
+    source_type: "productivity",
+    auth_type: "api_key",
+    credentialLabel: "Atlassian API token",
+    credentialKey: "api_token",
+    help: "Use the Atlassian account email and API token. The URL is your Jira site, for example https://company.atlassian.net.",
+    basePlaceholder: "https://company.atlassian.net",
+  },
+  slack: {
+    label: "Slack",
+    source_type: "engagement",
+    auth_type: "oauth2",
+    credentialLabel: "Slack OAuth bot token",
+    credentialKey: "bot_token",
+    help: "Install your Slack app, grant the required history scopes, invite the bot to the channels, then paste its OAuth token.",
+    basePlaceholder: "Slack uses its secure API endpoint automatically",
+  },
+  workday: {
+    label: "Workday",
+    source_type: "hris",
+    auth_type: "oauth2",
+    credentialLabel: "Workday access token",
+    credentialKey: "access_token",
+    help: "Use the exact versioned workers URL and OAuth credentials from your Workday REST API Explorer.",
+    basePlaceholder: "https://your-tenant.workday.com",
+  },
+  greenhouse: {
+    label: "Greenhouse",
+    source_type: "ats",
+    auth_type: "api_key",
+    credentialLabel: "Harvest API key",
+    credentialKey: "api_key",
+    help: "Create a Greenhouse Harvest API key with only the scopes required for your approved ATS workflows.",
+    basePlaceholder: "https://harvest.greenhouse.io",
+  },
+  lever: {
+    label: "Lever",
+    source_type: "ats",
+    auth_type: "api_key",
+    credentialLabel: "Lever API key",
+    credentialKey: "api_key",
+    help: "Use a Lever API key scoped to the tenant and actions your organization has approved.",
+    basePlaceholder: "https://api.lever.co/v1",
+  },
+  bamboohr: {
+    label: "BambooHR",
+    source_type: "hris",
+    auth_type: "api_key",
+    credentialLabel: "BambooHR API key",
+    credentialKey: "api_key",
+    help: "Use a BambooHR API key and set the company subdomain in the connection base URL/options.",
+    basePlaceholder: "https://api.bamboohr.com/api/gateway.php/company",
+  },
+  hibob: {
+    label: "HiBob",
+    source_type: "hris",
+    auth_type: "api_key",
+    credentialLabel: "HiBob service token",
+    credentialKey: "service_user_token",
+    help: "Create a HiBob service user token with the minimum people and metadata scopes required.",
+    basePlaceholder: "https://api.hibob.com/v1",
+  },
+  successfactors: {
+    label: "SAP SuccessFactors",
+    source_type: "hris",
+    auth_type: "oauth2",
+    credentialLabel: "OAuth access token",
+    credentialKey: "access_token",
+    help: "Use the tenant OData base URL and OAuth credentials configured in SAP Identity Authentication.",
+    basePlaceholder: "https://api...successfactors.com",
+  },
+  teams: {
+    label: "Microsoft Teams",
+    source_type: "engagement",
+    auth_type: "oauth2",
+    credentialLabel: "Microsoft Graph access token",
+    credentialKey: "access_token",
+    help: "Grant only the Microsoft Graph permissions required for approved manager notifications.",
+    basePlaceholder:
+      "Microsoft Graph uses its secure API endpoint automatically",
+  },
+};
+
+const EnterpriseOpsView = ({ active = true }) => {
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("pipelines"); // 'pipelines', 'ai-gov', 'workflows', 'compliance'
-  const [riskView, setRiskView] = useState("reviews");
+  const [activeTab, setActiveTab] = usePersistentState(
+    "dataops-active-tab",
+    "pipelines",
+  ); // 'pipelines', 'ai-gov', 'workflows', 'compliance'
+  const [riskView, setRiskView] = usePersistentState(
+    "dataops-risk-view",
+    "reviews",
+  );
 
   // Data States
-  const [connections, setConnections] = useState([]);
-  const [interventions, setInterventions] = useState([]);
-  const [attrition, setAttrition] = useState([]);
-  const [contracts, setContracts] = useState([]);
-  const [models, setModels] = useState([]);
-  const [drifts, setDrifts] = useState([]);
-  const [quarantine, setQuarantine] = useState([]);
-  const [modelTop, setModelTop] = useState([]);
-  const [scenarioResult, setScenarioResult] = useState(null);
-  const [, setScenarios] = useState([]);
-  const [policies, setPolicies] = useState([]);
-  const [modelCards, setModelCards] = useState([]);
-  const [fairness, setFairness] = useState(null);
-  const [releaseGates, setReleaseGates] = useState([]);
-  const [auditEvents, setAuditEvents] = useState([]);
-  const [drRunbooks, setDrRunbooks] = useState([]);
-  const [procurementArtifacts, setProcurementArtifacts] = useState([]);
-  const [drillResult, setDrillResult] = useState(null);
-  const [dataSummary, setDataSummary] = useState(null);
-  const [validationResults, setValidationResults] = useState({});
-  const [uploadProgress, setUploadProgress] = useState({});
-  const [executivePacket, setExecutivePacket] = useState(null);
-  const [selectedConnectionId, setSelectedConnectionId] = useState(null);
-  const [fieldMappings, setFieldMappings] = useState([]);
-  const [syncJobs, setSyncJobs] = useState([]);
+  const [connections, setConnections] = usePersistentState(
+    "dataops-connections",
+    [],
+  );
+  const [providerPresets, setProviderPresets] = usePersistentState(
+    "dataops-provider-presets",
+    {},
+  );
+  const [interventions, setInterventions] = usePersistentState(
+    "dataops-interventions",
+    [],
+  );
+  const [attrition, setAttrition] = usePersistentState("dataops-attrition", []);
+  const [contracts, setContracts] = usePersistentState("dataops-contracts", []);
+  const [models, setModels] = usePersistentState("dataops-models", []);
+  const [drifts, setDrifts] = usePersistentState("dataops-drifts", []);
+  const [quarantine, setQuarantine] = usePersistentState(
+    "dataops-quarantine",
+    [],
+  );
+  const [scenarioResult, setScenarioResult] = usePersistentState(
+    "dataops-scenario-result",
+    null,
+  );
+  const [, setScenarios] = usePersistentState("dataops-scenarios", []);
+  const [policies, setPolicies] = usePersistentState("dataops-policies", []);
+  const [modelCards, setModelCards] = usePersistentState(
+    "dataops-model-cards",
+    [],
+  );
+  const [fairness, setFairness] = usePersistentState("dataops-fairness", null);
+  const [releaseGates, setReleaseGates] = usePersistentState(
+    "dataops-release-gates",
+    [],
+  );
+  const [auditEvents, setAuditEvents] = usePersistentState(
+    "dataops-audit-events",
+    [],
+  );
+  const [drRunbooks, setDrRunbooks] = usePersistentState(
+    "dataops-dr-runbooks",
+    [],
+  );
+  const [procurementArtifacts, setProcurementArtifacts] = usePersistentState(
+    "dataops-procurement-artifacts",
+    [],
+  );
+  const [drillResult, setDrillResult] = usePersistentState(
+    "dataops-drill-result",
+    null,
+  );
+  const [dataSummary, setDataSummary] = usePersistentState(
+    "dataops-data-summary",
+    null,
+  );
+  const [validationResults, setValidationResults] = usePersistentState(
+    "dataops-validation-results",
+    {},
+  );
+  const [uploadProgress, setUploadProgress] = usePersistentState(
+    "dataops-upload-progress",
+    {},
+  );
+  const [executivePacket, setExecutivePacket] = usePersistentState(
+    "dataops-executive-packet",
+    null,
+  );
+  const [selectedConnectionId, setSelectedConnectionId] = usePersistentState(
+    "dataops-selected-connection",
+    null,
+  );
+  const [fieldMappings, setFieldMappings] = usePersistentState(
+    "dataops-field-mappings",
+    [],
+  );
+  const [syncJobs, setSyncJobs] = usePersistentState("dataops-sync-jobs", []);
   const [evidenceModalIntervention, setEvidenceModalIntervention] =
     useState(null);
-  const [interventionOutcomes, setInterventionOutcomes] = useState({});
+  const [interventionOutcomes, setInterventionOutcomes] = usePersistentState(
+    "dataops-intervention-outcomes",
+    {},
+  );
   const [outcomeLoading, setOutcomeLoading] = useState({});
-  const [outcomeFeedback, setOutcomeFeedback] = useState({});
+  const [outcomeFeedback, setOutcomeFeedback] = usePersistentState(
+    "dataops-outcome-feedback",
+    {},
+  );
 
   // Helper to calculate 100% dynamic risk metrics per employee card
   const getEmployeeMetrics = (item) => {
@@ -97,30 +252,69 @@ const EnterpriseOpsView = () => {
   };
 
   // Filter States for Reviews & Active Interventions
-  const [reviewSearchText, setReviewSearchText] = useState("");
-  const [reviewPriorityFilter, setReviewPriorityFilter] = useState("all");
-  const [reviewDeptFilter, setReviewDeptFilter] = useState("all");
+  const [reviewSearchText, setReviewSearchText] = usePersistentState(
+    "dataops-review-search",
+    "",
+  );
+  const [reviewPriorityFilter, setReviewPriorityFilter] = usePersistentState(
+    "dataops-review-priority",
+    "all",
+  );
+  const [reviewDeptFilter, setReviewDeptFilter] = usePersistentState(
+    "dataops-review-department",
+    "all",
+  );
 
-  const [activeSearchText, setActiveSearchText] = useState("");
-  const [activeStatusFilter, setActiveStatusFilter] = useState("all");
-  const [activeScopeFilter, setActiveScopeFilter] = useState("all");
+  const [activeSearchText, setActiveSearchText] = usePersistentState(
+    "dataops-active-search",
+    "",
+  );
+  const [activeStatusFilter, setActiveStatusFilter] = usePersistentState(
+    "dataops-active-status",
+    "all",
+  );
+  const [activeScopeFilter, setActiveScopeFilter] = usePersistentState(
+    "dataops-active-scope",
+    "all",
+  );
 
   // Modal States for Interactive Workflows
-  const [activeModal, setActiveModal] = useState(null); // 'escalate' | 'schedule' | 'dismiss'
-  const [selectedReview, setSelectedReview] = useState(null);
+  const [activeModal, setActiveModal] = usePersistentState(
+    "dataops-active-modal",
+    null,
+  ); // 'escalate' | 'schedule' | 'dismiss'
+  const [selectedReview, setSelectedReview] = usePersistentState(
+    "dataops-selected-review",
+    null,
+  );
 
-  const [modalBudget, setModalBudget] = useState("15000");
-  const [modalOwner, setModalOwner] = useState("HRBP Senior Lead");
-  const [modalPriority, setModalPriority] = useState("high");
-  const [modalNotes, setModalNotes] = useState(
+  const [modalBudget, setModalBudget] = usePersistentState(
+    "dataops-modal-budget",
+    "15000",
+  );
+  const [modalOwner, setModalOwner] = usePersistentState(
+    "dataops-modal-owner",
+    "HRBP Senior Lead",
+  );
+  const [modalPriority, setModalPriority] = usePersistentState(
+    "dataops-modal-priority",
+    "high",
+  );
+  const [modalNotes, setModalNotes] = usePersistentState(
+    "dataops-modal-notes",
     "Execute 12% salary adjustment & clear promotion path.",
   );
 
-  const [modalDate, setModalDate] = useState("");
-  const [modalAgenda, setModalAgenda] = useState(
+  const [modalDate, setModalDate] = usePersistentState(
+    "dataops-modal-date",
+    "",
+  );
+  const [modalAgenda, setModalAgenda] = usePersistentState(
+    "dataops-modal-agenda",
     "Discuss workload balance, equity options, and market pay alignment.",
   );
-  const [modalReason, setModalReason] = useState(
+  const [modalReason, setModalReason] = usePersistentState(
+    "dataops-modal-reason",
     "False positive risk signal / Employee satisfied",
   );
 
@@ -218,11 +412,24 @@ const EnterpriseOpsView = () => {
   };
 
   // Pipeline, Governance & Compliance Sub-Tab States
-  const [pipelineSubTab, setPipelineSubTab] = useState("connectors");
-  const [govSubTab, setGovSubTab] = useState("registry");
-  const [compSubTab, setCompSubTab] = useState("briefings_audit");
+  const [pipelineSubTab, setPipelineSubTab] = usePersistentState(
+    "dataops-pipeline-subtab",
+    "connectors",
+  );
+  const [govSubTab, setGovSubTab] = usePersistentState(
+    "dataops-governance-subtab",
+    "registry",
+  );
+  const [compSubTab, setCompSubTab] = usePersistentState(
+    "dataops-compliance-subtab",
+    "briefings_audit",
+  );
 
   // Form States
+  const [connFormDraft, setConnFormDraft] = usePersistentState(
+    "dataops-connection-form",
+    {},
+  );
   const [connForm, setConnForm] = useState({
     name: "",
     source_type: "hris",
@@ -230,18 +437,34 @@ const EnterpriseOpsView = () => {
     status: "draft",
     auth_type: "api_key",
     base_url: "",
+    account_email: "",
+    api_token: "",
+    api_key: "",
+    service_user_token: "",
+    bot_token: "",
+    client_id: "",
+    client_secret: "",
+    token_url: "",
+    access_token: "",
+    slack_channel_ids: "",
+    workday_workers_path: "/ccx/api/v1/workers",
+    ...connFormDraft,
   });
 
-  const [intForm, setIntForm] = useState({
-    title: "",
-    target_scope: "team",
-    target_department: "",
-    priority: "medium",
-    owner_name: "",
-    expected_impact: "",
-  });
+  const [intForm, setIntForm] = usePersistentState(
+    "dataops-intervention-form",
+    {
+      title: "",
+      target_scope: "team",
+      target_department: "",
+      priority: "medium",
+      owner_name: "",
+      expected_impact: "",
+    },
+  );
 
-  const [syncState, setSyncState] = useState({});
+  const [connectionFeedback, setConnectionFeedback] = useState({});
+  const [connectionFormError, setConnectionFormError] = useState("");
 
   const [importFiles, setImportFiles] = useState({
     employees: null,
@@ -250,33 +473,51 @@ const EnterpriseOpsView = () => {
     candidate_skills: null,
     employee_experience: null,
     candidate_experience: null,
+    collaboration_events: null,
+    skill_aliases: null,
     bundle: null,
   });
+  const [activeImportJobs, setActiveImportJobs] = usePersistentState(
+    "dataops-active-import-jobs",
+    [],
+  );
+  const activeImportJobIds = useRef(new Set());
+  const touchedImportFiles = useRef(new Set());
+  const activeUploadKinds = useRef(new Set());
 
-  const [contractForm, setContractForm] = useState({
-    source_type: "hris",
-    provider: "workday",
-    required_fields: "external_id,full_name,email,department,role",
-  });
+  const [contractForm, setContractForm] = usePersistentState(
+    "dataops-contract-form",
+    {
+      source_type: "hris",
+      provider: "workday",
+      required_fields: "external_id,full_name,email,department,role",
+    },
+  );
 
-  const [mappingForm, setMappingForm] = useState({
-    source_field: "",
-    canonical_field: "",
-    transform_rule: "",
-    required: true,
-  });
+  const [mappingForm, setMappingForm] = usePersistentState(
+    "dataops-mapping-form",
+    {
+      source_field: "",
+      canonical_field: "",
+      transform_rule: "",
+      required: true,
+    },
+  );
 
-  const [policyForm, setPolicyForm] = useState({
-    region: "global",
-    policy_name: "",
-    action_type: "intervention",
-    min_confidence: 0.75,
-    requires_approval: true,
-    blocked_if_missing_evidence: true,
-    blocked_actions: "",
-  });
+  const [policyForm, setPolicyForm] = usePersistentState(
+    "dataops-policy-form",
+    {
+      region: "global",
+      policy_name: "",
+      action_type: "intervention",
+      min_confidence: 0.75,
+      requires_approval: true,
+      blocked_if_missing_evidence: true,
+      blocked_actions: "",
+    },
+  );
 
-  const [drForm, setDrForm] = useState({
+  const [drForm, setDrForm] = usePersistentState("dataops-dr-form", {
     runbook_name: "",
     environment: "prod",
     rto_minutes: 120,
@@ -285,17 +526,165 @@ const EnterpriseOpsView = () => {
     notes: "",
   });
 
-  const [artifactForm, setArtifactForm] = useState({
-    artifact_type: "msa",
-    title: "",
-    version: "v1",
-    status: "draft",
-    notes: "",
-  });
+  const [artifactForm, setArtifactForm] = usePersistentState(
+    "dataops-artifact-form",
+    {
+      artifact_type: "msa",
+      title: "",
+      version: "v1",
+      status: "draft",
+      notes: "",
+    },
+  );
+
+  useEffect(() => {
+    if (!Object.keys(connFormDraft).length) return;
+    setConnForm((current) => {
+      const next = { ...current, ...connFormDraft };
+      const unchanged = Object.keys(connFormDraft).every(
+        (key) => current[key] === next[key],
+      );
+      return unchanged ? current : next;
+    });
+  }, [connFormDraft]);
+
+  useEffect(() => {
+    const {
+      name,
+      source_type,
+      provider,
+      status,
+      auth_type,
+      base_url,
+      account_email,
+      slack_channel_ids,
+      workday_workers_path,
+    } = connForm;
+    setConnFormDraft({
+      name,
+      source_type,
+      provider,
+      status,
+      auth_type,
+      base_url,
+      account_email,
+      slack_channel_ids,
+      workday_workers_path,
+    });
+  }, [connForm]);
+
+  useEffect(() => {
+    const fileKinds = [
+      "employees",
+      "candidates",
+      "employee_skills",
+      "candidate_skills",
+      "employee_experience",
+      "candidate_experience",
+      "collaboration_events",
+      "skill_aliases",
+      "bundle",
+    ];
+    let cancelled = false;
+    Promise.all(
+      fileKinds.map(async (kind) => [
+        kind,
+        await loadWorkspaceFile(`dataops-import-${kind}`),
+      ]),
+    )
+      .then((entries) => {
+        if (cancelled) return;
+        setImportFiles((current) => {
+          const restored = Object.fromEntries(entries);
+          touchedImportFiles.current.forEach((kind) => {
+            restored[kind] = current[kind];
+          });
+          return restored;
+        });
+      })
+      .catch((error) => {
+        console.error("Unable to restore saved import files", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleImportFileChange = async (kind, file) => {
+    touchedImportFiles.current.add(kind);
+    setImportFiles((previous) => ({ ...previous, [kind]: file || null }));
+    if (!file) {
+      await deleteWorkspaceFile(`dataops-import-${kind}`).catch(console.error);
+      return;
+    }
+    try {
+      await saveWorkspaceFile(`dataops-import-${kind}`, file);
+    } catch (error) {
+      window.dispatchEvent(
+        new CustomEvent("aurelinx:toast", {
+          detail: {
+            type: "error",
+            message: `Could not preserve ${file.name} in this browser: ${error.message}`,
+          },
+        }),
+      );
+    }
+  };
+
+  const forgetImportJob = (jobId) => {
+    activeImportJobIds.current.delete(jobId);
+    setActiveImportJobs((jobs) => jobs.filter((job) => job.jobId !== jobId));
+  };
 
   const trackImportJob = async (jobId, scope, kind = null) => {
+    if (activeImportJobIds.current.has(jobId)) return;
+    activeImportJobIds.current.add(jobId);
+    setActiveImportJobs((jobs) =>
+      jobs.some((job) => job.jobId === jobId)
+        ? jobs
+        : [...jobs, { jobId, scope, kind, startedAt: Date.now() }],
+    );
+    let consecutiveErrors = 0;
     while (true) {
-      const job = await leanAPI.getImportJobStatus(jobId);
+      let job;
+      try {
+        job = await leanAPI.getImportJobStatus(jobId);
+        consecutiveErrors = 0;
+      } catch (error) {
+        if (error?.status === 404) {
+          const interrupted = {
+            phase: "interrupted",
+            percent: 0,
+            message:
+              "The server no longer has this job. The saved file is ready to upload again.",
+          };
+          if (scope === "bundle") {
+            setUploadProgress((prev) => ({ ...prev, bundle: interrupted }));
+          } else if (kind) {
+            setUploadProgress((prev) => ({ ...prev, [kind]: interrupted }));
+          }
+          forgetImportJob(jobId);
+          return;
+        }
+        consecutiveErrors += 1;
+        const delay = Math.min(
+          30000,
+          500 * 2 ** Math.min(consecutiveErrors, 6),
+        );
+        const reconnecting = {
+          phase: "reconnecting",
+          percent: 0,
+          message: `Connection interrupted; retrying import status in ${Math.ceil(delay / 1000)}s.`,
+        };
+        if (scope === "bundle") {
+          setUploadProgress((prev) => ({ ...prev, bundle: reconnecting }));
+        } else if (kind) {
+          setUploadProgress((prev) => ({ ...prev, [kind]: reconnecting }));
+        }
+        console.warn("Import status check failed; will retry", error);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
       const nextState = {
         phase: job.phase || "running",
         percent: Number(job.progress || 0),
@@ -328,6 +717,7 @@ const EnterpriseOpsView = () => {
             },
           }));
         }
+        forgetImportJob(jobId);
         await loadAll();
         return job.result;
       }
@@ -353,12 +743,52 @@ const EnterpriseOpsView = () => {
             },
           }));
         }
+        forgetImportJob(jobId);
         throw error;
       }
 
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   };
+
+  useEffect(() => {
+    activeImportJobs.forEach(({ jobId, scope, kind }) => {
+      if (jobId && !activeImportJobIds.current.has(jobId)) {
+        trackImportJob(jobId, scope, kind).catch((error) => {
+          console.error("Could not resume import job", error);
+          forgetImportJob(jobId);
+        });
+      }
+    });
+  }, [activeImportJobs]);
+
+  useEffect(() => {
+    setUploadProgress((current) => {
+      let changed = false;
+      const next = { ...current };
+      Object.entries(current).forEach(([kind, progress]) => {
+        if (
+          ["uploading", "validating", "processing", "queued"].includes(
+            progress?.phase,
+          )
+        ) {
+          const hasTrackedJob = activeImportJobs.some(
+            (job) => job.jobId && (job.scope === kind || job.kind === kind),
+          );
+          if (!hasTrackedJob && !activeUploadKinds.current.has(kind)) {
+            next[kind] = {
+              ...progress,
+              phase: "interrupted",
+              message:
+                "The browser session ended before this step completed. Retry with the saved file.",
+            };
+            changed = true;
+          }
+        }
+      });
+      return changed ? next : current;
+    });
+  }, [activeImportJobs, setUploadProgress]);
 
   const loadAll = async () => {
     setLoading(true);
@@ -370,6 +800,13 @@ const EnterpriseOpsView = () => {
       ]);
       setConnections(connData || []);
       setInterventions(intData || []);
+      if (selectedReview) {
+        const refreshed = (intData || []).find(
+          (item) => String(item.id) === String(selectedReview.id),
+        );
+        setSelectedReview(refreshed || null);
+        if (!refreshed) setActiveModal(null);
+      }
       setAttrition(explainData?.items || []);
 
       const [contractData, modelData, quarantineData] = await Promise.all([
@@ -417,7 +854,11 @@ const EnterpriseOpsView = () => {
 
       // Auto select connection if available
       if (connData?.[0]?.id) {
-        const connectionId = connData[0].id;
+        const connectionId =
+          connData.find(
+            (connection) =>
+              String(connection.id) === String(selectedConnectionId),
+          )?.id || connData[0].id;
         setSelectedConnectionId(connectionId);
         const [mapData, jobData] = await Promise.all([
           leanAPI.listFieldMappings(connectionId),
@@ -432,6 +873,7 @@ const EnterpriseOpsView = () => {
   };
 
   useEffect(() => {
+    if (!active) return undefined;
     let isMounted = true;
     const run = async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -443,19 +885,152 @@ const EnterpriseOpsView = () => {
     return () => {
       isMounted = false;
     };
+  }, [active]);
+
+  useEffect(() => {
+    enterpriseAPI
+      .listProviderPresets()
+      .then((result) => setProviderPresets(result?.providers || {}))
+      .catch(() => setProviderPresets({}));
   }, []);
 
   const createConnection = async () => {
-    if (!connForm.name.trim() || !connForm.provider.trim()) return;
-    await enterpriseAPI.createConnection({
-      ...connForm,
-      name: connForm.name.trim(),
-      provider: connForm.provider.trim(),
-      base_url: connForm.base_url?.trim() || null,
-    });
-    setConnForm((prev) => ({ ...prev, name: "", provider: "", base_url: "" }));
+    const provider = connForm.provider.trim().toLowerCase();
+    const setup = PROVIDER_SETUP[provider];
+    if (!connForm.name.trim() || !setup) {
+      setConnectionFormError("Choose a provider and enter a connection name.");
+      return;
+    }
+    if (provider !== "slack" && !connForm.base_url.trim()) {
+      setConnectionFormError(
+        `${setup.label} requires its company API base URL.`,
+      );
+      return;
+    }
+    if (
+      provider === "jira" &&
+      (!connForm.account_email.trim() || !connForm.api_token.trim())
+    ) {
+      setConnectionFormError(
+        "Jira requires the Atlassian account email and API token.",
+      );
+      return;
+    }
+    if (provider === "slack" && !connForm.bot_token.trim()) {
+      setConnectionFormError("Slack requires an OAuth bot token.");
+      return;
+    }
+    if (
+      ["greenhouse", "lever", "bamboohr", "hibob"].includes(provider) &&
+      !String(connForm.api_key || connForm.service_user_token || "").trim()
+    ) {
+      setConnectionFormError(
+        `${setup.label} requires its provider credential.`,
+      );
+      return;
+    }
+    if (
+      provider === "workday" &&
+      !connForm.access_token?.trim() &&
+      (!connForm.client_id.trim() ||
+        !connForm.client_secret.trim() ||
+        !connForm.token_url.trim())
+    ) {
+      setConnectionFormError(
+        "Workday requires an access token, or all three OAuth client fields.",
+      );
+      return;
+    }
+    setConnectionFormError("");
+    const credentials = Object.fromEntries(
+      Object.entries({
+        email: connForm.account_email,
+        api_token: connForm.api_token,
+        api_key: connForm.api_key,
+        service_user_token: connForm.service_user_token,
+        bot_token: connForm.bot_token,
+        access_token: connForm.access_token,
+        client_id: connForm.client_id,
+        client_secret: connForm.client_secret,
+        token_url: connForm.token_url,
+      }).filter(([, value]) => value?.trim()),
+    );
+    const options = {};
+    if (provider === "slack") {
+      options.channel_ids = connForm.slack_channel_ids
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    }
+    if (provider === "workday" && connForm.workday_workers_path.trim()) {
+      options.workers_path = connForm.workday_workers_path.trim();
+      options.verify_path = connForm.workday_workers_path.trim();
+      options.discover_path = connForm.workday_workers_path.trim();
+    }
+    try {
+      const created = await enterpriseAPI.createConnection({
+        name: connForm.name.trim(),
+        source_type: connForm.source_type,
+        provider: connForm.provider.trim().toLowerCase(),
+        status: "draft",
+        auth_type: connForm.auth_type,
+        credentials,
+        options,
+        base_url: connForm.base_url?.trim() || null,
+      });
+      setConnectionFeedback((prev) => ({
+        ...prev,
+        [created.id]: "Saved. Verifying connection…",
+      }));
+      try {
+        await enterpriseAPI.verifyConnection(created.id);
+        await enterpriseAPI.discoverConnection(created.id);
+        setConnectionFeedback((prev) => ({
+          ...prev,
+          [created.id]: `Verified and discovered. Importing relevant records…`,
+        }));
+        const sync = await enterpriseAPI.triggerConnectionSync(created.id);
+        const imported =
+          sync?.records_imported ??
+          sync?.records_synced ??
+          sync?.count ??
+          "available";
+        setConnectionFeedback((prev) => ({
+          ...prev,
+          [created.id]: `Verified, discovered, and synced (${imported} records).`,
+        }));
+      } catch (verificationError) {
+        setConnectionFeedback((prev) => ({
+          ...prev,
+          [created.id]: `Saved, but verification failed: ${verificationError?.message || "provider error"}`,
+        }));
+      }
+      await loadAll();
+    } catch (error) {
+      setConnectionFormError(
+        error?.message || "Connection could not be saved.",
+      );
+      return;
+    }
+    setConnForm((prev) => ({
+      ...prev,
+      name: "",
+      provider: "",
+      base_url: "",
+      account_email: "",
+      api_token: "",
+      bot_token: "",
+      client_id: "",
+      client_secret: "",
+      token_url: "",
+      access_token: "",
+      slack_channel_ids: "",
+      workday_workers_path: "/ccx/api/v1/workers",
+    }));
     await loadAll();
   };
+
+  const connectionProvider = connForm.provider.toLowerCase();
 
   const createIntervention = async () => {
     if (!intForm.title.trim()) return;
@@ -494,16 +1069,6 @@ const EnterpriseOpsView = () => {
     } finally {
       setOutcomeLoading((prev) => ({ ...prev, [id]: false }));
     }
-  };
-
-  const triggerSync = async (connectionId) => {
-    await enterpriseAPI.triggerConnectionSync(connectionId);
-    await enterpriseAPI.streamConnectionSync(connectionId, {
-      onSync: (payload) => {
-        setSyncState((prev) => ({ ...prev, [connectionId]: payload }));
-      },
-    });
-    await loadAll();
   };
 
   const upsertOutcome = async (interventionId, checkpointDay, status) => {
@@ -551,15 +1116,19 @@ const EnterpriseOpsView = () => {
   };
 
   const runLeanSync = async (connectionId) => {
-    await leanAPI.syncConnection(connectionId);
-    await loadAll();
-  };
-
-  const trainAndScore = async () => {
-    await leanAPI.trainModel();
-    const scored = await leanAPI.scoreModel(20);
-    setModelTop(scored.top || []);
-    await loadAll();
+    try {
+      const result = await leanAPI.syncConnection(connectionId);
+      setConnectionFeedback((prev) => ({
+        ...prev,
+        [connectionId]: `Sync complete: ${result?.bronze_events || 0} source events, ${result?.silver_upserts || 0} canonical upserts, ${result?.quarantined || 0} quarantined.`,
+      }));
+      await loadAll();
+    } catch (error) {
+      setConnectionFeedback((prev) => ({
+        ...prev,
+        [connectionId]: `Sync failed: ${error?.message || "pipeline error"}`,
+      }));
+    }
   };
 
   const runScenario = async () => {
@@ -664,29 +1233,35 @@ const EnterpriseOpsView = () => {
   const uploadImport = async (kind) => {
     const file = importFiles[kind];
     if (!file) return;
+    activeUploadKinds.current.add(kind);
     setUploadProgress((prev) => ({
       ...prev,
       [kind]: { phase: "uploading", percent: 0, message: "Uploading CSV..." },
     }));
-    const queued = await leanAPI.importCsvAsync(kind, file, (percent) => {
-      setUploadProgress((prev) => ({
-        ...prev,
-        [kind]: {
-          phase: percent >= 100 ? "queued" : "uploading",
-          percent,
-          message:
-            percent >= 100
-              ? "Upload complete. Waiting for backend import..."
-              : `Uploading CSV... ${percent}%`,
-        },
-      }));
-    });
-    await trackImportJob(queued.job_id, "csv", kind);
+    try {
+      const queued = await leanAPI.importCsvAsync(kind, file, (percent) => {
+        setUploadProgress((prev) => ({
+          ...prev,
+          [kind]: {
+            phase: percent >= 100 ? "queued" : "uploading",
+            percent,
+            message:
+              percent >= 100
+                ? "Upload complete. Waiting for backend import..."
+                : `Uploading CSV... ${percent}%`,
+          },
+        }));
+      });
+      await trackImportJob(queued.job_id, "csv", kind);
+    } finally {
+      activeUploadKinds.current.delete(kind);
+    }
   };
 
   const uploadBundleImport = async () => {
     const file = importFiles.bundle;
     if (!file) return;
+    activeUploadKinds.current.add("bundle");
     setUploadProgress((prev) => ({
       ...prev,
       bundle: {
@@ -695,25 +1270,30 @@ const EnterpriseOpsView = () => {
         message: "Uploading ZIP bundle...",
       },
     }));
-    const queued = await leanAPI.importDatasetBundleAsync(file, (percent) => {
-      setUploadProgress((prev) => ({
-        ...prev,
-        bundle: {
-          phase: percent >= 100 ? "queued" : "uploading",
-          percent,
-          message:
-            percent >= 100
-              ? "Upload complete. Waiting for backend bundle import..."
-              : `Uploading ZIP bundle... ${percent}%`,
-        },
-      }));
-    });
-    await trackImportJob(queued.job_id, "bundle");
+    try {
+      const queued = await leanAPI.importDatasetBundleAsync(file, (percent) => {
+        setUploadProgress((prev) => ({
+          ...prev,
+          bundle: {
+            phase: percent >= 100 ? "queued" : "uploading",
+            percent,
+            message:
+              percent >= 100
+                ? "Upload complete. Waiting for backend bundle import..."
+                : `Uploading ZIP bundle... ${percent}%`,
+          },
+        }));
+      });
+      await trackImportJob(queued.job_id, "bundle");
+    } finally {
+      activeUploadKinds.current.delete("bundle");
+    }
   };
 
   const validateImport = async (kind) => {
     const file = importFiles[kind];
     if (!file) return;
+    activeUploadKinds.current.add(kind);
     setUploadProgress((prev) => ({
       ...prev,
       [kind]: {
@@ -722,28 +1302,32 @@ const EnterpriseOpsView = () => {
         message: "Uploading file for validation...",
       },
     }));
-    const result = await leanAPI.validateCsv(kind, file, (percent) => {
+    try {
+      const result = await leanAPI.validateCsv(kind, file, (percent) => {
+        setUploadProgress((prev) => ({
+          ...prev,
+          [kind]: {
+            phase: percent >= 100 ? "processing" : "validating",
+            percent,
+            message:
+              percent >= 100
+                ? "Computing validation score..."
+                : `Validating file... ${percent}%`,
+          },
+        }));
+      });
+      setValidationResults((prev) => ({ ...prev, [kind]: result }));
       setUploadProgress((prev) => ({
         ...prev,
         [kind]: {
-          phase: percent >= 100 ? "processing" : "validating",
-          percent,
-          message:
-            percent >= 100
-              ? "Computing validation score..."
-              : `Validating file... ${percent}%`,
+          phase: "validated",
+          percent: 100,
+          message: "Validation complete.",
         },
       }));
-    });
-    setValidationResults((prev) => ({ ...prev, [kind]: result }));
-    setUploadProgress((prev) => ({
-      ...prev,
-      [kind]: {
-        phase: "validated",
-        percent: 100,
-        message: "Validation complete.",
-      },
-    }));
+    } finally {
+      activeUploadKinds.current.delete(kind);
+    }
   };
 
   const refreshExecutivePacket = async () => {
@@ -780,6 +1364,14 @@ const EnterpriseOpsView = () => {
 
   const onSelectConnection = async (connId) => {
     setSelectedConnectionId(connId);
+    const selected = connections.find((connection) => connection.id === connId);
+    if (selected) {
+      setContractForm((prev) => ({
+        ...prev,
+        source_type: selected.source_type,
+        provider: selected.provider,
+      }));
+    }
     setLoading(true);
     try {
       const [mapData, jobData] = await Promise.all([
@@ -1131,14 +1723,75 @@ const EnterpriseOpsView = () => {
                       </div>
                       <div>
                         <h2 className="font-extrabold text-sm uppercase tracking-wider text-white">
-                          Register Connection
+                          Connect a Provider
                         </h2>
                         <span className="text-[10px] text-slate-400 font-mono block">
-                          Ingestion Endpoint &amp; Credentials
+                          Verify first, then sync securely
                         </span>
                       </div>
                     </div>
                     <div className="space-y-4">
+                      <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-3 text-[10px] leading-relaxed text-slate-300">
+                        <div className="mb-2 flex items-center justify-between font-bold uppercase tracking-wider text-cyan-200">
+                          <span>Quick connect</span>
+                          <span>1 of 4</span>
+                        </div>
+                        <p>
+                          Choose a provider, enter its credentials, add the
+                          connection, then use Verify → Discover → Pipeline Sync
+                          on the right.
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                          Provider
+                        </label>
+                        <PremiumSelect
+                          className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                          value={connForm.provider}
+                          onChange={(e) => {
+                            const provider = e.target.value;
+                            const setup = PROVIDER_SETUP[provider];
+                            setConnectionFormError("");
+                            setConnForm((p) => ({
+                              ...p,
+                              provider,
+                              source_type: setup?.source_type || "hris",
+                              auth_type: setup?.auth_type || "api_key",
+                              base_url:
+                                providerPresets[provider]?.base_url ||
+                                {
+                                  slack: "https://slack.com/api",
+                                  greenhouse: "https://harvest.greenhouse.io",
+                                  lever: "https://api.lever.co/v1",
+                                  teams: "https://graph.microsoft.com/v1.0",
+                                  hibob: "https://api.hibob.com/v1",
+                                }[provider] ||
+                                (provider === "slack" ? "" : p.base_url),
+                              api_key: "",
+                              service_user_token: "",
+                            }));
+                          }}
+                        >
+                          <option value="">Select provider</option>
+                          <option value="jira">Jira</option>
+                          <option value="slack">Slack</option>
+                          <option value="workday">Workday</option>
+                          <option value="greenhouse">Greenhouse</option>
+                          <option value="lever">Lever</option>
+                          <option value="bamboohr">BambooHR</option>
+                          <option value="hibob">HiBob</option>
+                          <option value="successfactors">
+                            SAP SuccessFactors
+                          </option>
+                          <option value="teams">Microsoft Teams</option>
+                        </PremiumSelect>
+                        {connectionProvider && (
+                          <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
+                            {PROVIDER_SETUP[connectionProvider]?.help}
+                          </p>
+                        )}
+                      </div>
                       <div>
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
                           Connection Name
@@ -1153,74 +1806,278 @@ const EnterpriseOpsView = () => {
                           }
                         />
                       </div>
+                      {connectionProvider === "jira" && (
+                        <div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                              {connectionProvider === "jira"
+                                ? "Jira Account Email"
+                                : "Account Email (optional)"}
+                            </label>
+                            <input
+                              type="email"
+                              className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                              placeholder="admin@company.com"
+                              value={connForm.account_email}
+                              onChange={(e) =>
+                                setConnForm((p) => ({
+                                  ...p,
+                                  account_email: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                              {connectionProvider === "slack"
+                                ? "Slack OAuth Bot Token"
+                                : "API Token (Jira)"}
+                            </label>
+                            <input
+                              type="password"
+                              className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                              placeholder="Stored encrypted on the server"
+                              value={connForm.api_token || connForm.bot_token}
+                              onChange={(e) =>
+                                setConnForm((p) => ({
+                                  ...p,
+                                  api_token:
+                                    p.provider.toLowerCase() === "jira"
+                                      ? e.target.value
+                                      : "",
+                                  bot_token:
+                                    p.provider.toLowerCase() === "slack"
+                                      ? e.target.value
+                                      : "",
+                                }))
+                              }
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {connectionProvider === "slack" && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                            Slack OAuth Bot Token
+                          </label>
+                          <input
+                            type="password"
+                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                            placeholder="xoxb-… — encrypted on the server"
+                            value={connForm.bot_token}
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                bot_token: e.target.value,
+                              }))
+                            }
+                          />
+                          <label className="mt-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                            Slack Channel IDs (optional)
+                          </label>
+                          <input
+                            type="text"
+                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                            placeholder="C012ABC, C034XYZ"
+                            value={connForm.slack_channel_ids}
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                slack_channel_ids: e.target.value,
+                              }))
+                            }
+                          />
+                          <p className="mt-1 text-[10px] text-slate-500">
+                            Optional comma-separated IDs. Leave blank to sync
+                            every channel the bot can access.
+                          </p>
+                        </div>
+                      )}
+                      {connectionProvider === "workday" && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                              OAuth Client ID (Workday, optional)
+                            </label>
+                            <input
+                              type="text"
+                              className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                              value={connForm.client_id}
+                              onChange={(e) =>
+                                setConnForm((p) => ({
+                                  ...p,
+                                  client_id: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                              OAuth Client Secret (Workday, optional)
+                            </label>
+                            <input
+                              type="password"
+                              className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                              value={connForm.client_secret}
+                              onChange={(e) =>
+                                setConnForm((p) => ({
+                                  ...p,
+                                  client_secret: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {["successfactors", "teams"].includes(
+                        connectionProvider,
+                      ) && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                            {
+                              PROVIDER_SETUP[connectionProvider]
+                                ?.credentialLabel
+                            }
+                          </label>
+                          <input
+                            type="password"
+                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                            placeholder="OAuth access token: encrypted on the server"
+                            value={connForm.access_token}
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                access_token: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      )}
+                      {["greenhouse", "lever", "bamboohr", "hibob"].includes(
+                        connectionProvider,
+                      ) && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                            {
+                              PROVIDER_SETUP[connectionProvider]
+                                ?.credentialLabel
+                            }
+                          </label>
+                          <input
+                            type="password"
+                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                            placeholder="Stored encrypted on the server"
+                            value={
+                              connForm.api_key || connForm.service_user_token
+                            }
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                api_key: [
+                                  "greenhouse",
+                                  "lever",
+                                  "bamboohr",
+                                ].includes(p.provider)
+                                  ? e.target.value
+                                  : "",
+                                service_user_token:
+                                  p.provider === "hibob" ? e.target.value : "",
+                              }))
+                            }
+                          />
+                        </div>
+                      )}
+                      {connectionProvider === "workday" && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                            Workday Access Token (or use OAuth client fields
+                            below)
+                          </label>
+                          <input
+                            type="password"
+                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                            placeholder="Bearer access token — encrypted on the server"
+                            value={connForm.access_token}
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                access_token: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      )}
+                      {connectionProvider === "workday" && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                            Workday Workers API Path
+                          </label>
+                          <input
+                            type="text"
+                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                            placeholder="/api/staffing/v7/tenant/workers"
+                            value={connForm.workday_workers_path}
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                workday_workers_path: e.target.value,
+                              }))
+                            }
+                          />
+                          <p className="mt-1 text-[10px] text-slate-500">
+                            Copy the production workers path from Workday REST
+                            API Explorer, including service version and tenant
+                            where required.
+                          </p>
+                        </div>
+                      )}
+                      {connectionProvider === "workday" && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                            OAuth Token URL (Workday, optional with access
+                            token)
+                          </label>
+                          <input
+                            type="url"
+                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs outline-none"
+                            placeholder="https://your-tenant.workday.com/ccx/oauth2/token"
+                            value={connForm.token_url}
+                            onChange={(e) =>
+                              setConnForm((p) => ({
+                                ...p,
+                                token_url: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between rounded-xl border border-white/5 bg-slate-950/30 px-3 py-2 text-[10px] text-slate-400">
+                        <span>
+                          Pipeline type:{" "}
+                          <strong className="text-slate-200">
+                            {PROVIDER_SETUP[connectionProvider]?.source_type ||
+                              "—"}
+                          </strong>
+                        </span>
+                        <span>
+                          New connections start as{" "}
+                          <strong className="text-amber-200">Draft</strong>
+                        </span>
+                      </div>
                       <div>
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                          Provider
+                          {connectionProvider === "slack"
+                            ? "Base URL (automatic)"
+                            : "Provider API Base URL"}
                         </label>
                         <input
                           type="text"
                           className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 placeholder:text-slate-600 text-xs focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all outline-none"
-                          placeholder="workday / greenhouse / etc."
-                          value={connForm.provider}
-                          onChange={(e) =>
-                            setConnForm((p) => ({
-                              ...p,
-                              provider: e.target.value,
-                            }))
+                          placeholder={
+                            PROVIDER_SETUP[connectionProvider]
+                              ?.basePlaceholder || "Select a provider first"
                           }
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                            Source Type
-                          </label>
-                          <PremiumSelect
-                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all outline-none cursor-pointer"
-                            value={connForm.source_type}
-                            onChange={(e) =>
-                              setConnForm((p) => ({
-                                ...p,
-                                source_type: e.target.value,
-                              }))
-                            }
-                          >
-                            <option value="hris">HRIS</option>
-                            <option value="ats">ATS</option>
-                            <option value="engagement">Engagement</option>
-                            <option value="productivity">Productivity</option>
-                            <option value="finance">Finance</option>
-                          </PremiumSelect>
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                            Status
-                          </label>
-                          <PremiumSelect
-                            className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 text-xs focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all outline-none cursor-pointer"
-                            value={connForm.status}
-                            onChange={(e) =>
-                              setConnForm((p) => ({
-                                ...p,
-                                status: e.target.value,
-                              }))
-                            }
-                          >
-                            <option value="draft">Draft</option>
-                            <option value="active">Active</option>
-                            <option value="paused">Paused</option>
-                            <option value="error">Error</option>
-                          </PremiumSelect>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                          Base URL (optional)
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full h-10 px-3 rounded-xl bg-slate-950/50 border border-white/10 text-slate-200 placeholder:text-slate-600 text-xs focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all outline-none"
-                          placeholder="https://api.workday.com/v1"
+                          disabled={connectionProvider === "slack"}
                           value={connForm.base_url}
                           onChange={(e) =>
                             setConnForm((p) => ({
@@ -1236,6 +2093,11 @@ const EnterpriseOpsView = () => {
                       >
                         <Plus size={14} /> Add Connection
                       </button>
+                      {connectionFormError && (
+                        <div className="rounded-xl border border-rose-400/20 bg-rose-400/[0.06] px-3 py-2 text-[10px] leading-relaxed text-rose-200">
+                          {connectionFormError}
+                        </div>
+                      )}
                     </div>
                   </section>
                 </div>
@@ -1292,23 +2154,9 @@ const EnterpriseOpsView = () => {
                               </div>
                             </div>
 
-                            {syncState[c.id] && (
-                              <div className="mt-3 bg-cyan-950/20 border border-cyan-400/20 rounded-lg p-2.5 text-xs text-cyan-300 relative overflow-hidden">
-                                <div className="flex items-center justify-between font-mono text-[10px] mb-1">
-                                  <span>Phase: {syncState[c.id].phase}</span>
-                                  <span>{syncState[c.id].progress}%</span>
-                                </div>
-                                <div className="h-1 w-full bg-cyan-950 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-cyan-400 transition-all duration-300"
-                                    style={{
-                                      width: `${syncState[c.id].progress}%`,
-                                    }}
-                                  />
-                                </div>
-                                <div className="text-[10px] text-cyan-400/70 mt-1 leading-normal">
-                                  {syncState[c.id].message}
-                                </div>
+                            {connectionFeedback[c.id] && (
+                              <div className="mt-3 bg-cyan-950/20 border border-cyan-400/20 rounded-lg p-2.5 text-[10px] text-cyan-200">
+                                {connectionFeedback[c.id]}
                               </div>
                             )}
 
@@ -1316,12 +2164,76 @@ const EnterpriseOpsView = () => {
                               className="mt-3.5 pt-3 border-t border-white/5 flex flex-wrap gap-2 justify-end"
                               onClick={(e) => e.stopPropagation()}
                             >
+                              {["successfactors", "teams", "workday"].includes(
+                                String(c.provider || "").toLowerCase(),
+                              ) && (
+                                <button
+                                  className="px-3 h-8 rounded-lg border border-cyan-400/20 hover:bg-cyan-500/10 text-[10px] font-bold uppercase tracking-wider text-cyan-300 inline-flex items-center gap-1.5 transition-all"
+                                  onClick={async () => {
+                                    try {
+                                      const result = await oauthAPI.start(
+                                        c.provider,
+                                        c.id,
+                                      );
+                                      if (result?.authorization_url)
+                                        window.location.assign(
+                                          result.authorization_url,
+                                        );
+                                    } catch (error) {
+                                      setConnectionFeedback((prev) => ({
+                                        ...prev,
+                                        [c.id]: `OAuth start failed: ${error?.message || "provider error"}`,
+                                      }));
+                                    }
+                                  }}
+                                >
+                                  Connect with OAuth
+                                </button>
+                              )}
                               <button
-                                className="px-3 h-8 rounded-lg border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-wider text-slate-300 inline-flex items-center gap-1.5 transition-all"
-                                onClick={() => triggerSync(c.id)}
+                                className="px-3 h-8 rounded-lg border border-emerald-400/20 hover:bg-emerald-500/10 text-[10px] font-bold uppercase tracking-wider text-emerald-300 inline-flex items-center gap-1.5 transition-all"
+                                onClick={async () => {
+                                  try {
+                                    const result =
+                                      await enterpriseAPI.verifyConnection(
+                                        c.id,
+                                      );
+                                    setConnectionFeedback((prev) => ({
+                                      ...prev,
+                                      [c.id]: `Verified live provider connection${result?.account || result?.team ? `: ${result.account || result.team}` : ""}.`,
+                                    }));
+                                    await loadAll();
+                                  } catch (error) {
+                                    setConnectionFeedback((prev) => ({
+                                      ...prev,
+                                      [c.id]: `Verification failed: ${error?.message || "provider error"}`,
+                                    }));
+                                  }
+                                }}
                               >
-                                <Play size={10} className="text-cyan-400" />{" "}
-                                Realtime Sync
+                                Verify Connection
+                              </button>
+                              <button
+                                className="px-3 h-8 rounded-lg border border-purple-400/20 hover:bg-purple-500/10 text-[10px] font-bold uppercase tracking-wider text-purple-300 inline-flex items-center gap-1.5 transition-all"
+                                onClick={async () => {
+                                  try {
+                                    const metadata =
+                                      await enterpriseAPI.discoverConnection(
+                                        c.id,
+                                      );
+                                    setConnectionFeedback((prev) => ({
+                                      ...prev,
+                                      [c.id]: `Metadata discovered: ${Object.keys(metadata || {}).join(", ") || "none"}.`,
+                                    }));
+                                  } catch (error) {
+                                    setConnectionFeedback((prev) => ({
+                                      ...prev,
+                                      [c.id]: `Discovery failed: ${error?.message || "provider error"}`,
+                                    }));
+                                  }
+                                }}
+                              >
+                                Discover Metadata
                               </button>
                               <button
                                 className="px-3 h-8 rounded-lg border border-cyan-400/20 hover:bg-cyan-500/10 text-[10px] font-bold uppercase tracking-wider text-cyan-400 inline-flex items-center gap-1.5 transition-all"
@@ -1357,6 +2269,19 @@ const EnterpriseOpsView = () => {
             {/* SUB-TAB 2: SCHEMA & FIELD MAPPINGS */}
             {pipelineSubTab === "mappings" && (
               <div className="space-y-6 w-full">
+                <div className="rounded-2xl border border-purple-400/20 bg-purple-400/[0.04] p-4 text-xs text-slate-300">
+                  <div className="font-bold uppercase tracking-wider text-purple-200">
+                    Advanced step — schema and mappings
+                  </div>
+                  <p className="mt-1 leading-relaxed">
+                    First connect and verify a provider in{" "}
+                    <strong className="text-white">System Integrations</strong>.
+                    Select a connection there, then return here only if its
+                    discovered fields need translation. Most standard Jira,
+                    Slack, and Workday records can proceed without manual
+                    mappings.
+                  </p>
+                </div>
                 {/* Top 2-Column Grid: Field Mapping Form & Lean Data Contracts */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
                   {/* Field Mappings Form Card */}
@@ -1682,10 +2607,10 @@ const EnterpriseOpsView = () => {
                           id="dataset-bundle-file"
                           className="hidden"
                           onChange={(e) =>
-                            setImportFiles((p) => ({
-                              ...p,
-                              bundle: e.target.files?.[0] || null,
-                            }))
+                            handleImportFileChange(
+                              "bundle",
+                              e.target.files?.[0] || null,
+                            )
                           }
                         />
                         <label
@@ -1734,7 +2659,7 @@ const EnterpriseOpsView = () => {
                     )}
                   </div>
 
-                  {/* 6 Individual CSV Upload Cards */}
+                  {/* Individual CSV Upload Cards */}
                   <div className="space-y-4">
                     <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold border-b border-white/5 pb-2">
                       Upload Individual CSV Schemas
@@ -1768,6 +2693,16 @@ const EnterpriseOpsView = () => {
                           "Candidate Experience CSV",
                           "candidate_experience_public.csv",
                         ],
+                        [
+                          "collaboration_events",
+                          "Collaboration Events CSV",
+                          "collaboration_events.csv",
+                        ],
+                        [
+                          "skill_aliases",
+                          "Reviewed Skill Aliases CSV",
+                          "skill_aliases.csv",
+                        ],
                       ].map(([key, label, filename]) => (
                         <div
                           key={key}
@@ -1789,10 +2724,10 @@ const EnterpriseOpsView = () => {
                               id={`csv-file-${key}`}
                               className="hidden"
                               onChange={(e) =>
-                                setImportFiles((p) => ({
-                                  ...p,
-                                  [key]: e.target.files?.[0] || null,
-                                }))
+                                handleImportFileChange(
+                                  key,
+                                  e.target.files?.[0] || null,
+                                )
                               }
                             />
                             <label
@@ -1840,6 +2775,55 @@ const EnterpriseOpsView = () => {
                                     ?.duplicate_rows ?? 0}
                                 </div>
                               </div>
+                              {(validationResults[key].metrics?.dated_rows !==
+                                undefined ||
+                                validationResults[key].metrics
+                                  ?.with_salary_units !== undefined ||
+                                validationResults[key].metrics
+                                  ?.with_employment_outcome_fields !==
+                                  undefined) && (
+                                <div className="mt-1 border-t border-white/5 pt-1 text-slate-400">
+                                  {validationResults[key].metrics
+                                    ?.dated_rows !== undefined && (
+                                    <div>
+                                      Career dates:{" "}
+                                      {
+                                        validationResults[key].metrics
+                                          .dated_rows
+                                      }{" "}
+                                      dated ·{" "}
+                                      {
+                                        validationResults[key].metrics
+                                          .undated_rows
+                                      }{" "}
+                                      undated
+                                    </div>
+                                  )}
+                                  {validationResults[key].metrics
+                                    ?.with_salary_units !== undefined && (
+                                    <div>
+                                      Compensation units:{" "}
+                                      {
+                                        validationResults[key].metrics
+                                          .with_salary_units
+                                      }{" "}
+                                      rows with salary, currency, and pay period
+                                    </div>
+                                  )}
+                                  {validationResults[key].metrics
+                                    ?.with_employment_outcome_fields !==
+                                    undefined && (
+                                    <div>
+                                      Survival outcomes:{" "}
+                                      {
+                                        validationResults[key].metrics
+                                          .with_employment_outcome_fields
+                                      }{" "}
+                                      complete dated outcomes
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -2074,49 +3058,67 @@ const EnterpriseOpsView = () => {
                                 {m.version}
                               </span>
                             </span>
-                            {getStatusBadge(m.status)}
+                            {getStatusBadge(
+                              m.model_name === "attrition_v1"
+                                ? "unvalidated"
+                                : m.status,
+                            )}
                           </div>
-                          <div className="grid grid-cols-3 gap-2 bg-slate-950/40 p-2.5 rounded-xl font-mono text-[9px] text-slate-400 my-3 border border-white/5">
-                            <div>
-                              PR-AUC:{" "}
-                              <span className="text-cyan-400 font-extrabold block text-xs">
-                                {m.pr_auc}
-                              </span>
+                          {m.model_name === "attrition_v1" ? (
+                            <div className="my-3 rounded-xl border border-amber-400/15 bg-amber-400/[0.04] p-2.5 text-[10px] text-amber-200/80">
+                              Validation metrics unavailable
                             </div>
-                            <div>
-                              Cal Error:{" "}
-                              <span className="text-cyan-400 font-extrabold block text-xs">
-                                {m.calibration_error}
-                              </span>
+                          ) : (
+                            <div className="grid grid-cols-3 gap-2 bg-slate-950/40 p-2.5 rounded-xl font-mono text-[9px] text-slate-400 my-3 border border-white/5">
+                              <div>
+                                PR-AUC:{" "}
+                                <span className="text-cyan-400 font-extrabold block text-xs">
+                                  {m.pr_auc ?? "N/A"}
+                                </span>
+                              </div>
+                              <div>
+                                Cal Error:{" "}
+                                <span className="text-cyan-400 font-extrabold block text-xs">
+                                  {m.calibration_error ?? "N/A"}
+                                </span>
+                              </div>
+                              <div>
+                                Fairness Gap:{" "}
+                                <span className="text-cyan-400 font-extrabold block text-xs">
+                                  {m.fairness_gap ?? "N/A"}
+                                </span>
+                              </div>
                             </div>
-                            <div>
-                              Fairness Gap:{" "}
-                              <span className="text-cyan-400 font-extrabold block text-xs">
-                                {m.fairness_gap}
-                              </span>
-                            </div>
+                          )}
+                        </div>
+                        {m.model_name === "attrition_v1" ? (
+                          <p className="mt-3 border-t border-white/5 pt-3 text-[10px] leading-4 text-amber-200/80">
+                            Historical heuristic metrics are hidden. This card
+                            cannot be approved or promoted without outcome-based
+                            validation.
+                          </p>
+                        ) : (
+                          <div className="flex gap-2 justify-end mt-4 pt-3 border-t border-white/5">
+                            <button
+                              onClick={() => approveModelCard(m.id)}
+                              className="px-3 h-8 rounded-lg bg-slate-950 border border-white/10 hover:border-cyan-400/30 text-[9px] text-slate-300 font-bold uppercase transition-all"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => promoteModelCard(m.id)}
+                              className="px-3 h-8 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-[9px] text-slate-950 font-extrabold uppercase transition-all shadow-md shadow-cyan-950/50"
+                            >
+                              Promote
+                            </button>
+                            <button
+                              onClick={() => rollbackModelCard(m.id)}
+                              className="px-3 h-8 rounded-lg bg-rose-500/15 border border-rose-500/30 hover:bg-rose-500/25 text-[9px] text-rose-400 font-bold uppercase transition-all"
+                            >
+                              Rollback
+                            </button>
                           </div>
-                        </div>
-                        <div className="flex gap-2 justify-end mt-4 pt-3 border-t border-white/5">
-                          <button
-                            onClick={() => approveModelCard(m.id)}
-                            className="px-3 h-8 rounded-lg bg-slate-950 border border-white/10 hover:border-cyan-400/30 text-[9px] text-slate-300 font-bold uppercase transition-all"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => promoteModelCard(m.id)}
-                            className="px-3 h-8 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-[9px] text-slate-950 font-extrabold uppercase transition-all shadow-md shadow-cyan-950/50"
-                          >
-                            Promote
-                          </button>
-                          <button
-                            onClick={() => rollbackModelCard(m.id)}
-                            className="px-3 h-8 rounded-lg bg-rose-500/15 border border-rose-500/30 hover:bg-rose-500/25 text-[9px] text-rose-400 font-bold uppercase transition-all"
-                          >
-                            Rollback
-                          </button>
-                        </div>
+                        )}
                       </div>
                     ))}
                     {!modelCards.length && (
@@ -2345,16 +3347,27 @@ const EnterpriseOpsView = () => {
                           Lean MLOps Deployment Center
                         </h2>
                         <span className="text-[10px] text-slate-400 font-mono block">
-                          Automated Model Training &amp; Prediction Pipeline
+                          Model registry · outcome-based attrition validation
+                          required
                         </span>
                       </div>
                     </div>
                     <button
-                      onClick={trainAndScore}
-                      className="h-9 px-5 rounded-xl bg-cyan-400 text-slate-950 hover:bg-cyan-300 text-xs font-extrabold uppercase tracking-wider transition-all shadow-lg shadow-cyan-950/50 active:scale-95 inline-flex items-center gap-2"
+                      type="button"
+                      disabled
+                      title="Observed departure and censoring history is required before training or scoring."
+                      className="h-9 px-5 rounded-xl border border-amber-400/20 bg-amber-400/5 text-amber-200 text-xs font-extrabold uppercase tracking-wider inline-flex items-center gap-2 cursor-not-allowed"
                     >
-                      <Zap size={14} /> Train &amp; Score Engine
+                      <Zap size={14} /> Awaiting outcome data
                     </button>
+                  </div>
+
+                  <div className="mb-5 rounded-lg border border-amber-400/20 bg-amber-400/[0.04] p-3 text-xs leading-5 text-amber-100/80">
+                    Attrition model training and employee scoring are disabled
+                    until this tenant has observed departures, active censoring
+                    dates, and a model that passes held-out validation and
+                    calibration checks. Existing profile-heuristic records are
+                    marked unvalidated and cannot produce employee forecasts.
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2363,7 +3376,7 @@ const EnterpriseOpsView = () => {
                       <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1 flex items-center justify-between">
                         <span>Algorithmic Models ({models.length})</span>
                         <span className="font-mono text-cyan-400">
-                          Production Instances
+                          Validation status
                         </span>
                       </div>
                       <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
@@ -2381,14 +3394,27 @@ const EnterpriseOpsView = () => {
                             <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono bg-slate-950/40 p-2 rounded-lg border border-white/5">
                               <span>
                                 Status:{" "}
-                                <strong className="text-emerald-400 uppercase">
-                                  {m.status}
+                                <strong
+                                  className={
+                                    m.model_name === "attrition_v1" ||
+                                    m.status === "unvalidated"
+                                      ? "text-amber-300 uppercase"
+                                      : "text-emerald-400 uppercase"
+                                  }
+                                >
+                                  {m.model_name === "attrition_v1"
+                                    ? "unvalidated"
+                                    : m.status}
                                 </strong>
                               </span>
                               <span>
-                                Risk Rate:{" "}
+                                Validation:{" "}
                                 <strong className="text-slate-100">
-                                  {m.metrics?.risk_rate ?? 0}
+                                  {m.model_name === "attrition_v1" ||
+                                  m.validation_status ===
+                                    "insufficient_outcome_data"
+                                    ? "unavailable"
+                                    : m.validation_status || "not reported"}
                                 </strong>
                               </span>
                             </div>
@@ -2397,39 +3423,18 @@ const EnterpriseOpsView = () => {
                       </div>
                     </div>
 
-                    {/* Scored employees Top risk preview */}
+                    {/* Forecast output remains unavailable until validation. */}
                     <div className="space-y-3">
                       <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1 flex items-center justify-between">
-                        <span>High-Risk Scoring Output (Top Preview)</span>
-                        <span className="font-mono text-rose-400">
-                          Priority Review
+                        <span>Employee survival forecasts</span>
+                        <span className="font-mono text-amber-300">
+                          Not validated
                         </span>
                       </div>
-                      <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
-                        {modelTop.map((r) => (
-                          <div
-                            key={r.employee_id}
-                            className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3.5 text-xs flex justify-between items-center text-left hover:border-rose-500/40 transition-all"
-                          >
-                            <div>
-                              <span className="font-bold text-slate-100 text-xs">
-                                {r.full_name}
-                              </span>
-                              <span className="text-[10px] text-slate-500 block font-mono mt-0.5">
-                                ID: {r.employee_id}
-                              </span>
-                            </div>
-                            <span className="px-3 py-1 rounded-xl text-[10px] font-extrabold bg-rose-500/15 text-rose-300 border border-rose-500/30 font-mono">
-                              Risk: {(r.risk_probability * 100).toFixed(1)}%
-                            </span>
-                          </div>
-                        ))}
-                        {!modelTop.length && (
-                          <div className="text-center py-10 rounded-xl border border-white/5 border-dashed bg-white/[0.01] text-slate-500 text-xs">
-                            Run 'Train &amp; Score Engine' to generate real-time
-                            risk predictions.
-                          </div>
-                        )}
+                      <div className="min-h-48 rounded-xl border border-white/5 border-dashed bg-white/[0.01] p-5 text-xs leading-5 text-slate-400 flex items-center justify-center text-center">
+                        No employee-level probability is displayed. Import
+                        tenant-scoped employment start and end/censor dates,
+                        then validate the survival model on held-out outcomes.
                       </div>
                     </div>
                   </div>
@@ -2442,6 +3447,7 @@ const EnterpriseOpsView = () => {
         {/* TAB 3: WORKFLOWS & RISK */}
         {activeTab === "workflows" && (
           <div className="space-y-6">
+            <AgentActionsView />
             {/* INTERACTIVE WORKFLOW MODALS OVERLAY */}
             {activeModal && selectedReview && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
@@ -3742,6 +4748,11 @@ const EnterpriseOpsView = () => {
                   icon: Shield,
                   badge: drRunbooks.length,
                 },
+                {
+                  id: "privacy_controls",
+                  label: "Privacy Controls",
+                  icon: Lock,
+                },
               ].map((st) => {
                 const Icon = st.icon;
                 const isActive = compSubTab === st.id;
@@ -4440,6 +5451,8 @@ const EnterpriseOpsView = () => {
                 </section>
               </div>
             )}
+
+            {compSubTab === "privacy_controls" && <PrivacyGovernanceView />}
           </div>
         )}
 

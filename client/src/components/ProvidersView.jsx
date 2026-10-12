@@ -60,14 +60,18 @@ const LLM_FAMILIES = [
     name: "Google",
     defaultUrl: "https://generativelanguage.googleapis.com",
     placeholder: "AIzaSy...",
-    standardModels: ["gemini-1.5-flash", "gemini-1.5-pro"],
+    standardModels: ["gemini-3.6-flash", "gemini-2.0-flash"],
   },
   {
     id: "groq",
     name: "Groq",
     defaultUrl: "https://api.groq.com/openai/v1",
     placeholder: "gsk_...",
-    standardModels: ["llama-3.1-70b-versatile", "llama-3.1-8b-instant"],
+    standardModels: [
+      "openai/gpt-oss-20b",
+      "llama-3.3-70b-versatile",
+      "qwen-qwq-32b",
+    ],
   },
   {
     id: "lmstudio",
@@ -91,11 +95,67 @@ const LLM_FAMILIES = [
     standardModels: ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
   },
   {
+    id: "openrouter",
+    name: "OpenRouter",
+    defaultUrl: "https://openrouter.ai/api/v1",
+    placeholder: "sk-or-v1-...",
+    standardModels: [
+      "nvidia/nemotron-3.5-lightning:free",
+      "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "inclusionai/ling-3.0-flash-fin:free",
+    ],
+  },
+  {
+    id: "moonshot",
+    name: "Kimi (Moonshot AI)",
+    defaultUrl: "https://api.moonshot.ai/v1",
+    placeholder: "sk-...",
+    standardModels: ["kimi-k2.6", "kimi-k2.5"],
+  },
+  {
+    id: "zai",
+    name: "Z.AI (GLM)",
+    defaultUrl: "https://api.z.ai/api/paas/v4",
+    placeholder: "...",
+    standardModels: ["glm-5.3", "glm-5.2"],
+  },
+  {
+    id: "nvidia",
+    name: "NVIDIA NIM",
+    defaultUrl: "https://integrate.api.nvidia.com/v1",
+    placeholder: "nvapi-...",
+    standardModels: [
+      "nvidia/llama-3.3-nemotron-super-49b-v1",
+      "deepseek-ai/deepseek-v4-flash",
+    ],
+  },
+  {
+    id: "deepseek",
+    name: "DeepSeek",
+    defaultUrl: "https://api.deepseek.com",
+    placeholder: "sk-...",
+    standardModels: ["deepseek-flash", "deepseek-reasoner"],
+  },
+  {
+    id: "mistral",
+    name: "Mistral AI",
+    defaultUrl: "https://api.mistral.ai/v1",
+    placeholder: "...",
+    standardModels: ["mistral-small-latest", "mistral-large-latest"],
+  },
+  {
+    id: "cline",
+    name: "Cline",
+    defaultUrl: "https://api.cline.bot/api/v1",
+    placeholder: "...",
+    standardModels: ["minimax/minimax-m2.5"],
+  },
+  {
     id: "opencode",
     name: "OpenCode Zen",
     defaultUrl: "https://opencode.ai/zen/v1",
     placeholder: "oc-zen-...",
-    standardModels: ["gpt-5.5", "minimax-m2.5-free"],
+    standardModels: ["gpt-6-astra", "kimi-k3", "deepseek-v4.1-flash"],
   },
 ];
 
@@ -242,7 +302,16 @@ const ProvidersView = () => {
               parsed[fam.id].endpoint ||
               fam.defaultUrl,
             selectedModel:
-              parsed[fam.id].selectedModel || fam.standardModels[0],
+              (Array.isArray(parsed[fam.id].discoveredModels) &&
+                parsed[fam.id].discoveredModels.includes(
+                  parsed[fam.id].selectedModel,
+                )) ||
+              fam.standardModels.includes(parsed[fam.id].selectedModel)
+                ? parsed[fam.id].selectedModel
+                : fam.standardModels[0],
+            discoveredModels: Array.isArray(parsed[fam.id].discoveredModels)
+              ? parsed[fam.id].discoveredModels
+              : fam.standardModels,
             isActive: parsed.activeProvider === fam.id,
           });
         }
@@ -276,7 +345,7 @@ const ProvidersView = () => {
   const [loadingTokens, setLoadingTokens] = useState(false);
   const [newTokenName, setNewTokenName] = useState("My-Company-Webhook");
   const [generatedKey, setGeneratedKey] = useState("");
-  const [employeeEmail, setEmployeeEmail] = useState("silas.vance@aurelinx.io");
+  const [employeeEmail, setEmployeeEmail] = useState("");
   const [simulatingWebhook, setSimulatingWebhook] = useState(null); // 'slack' | 'jira' | 'workday'
   const [integrationLogs, setIntegrationLogs] = useState([]);
   const [webhookEvents, setWebhookEvents] = useState([]);
@@ -462,37 +531,16 @@ const ProvidersView = () => {
     }
   };
 
-  const handleSimulateIngest = async (type) => {
+  const handleTestIngest = async (type) => {
     setSimulatingWebhook(type);
     try {
       const apiBase = API_BASE_URL;
-      const authHeaders = getAuthHeaders();
       let tokenToUse =
         generatedKey || (tokens.length > 0 ? tokens[0].api_key : null);
 
-      if (!tokenToUse && authHeaders.Authorization) {
-        try {
-          const genResp = await fetch(
-            `${apiBase}/api/v1/integrations/token?name=Demo-Simulator-Key`,
-            {
-              method: "POST",
-              headers: authHeaders,
-            },
-          );
-          if (genResp.ok) {
-            const genData = await genResp.json();
-            tokenToUse = genData.api_key;
-            setGeneratedKey(genData.api_key);
-            await fetchTokens();
-          }
-        } catch (e) {
-          console.error("Auto-generate token error:", e);
-        }
-      }
-
       if (!tokenToUse) {
         showToast(
-          "No integration token available. Click 'Generate Token' on the API Key Registry tab.",
+          "Generate a token first and keep the one-time secret available for this signed test.",
           "error",
         );
         setSimulatingWebhook(null);
@@ -552,19 +600,19 @@ const ProvidersView = () => {
       if (response.ok) {
         await response.json();
         showToast(
-          `Simulated ${type.toUpperCase()} Ingestion Event Succeeded!`,
+          `Signed ${type.toUpperCase()} test event accepted by Aurelinx.`,
           "success",
         );
       } else {
         const errData = await response.json();
         showToast(
-          `Simulation failed: ${errData.detail || errData.message || "check parameters"}`,
+          `Signed test failed: ${errData.detail || errData.message || "check parameters"}`,
           "error",
         );
       }
     } catch (err) {
       console.error(err);
-      showToast("Simulation connection failed", "error");
+      showToast("Signed test request failed", "error");
     } finally {
       setSimulatingWebhook(null);
     }
@@ -602,14 +650,22 @@ const ProvidersView = () => {
     setSelectedConnection(family);
     // Find existing config or load defaults
     const existing = linkedConnections.find((c) => c.id === family.id);
+    const existingModels =
+      Array.isArray(existing?.discoveredModels) &&
+      existing.discoveredModels.length
+        ? existing.discoveredModels
+        : family.standardModels;
     setFormData({
       authProtocol:
         family.id === "lmstudio" || family.id === "ollama" ? "None" : "API Key",
       url: existing ? existing.url : family.defaultUrl,
       token: existing ? existing.key : "",
-      selectedModel: existing ? existing.selectedModel : "Not Assigned",
+      selectedModel:
+        existing && existingModels.includes(existing.selectedModel)
+          ? existing.selectedModel
+          : "Not Assigned",
     });
-    setAvailableModels(family.standardModels);
+    setAvailableModels(existingModels);
     setPingStatus(existing ? "connected" : null);
     setPingMessage(existing ? "Configuration loaded." : "");
     setInventoryMode("list");
@@ -651,12 +707,43 @@ const ProvidersView = () => {
           ) {
             setFormData((prev) => ({ ...prev, selectedModel: data.models[0] }));
           }
+          setLinkedConnections((prev) =>
+            prev.map((c) =>
+              c.id === selectedConnection.id
+                ? { ...c, discoveredModels: data.models }
+                : c,
+            ),
+          );
+          try {
+            const savedRaw = localStorage.getItem("AURELINX_PROVIDERS_CONFIG");
+            if (savedRaw) {
+              const parsed = JSON.parse(savedRaw);
+              if (parsed[selectedConnection.id]) {
+                parsed[selectedConnection.id].discoveredModels = data.models;
+                localStorage.setItem(
+                  "AURELINX_PROVIDERS_CONFIG",
+                  JSON.stringify(parsed),
+                );
+                window.dispatchEvent(new Event("aurelinx-provider-changed"));
+              }
+            }
+          } catch {
+            /* ignore */
+          }
           showToast(
             `Discovered ${data.models.length} active models!`,
             "success",
           );
         } else {
           setAvailableModels(selectedConnection.standardModels);
+          setFormData((prev) => ({
+            ...prev,
+            selectedModel: selectedConnection.standardModels.includes(
+              prev.selectedModel,
+            )
+              ? prev.selectedModel
+              : selectedConnection.standardModels[0],
+          }));
           showToast(
             "Live discovery failed, loaded pre-defined models.",
             "info",
@@ -664,10 +751,26 @@ const ProvidersView = () => {
         }
       } else {
         setAvailableModels(selectedConnection.standardModels);
+        setFormData((prev) => ({
+          ...prev,
+          selectedModel: selectedConnection.standardModels.includes(
+            prev.selectedModel,
+          )
+            ? prev.selectedModel
+            : selectedConnection.standardModels[0],
+        }));
       }
     } catch (err) {
       console.error(err);
       setAvailableModels(selectedConnection.standardModels);
+      setFormData((prev) => ({
+        ...prev,
+        selectedModel: selectedConnection.standardModels.includes(
+          prev.selectedModel,
+        )
+          ? prev.selectedModel
+          : selectedConnection.standardModels[0],
+      }));
     } finally {
       setLoadingModels(false);
     }
@@ -684,9 +787,12 @@ const ProvidersView = () => {
       selectedConnection.id === "ollama" ||
       selectedConnection.id === "custom" ||
       formData.authProtocol === "None";
+    const isOpenRouter = selectedConnection.id === "openrouter";
     const canDiscover = isLocalOrCustom
       ? formData.url && formData.url.length > 5
-      : formData.token && formData.token.length > 5;
+      : isOpenRouter
+        ? true
+        : formData.token && formData.token.length > 5;
 
     if (canDiscover) {
       const timer = setTimeout(() => {
@@ -704,14 +810,15 @@ const ProvidersView = () => {
     setPingStatus(null);
     setPingMessage("");
 
+    const selectedModel =
+      formData.selectedModel !== "Not Assigned"
+        ? formData.selectedModel
+        : selectedConnection.standardModels[0];
     const payload = {
       provider: selectedConnection.id,
       api_key: formData.token || null,
       base_url: formData.url,
-      model:
-        formData.selectedModel !== "Not Assigned"
-          ? formData.selectedModel
-          : selectedConnection.standardModels[0],
+      model: selectedModel,
     };
 
     try {
@@ -726,12 +833,15 @@ const ProvidersView = () => {
 
       if (data.status === "healthy") {
         setPingStatus("connected");
-        setPingMessage("Connection healthy! Latency 42ms.");
+        setPingMessage(
+          `Connection healthy! Latency ${Number.isFinite(data.latency_ms) ? data.latency_ms : "—"}ms.`,
+        );
         showToast("Ping succeeded!", "success");
       } else {
+        const message = data.message || "Provider rejected the test request.";
         setPingStatus("error");
-        setPingMessage(`Ping failed: ${data.message}`);
-        showToast("Ping failed", "error");
+        setPingMessage(`Ping failed: ${message}`);
+        showToast(message, "error");
       }
     } catch (err) {
       console.error(err);
@@ -760,6 +870,9 @@ const ProvidersView = () => {
         formData.selectedModel !== "Not Assigned"
           ? formData.selectedModel
           : selectedConnection.standardModels[0],
+      discoveredModels: availableModels.length
+        ? availableModels
+        : selectedConnection.standardModels,
       isActive: true,
     };
 
@@ -786,12 +899,21 @@ const ProvidersView = () => {
         base_url: conn.url,
         endpoint: conn.url,
         selectedModel: conn.selectedModel,
+        discoveredModels:
+          Array.isArray(conn.discoveredModels) && conn.discoveredModels.length
+            ? conn.discoveredModels
+            : conn.standardModels || [],
       };
     });
     localStorage.setItem(
       "AURELINX_PROVIDERS_CONFIG",
       JSON.stringify(savedConfig),
     );
+    try {
+      window.dispatchEvent(new Event("aurelinx-provider-changed"));
+    } catch {
+      /* non-browser safe */
+    }
     showToast(`Successfully linked ${selectedConnection.name}!`, "success");
     setSelectedConnection(null);
   };
@@ -810,6 +932,11 @@ const ProvidersView = () => {
       }
       localStorage.setItem("AURELINX_PROVIDERS_CONFIG", JSON.stringify(parsed));
     }
+    try {
+      window.dispatchEvent(new Event("aurelinx-provider-changed"));
+    } catch {
+      /* non-browser safe */
+    }
     showToast("Unlinked connection", "info");
     if (selectedConnection?.id === connId) {
       setSelectedConnection(null);
@@ -822,6 +949,11 @@ const ProvidersView = () => {
       const parsed = JSON.parse(saved);
       parsed.activeProvider = connId;
       localStorage.setItem("AURELINX_PROVIDERS_CONFIG", JSON.stringify(parsed));
+      try {
+        window.dispatchEvent(new Event("aurelinx-provider-changed"));
+      } catch {
+        /* non-browser safe */
+      }
     }
 
     setLinkedConnections((prev) =>
@@ -1144,7 +1276,9 @@ const ProvidersView = () => {
 
                         <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[9px] font-mono font-bold tracking-wider uppercase shrink-0">
                           <ShieldCheck size={11} />
-                          <span>Zero-Knowledge API Key Security Active</span>
+                          <span>
+                            Provider credentials are masked in the interface
+                          </span>
                         </div>
                       </div>
 
@@ -1319,7 +1453,7 @@ const ProvidersView = () => {
                       </div>
 
                       {/* SUB-TAB NAVIGATION BAR */}
-                      <div className="flex items-center gap-2 p-2 rounded-2xl bg-[#06101e]/95 border border-cyan-500/30 shadow-[0_12px_40px_rgba(0,0,0,0.7)] backdrop-blur-2xl overflow-x-auto custom-scrollbar mb-4 shrink-0">
+                      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 items-stretch gap-2 p-2 rounded-2xl bg-[#06101e]/95 border border-cyan-500/30 shadow-[0_12px_40px_rgba(0,0,0,0.7)] backdrop-blur-2xl mb-4 shrink-0">
                         {[
                           {
                             id: "keys",
@@ -1349,9 +1483,9 @@ const ProvidersView = () => {
                             <button
                               key={st.id}
                               onClick={() => setIntegrationSubTab(st.id)}
-                              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all duration-300 whitespace-nowrap cursor-pointer ${
+                              className={`w-full min-w-0 flex flex-wrap items-center justify-center gap-2 px-2 sm:px-4 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider text-center transition-colors duration-300 cursor-pointer ${
                                 isActive
-                                  ? "bg-gradient-to-r from-cyan-500/20 via-teal-500/15 to-cyan-500/10 border border-cyan-400/40 text-cyan-300 shadow-lg shadow-cyan-950/50 scale-[1.02]"
+                                  ? "bg-gradient-to-r from-cyan-500/20 via-teal-500/15 to-cyan-500/10 border border-cyan-400/40 text-cyan-300 shadow-lg shadow-cyan-950/50"
                                   : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent"
                               }`}
                             >
@@ -1361,10 +1495,12 @@ const ProvidersView = () => {
                                   isActive ? "text-cyan-400" : "text-slate-500"
                                 }
                               />
-                              <span>{st.label}</span>
+                              <span className="min-w-0 whitespace-normal leading-tight">
+                                {st.label}
+                              </span>
                               {st.badge !== undefined && (
                                 <span
-                                  className={`ml-1 px-2 py-0.5 rounded-full text-[9px] font-mono ${
+                                  className={`shrink-0 ml-1 px-2 py-0.5 rounded-full text-[9px] font-mono ${
                                     isActive
                                       ? "bg-cyan-400/20 text-cyan-200 border border-cyan-400/30"
                                       : "bg-white/5 text-slate-400 border border-white/10"
@@ -1392,10 +1528,11 @@ const ProvidersView = () => {
                                   </div>
                                   <div>
                                     <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                                      Generate New Webhook API Key
+                                      Generate Inbound Webhook Credential
                                     </h3>
                                     <span className="text-[10px] text-slate-400 font-mono block">
-                                      B2B Middleware Credentials
+                                      For approved provider-to-Aurelinx event
+                                      delivery
                                     </span>
                                   </div>
                                 </div>
@@ -1416,32 +1553,31 @@ const ProvidersView = () => {
                                   </div>
                                   <div>
                                     <label className="block text-[9px] uppercase tracking-widest text-slate-400 mb-1.5 font-bold font-mono">
-                                      Simulator Employee Target
+                                      Event identity email (optional)
                                     </label>
-                                    <PremiumSelect
+                                    <input
+                                      type="email"
                                       value={employeeEmail}
                                       onChange={(e) =>
                                         setEmployeeEmail(e.target.value)
                                       }
+                                      placeholder="employee@your-company.com"
                                       className="w-full h-10 rounded-xl bg-slate-950/80 border border-white/10 px-3 text-xs outline-none focus:border-cyan-500/40 text-slate-200"
-                                    >
-                                      <option value={employeeEmail}>
-                                        {employeeEmail} (Active Dev)
-                                      </option>
-                                      <option value="silas.vance@aurelinx.io">
-                                        silas.vance@aurelinx.io (Seed lead)
-                                      </option>
-                                      <option value="clara.sutton@aurelinx.io">
-                                        clara.sutton@aurelinx.io (Senior dev)
-                                      </option>
-                                    </PremiumSelect>
+                                    />
+                                    <p className="mt-1.5 text-[9px] leading-relaxed text-slate-500">
+                                      Used only when the inbound event
+                                      identifies one employee. This does not
+                                      connect a provider or create a demo
+                                      employee.
+                                    </p>
                                   </div>
                                   <button
                                     type="button"
                                     onClick={handleGenerateToken}
                                     className="w-full h-10 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-900 text-xs font-black tracking-wide transition-all shadow-md shadow-cyan-950/20 cursor-pointer uppercase inline-flex items-center justify-center gap-2 active:scale-95 mt-1"
                                   >
-                                    <Plus size={14} /> Generate Ingestion Token
+                                    <Plus size={14} /> Generate Webhook
+                                    Credential
                                   </button>
                                 </div>
 
@@ -1520,10 +1656,9 @@ const ProvidersView = () => {
                                       <strong className="text-slate-200 block mb-0.5">
                                         Instant Key Revocation
                                       </strong>
-                                      Revoking a credential terminates ingestion
-                                      access across Jira, Slack, and Workday
-                                      middleware routers within 250
-                                      milliseconds.
+                                      Revoking a credential blocks the token on
+                                      the next ingestion request across Jira,
+                                      Slack, and Workday endpoints.
                                     </div>
                                   </div>
                                   <div className="flex items-start gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
@@ -1760,10 +1895,11 @@ const ProvidersView = () => {
                                     Jira Ticket &amp; Assignee sync
                                   </h4>
                                   <p className="text-[10px] text-slate-400 leading-relaxed">
-                                    Captures pull request reviews and task
-                                    activities between developers, dynamically
-                                    building ONA spring-physics link weights in
-                                    real-time.
+                                    Accepts signed Jira collaboration events
+                                    containing a reporter and assignee. A
+                                    successful event is recorded for ONA
+                                    processing; this endpoint does not pull Jira
+                                    data by itself.
                                   </p>
                                 </div>
                                 <div className="space-y-2 mt-auto">
@@ -1786,9 +1922,7 @@ const ProvidersView = () => {
                                       <Copy size={11} /> Copy URL
                                     </button>
                                     <button
-                                      onClick={() =>
-                                        handleSimulateIngest("jira")
-                                      }
+                                      onClick={() => handleTestIngest("jira")}
                                       disabled={simulatingWebhook === "jira"}
                                       className="flex-1 h-9 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
                                     >
@@ -1800,7 +1934,7 @@ const ProvidersView = () => {
                                       ) : (
                                         <Play size={11} />
                                       )}
-                                      Simulate Event
+                                      Send Signed Test Event
                                     </button>
                                   </div>
                                 </div>
@@ -1814,17 +1948,17 @@ const ProvidersView = () => {
                                       Slack Morale API
                                     </span>
                                     <span className="text-[8px] text-slate-500 font-mono">
-                                      Cox Attrition Curve
+                                      Sentiment Trend Analytics
                                     </span>
                                   </div>
                                   <h4 className="text-xs font-bold text-white mb-1.5 uppercase">
                                     Slack channel Sentiment score
                                   </h4>
                                   <p className="text-[10px] text-slate-400 leading-relaxed">
-                                    Ingests message sentiments, dynamically
-                                    shifting employee hazard ratios, survival
-                                    timelines, and risk indicators automatically
-                                    in-memory.
+                                    Accepts a signed employee sentiment event. A
+                                    successful event updates the employee
+                                    sentiment/risk fields used by tenant-scoped
+                                    workforce analytics.
                                   </p>
                                 </div>
                                 <div className="space-y-2 mt-auto">
@@ -1847,9 +1981,7 @@ const ProvidersView = () => {
                                       <Copy size={11} /> Copy URL
                                     </button>
                                     <button
-                                      onClick={() =>
-                                        handleSimulateIngest("slack")
-                                      }
+                                      onClick={() => handleTestIngest("slack")}
                                       disabled={simulatingWebhook === "slack"}
                                       className="flex-1 h-9 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
                                     >
@@ -1861,7 +1993,7 @@ const ProvidersView = () => {
                                       ) : (
                                         <Play size={11} />
                                       )}
-                                      Simulate Event
+                                      Send Signed Test Event
                                     </button>
                                   </div>
                                 </div>
@@ -1882,10 +2014,11 @@ const ProvidersView = () => {
                                     Workday automated Directory Sync
                                   </h4>
                                   <p className="text-[10px] text-slate-400 leading-relaxed">
-                                    Connects directly to employee directories.
-                                    Promotes, hires, or updates developers and
-                                    skill matrices transactionally with zero
-                                    manual clicks.
+                                    Accepts signed hire, update, and promotion
+                                    payloads from an HRIS. It updates the
+                                    directory after the source system sends the
+                                    event; it is not an outbound Workday API
+                                    client.
                                   </p>
                                 </div>
                                 <div className="space-y-2 mt-auto">
@@ -1909,7 +2042,7 @@ const ProvidersView = () => {
                                     </button>
                                     <button
                                       onClick={() =>
-                                        handleSimulateIngest("workday")
+                                        handleTestIngest("workday")
                                       }
                                       disabled={simulatingWebhook === "workday"}
                                       className="flex-1 h-9 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold tracking-wide transition-all inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
@@ -1922,7 +2055,7 @@ const ProvidersView = () => {
                                       ) : (
                                         <Play size={11} />
                                       )}
-                                      Simulate Event
+                                      Send Signed Test Event
                                     </button>
                                   </div>
                                 </div>
@@ -2077,7 +2210,15 @@ const ProvidersView = () => {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const curlCmd = `curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\\n  -H "Content-Type: application/json" \\\n  -H "X-API-Key: ${generatedKey || "aur_your_secure_ingestion_api_token"}" \\\n  -d '{\n    "action": "sync",\n    "employee_email": "${employeeEmail}",\n    "metrics": { "sentiment_score": 0.85, "message_count": 142 }\n  }'`;
+                                    const curlCmd = `$ API_KEY="${generatedKey || "aur_your_secure_ingestion_api_token"}"
+$ BODY='{"action":"sync","employee_email":"${employeeEmail}"}'
+$ SIGNATURE=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$API_KEY" | awk '{print $2}')
+$ curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: $API_KEY" \\
+  -H "X-Signature: sha256=$SIGNATURE" \\
+  -H "Idempotency-Key: evt_$(date +%s)" \\
+  -d "$BODY"`;
                                     navigator.clipboard.writeText(curlCmd);
                                     showToast(
                                       "cURL command copied!",
@@ -2090,10 +2231,15 @@ const ProvidersView = () => {
                                 </button>
                               </div>
                               <div className="p-3.5 bg-black/60 text-emerald-400 select-all border-b border-white/5 whitespace-pre overflow-x-auto">
-                                {`$ curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\
+                                {`$ API_KEY="${generatedKey || "aur_your_secure_ingestion_api_token"}"
+$ BODY='{"action":"sync","employee_email":"${employeeEmail}"}'
+$ SIGNATURE=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$API_KEY" | awk '{print $2}')
+$ curl -X POST "${API_BASE_URL}/api/v1/integrations/jira" \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: ${generatedKey || "aur_your_secure_ingestion_api_token"}" \\
-  -d '{"action": "sync", "employee_email": "${employeeEmail}"}'`}
+  -H "X-API-Key: $API_KEY" \\
+  -H "X-Signature: sha256=$SIGNATURE" \\
+  -H "Idempotency-Key: evt_$(date +%s)" \\
+  -d "$BODY"`}
                               </div>
 
                               {/* Native JS Fetch Example */}
@@ -2104,7 +2250,19 @@ const ProvidersView = () => {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const snippet = `// Direct REST Ingestion (Standard HTTP Fetch)\nconst response = await fetch("${API_BASE_URL}/api/v1/integrations/jira", {\n  method: "POST",\n  headers: {\n    "Content-Type": "application/json",\n    "X-API-Key": "${generatedKey || "aur_your_secure_ingestion_api_token"}",\n    "Idempotency-Key": "evt_" + Date.now()\n  },\n  body: JSON.stringify({\n    action: "sync",\n    employee_email: "${employeeEmail}",\n    metrics: { sentiment_score: 0.85, message_count: 142 }\n  })\n});\nconst result = await response.json();\nconsole.log("Ingestion Status:", result);`;
+                                    const snippet = `// Direct REST Ingestion (Standard HTTP Fetch)
+const apiKey = "${generatedKey || "aur_your_secure_ingestion_api_token"}";
+const body = JSON.stringify({ action: "sync", employee_email: "${employeeEmail}", metrics: { sentiment_score: 0.85, message_count: 142 } });
+const signingKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(apiKey), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+const digest = await crypto.subtle.sign("HMAC", signingKey, new TextEncoder().encode(body));
+const signature = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+const response = await fetch("${API_BASE_URL}/api/v1/integrations/jira", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "X-API-Key": apiKey, "X-Signature": "sha256=" + signature, "Idempotency-Key": "evt_" + Date.now() },
+  body
+});
+const result = await response.json();
+console.log("Ingestion Status:", result);`;
                                     navigator.clipboard.writeText(snippet);
                                     showToast(
                                       "Fetch snippet copied!",
@@ -2118,18 +2276,20 @@ const ProvidersView = () => {
                               </div>
                               <div className="p-4 bg-slate-950/80 overflow-x-auto whitespace-pre leading-relaxed select-all text-slate-300">
                                 {`// Native REST API Integration (Zero External SDK Dependencies)
+const apiKey = "${generatedKey || "aur_your_secure_ingestion_api_token"}";
+const body = JSON.stringify({ action: "sync", employee_email: "${employeeEmail}", metrics: { sentiment_score: 0.85, message_count: 142 } });
+const signingKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(apiKey), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+const digest = await crypto.subtle.sign("HMAC", signingKey, new TextEncoder().encode(body));
+const signature = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 const response = await fetch("${API_BASE_URL}/api/v1/integrations/jira", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "X-API-Key": "${generatedKey || "aur_your_secure_ingestion_api_token"}",
+    "X-API-Key": apiKey,
+    "X-Signature": "sha256=" + signature,
     "Idempotency-Key": "evt_" + Date.now()
   },
-  body: JSON.stringify({
-    action: "sync",
-    employee_email: "${employeeEmail}",
-    metrics: { sentiment_score: 0.85, message_count: 142 }
-  })
+  body
 });
 const result = await response.json();
 console.log("Ingestion Status:", result);`}
@@ -2262,7 +2422,9 @@ console.log("Ingestion Status:", result);`}
                                 size={11}
                                 className="text-cyan-300 shrink-0"
                               />
-                              The backend stores only encrypted secret material.
+                              Provider settings are saved locally in this
+                              browser; use a trusted device and never share this
+                              browser profile.
                             </div>
                           </div>
                         ) : (

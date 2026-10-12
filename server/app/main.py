@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +17,7 @@ Main FastAPI application
 Production-grade setup with middleware, exception handling, and security
 """
 
+import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -29,6 +29,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1 import (
+    actions,
     analysis,
     auth,
     candidates,
@@ -38,6 +39,8 @@ from app.api.v1 import (
     integrations,
     intelligence,
     lean_enterprise,
+    oauth,
+    privacy,
 )
 from app.core.config import settings
 from app.core.logging_config import AurelinxException, get_logger, setup_logging
@@ -68,8 +71,13 @@ async def lifespan(app: FastAPI):
         raise
 
     try:
-        lean_enterprise.start_scheduler()
-        logger.info("Lean enterprise scheduler started")
+        if os.getenv("IN_PROCESS_SCHEDULER", "true").lower() == "true":
+            lean_enterprise.start_scheduler()
+            logger.info("Lean enterprise scheduler started")
+        else:
+            logger.info(
+                "In-process scheduler disabled; durable connector scheduler is external"
+            )
     except Exception as e:
         logger.warning(f"Could not start lean enterprise scheduler: {e}")
 
@@ -88,7 +96,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Aurelinx Intelligence API",
     description="Production-grade HR Intelligence Platform with Agentic AI",
-    version="1.0.0",
+    version=settings.VERSION,
     docs_url="/api/v1/docs",
     redoc_url="/api/v1/redoc",
     openapi_url="/api/v1/openapi.json",
@@ -207,7 +215,10 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
     # Don't expose internal error details in production
-    if settings.DEBUG:
+    is_auth_endpoint = request.url.path.startswith("/api/v1/auth/")
+    if is_auth_endpoint:
+        error_detail = "Authentication could not be completed. Please try again."
+    elif settings.DEBUG:
         error_detail = str(exc)
     else:
         error_detail = "An unexpected error occurred"
@@ -271,6 +282,9 @@ app.include_router(enterprise.router, prefix="/api/v1")
 app.include_router(lean_enterprise.router, prefix="/api/v1")
 app.include_router(intelligence.router, prefix="/api/v1")
 app.include_router(integrations.router, prefix="/api/v1")
+app.include_router(actions.router, prefix="/api/v1")
+app.include_router(oauth.router, prefix="/api/v1")
+app.include_router(privacy.router, prefix="/api/v1")
 
 
 # Proxy routes

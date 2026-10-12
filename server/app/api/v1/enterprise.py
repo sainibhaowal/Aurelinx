@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,28 +19,32 @@ Enterprise HR intelligence endpoints:
 - Integration connector registry
 """
 
-import asyncio
 import json
 from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from app.core.data_policy import filter_real_records
-from app.core.security import TokenData, get_current_user, get_tenant_id
+from app.core.security import (
+    TokenData,
+    get_current_admin_user_strict,
+    get_current_user,
+    get_tenant_id,
+)
 from app.models.database import (
     AuditLogTable,
+    ConnectorSyncJobTable,
     EmployeeTable,
+    GoldMetricSnapshotTable,
     IntegrationConnectionTable,
     InterventionOutcomeTable,
     InterventionTable,
+    QuarantineEventTable,
     get_session,
 )
 from app.schemas.schemas import (
-    AttritionDriverOut,
-    AttritionExplainOut,
     AttritionExplainResponse,
     ConnectionSyncStatusOut,
     IntegrationConnectionCreate,
@@ -52,12 +55,22 @@ from app.schemas.schemas import (
     InterventionOutcomeCreate,
     InterventionOutcomeOut,
     InterventionUpdate,
-    RiskDriverDrilldownItem,
     RiskDriverDrilldownResponse,
 )
+from app.services.connectors.factory import (
+    PROVIDER_PRESETS,
+    get_connector,
+    get_provider_preset,
+)
+from app.services.connectors.secrets import open_credentials, seal_credentials
 
 router = APIRouter(prefix="/enterprise", tags=["enterprise"])
-_SYNC_STATE: dict[str, dict] = {}
+
+
+@router.get("/connection-providers")
+async def list_connection_provider_presets():
+    """Return non-secret provider defaults used by the connection form."""
+    return {"providers": PROVIDER_PRESETS}
 
 
 def _audit(
@@ -77,6 +90,7 @@ def _audit(
     db.add(
         AuditLogTable(
             user_id=user_uuid,
+            tenant_id=current_user.tenant_id,
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
@@ -84,81 +98,6 @@ def _audit(
             ip_address="system",
         )
     )
-
-
-def _risk_components(employee: EmployeeTable) -> list[AttritionDriverOut]:
-    drivers: list[AttritionDriverOut] = []
-    sentiment = float(employee.sentiment_score or 0.5)
-    retention = float(
-        employee.retention_prob if employee.retention_prob is not None else 0.5
-    )
-
-    if sentiment < 0.45:
-        drivers.append(
-            AttritionDriverOut(
-                factor="Low morale trend",
-                contribution=round(min(1.0, (0.45 - sentiment) * 1.8), 3),
-                evidence=f"sentiment_score={sentiment:.2f} below healthy threshold 0.45",
-            )
-        )
-    if retention < 0.55:
-        drivers.append(
-            AttritionDriverOut(
-                factor="Retention probability pressure",
-                contribution=round(min(1.0, (0.55 - retention) * 1.8), 3),
-                evidence=f"retention_prob={retention:.2f} indicates elevated exit likelihood",
-            )
-        )
-    if employee.is_at_risk:
-        drivers.append(
-            AttritionDriverOut(
-                factor="Rule-based risk flag",
-                contribution=0.26,
-                evidence="is_at_risk flag set by workforce policy or prior analysis",
-            )
-        )
-    if not drivers:
-        drivers.append(
-            AttritionDriverOut(
-                factor="No critical risk signal",
-                contribution=0.08,
-                evidence="current morale and retention indicators are within stable range",
-            )
-        )
-    drivers.sort(key=lambda d: d.contribution, reverse=True)
-    return drivers
-
-
-def _risk_probability(
-    employee: EmployeeTable, drivers: list[AttritionDriverOut]
-) -> float:
-    sentiment = float(employee.sentiment_score or 0.5)
-    retention = float(
-        employee.retention_prob if employee.retention_prob is not None else 0.5
-    )
-    base = 0.12
-    base += max(0.0, (0.55 - sentiment) * 0.9)
-    base += max(0.0, (0.60 - retention) * 0.8)
-    if employee.is_at_risk:
-        base += 0.2
-    base += min(0.18, sum(d.contribution for d in drivers[:2]) * 0.35)
-    return round(max(0.01, min(0.99, base)), 3)
-
-
-def _recommended_actions(employee: EmployeeTable, risk_probability: float) -> list[str]:
-    actions = []
-    if risk_probability >= 0.6:
-        actions.append("Schedule manager + HRBP retention conversation within 7 days.")
-        actions.append("Run compensation and role-level market parity review.")
-    elif risk_probability >= 0.4:
-        actions.append("Initiate growth-path check-in and mobility options review.")
-    else:
-        actions.append("Maintain standard engagement cadence and monitor monthly.")
-    if employee.department:
-        actions.append(
-            f"Compare {employee.department} team baseline against org median sentiment."
-        )
-    return actions[:3]
 
 
 def _json(payload: dict) -> str:
@@ -172,46 +111,109 @@ async def explain_attrition(
     current_user: TokenData = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
-    query = select(EmployeeTable)
+    # This legacy API remains for compatibility, but it must follow the signed-in
+    # tenant and must not manufacture probabilities from profile heuristics.
+    tenant_id = current_user.tenant_id or "default"
+    query = select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
     if department:
         query = query.where(EmployeeTable.department == department)
 
     employees = filter_real_records(db.exec(query).all())
-    if not employees:
-        return AttritionExplainResponse(
-            generated_at=datetime.utcnow(),
-            model_version="attrition-v1.0-ruleboost",
-            items=[],
-        )
-
-    scored = []
-    for e in employees:
-        drivers = _risk_components(e)
-        risk = _risk_probability(e, drivers)
-        scored.append((risk, e, drivers))
-    scored.sort(key=lambda x: x[0], reverse=True)
-
-    items = []
-    for risk, e, drivers in scored[:top_n]:
-        confidence = 0.72 if e.retention_prob is None else 0.84
-        items.append(
-            AttritionExplainOut(
-                employee_id=e.id,
-                full_name=e.full_name,
-                department=e.department,
-                role=e.role,
-                risk_probability=risk,
-                confidence=confidence,
-                recommended_actions=_recommended_actions(e, risk),
-                drivers=drivers[:4],
-            )
-        )
-
     return AttritionExplainResponse(
         generated_at=datetime.utcnow(),
-        model_version="attrition-v1.0-ruleboost",
-        items=items,
+        model_version="unavailable-no-observed-outcomes",
+        status="insufficient_outcome_data",
+        message=(
+            "This tenant has no validated departure and censoring history. "
+            "No individual attrition probability is available."
+        ),
+        tenant_profile_count=len(employees),
+        items=[],
     )
+
+
+@router.get("/risk-explain")
+async def explain_single_risk(
+    email: str = Query(...),
+    current_user: TokenData = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    """Single-employee risk proof: score + why + trend. Additive, tenant-scoped."""
+    from app.services.risk_explainer import explain_employee, trend_velocity
+
+    tenant_id = current_user.tenant_id or "default"
+    row = db.exec(
+        select(EmployeeTable)
+        .where(EmployeeTable.tenant_id == tenant_id)
+        .where(EmployeeTable.email == email.strip().lower())
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    explained = explain_employee(row)
+    snaps = db.exec(
+        select(GoldMetricSnapshotTable)
+        .where(GoldMetricSnapshotTable.tenant_id == tenant_id)
+        .order_by(GoldMetricSnapshotTable.created_at.desc())
+        .limit(6)
+    ).all()
+    trend = trend_velocity([{"payload": s.payload} for s in reversed(snaps)])
+    return {"tenant_id": tenant_id, "explanation": explained, "org_trend": trend}
+
+
+@router.get("/sync-health")
+async def sync_health(
+    current_user: TokenData = Depends(get_current_user),
+    tenant_id: str = Depends(get_tenant_id),
+    db: Session = Depends(get_session),
+):
+    """Aggregated sync health: connections + last jobs + quarantine. Additive read-only."""
+    connections = db.exec(
+        select(IntegrationConnectionTable).where(
+            IntegrationConnectionTable.tenant_id == tenant_id
+        )
+    ).all()
+    jobs = db.exec(
+        select(ConnectorSyncJobTable)
+        .where(ConnectorSyncJobTable.tenant_id == tenant_id)
+        .order_by(ConnectorSyncJobTable.started_at.desc())
+        .limit(10)
+    ).all()
+    qcount = len(
+        db.exec(
+            select(QuarantineEventTable).where(
+                QuarantineEventTable.tenant_id == tenant_id
+            )
+        ).all()
+    )
+    return {
+        "tenant_id": tenant_id,
+        "connections": [
+            {
+                "id": str(c.id),
+                "name": c.name,
+                "provider": c.provider,
+                "status": c.status,
+                "last_sync_status": c.last_sync_status,
+                "last_sync_summary": c.last_sync_summary,
+                "next_sync_at": c.next_sync_at.isoformat() if c.next_sync_at else None,
+            }
+            for c in connections
+        ],
+        "recent_jobs": [
+            {
+                "id": str(j.id),
+                "provider": j.provider,
+                "status": j.status,
+                "bronze": j.bronze_events,
+                "silver": j.silver_upserts,
+                "quarantined": j.quarantined,
+                "error": j.error_message,
+                "started_at": j.started_at.isoformat() if j.started_at else None,
+            }
+            for j in jobs
+        ],
+        "quarantined_total": qcount,
+    }
 
 
 @router.get("/risk-drivers/drilldown", response_model=RiskDriverDrilldownResponse)
@@ -219,46 +221,19 @@ async def risk_driver_drilldown(
     factor: str = Query(...),
     top_n: int = Query(30, ge=1, le=10000),
     current_user: TokenData = Depends(get_current_user),
-    db: Session = Depends(get_session),
 ):
-    employees = filter_real_records(db.exec(select(EmployeeTable)).all())
-    normalized = factor.strip().lower()
-    selected = []
-    for e in employees:
-        drivers = _risk_components(e)
-        risk = _risk_probability(e, drivers)
-        evidence = ""
-        include = False
-        if "morale" in normalized:
-            include = (e.sentiment_score or 0.5) < 0.45
-            evidence = f"sentiment_score={e.sentiment_score:.2f}"
-        elif "retention" in normalized:
-            include = (e.retention_prob if e.retention_prob is not None else 0.5) < 0.55
-            evidence = f"retention_prob={(e.retention_prob if e.retention_prob is not None else 0.5):.2f}"
-        elif "policy" in normalized or "flag" in normalized:
-            include = bool(e.is_at_risk)
-            evidence = f"is_at_risk={e.is_at_risk}"
-        elif "department" in normalized:
-            include = True
-            evidence = f"department={e.department}"
-        if include:
-            selected.append((risk, e, evidence))
-    selected.sort(key=lambda x: x[0], reverse=True)
-    items = [
-        RiskDriverDrilldownItem(
-            employee_id=e.id,
-            full_name=e.full_name,
-            department=e.department,
-            role=e.role,
-            sentiment_score=e.sentiment_score,
-            retention_prob=e.retention_prob,
-            risk_probability=risk,
-            evidence=evidence,
-        )
-        for risk, e, evidence in selected[:top_n]
-    ]
+    # Do not return profile heuristics as validated individual attrition risk.
+    # Keep factor/top_n accepted for old clients while the outcome-data pipeline
+    # is not available.
     return RiskDriverDrilldownResponse(
-        factor=factor, generated_at=datetime.utcnow(), items=items
+        factor=factor,
+        generated_at=datetime.utcnow(),
+        status="insufficient_outcome_data",
+        message=(
+            "Observed employee departures and censoring dates are required "
+            "before individual risk probabilities can be returned."
+        ),
+        items=[],
     )
 
 
@@ -321,7 +296,10 @@ async def create_intervention(
         target_employee_id=payload.target_employee_id,
         target_department=payload.target_department,
         priority=payload.priority,
-        status=payload.status,
+        # A connection cannot become active until a live provider verification
+        # succeeds. This prevents an unverified credential from entering the
+        # scheduler even when a client submits status=active.
+        status="draft",
         owner_name=payload.owner_name,
         due_date=payload.due_date,
         expected_impact=payload.expected_impact,
@@ -539,7 +517,7 @@ def _to_connection_out(item: IntegrationConnectionTable) -> IntegrationConnectio
         status=item.status,
         base_url=item.base_url,
         auth_type=item.auth_type,
-        encrypted_secret_ref=item.encrypted_secret_ref,
+        encrypted_secret_ref=("configured" if item.encrypted_secret_ref else None),
         sync_interval_minutes=item.sync_interval_minutes,
         next_sync_at=item.next_sync_at,
         sync_retry_count=item.sync_retry_count,
@@ -572,19 +550,34 @@ async def list_connections(
 )
 async def create_connection(
     payload: IntegrationConnectionCreate,
-    current_user: TokenData = Depends(get_current_user),
+    current_user: TokenData = Depends(get_current_admin_user_strict),
     tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
+    preset = get_provider_preset(payload.provider)
+    if not preset:
+        raise HTTPException(status_code=422, detail="Unsupported provider")
+    if preset.get("requires_tenant_url") and not payload.base_url:
+        raise HTTPException(
+            status_code=422,
+            detail="This provider requires its tenant-specific base URL",
+        )
+    credentials = payload.credentials or {}
+    if payload.options:
+        credentials = {**credentials, "__options": payload.options}
     row = IntegrationConnectionTable(
         tenant_id=tenant_id,
         name=payload.name,
-        source_type=payload.source_type,
-        provider=payload.provider,
+        source_type=payload.source_type or preset.get("source_type"),
+        provider=payload.provider.lower(),
         status=payload.status,
-        base_url=payload.base_url,
-        auth_type=payload.auth_type,
-        encrypted_secret_ref=payload.encrypted_secret_ref,
+        base_url=payload.base_url or preset.get("base_url"),
+        auth_type=payload.auth_type or preset.get("auth_type", "api_key"),
+        encrypted_secret_ref=(
+            seal_credentials(credentials)
+            if credentials
+            else payload.encrypted_secret_ref
+        ),
         sync_interval_minutes=payload.sync_interval_minutes or 60,
         next_sync_at=datetime.utcnow(),
     )
@@ -607,14 +600,22 @@ async def create_connection(
 async def update_connection(
     connection_id: UUID,
     payload: IntegrationConnectionUpdate,
-    current_user: TokenData = Depends(get_current_user),
+    current_user: TokenData = Depends(get_current_admin_user_strict),
     tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
     row = db.get(IntegrationConnectionTable, connection_id)
     if not row or row.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Connection not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    credentials = updates.pop("credentials", None)
+    options = updates.pop("options", None)
+    updates.pop("encrypted_secret_ref", None)
+    if credentials is not None:
+        if options:
+            credentials = {**credentials, "__options": options}
+        row.encrypted_secret_ref = seal_credentials(credentials)
+    for field, value in updates.items():
         setattr(row, field, value)
     row.updated_at = datetime.utcnow()
     db.add(row)
@@ -632,26 +633,87 @@ async def update_connection(
     return _to_connection_out(row)
 
 
-async def _run_sync_job(connection_id: UUID):
-    phases = [
-        ("auth", 10, "Authenticating connector"),
-        ("extract", 35, "Extracting source payload"),
-        ("normalize", 60, "Normalizing canonical records"),
-        ("quality", 82, "Running quality checks"),
-        ("upsert", 95, "Applying upserts"),
-        ("complete", 100, "Sync completed"),
-    ]
-    key = str(connection_id)
-    for phase, progress, message in phases:
-        _SYNC_STATE[key] = {
-            "connection_id": key,
-            "status": "running" if phase != "complete" else "completed",
-            "phase": phase,
-            "progress": progress,
-            "message": message,
-            "updated_at": datetime.utcnow().isoformat(),
-        }
-        await asyncio.sleep(1.0)
+def _connector_request_config(row: IntegrationConnectionTable) -> dict:
+    credentials = open_credentials(row.encrypted_secret_ref)
+    options = credentials.pop("__options", {}) if credentials else {}
+    return {"base_url": row.base_url, "credentials": credentials, "options": options}
+
+
+@router.post("/connections/{connection_id}/verify")
+async def verify_connection(
+    connection_id: UUID,
+    current_user: TokenData = Depends(get_current_admin_user_strict),
+    tenant_id: str = Depends(get_tenant_id),
+    db: Session = Depends(get_session),
+):
+    row = db.get(IntegrationConnectionTable, connection_id)
+    if not row or row.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    connector = get_connector(row.provider)
+    if connector is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"No connector adapter configured for provider {row.provider}",
+        )
+    try:
+        result = connector.verify(_connector_request_config(row))
+        row.status = "active"
+        row.last_sync_status = "verified"
+        row.last_sync_summary = "Connection verified"
+        db.add(row)
+        _audit(
+            db,
+            current_user,
+            "VERIFY_CONNECTION",
+            "integration_connection",
+            row.id,
+            {"provider": row.provider},
+        )
+        db.commit()
+        return result
+    except Exception as exc:
+        row.status = "error"
+        row.last_sync_status = "failed"
+        row.last_sync_summary = str(exc)[:240]
+        db.add(row)
+        db.commit()
+        raise HTTPException(
+            status_code=502, detail=f"Provider verification failed: {str(exc)[:240]}"
+        ) from exc
+
+
+@router.get("/connections/{connection_id}/discover")
+async def discover_connection(
+    connection_id: UUID,
+    current_user: TokenData = Depends(get_current_admin_user_strict),
+    tenant_id: str = Depends(get_tenant_id),
+    db: Session = Depends(get_session),
+):
+    row = db.get(IntegrationConnectionTable, connection_id)
+    if not row or row.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    connector = get_connector(row.provider)
+    if connector is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"No connector adapter configured for provider {row.provider}",
+        )
+    try:
+        result = connector.discover(_connector_request_config(row))
+        _audit(
+            db,
+            current_user,
+            "DISCOVER_CONNECTION_METADATA",
+            "integration_connection",
+            row.id,
+            {"provider": row.provider, "keys": list(result.keys())},
+        )
+        db.commit()
+        return result
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Provider discovery failed: {str(exc)[:240]}"
+        ) from exc
 
 
 @router.post(
@@ -659,44 +721,37 @@ async def _run_sync_job(connection_id: UUID):
 )
 async def trigger_connection_sync(
     connection_id: UUID,
-    current_user: TokenData = Depends(get_current_user),
+    current_user: TokenData = Depends(get_current_admin_user_strict),
+    tenant_id: str = Depends(get_tenant_id),
     db: Session = Depends(get_session),
 ):
     row = db.get(IntegrationConnectionTable, connection_id)
-    if not row:
+    if not row or row.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Connection not found")
-    row.status = "active"
-    row.last_sync_status = "running"
-    row.last_sync_summary = "Sync started"
-    row.last_sync_at = datetime.utcnow()
-    row.updated_at = datetime.utcnow()
-    db.add(row)
-    db.commit()
+    # Keep the legacy endpoint useful for existing clients, but execute the
+    # same real connector pipeline as the current /lean endpoint. There is no
+    # simulated progress state: the response reflects committed sync results.
+    from app.api.v1.lean_enterprise import _run_connection_sync
+
+    result = _run_connection_sync(connection_id, tenant_id, db)
     _audit(
         db,
         current_user,
         "TRIGGER_CONNECTION_SYNC",
         "integration_connection",
         row.id,
-        {"connection_id": str(connection_id)},
+        result,
     )
     db.commit()
-    key = str(connection_id)
-    _SYNC_STATE[key] = {
-        "connection_id": key,
-        "status": "running",
-        "phase": "queued",
-        "progress": 1,
-        "message": "Sync queued",
-        "updated_at": datetime.utcnow().isoformat(),
-    }
-    asyncio.create_task(_run_sync_job(connection_id))
     return ConnectionSyncStatusOut(
         connection_id=connection_id,
-        status="running",
-        phase="queued",
-        progress=1,
-        message="Sync queued",
+        status="completed",
+        phase="committed",
+        progress=100,
+        message=(
+            f"Sync committed: bronze={result['bronze_events']}, "
+            f"silver={result['silver_upserts']}, quarantined={result['quarantined']}"
+        ),
         updated_at=datetime.utcnow(),
     )
 
@@ -706,59 +761,51 @@ async def trigger_connection_sync(
 )
 async def get_sync_status(
     connection_id: UUID,
-    current_user: TokenData = Depends(get_current_user),
+    current_user: TokenData = Depends(get_current_admin_user_strict),
+    tenant_id: str = Depends(get_tenant_id),
+    db: Session = Depends(get_session),
 ):
-    key = str(connection_id)
-    state = _SYNC_STATE.get(key)
-    if not state:
-        return ConnectionSyncStatusOut(
-            connection_id=connection_id,
-            status="idle",
-            phase="idle",
-            progress=0,
-            message="No sync in progress",
-            updated_at=datetime.utcnow(),
-        )
+    row = db.get(IntegrationConnectionTable, connection_id)
+    if not row or row.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    state = row.last_sync_status or "idle"
+    status_value = "completed" if state in {"success", "verified"} else state
     return ConnectionSyncStatusOut(
         connection_id=connection_id,
-        status=state["status"],
-        phase=state["phase"],
-        progress=state["progress"],
-        message=state["message"],
-        updated_at=datetime.fromisoformat(state["updated_at"]),
+        status=status_value,
+        phase="committed" if status_value == "completed" else "provider",
+        progress=100 if status_value == "completed" else 0,
+        message=row.last_sync_summary or "No sync has completed",
+        updated_at=row.updated_at,
     )
 
 
 @router.get("/connections/{connection_id}/sync/stream")
 async def sync_status_stream(
     connection_id: UUID,
-    current_user: TokenData = Depends(get_current_user),
+    current_user: TokenData = Depends(get_current_admin_user_strict),
+    tenant_id: str = Depends(get_tenant_id),
+    db: Session = Depends(get_session),
 ):
-    key = str(connection_id)
+    row = db.get(IntegrationConnectionTable, connection_id)
+    if not row or row.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Connection not found")
 
     async def event_generator():
-        while True:
-            state = _SYNC_STATE.get(
-                key,
-                {
-                    "status": "idle",
-                    "phase": "idle",
-                    "progress": 0,
-                    "message": "No sync in progress",
-                    "updated_at": datetime.utcnow().isoformat(),
-                },
-            )
-            yield f"event: sync\ndata: {_json(state)}\n\n"
-            if state.get("status") == "completed":
-                break
-            await asyncio.sleep(1.0)
+        state = {
+            "connection_id": str(connection_id),
+            "status": (
+                "completed"
+                if row.last_sync_status == "success"
+                else (row.last_sync_status or "idle")
+            ),
+            "phase": "committed" if row.last_sync_status == "success" else "provider",
+            "progress": 100 if row.last_sync_status == "success" else 0,
+            "message": row.last_sync_summary or "No sync has completed",
+            "updated_at": row.updated_at.isoformat(),
+        }
+        yield f"event: sync\ndata: {_json(state)}\n\n"
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+    from fastapi.responses import StreamingResponse
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

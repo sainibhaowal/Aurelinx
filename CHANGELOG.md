@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.6](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.5...v0.2.6) (2026-09-10)
+
+
+### Bug Fixes
+
+* support OpenCode Zen model transports ([813fab7](https://github.com/sainibhaowal/Aurelinx/commit/813fab76ffa7bf064af82e628e3b1abd8d88729e))
+
+### [0.2.5](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.4...v0.2.5) (2026-09-10)
+
+
+### Bug Fixes
+
+* normalize saved OpenCode provider endpoints ([ff285fd](https://github.com/sainibhaowal/Aurelinx/commit/ff285fd4b4767b4eef3dbd4826b024fcd57d865f))
+
+### [0.2.4](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.3...v0.2.4) (2026-09-10)
+
+
+### Bug Fixes
+
+* route OpenCode Zen models to compatible APIs ([e29e60c](https://github.com/sainibhaowal/Aurelinx/commit/e29e60c4b8568dd727e1646b08ec5b554705c855))
+* use centralized release version in sidebar ([57cbdec](https://github.com/sainibhaowal/Aurelinx/commit/57cbdecb5a08a56f302fac3628278257f4d4217f))
+
+### [0.2.3](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.2...v0.2.3) (2026-09-10)
+
+
+### Bug Fixes
+
+* clarify integration setup and harden workflow safety ([f6ab8ea](https://github.com/sainibhaowal/Aurelinx/commit/f6ab8ea7cc8b1c90835977e5cc424b014bb8fae8))
+* satisfy release quality checks ([ec92a56](https://github.com/sainibhaowal/Aurelinx/commit/ec92a56c1f401af8d54d2cef7d7a8c4945e961f7))
+* use safe non-aggressive image cleanup ([5dbc4fb](https://github.com/sainibhaowal/Aurelinx/commit/5dbc4fb078544c7b71dbfbd681ecf75b95ec4fe4))
+
+### [0.2.2](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.1...v0.2.2) (2026-09-08)
+
+
+### Bug Fixes
+
+* correct VPS deployment shell guard ([cdb3eca](https://github.com/sainibhaowal/Aurelinx/commit/cdb3eca7e8144fcb147bba1be6c4ae8ae6a973fc))
+* make evidence migration idempotent ([d6fa25d](https://github.com/sainibhaowal/Aurelinx/commit/d6fa25df18c2252b6e72984d0fd4655cc93326b4))
+* print deployment startup diagnostics ([50989f9](https://github.com/sainibhaowal/Aurelinx/commit/50989f95d72a895059bc2fc341da771ed579b9f0))
+
+### [0.2.1](https://github.com/sainibhaowal/Aurelinx/compare/v0.2.0...v0.2.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* include integration evidence migration ([79ac76b](https://github.com/sainibhaowal/Aurelinx/commit/79ac76b8acfc6d2cbfef866585fbac9aa229a7ab))
+
+## [0.2.0](https://github.com/sainibhaowal/Aurelinx/compare/v0.1.0...v0.2.0) (2026-09-08)
+
+
+### Features
+
+* production integration harness and provenance ([e09b591](https://github.com/sainibhaowal/Aurelinx/commit/e09b591e1804d298b0fe93e75a9669761da0307c))
+
 ### [0.1.1](https://github.com/sainibhaowal/Aurelinx/compare/v0.1.0...v0.1.1) (2026-09-07)
 
 

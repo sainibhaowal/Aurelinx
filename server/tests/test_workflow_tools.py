@@ -1,4 +1,3 @@
-
 # Copyright 2026 Ravinder Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,9 +44,16 @@ from sqlmodel import Session as SQLSession
 
 from app.api.v1.chat import (
     _execute_agent_tool,
+    _execute_hr_specialist_tool,
+    _opencode_api_mode,
+    _opencode_base_url,
+    _opencode_model_id,
+    _opencode_route,
     _perform_approved_delete,
     _prepare_delete_spec,
+    _safe_provider_failure_reply,
 )
+from app.core import config as app_config
 from app.core.security import TokenData, get_current_user, get_tenant_id
 from app.main import app
 from app.models import database as db
@@ -67,6 +73,33 @@ ADMIN = TokenData(user_id=str(uuid4()), email="admin-tools@aurelinx.com", is_adm
 MEMBER = TokenData(
     user_id=str(uuid4()), email="member-tools@aurelinx.com", is_admin=False
 )
+
+
+def test_opencode_uses_the_responses_api_for_gpt_family_models():
+    assert _opencode_api_mode("gpt-5.5") == "responses"
+    assert _opencode_api_mode("opencode/gpt-5.5") == "responses"
+    assert _opencode_api_mode("grok-4.5") == "responses"
+    assert _opencode_api_mode("claude-sonnet-4-5") == "messages"
+    assert _opencode_api_mode("deepseek-v4-flash") == "chat_completions"
+    assert _opencode_route("messages") == "messages"
+    assert _opencode_model_id("minimax-m2.5-free") == "minimax-m2.5"
+    assert (
+        _opencode_base_url("https://opencode.ai/zen/v1") == "https://opencode.ai/zen/v1"
+    )
+    assert (
+        _opencode_base_url("https://opencode.ai/zen/v1/chat/completions")
+        == "https://opencode.ai/zen/v1"
+    )
+
+
+def test_provider_failure_reply_is_clear_and_never_claims_an_answer():
+    reply = _safe_provider_failure_reply({}, "HTTP 400 invalid request")
+    assert "Aurelinx" in reply
+    assert "AI Model Error" in reply
+    assert "HTTP 400 invalid request" in reply
+    assert "LM Studio, OpenAI, Claude, Groq" in reply
+    assert "completed the permitted retrieval" not in reply
+    assert "—" not in reply
 
 
 @pytest.fixture()
@@ -169,6 +202,65 @@ def test_search_groups_records_and_redacts_secrets(client_db):
         "api_key" not in row or row["api_key"] == "[redacted]"
         for row in integration_rows
     )
+
+
+def test_search_no_match_never_browses_unrelated_records(client_db):
+    _seed_employee(client_db["engine"], "old.record@aurelinx.io", "Older Record")
+
+    result = _execute_agent_tool(
+        "search",
+        {"query": "person-who-does-not-exist", "limit": 20},
+        "find person-who-does-not-exist",
+        MEMBER,
+        str(uuid4()),
+        {},
+    )
+
+    assert result["returned"] == 0
+    assert result["groups"] == []
+    assert result["browsed"] is False
+
+
+def test_employee_directory_all_query_lists_tenant_records(client_db):
+    engine = client_db["engine"]
+    _seed_employee(engine, "directory.one@aurelinx.io", "Directory One")
+    _seed_employee(engine, "directory.two@aurelinx.io", "Directory Two")
+    with SQLSession(engine) as session:
+        result = _execute_hr_specialist_tool(
+            session,
+            "employee_directory",
+            "all employees",
+            20,
+            str(uuid4()),
+            [],
+            MEMBER,
+            {},
+        )
+    assert result["returned"] == 2
+    assert {record["email"] for record in result["records"]} == {
+        "directory.one@aurelinx.io",
+        "directory.two@aurelinx.io",
+    }
+    # Totals must always ride along so the model never mistakes a page for the total.
+    assert result["total_count"] == 2
+    assert result["matched_total"] == 2
+    assert "total_count" in result["paging_note"]
+
+
+def test_agent_is_blocked_in_production_without_tenant_safe_sql(client_db, monkeypatch):
+    monkeypatch.setattr(app_config.settings, "ENVIRONMENT", "production")
+
+    result = _execute_agent_tool(
+        "search",
+        {"query": "Older Record"},
+        "find Older Record",
+        MEMBER,
+        str(uuid4()),
+        {},
+    )
+
+    assert result["blocked"] is True
+    assert result["error_code"] == "TENANT_SCOPE_REQUIRED"
 
 
 def test_read_by_email_and_redacts_file_path(client_db):
@@ -529,3 +621,22 @@ def test_observe_reports_patterns_symptoms_and_delta(client_db):
     second_observation = second["observation"]
     assert second_observation["prior_observations_seen"] == 1
     assert any("decreased" in symptom for symptom in second_observation["symptoms"])
+
+
+def test_safe_provider_failure_honest_error():
+    payload = {
+        "user_text": "tell me about sentiment in the app",
+        "session_history": [],
+        "tool_context": {"rbac_role": "admin"},
+    }
+    reply = _safe_provider_failure_reply(
+        payload, error="Connection refused on port 1234"
+    )
+    assert "AI Model Error" in reply
+    assert "Connection refused on port 1234" in reply
+    assert "LM Studio, OpenAI, Claude, Groq" in reply
+    # Must never return pre-filled canned essays
+    assert "Continuous sentiment pulse" not in reply
+    assert "Executive Dashboard" not in reply
+    # Must adhere to strict workspace rule: zero em dashes
+    assert "—" not in reply

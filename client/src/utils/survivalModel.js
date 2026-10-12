@@ -13,15 +13,13 @@
 // limitations under the License.
 
 /**
- * Cox Proportional Hazards survival engine — client mirror.
+ * Legacy fixed-coefficient survival scenario calculation.
  *
- * Pure-JS 1:1 mirror of the server model in
- * server/app/api/v1/intelligence.py (section "COX PROPORTIONAL HAZARDS
- * SURVIVAL ENGINE"). Used by the Flight Risk Mitigation Sandbox to
- * recompute hazard ratios, survival curves, CI bands and SHAP
- * waterfalls live as sliders move, with exact parity to the backend.
- *
- * IMPORTANT: constants below MUST stay in lockstep with the backend.
+ * These constants are not fitted to observed employment outcomes, and the
+ * ranges and contributions are not validated confidence intervals or SHAP
+ * values. Do not use this module to produce employee-level forecasts. The UI
+ * must keep employee forecasts disabled until it consumes a validated,
+ * server-generated survival result for the authenticated tenant.
  */
 
 export const BASELINE_HAZARD_BUCKETS = [
@@ -237,7 +235,7 @@ export function computeSurvival(
     }
   }
 
-  // SHAP waterfall (sorted by |impact|, ratios multiply to HR)
+  // Formula contribution list (not SHAP feature attribution).
   const waterfall = Object.keys(contribs).map((key) => {
     const ratio = Math.exp(contribs[key]);
     return {
@@ -268,8 +266,8 @@ export function computeSurvival(
 }
 
 /**
- * Risk tier from 12-month attrition probability (backend parity).
- * The percentile is reported separately as Risk Percentile.
+ * Legacy illustrative tier from the fixed-formula scenario value.
+ * Not a calibrated or validated employee risk classification.
  */
 export function riskTier(attr12) {
   if (attr12 < 0.05) return "Low";

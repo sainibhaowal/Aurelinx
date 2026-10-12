@@ -20,15 +20,18 @@ import Button from "./ui/Button";
 
 const TalentCard = ({ talent, onOpenProfile }) => {
   const hasOpenAction = typeof onOpenProfile === "function";
-  const riskProbability = talent.retention_prob ?? talent.match_score ?? 0;
-  const statusLabel =
-    typeof talent.is_at_risk === "boolean"
+  const isCandidate =
+    talent.match_score !== undefined || talent.application_date !== undefined;
+  const storedIndicator = isCandidate
+    ? talent.match_score
+    : talent.retention_prob;
+  const statusLabel = isCandidate
+    ? "Candidate"
+    : typeof talent.is_at_risk === "boolean"
       ? talent.is_at_risk
         ? "At-Risk"
         : "Optimal"
-      : talent.match_score != null
-        ? "Candidate"
-        : "Optimal";
+      : "Unclassified";
 
   return (
     <Card
@@ -71,7 +74,9 @@ const TalentCard = ({ talent, onOpenProfile }) => {
             </div>
 
             <Badge
-              color={talent.is_at_risk ? "danger" : "success"}
+              color={
+                isCandidate ? "info" : talent.is_at_risk ? "danger" : "success"
+              }
               variant="glow"
               className="shrink-0 text-[8px] px-2 py-0.5 tracking-wider font-extrabold uppercase"
             >
@@ -85,6 +90,22 @@ const TalentCard = ({ talent, onOpenProfile }) => {
           >
             {talent.email || "Verified profile"}
           </div>
+
+          {talent.source_providers?.length > 0 && (
+            <div
+              className="mt-2 flex flex-wrap gap-1"
+              title="Live source systems"
+            >
+              {talent.source_providers.map((source) => (
+                <span
+                  key={source}
+                  className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-cyan-200"
+                >
+                  {source}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Skill Tag Pills */}
           <div className="flex flex-wrap gap-1.5 my-2.5">
@@ -106,7 +127,7 @@ const TalentCard = ({ talent, onOpenProfile }) => {
             <div className="flex gap-3 sm:gap-5 min-w-0">
               <div className="space-y-0.5">
                 <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                  Sentiment
+                  {isCandidate ? "Candidate score" : "Stored sentiment"}
                 </p>
                 <p className="text-xs font-black text-white">
                   {talent.sentiment_score}
@@ -114,10 +135,12 @@ const TalentCard = ({ talent, onOpenProfile }) => {
               </div>
               <div className="space-y-0.5">
                 <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                  Risk Prob
+                  {isCandidate ? "Match score" : "Stored indicator"}
                 </p>
                 <p className="text-xs font-black text-white">
-                  {riskProbability ? (riskProbability * 100).toFixed(0) : "0"}%
+                  {storedIndicator == null
+                    ? "N/A"
+                    : `${(Number(storedIndicator) * 100).toFixed(0)}%`}
                 </p>
               </div>
             </div>

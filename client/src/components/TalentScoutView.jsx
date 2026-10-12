@@ -33,6 +33,7 @@ import TalentCard from "./TalentCard";
 import { UserManualButton } from "./UserManual";
 import { analysisAPI, candidatesAPI } from "../services/apiClient";
 import PremiumSelect from "./PremiumSelect";
+import { usePersistentState } from "../services/workspacePersistence";
 
 const MarkdownRenderer = ({ children }) => (
   <ReactMarkdown
@@ -119,90 +120,85 @@ const MarkdownRenderer = ({ children }) => (
   </ReactMarkdown>
 );
 
+const readLegacyScoutValue = (key, selector, fallback) => {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) || "null");
+    return selector ? (selector(parsed) ?? fallback) : (parsed ?? fallback);
+  } catch {
+    return fallback;
+  }
+};
+
 const TalentScoutView = () => {
-  const SCOUT_CACHE_KEY = "aurelinx_talent_scout_history_v1";
-  const [query, setQuery] = useState(() => {
-    if (typeof window === "undefined") return "";
-    try {
-      return (
-        JSON.parse(window.localStorage.getItem(SCOUT_CACHE_KEY) || "null")
-          ?.query || ""
-      );
-    } catch {
-      return "";
-    }
-  });
-  const [results, setResults] = useState(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      return (
-        JSON.parse(window.localStorage.getItem(SCOUT_CACHE_KEY) || "null")
-          ?.results || []
-      );
-    } catch {
-      return [];
-    }
-  });
+  const [query, setQuery] = usePersistentState("scout-query", () =>
+    readLegacyScoutValue(
+      "aurelinx_talent_scout_history_v1",
+      (value) => value?.query,
+      "",
+    ),
+  );
+  const [results, setResults] = usePersistentState("scout-results", () =>
+    readLegacyScoutValue(
+      "aurelinx_talent_scout_history_v1",
+      (value) => value?.results,
+      [],
+    ),
+  );
   const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState(() => {
-    if (typeof window === "undefined") return "";
-    try {
-      return (
-        JSON.parse(window.localStorage.getItem(SCOUT_CACHE_KEY) || "null")
-          ?.analysis || ""
-      );
-    } catch {
-      return "";
-    }
-  });
-  const [history, setHistory] = useState(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      return JSON.parse(
-        window.localStorage.getItem(`${SCOUT_CACHE_KEY}_list`) || "[]",
-      );
-    } catch {
-      return [];
-    }
-  });
-  const [selectedTalent, setSelectedTalent] = useState(null);
+  const [analysis, setAnalysis] = usePersistentState("scout-analysis", () =>
+    readLegacyScoutValue(
+      "aurelinx_talent_scout_history_v1",
+      (value) => value?.analysis,
+      "",
+    ),
+  );
+  const [history, setHistory] = usePersistentState("scout-history", () =>
+    readLegacyScoutValue("aurelinx_talent_scout_history_v1_list", null, []),
+  );
+  const [selectedTalent, setSelectedTalent] = usePersistentState(
+    "scout-selected-talent",
+    null,
+  );
   const [selectedTalentLoading, setSelectedTalentLoading] = useState(false);
-  const [departmentFilter, setDepartmentFilter] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [minMatch, setMinMatch] = useState(0);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [shortlist, setShortlist] = useState(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      return JSON.parse(
-        window.localStorage.getItem("aurelinx_scout_shortlist_v1") || "[]",
-      );
-    } catch {
-      return [];
-    }
-  });
-  const [candidateNotes, setCandidateNotes] = useState(() => {
-    if (typeof window === "undefined") return {};
-    try {
-      return JSON.parse(
-        window.localStorage.getItem("aurelinx_scout_notes_v1") || "{}",
-      );
-    } catch {
-      return {};
-    }
-  });
-  const [candidateStatus, setCandidateStatus] = useState(() => {
-    if (typeof window === "undefined") return {};
-    try {
-      return JSON.parse(
-        window.localStorage.getItem("aurelinx_scout_status_v1") || "{}",
-      );
-    } catch {
-      return {};
-    }
-  });
-  const [scoutRun, setScoutRun] = useState(null);
+  const [departmentFilter, setDepartmentFilter] = usePersistentState(
+    "scout-department-filter",
+    "",
+  );
+  const [roleFilter, setRoleFilter] = usePersistentState(
+    "scout-role-filter",
+    "",
+  );
+  const [minMatch, setMinMatch] = usePersistentState("scout-min-match", 0);
+  const [selectedIds, setSelectedIds] = usePersistentState(
+    "scout-selected-ids",
+    [],
+  );
+  const [shortlist, setShortlist] = usePersistentState("scout-shortlist", () =>
+    readLegacyScoutValue("aurelinx_scout_shortlist_v1", null, []),
+  );
+  const [candidateNotes, setCandidateNotes] = usePersistentState(
+    "scout-candidate-notes",
+    () => readLegacyScoutValue("aurelinx_scout_notes_v1", null, {}),
+  );
+  const [candidateStatus, setCandidateStatus] = usePersistentState(
+    "scout-candidate-status",
+    () => readLegacyScoutValue("aurelinx_scout_status_v1", null, {}),
+  );
+  const [scoutRun, setScoutRun] = usePersistentState("scout-run", null);
   const [scoutElapsed, setScoutElapsed] = useState(0);
+
+  useEffect(() => {
+    if (scoutRun?.status === "running" && !loading) {
+      setScoutRun({
+        ...scoutRun,
+        status: "interrupted",
+        duration: scoutRun.startedAt
+          ? Date.now() - scoutRun.startedAt
+          : scoutRun.duration,
+      });
+    }
+  }, [loading, scoutRun]);
 
   useEffect(() => {
     if (!loading || !scoutRun?.startedAt) return undefined;
@@ -270,28 +266,16 @@ const TalentScoutView = () => {
         analysis: data.analysis || "",
         savedAt: Date.now(),
       };
-      localStorage.setItem(SCOUT_CACHE_KEY, JSON.stringify(saved));
       setHistory((previous) => {
         const next = [
           saved,
           ...previous.filter((item) => item.query !== query),
         ].slice(0, 10);
-        localStorage.setItem(`${SCOUT_CACHE_KEY}_list`, JSON.stringify(next));
         return next;
       });
 
       const fullText = data.analysis || "";
-      let index = 0;
-      const step = 8;
-      const interval = setInterval(() => {
-        index += step;
-        if (index >= fullText.length) {
-          setAnalysis(fullText);
-          clearInterval(interval);
-        } else {
-          setAnalysis(fullText.slice(0, index));
-        }
-      }, 15);
+      setAnalysis(fullText);
     } catch (err) {
       console.error(err);
       setScoutRun((previous) =>
@@ -355,7 +339,6 @@ const TalentScoutView = () => {
       const next = previous.some((item) => item.id === candidate.id)
         ? previous.filter((item) => item.id !== candidate.id)
         : [...previous, candidate];
-      localStorage.setItem("aurelinx_scout_shortlist_v1", JSON.stringify(next));
       return next;
     });
   };
@@ -370,12 +353,10 @@ const TalentScoutView = () => {
   const saveCandidateNote = (candidateId, value) => {
     const next = { ...candidateNotes, [candidateId]: value };
     setCandidateNotes(next);
-    localStorage.setItem("aurelinx_scout_notes_v1", JSON.stringify(next));
   };
   const saveCandidateStatus = (candidateId, value) => {
     const next = { ...candidateStatus, [candidateId]: value };
     setCandidateStatus(next);
-    localStorage.setItem("aurelinx_scout_status_v1", JSON.stringify(next));
   };
   const exportCandidates = async (format) => {
     const { generateAurelinxReport } = await import("../utils/reportGenerator");
@@ -789,7 +770,7 @@ const TalentScoutView = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-hidden"
             onClick={() => setSelectedTalent(null)}
           >
             <motion.div
@@ -797,7 +778,7 @@ const TalentScoutView = () => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.98 }}
               transition={{ duration: 0.18 }}
-              className="relative w-full max-w-3xl my-8 overflow-hidden rounded-xl border border-blue-500/40 bg-[#0b1329] p-6 md:p-8 text-slate-100 shadow-[0_0_50px_rgba(0,0,0,0.5)] shadow-blue-950/20"
+              className="relative w-full max-w-3xl max-h-[calc(100vh-2rem)] overscroll-contain overflow-y-auto rounded-xl border border-blue-500/40 bg-[#0b1329] p-6 md:p-8 text-slate-100 shadow-[0_0_50px_rgba(0,0,0,0.5)] shadow-blue-950/20"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Dossier Title */}
@@ -829,7 +810,7 @@ const TalentScoutView = () => {
                       : "CD"}
                   </div>
                   <div className="text-[9px] font-mono mt-3 tracking-widest text-slate-400 uppercase">
-                    Active Directory
+                    Candidate Pool
                   </div>
                 </div>
 
@@ -872,6 +853,17 @@ const TalentScoutView = () => {
                 </div>
               </div>
 
+              {String(selectedTalent.email || "")
+                .toLowerCase()
+                .endsWith("@public.local") && (
+                <div className="mb-5 rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[11px] leading-relaxed text-amber-100">
+                  Pseudonymous offline demo profile. The stored candidate and
+                  match scores are sample indicators, not validated hiring
+                  recommendations. Salary and hiring-stage data are not present
+                  in this bundle.
+                </div>
+              )}
+
               {/* Core Diagnostics & Salary Matrix */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 {/* Match Score Progress */}
@@ -896,14 +888,14 @@ const TalentScoutView = () => {
                     />
                   </div>
                   <div className="text-[9px] text-slate-500 mt-2 text-right">
-                    PROFILE FIT
+                    STORED MATCH SCORE · NOT A VALIDATED FIT MODEL
                   </div>
                 </div>
 
                 {/* Sentiment Vector */}
                 <div className="p-4 rounded-lg bg-slate-900/60 border border-white/5 font-mono">
                   <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-2 flex justify-between">
-                    <span>Morale Sentiment</span>
+                    <span>Stored candidate score</span>
                     <span className="text-slate-200 font-bold">
                       {selectedTalent.sentiment_score ?? "N/A"}
                     </span>
@@ -917,7 +909,7 @@ const TalentScoutView = () => {
                     />
                   </div>
                   <div className="text-[9px] text-slate-500 mt-2 text-right">
-                    METRIC: INTERVIEW_SCORE
+                    SOURCE VALUE · NOT AN EMPLOYEE MORALE MEASURE
                   </div>
                 </div>
 
@@ -942,18 +934,17 @@ const TalentScoutView = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
                   <div className="text-2xl font-bold tracking-tight text-white flex items-baseline gap-1">
-                    $
-                    {selectedTalent.salary
-                      ? selectedTalent.salary.toLocaleString()
-                      : "110,000"}
+                    {selectedTalent.salary == null
+                      ? "Not provided"
+                      : Number(selectedTalent.salary).toLocaleString()}
                     <span className="text-xs text-slate-500 font-normal">
-                      / yr expected base
+                      {selectedTalent.salary == null
+                        ? ""
+                        : " · unit not provided"}
                     </span>
                   </div>
                   <div className="px-2 py-0.5 rounded text-[10px] bg-cyan-400/10 border border-cyan-400/20 text-cyan-300 font-bold">
-                    MARKET COMPARE:{" "}
-                    {((selectedTalent.salary || 110000) / 108000).toFixed(2)}x
-                    Avg
+                    MARKET COMPARISON: UNAVAILABLE
                   </div>
                 </div>
               </div>
@@ -1005,31 +996,56 @@ const TalentScoutView = () => {
                   Chronological Experience Record
                 </div>
                 <div className="relative border-l border-white/10 pl-6 ml-3 space-y-6">
-                  {(selectedTalent.experiences || []).map((experience, idx) => (
-                    <div
-                      key={`${experience.company}-${experience.position}-${idx}`}
-                      className="relative"
-                    >
-                      {/* Glowing timeline node */}
-                      <div className="absolute -left-[32px] top-1.5 w-4 h-4 rounded-full border border-cyan-400 bg-slate-950 flex items-center justify-center">
-                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                          {experience.position}
+                  {[...(selectedTalent.experiences || [])]
+                    .sort((left, right) => {
+                      const leftDate = left.effective_start
+                        ? Date.parse(left.effective_start)
+                        : 0;
+                      const rightDate = right.effective_start
+                        ? Date.parse(right.effective_start)
+                        : 0;
+                      return leftDate - rightDate;
+                    })
+                    .map((experience, idx) => (
+                      <div
+                        key={`${experience.company}-${experience.position}-${idx}`}
+                        className="relative"
+                      >
+                        {/* Glowing timeline node */}
+                        <div className="absolute -left-[32px] top-1.5 w-4 h-4 rounded-full border border-cyan-400 bg-slate-950 flex items-center justify-center">
+                          <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                         </div>
-                        <div className="text-[11px] text-cyan-400/90 mt-0.5 font-bold">
-                          {experience.company}{" "}
-                          <span className="text-slate-500">//</span>{" "}
-                          {experience.duration_years ?? "N/A"} years tenure
+                        <div>
+                          <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                            {experience.position}
+                          </div>
+                          <div className="text-[11px] text-cyan-400/90 mt-0.5 font-bold">
+                            {experience.company}{" "}
+                            <span className="text-slate-500">//</span>{" "}
+                            {experience.duration_years ?? "N/A"} years tenure
+                          </div>
+                          <div className="mt-1 text-[10px] text-slate-500">
+                            {experience.effective_start
+                              ? new Date(
+                                  experience.effective_start,
+                                ).toLocaleDateString()
+                              : "Start date not provided"}
+                            {" — "}
+                            {experience.is_current
+                              ? "Current"
+                              : experience.effective_end
+                                ? new Date(
+                                    experience.effective_end,
+                                  ).toLocaleDateString()
+                                : "End date not provided"}
+                          </div>
+                          <p className="text-[11px] text-slate-400 leading-relaxed mt-2 p-2 rounded bg-slate-900/30 border border-white/5">
+                            {experience.description ||
+                              "No duties specification recorded."}
+                          </p>
                         </div>
-                        <p className="text-[11px] text-slate-400 leading-relaxed mt-2 p-2 rounded bg-slate-900/30 border border-white/5">
-                          {experience.description ||
-                            "No duties specification recorded."}
-                        </p>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                   {(!selectedTalent.experiences ||
                     selectedTalent.experiences.length === 0) && (
                     <div className="text-xs text-slate-500 italic">

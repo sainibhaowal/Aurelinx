@@ -89,7 +89,9 @@ API docs: http://localhost:5000/docs
 ## Background workers
 
 - **`worker`** — Redis RQ worker executing queued tasks (`worker/tasks.py`).
-- **`scheduler`** — lean periodic scheduler for recurring jobs.
+- **`scheduler`** — durable Redis/RQ scheduler for recurring connector syncs and
+  webhook retries. In production, the API's in-process scheduler is disabled
+  so multiple API replicas cannot duplicate scheduled work.
 - Both are separate containers sharing the backend image (see [`infra/README.md`](../infra/README.md)).
 
 ---
@@ -126,3 +128,6 @@ The backend is built via `infra/backend.Dockerfile` and published to **GHCR** as
 - Frontend: [`client/`](../client/README.md)
 - Desktop shell: [`desktop/`](../desktop/README.md)
 - Infrastructure: [`infra/`](../infra/README.md)
+# Production agent and provider actions
+
+The agent runtime uses native function schemas where supported and a bounded compatibility protocol otherwise. Provider writes are approval-bound through `/api/v1/actions`; see `../docs/security/action-governance.md` and `../docs/integrations/provider-setup.md`.

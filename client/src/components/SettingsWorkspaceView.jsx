@@ -24,6 +24,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import ProvidersView from "./ProvidersView";
+import { UserManualButton } from "./UserManual";
 import { authAPI } from "../services/apiClient";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -149,23 +150,26 @@ const SettingsWorkspaceView = () => {
     <div className="mx-auto max-w-4xl space-y-8 pb-12">
       {/* ── Header ── */}
       <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p
-            className="text-[10px] font-bold uppercase tracking-[0.28em]"
-            style={{ color: "#6ee7b7" }}
-          >
-            Workspace Settings
-          </p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-white">
-            Profile &amp; system controls
-          </h1>
-          <p
-            className="mt-2 max-w-xl text-sm leading-6"
-            style={{ color: "rgba(148,163,184,0.65)" }}
-          >
-            Manage account access, logout, destructive data reset, and provider
-            configuration.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p
+              className="text-[10px] font-bold uppercase tracking-[0.28em]"
+              style={{ color: "#6ee7b7" }}
+            >
+              Workspace Settings
+            </p>
+            <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-white">
+              Profile &amp; system controls
+            </h1>
+            <p
+              className="mt-2 max-w-xl text-sm leading-6"
+              style={{ color: "rgba(148,163,184,0.65)" }}
+            >
+              Manage account access, logout, destructive data reset, and
+              provider configuration.
+            </p>
+          </div>
+          <UserManualButton defaultTab="settings" className="shrink-0" />
         </div>
 
         {/* Underline tabs */}

@@ -37,6 +37,7 @@ import {
   ChevronDown,
   AlertTriangle,
   Menu,
+  ShieldCheck,
 } from "lucide-react";
 import TalentCard from "./components/TalentCard";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -45,6 +46,7 @@ import AurelinxLogo from "./components/AurelinxLogo";
 import Toast from "./components/Toast";
 import AuthScreen from "./components/AuthScreen";
 import WindowControls from "./components/WindowControls";
+import { APP_VERSION } from "./config/version";
 import {
   analysisAPI,
   candidatesAPI,
@@ -70,6 +72,7 @@ const SettingsWorkspaceView = lazy(
   () => import("./components/SettingsWorkspaceView"),
 );
 const EnterpriseOpsView = lazy(() => import("./components/EnterpriseOpsView"));
+const RetentionOpsView = lazy(() => import("./components/RetentionOpsView"));
 
 const VALID_APP_TABS = [
   "dashboard",
@@ -80,8 +83,19 @@ const VALID_APP_TABS = [
   "intelligence",
   "intel-center",
   "enterprise",
+  "retention",
   "providers",
 ];
+
+const recentStartupErrors = new Map();
+const reportStartupErrorOnce = (key, error) => {
+  if (error?.name === "AbortError") return false;
+  const now = Date.now();
+  if (now - (recentStartupErrors.get(key) || 0) < 5000) return false;
+  recentStartupErrors.set(key, now);
+  console.error(`[startup:${key}]`, error);
+  return true;
+};
 
 const isAppPath = (pathname = "") =>
   pathname === "/app" ||
@@ -134,14 +148,33 @@ const App = () => {
     if (!isAppPath(window.location.pathname)) return "landing";
     return getTabFromPathname(window.location.pathname) || defaultWorkspaceTab;
   });
+  const userScope = user
+    ? `${user.tenant_id || user.workspace_id || "tenant"}:${user.id || user.user_id || user.email || "user"}`
+    : "anonymous";
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([activeTab]));
+  const [visitedTabsUserScope, setVisitedTabsUserScope] = useState(userScope);
+
+  useEffect(() => {
+    if (visitedTabsUserScope !== userScope) {
+      setVisitedTabs(new Set([activeTab]));
+      setVisitedTabsUserScope(userScope);
+      return;
+    }
+    setVisitedTabs((visited) =>
+      visited.has(activeTab) ? visited : new Set([...visited, activeTab]),
+    );
+  }, [activeTab, userScope, visitedTabsUserScope]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !isAppPath(window.location.pathname))
       return;
     if (activeTab && VALID_APP_TABS.includes(activeTab)) {
       localStorage.setItem("aurelinx_active_tab", activeTab);
-      const targetPath = getPathnameForTab(activeTab);
-      if (window.location.pathname !== targetPath) {
+      const targetPath = `${getPathnameForTab(activeTab)}${window.location.search}${window.location.hash}`;
+      if (
+        `${window.location.pathname}${window.location.search}${window.location.hash}` !==
+        targetPath
+      ) {
         window.history.pushState({ tab: activeTab }, "", targetPath);
       }
     }
@@ -196,6 +229,7 @@ const App = () => {
     open: false,
     factor: "",
     items: [],
+    message: "",
   });
 
   const navigate = (path, tab = null) => {
@@ -205,7 +239,12 @@ const App = () => {
     if (isApp && !targetTab) {
       targetTab = getTabFromPathname(path);
     }
-    const finalPath = isApp && targetTab ? getPathnameForTab(targetTab) : path;
+    const currentUrl = new URL(window.location.href);
+    const requestedUrl = new URL(path, window.location.origin);
+    const finalPath =
+      isApp && targetTab
+        ? `${getPathnameForTab(targetTab)}${requestedUrl.search || currentUrl.search}${requestedUrl.hash || currentUrl.hash}`
+        : path;
     window.history.pushState({ tab: targetTab }, "", finalPath);
     setRoute(isApp ? "app" : isAuthPath(finalPath) ? "auth" : "landing");
     if (targetTab) setActiveTab(targetTab);
@@ -256,9 +295,9 @@ const App = () => {
         return data;
       })
       .catch((err) => {
-        console.error(err);
+        const shouldReport = reportStartupErrorOnce("employees", err);
         setLoading(false);
-        if (employees.length === 0)
+        if (shouldReport && employees.length === 0)
           showToast("Failed to load dashboard data", "error");
         throw err;
       });
@@ -275,9 +314,9 @@ const App = () => {
         return data;
       })
       .catch((err) => {
-        console.error(err);
+        const shouldReport = reportStartupErrorOnce("candidates", err);
         setLoading(false);
-        if (candidates.length === 0)
+        if (shouldReport && candidates.length === 0)
           showToast("Failed to load candidate data", "error");
         throw err;
       });
@@ -301,9 +340,10 @@ const App = () => {
         return nextSnapshot;
       })
       .catch((err) => {
-        console.error(err);
+        const shouldReport = reportStartupErrorOnce("analytics", err);
         setAnalyticsLoading(false);
-        showToast("Failed to load analytics snapshot", "error");
+        if (shouldReport)
+          showToast("Failed to load analytics snapshot", "error");
         throw err;
       });
   };
@@ -311,7 +351,20 @@ const App = () => {
   const openDriverDrilldown = async (factor) => {
     try {
       const res = await enterpriseAPI.getRiskDriverDrilldown(factor, 500);
-      setDriverModal({ open: true, factor, items: res.items || [] });
+      const validated =
+        res.status === "validated" &&
+        res.validation?.holdout_evaluated === true &&
+        res.validation?.calibration_passed === true;
+      setDriverModal({
+        open: true,
+        factor,
+        items: validated ? res.items || [] : [],
+        message:
+          validated && res.items?.length
+            ? ""
+            : res.message ||
+              "Validated departure and censoring data are required before individual attrition results are available.",
+      });
     } catch (err) {
       console.error(err);
       showToast("Failed to load risk driver drilldown", "error");
@@ -367,6 +420,7 @@ const App = () => {
       riskOnly = false,
       sentimentMin = null,
       sentimentMax = null,
+      employmentStatus = null,
     } = scope;
     const loadAllRecords = async (listFn, args = []) => {
       const pageSize = 1000;
@@ -387,6 +441,7 @@ const App = () => {
             query,
             sentimentMin,
             sentimentMax,
+            employmentStatus,
           ])
         : [];
     const allCandidates =
@@ -402,7 +457,7 @@ const App = () => {
     const ratio = allEmployees.length
       ? ((atRisk / allEmployees.length) * 100).toFixed(1)
       : "0.0";
-    const summary = `Aurelinx Directory export: ${allEmployees.length} employees, ${allCandidates.length} candidates, ${atRisk} policy risk flags (${ratio}%). Filters: ${query || "none"}; tab: ${viewMode}; department: ${department || "all"}; risk-only: ${riskOnly ? "yes" : "no"}; sentiment: ${sentimentMin ?? "-"} to ${sentimentMax ?? "-"}.`;
+    const summary = `Aurelinx Directory export: ${allEmployees.length} employees, ${allCandidates.length} candidates, ${atRisk} imported risk flags (${ratio}%). Filters: ${query || "none"}; tab: ${viewMode}; department: ${department || "all"}; employment status: ${employmentStatus || "all"}; risk-only: ${riskOnly ? "yes" : "no"}; sentiment: ${sentimentMin ?? "-"} to ${sentimentMax ?? "-"}.`;
     const { generateAurelinxReport } = await import("./utils/reportGenerator");
     generateAurelinxReport(
       { employees: allEmployees, candidates: allCandidates },
@@ -699,6 +754,17 @@ const App = () => {
                 }
                 onClick={() => setActiveTab("enterprise")}
               />
+              <SidebarItem
+                icon={<ShieldCheck size={16} />}
+                label="Retention"
+                active={activeTab === "retention"}
+                collapsed={
+                  typeof window !== "undefined" && window.innerWidth < 768
+                    ? false
+                    : isSidebarCollapsed
+                }
+                onClick={() => setActiveTab("retention")}
+              />
             </nav>
 
             <div className={`px-2 pb-1`}>
@@ -719,7 +785,9 @@ const App = () => {
               className={`mt-auto pb-2 text-center select-none pointer-events-none`}
             >
               <span className="text-[10px] text-slate-500 font-mono tracking-wider">
-                {isSidebarCollapsed ? "v1.0.0" : "AURELINX v1.0.0"}
+                {isSidebarCollapsed
+                  ? `v${APP_VERSION}`
+                  : `AURELINX v${APP_VERSION}`}
               </span>
             </div>
 
@@ -746,11 +814,9 @@ const App = () => {
               >
                 <AnimatePresence mode="wait">
                   <motion.div
-                    key={activeTab}
                     variants={containerVariants}
-                    initial="hidden"
+                    initial={false}
                     animate="visible"
-                    exit="hidden"
                     className={`relative min-h-0 flex flex-col ${activeTab === "intelligence" ? "h-full" : activeTab === "intel-center" || activeTab === "enterprise" ? "h-auto lg:h-full" : "h-auto"}`}
                   >
                     {activeTab === "dashboard" && (
@@ -845,9 +911,10 @@ const App = () => {
                               The shape of your organization, at a glance.
                             </h2>
                             <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-400">
-                              Workforce and candidate totals are sourced from
-                              the authoritative records. Risk and morale are
-                              model indicators calculated from employee data.
+                              Employee and candidate totals are sourced from
+                              their separate profile records. Risk flags and
+                              morale scores are stored indicators, not validated
+                              attrition predictions.
                             </p>
                             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] uppercase tracking-[0.14em] text-slate-500">
                               <span>
@@ -873,7 +940,7 @@ const App = () => {
                           <div className="dashboard-hero-metrics">
                             <div className="dashboard-metric dashboard-metric-primary">
                               <div className="dashboard-metric-label">
-                                <Users size={14} /> Workforce
+                                <Users size={14} /> Employee records
                               </div>
                               <div className="dashboard-metric-value">
                                 {analyticsLoading
@@ -907,7 +974,7 @@ const App = () => {
                               <div className="dashboard-metric-note">
                                 {analyticsLoading
                                   ? "loading"
-                                  : `${analyticsSnapshot.atRiskPct}% of workforce`}
+                                  : `source flags · ${analyticsSnapshot.atRiskPct}% of active employees`}
                               </div>
                             </div>
                             <div className="dashboard-metric">
@@ -922,7 +989,7 @@ const App = () => {
                                     ).toFixed(2)}
                               </div>
                               <div className="dashboard-metric-note">
-                                model indicator
+                                stored profile score
                               </div>
                             </div>
                           </div>
@@ -971,6 +1038,12 @@ const App = () => {
                                 "Data Ops",
                                 "Imports, governance, and data quality.",
                                 Database,
+                              ],
+                              [
+                                "retention",
+                                "Retention",
+                                "Sync health, risk proof, approvals.",
+                                ShieldCheck,
                               ],
                             ].map(([tab, label, description, Icon]) => (
                               <button
@@ -1236,28 +1309,164 @@ const App = () => {
                         </section>
                       </>
                     )}
-                    {activeTab === "directory" && (
-                      <DirectoryView
-                        onExport={exportCurrentReport}
-                        cacheScope={
-                          user?.tenant_id ||
-                          user?.workspace_id ||
-                          user?.user_id ||
-                          "workspace"
-                        }
-                      />
-                    )}
-                    {activeTab === "analytics" && <AnalyticsView />}
-                    {activeTab === "scout" && <TalentScoutView />}
-                    {activeTab === "intelligence" && (
-                      <div className="absolute inset-0 flex min-h-0 flex-col">
-                        <IntelligenceChatView />
+                    {visitedTabs.has("directory") && (
+                      <div
+                        hidden={activeTab !== "directory"}
+                        style={{
+                          display:
+                            activeTab === "directory" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Directory" />}
+                        >
+                          <DirectoryView
+                            onExport={exportCurrentReport}
+                            isAdmin={Boolean(user?.is_admin)}
+                            cacheScope={
+                              user?.tenant_id ||
+                              user?.workspace_id ||
+                              user?.user_id ||
+                              "workspace"
+                            }
+                          />
+                        </Suspense>
                       </div>
                     )}
-                    {activeTab === "intel-center" && <IntelligenceCenterView />}
-                    {activeTab === "sentiment" && <SentimentPulseView />}
-                    {activeTab === "enterprise" && <EnterpriseOpsView />}
-                    {activeTab === "providers" && <SettingsWorkspaceView />}
+                    {visitedTabs.has("analytics") && (
+                      <div
+                        hidden={activeTab !== "analytics"}
+                        style={{
+                          display:
+                            activeTab === "analytics" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Analytics" />}
+                        >
+                          <AnalyticsView />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("scout") && (
+                      <div
+                        hidden={activeTab !== "scout"}
+                        style={{
+                          display: activeTab === "scout" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Talent Scout" />}
+                        >
+                          <TalentScoutView />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("intelligence") && (
+                      <div
+                        hidden={activeTab !== "intelligence"}
+                        style={{
+                          display:
+                            activeTab === "intelligence" ? undefined : "none",
+                        }}
+                        className="absolute inset-0 flex min-h-0 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Intelligence" />}
+                        >
+                          <IntelligenceChatView
+                            active={activeTab === "intelligence"}
+                          />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("intel-center") && (
+                      <div
+                        hidden={activeTab !== "intel-center"}
+                        style={{
+                          display:
+                            activeTab === "intel-center" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={
+                            <LoadingScreen label="Intelligence Center" />
+                          }
+                        >
+                          <IntelligenceCenterView
+                            active={activeTab === "intel-center"}
+                          />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("sentiment") && (
+                      <div
+                        hidden={activeTab !== "sentiment"}
+                        style={{
+                          display:
+                            activeTab === "sentiment" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Sentiment" />}
+                        >
+                          <SentimentPulseView />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("enterprise") && (
+                      <div
+                        hidden={activeTab !== "enterprise"}
+                        style={{
+                          display:
+                            activeTab === "enterprise" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Enterprise Ops" />}
+                        >
+                          <EnterpriseOpsView
+                            active={activeTab === "enterprise"}
+                          />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("retention") && (
+                      <div
+                        hidden={activeTab !== "retention"}
+                        style={{
+                          display:
+                            activeTab === "retention" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense
+                          fallback={<LoadingScreen label="Retention" />}
+                        >
+                          <RetentionOpsView />
+                        </Suspense>
+                      </div>
+                    )}
+                    {visitedTabs.has("providers") && (
+                      <div
+                        hidden={activeTab !== "providers"}
+                        style={{
+                          display:
+                            activeTab === "providers" ? undefined : "none",
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <Suspense fallback={<LoadingScreen label="Settings" />}>
+                          <SettingsWorkspaceView />
+                        </Suspense>
+                      </div>
+                    )}
                   </motion.div>
                 </AnimatePresence>
               </Suspense>
@@ -1273,7 +1482,12 @@ const App = () => {
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-[260] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
               onClick={() =>
-                setDriverModal({ open: false, factor: "", items: [] })
+                setDriverModal({
+                  open: false,
+                  factor: "",
+                  items: [],
+                  message: "",
+                })
               }
             >
               <motion.div
@@ -1287,10 +1501,8 @@ const App = () => {
                   {driverModal.factor} - Drilldown
                 </h3>
                 <p className="text-sm text-slate-300 mb-4">
-                  Create interventions directly from evidence-backed at-risk
-                  profiles. This records a tracked HR action; it does not change
-                  the employee record. High-priority actions require an
-                  administrator.
+                  Employee-specific attrition results appear here only when
+                  validated departure and censoring data support them.
                 </p>
                 <div className="mb-3 flex items-center justify-between text-[11px] uppercase tracking-wider text-slate-500">
                   <span>All matching records</span>
@@ -1337,7 +1549,8 @@ const App = () => {
                   ))}
                   {!driverModal.items.length && (
                     <div className="text-sm text-slate-400">
-                      No impacted employees found.
+                      {driverModal.message ||
+                        "No validated attrition results are available."}
                     </div>
                   )}
                 </div>
@@ -1349,14 +1562,14 @@ const App = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+              className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-hidden"
               onClick={() => setSelectedProfile(null)}
             >
               <motion.div
                 initial={{ opacity: 0, y: 12, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.98 }}
-                className="w-full max-w-2xl premium-card p-6 md:p-8 border border-white/15"
+                className="w-full max-w-2xl max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain premium-card p-6 md:p-8 border border-white/15"
                 onClick={(e) => e.stopPropagation()}
               >
                 <h3 className="text-2xl font-extrabold mb-2">
@@ -1365,6 +1578,15 @@ const App = () => {
                 <p className="text-slate-300 mb-6">
                   {selectedProfile.role} - {selectedProfile.department}
                 </p>
+                {String(selectedProfile.email || "")
+                  .toLowerCase()
+                  .endsWith("@public.local") && (
+                  <div className="mb-5 rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[11px] leading-relaxed text-amber-100">
+                    Pseudonymous offline demo profile. Stored sentiment, risk,
+                    retention, and candidate match values are sample indicators,
+                    not validated individual predictions or hiring decisions.
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-6">
                   <div className="rounded-lg border border-white/10 bg-white/5 p-3">
@@ -1377,32 +1599,120 @@ const App = () => {
                   </div>
                   <div className="rounded-lg border border-white/10 bg-white/5 p-3">
                     <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
-                      Retention
+                      {isCandidateRecord(selectedProfile)
+                        ? "Stored match score"
+                        : "Stored retention indicator"}
                     </div>
                     <div>
-                      {selectedProfile.retention_prob !== null &&
-                      selectedProfile.retention_prob !== undefined
-                        ? `${(Number(selectedProfile.retention_prob) * 100).toFixed(1)}%`
-                        : "N/A"}
+                      {isCandidateRecord(selectedProfile)
+                        ? selectedProfile.match_score == null
+                          ? "N/A"
+                          : `${(Number(selectedProfile.match_score) * 100).toFixed(1)}%`
+                        : selectedProfile.retention_prob == null
+                          ? "N/A"
+                          : `${(Number(selectedProfile.retention_prob) * 100).toFixed(1)}%`}
+                      {!isCandidateRecord(selectedProfile) && (
+                        <div className="mt-1 text-[10px] text-slate-500">
+                          Stored source value; not an individual forecast.
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="rounded-lg border border-white/10 bg-white/5 p-3">
                     <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
-                      Sentiment
+                      {isCandidateRecord(selectedProfile)
+                        ? "Stored candidate score"
+                        : "Stored sentiment score"}
                     </div>
                     <div>{selectedProfile.sentiment_score ?? "N/A"}</div>
                   </div>
                   <div className="rounded-lg border border-white/10 bg-white/5 p-3">
                     <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">
-                      Risk
+                      {isCandidateRecord(selectedProfile)
+                        ? "Attrition status"
+                        : "Imported risk flag"}
                     </div>
                     <div>
-                      {selectedProfile.is_at_risk
-                        ? "High Attrition Risk"
-                        : "Stable"}
+                      {isCandidateRecord(selectedProfile)
+                        ? "Not an attrition label"
+                        : selectedProfile.is_at_risk
+                          ? "Flagged at risk in source"
+                          : "Not flagged in source"}
                     </div>
                   </div>
                 </div>
+
+                {!isCandidateRecord(selectedProfile) && user?.is_admin && (
+                  <section className="mb-6 rounded-lg border border-indigo-300/15 bg-indigo-300/[0.03] p-3 text-xs">
+                    <h4 className="mb-2 font-semibold uppercase tracking-[0.16em] text-indigo-200">
+                      Employment &amp; outcome record
+                    </h4>
+                    <div className="grid grid-cols-1 gap-2 text-slate-400 sm:grid-cols-2">
+                      <span>
+                        Status:{" "}
+                        <strong className="text-slate-200">
+                          {selectedProfile.employment_status || "Not provided"}
+                        </strong>
+                      </span>
+                      <span>
+                        Departure flag:{" "}
+                        <strong className="text-slate-200">
+                          {selectedProfile.departure_event == null
+                            ? "Not provided"
+                            : selectedProfile.departure_event
+                              ? "Departed"
+                              : "Active/censored"}
+                        </strong>
+                      </span>
+                      <span>
+                        Employment start:{" "}
+                        <strong className="text-slate-200">
+                          {selectedProfile.employment_start_date
+                            ? new Date(
+                                selectedProfile.employment_start_date,
+                              ).toLocaleDateString()
+                            : "Not provided"}
+                        </strong>
+                      </span>
+                      <span>
+                        Employment end:{" "}
+                        <strong className="text-slate-200">
+                          {selectedProfile.employment_end_date
+                            ? new Date(
+                                selectedProfile.employment_end_date,
+                              ).toLocaleDateString()
+                            : "Not provided"}
+                        </strong>
+                      </span>
+                      <span>
+                        Censor date:{" "}
+                        <strong className="text-slate-200">
+                          {selectedProfile.employment_censor_date
+                            ? new Date(
+                                selectedProfile.employment_censor_date,
+                              ).toLocaleDateString()
+                            : "Not provided"}
+                        </strong>
+                      </span>
+                      <span>
+                        Duration:{" "}
+                        <strong className="text-slate-200">
+                          {selectedProfile.employment_duration_years == null
+                            ? "Not provided"
+                            : `${Number(selectedProfile.employment_duration_years).toFixed(2)} years`}
+                        </strong>
+                      </span>
+                      <span>
+                        Compensation:{" "}
+                        <strong className="text-slate-200">
+                          {selectedProfile.salary == null
+                            ? "Not provided"
+                            : `${selectedProfile.salary_currency || "Currency not specified"} ${Number(selectedProfile.salary).toLocaleString()} per ${selectedProfile.salary_period || "period not specified"}`}
+                        </strong>
+                      </span>
+                    </div>
+                  </section>
+                )}
 
                 <div className="mb-6">
                   <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">
@@ -1466,6 +1776,21 @@ const App = () => {
                           <div className="text-slate-400">
                             {experience.company || "Company unavailable"} ·{" "}
                             {experience.duration_years ?? "N/A"} years
+                          </div>
+                          <div className="mt-1 text-[10px] text-slate-500">
+                            {experience.effective_start
+                              ? new Date(
+                                  experience.effective_start,
+                                ).toLocaleDateString()
+                              : "Start date not provided"}
+                            {" — "}
+                            {experience.is_current
+                              ? "Current"
+                              : experience.effective_end
+                                ? new Date(
+                                    experience.effective_end,
+                                  ).toLocaleDateString()
+                                : "End date not provided"}
                           </div>
                           {experience.description && (
                             <div className="mt-1 text-slate-500">
