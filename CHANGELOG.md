@@ -56,6 +56,8 @@ All notable changes to this project will be documented in this file. See [standa
 
 * production integration harness and provenance ([e09b591](https://github.com/sainibhaowal/Aurelinx/commit/e09b591e1804d298b0fe93e75a9669761da0307c))
 
+### [0.1.1](https://github.com/sainibhaowal/Aurelinx/compare/v0.1.0...v0.1.1) (2026-09-07)
+
 
 ### Bug Fixes
 
