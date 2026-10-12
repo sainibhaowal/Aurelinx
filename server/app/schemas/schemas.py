@@ -364,17 +364,41 @@ class AIAnalysisRequest(BaseModel):
     prompt: str = Field(
         ..., min_length=5, max_length=1000, description="What are you looking for?"
     )
-    provider: str = Field(..., description="LLM provider: openai, claude, or groq")
+    provider: str = Field(
+        ..., description="Configured Talent Scout AI provider identifier"
+    )
     api_key: str | None = None
     base_url: str | None = None
     model: str | None = None
 
     @field_validator("provider")
     def validate_provider(cls, v):
-        allowed = ["openai", "claude", "groq", "lmstudio", "gemini", "opencode"]
-        if v.lower() not in allowed:
+        provider = v.strip().lower()
+        provider = {
+            "anthropic": "claude",
+            "google": "gemini",
+            "google-gemini": "gemini",
+        }.get(provider, provider)
+        allowed = [
+            "openai",
+            "claude",
+            "groq",
+            "lmstudio",
+            "gemini",
+            "opencode",
+            "openrouter",
+            "ollama",
+            "custom",
+            "moonshot",
+            "zai",
+            "nvidia",
+            "deepseek",
+            "mistral",
+            "cline",
+        ]
+        if provider not in allowed:
             raise ValueError(f"Provider must be one of {allowed}")
-        return v.lower()
+        return provider
 
     @field_validator("prompt")
     def validate_prompt(cls, v):

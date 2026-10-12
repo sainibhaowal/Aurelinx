@@ -330,14 +330,39 @@ const AnalyticsView = () => {
 
     let active = true;
     const controller = new AbortController();
+    let receivedLiveSnapshot = false;
     setLoading(true);
     setStreamError(null);
+
+    // Paint the authoritative point-in-time data immediately. The live SSE
+    // connection can take longer to establish through a proxy or reconnect.
+    analysisAPI
+      .getAnalyticsSnapshot()
+      .then((payload) => {
+        if (!active || receivedLiveSnapshot) return;
+        setStats({
+          depts: payload.depts || [],
+          total: Number(payload.total ?? 0),
+          atRisk: Number(payload.atRisk ?? 0),
+          atRiskPct: Number(payload.atRiskPct ?? 0),
+          avgSentiment: Number(payload.avgSentiment ?? 0),
+          riskLevel: payload.riskLevel || "LOW",
+          topRiskDepartment: payload.topRiskDepartment || null,
+          topRiskDepartmentRatio: Number(payload.topRiskDepartmentRatio ?? 0),
+          timestamp: payload.timestamp || null,
+        });
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Analytics snapshot fallback failed", error);
+      });
 
     analysisAPI
       .streamAnalytics(
         {
           analytics: (payload) => {
             if (!active) return;
+            receivedLiveSnapshot = true;
             setStats({
               depts: payload.depts || [],
               total: payload.total || 0,

@@ -27,6 +27,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api.v1 import (
     actions,
@@ -45,7 +46,7 @@ from app.api.v1 import (
 from app.core.config import settings
 from app.core.logging_config import AurelinxException, get_logger, setup_logging
 from app.core.provider_utils import build_local_provider_base_candidates
-from app.models.database import create_db_and_tables
+from app.models.database import create_db_and_tables, resolve_engine
 
 # Setup logging
 logger_setup = setup_logging(settings.LOG_LEVEL)
@@ -239,7 +240,23 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health", tags=["health"])
 async def health_check():
-    """Health check endpoint"""
+    """Report readiness only when the primary database can serve requests."""
+    try:
+        with resolve_engine().connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except Exception:
+        logger.warning("Health check failed because the database is unavailable")
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "degraded",
+                "service": "aurelinx",
+                "version": settings.VERSION,
+                "environment": settings.ENVIRONMENT,
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+
     return {
         "status": "healthy",
         "service": "aurelinx",

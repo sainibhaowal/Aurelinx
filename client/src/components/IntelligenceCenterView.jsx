@@ -24,12 +24,12 @@ import {
   Play,
   Briefcase,
   Search,
-  Plus,
   Trash2,
   RefreshCw,
   Maximize2,
   Minimize2,
   Sparkles,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Share2,
@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { UserManualButton } from "./UserManual";
 import PremiumSelect from "./PremiumSelect";
-import OnaGraph3DCanvas from "./ui/OnaGraph3DCanvas";
+import OnaNetworkMap2D from "./ui/OnaNetworkMap2D";
 import { API_BASE_URL } from "../services/apiBase";
 import {
   buildCovariates,
@@ -49,6 +49,19 @@ import {
 import { usePersistentState } from "../services/workspacePersistence";
 import AIExplanationPanel from "./AIExplanationPanel";
 
+const humanizeCompensationUnit = (value) =>
+  String(value || "recorded amount")
+    .replace(/ per annual$/i, "/year")
+    .replace(/ per monthly$/i, "/month")
+    .replace(/ per weekly$/i, "/week")
+    .replace(/ per hourly$/i, "/hour");
+
+const formatOnaDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString();
+};
+
 const MobileSplitPane = ({
   activePane,
   setActivePane,
@@ -59,6 +72,8 @@ const MobileSplitPane = ({
   leftContent,
   rightContent,
   leftWidthClass = "lg:w-[340px] xl:w-[360px]",
+  leftStyle = null,
+  leftHandle = null,
 }) => {
   const handleLeftClick = () => {
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
@@ -109,11 +124,12 @@ const MobileSplitPane = ({
       </div>
 
       {/* Side-by-Side Flex Container */}
-      <div className="flex-1 flex flex-row items-stretch gap-2 lg:gap-6 min-h-0 lg:h-full w-full relative">
+      <div className="flex-1 flex flex-row items-stretch gap-2 lg:gap-6 min-h-0 min-w-0 h-full w-full relative">
         {/* LEFT PANE */}
         <div
           onClick={handleLeftClick}
-          className={`flex flex-col min-h-0 ${leftWidthClass} ${
+          style={leftStyle}
+          className={`relative group flex flex-col min-h-0 h-full min-w-0 ${leftWidthClass} ${
             activePane === "left"
               ? "max-lg:flex-1 max-lg:w-[calc(100%-48px)] sm:max-lg:w-[calc(100%-54px)] max-lg:transition-all max-lg:duration-300"
               : "max-lg:w-11 sm:max-lg:w-12 max-lg:shrink-0 max-lg:overflow-hidden max-lg:cursor-pointer max-lg:select-none max-lg:opacity-85 max-lg:hover:opacity-100 max-lg:transition-all max-lg:duration-300"
@@ -124,9 +140,10 @@ const MobileSplitPane = ({
           >
             {leftContent}
           </div>
+          {leftHandle}
 
           {activePane !== "left" && (
-            <div className="lg:hidden h-full min-h-[380px] rounded-2xl border border-white/10 bg-slate-950/80 p-2 flex flex-col items-center justify-between hover:border-indigo-400/40 transition-all shadow-lg group">
+            <div className="lg:hidden h-full min-h-[200px] rounded-2xl border border-white/10 bg-slate-950/80 p-2 flex flex-col items-center justify-between hover:border-indigo-400/40 transition-all shadow-lg group">
               <div className="flex flex-col items-center gap-2 pt-2 text-indigo-400 group-hover:scale-110 transition-transform">
                 {leftIcon}
                 <ChevronRight
@@ -153,7 +170,7 @@ const MobileSplitPane = ({
         {/* RIGHT PANE */}
         <div
           onClick={handleRightClick}
-          className={`flex flex-col min-h-0 lg:flex-1 ${
+          className={`flex flex-col min-h-0 h-full min-w-0 lg:flex-1 ${
             activePane === "right"
               ? "max-lg:flex-1 max-lg:w-[calc(100%-48px)] sm:max-lg:w-[calc(100%-54px)] max-lg:transition-all max-lg:duration-300"
               : "max-lg:w-11 sm:max-lg:w-12 max-lg:shrink-0 max-lg:overflow-hidden max-lg:cursor-pointer max-lg:select-none max-lg:opacity-85 max-lg:hover:opacity-100 max-lg:transition-all max-lg:duration-300"
@@ -166,7 +183,7 @@ const MobileSplitPane = ({
           </div>
 
           {activePane !== "right" && (
-            <div className="lg:hidden h-full min-h-[380px] rounded-2xl border border-white/10 bg-slate-950/80 p-2 flex flex-col items-center justify-between hover:border-cyan-400/40 transition-all shadow-lg group">
+            <div className="lg:hidden h-full min-h-[200px] rounded-2xl border border-white/10 bg-slate-950/80 p-2 flex flex-col items-center justify-between hover:border-cyan-400/40 transition-all shadow-lg group">
               <div className="flex flex-col items-center gap-2 pt-2 text-cyan-400 group-hover:scale-110 transition-transform">
                 {rightIcon}
                 <ChevronLeft
@@ -339,6 +356,14 @@ const SKILL_GRAPH_LINKS = [
   { source: "CRM", target: "HubSpot", weight: 0.1 },
   { source: "Customer Success", target: "Communication", weight: 0.15 },
 ];
+const SKILL_GRAPH_UNIQUE_LINKS = Array.from(
+  new Map(
+    SKILL_GRAPH_LINKS.map((link) => [
+      JSON.stringify([link.source, link.target].sort()),
+      link,
+    ]),
+  ).values(),
+);
 
 // Share identical in-flight reads so React Strict Mode's development effect
 // replay does not send each initial intelligence request twice.
@@ -447,6 +472,20 @@ const apiCallWithProgress = async (url, body, onProgress) => {
   return results;
 };
 
+const createLocalRunIdentity = (prefix) => {
+  const generatedAt = new Date().toISOString();
+  const generatedPart = generatedAt
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
+  const nonce =
+    globalThis.crypto?.randomUUID?.().replaceAll("-", "").slice(0, 8) ||
+    Math.random().toString(16).slice(2, 10).padEnd(8, "0");
+  return {
+    scenarioId: `${prefix}-${generatedPart}-${nonce}`,
+    generatedAt,
+  };
+};
+
 const IntelligenceCenterView = ({ active = true }) => {
   const [activeSubTab, setActiveSubTab] = usePersistentState(
     "active-subtab",
@@ -479,13 +518,45 @@ const IntelligenceCenterView = ({ active = true }) => {
     "new-skill-name",
     "",
   );
-  const [newSkillLevel, setNewSkillLevel] = usePersistentState(
-    "new-skill-level",
-    3,
+  const [newSkillLevel] = usePersistentState("new-skill-level", 3);
+  // Skill-match browser: same database-backed picker as team assembly.
+  const [matchSkillQuery, setMatchSkillQuery] = useState("");
+  const [matchSkillOptions, setMatchSkillOptions] = useState([]);
+  const [matchPickerLevels, setMatchPickerLevels] = useState({});
+  const [matchCustomLevel, setMatchCustomLevel] = useState(3);
+  const [matchInputError, setMatchInputError] = useState("");
+  const fetchMatchSkillOptions = async (query = "") => {
+    try {
+      const data = await apiCall(
+        `/team-optimize/skill-suggestions?q=${encodeURIComponent(query)}&limit=200`,
+      );
+      setMatchSkillOptions(
+        Array.isArray(data?.suggestions) ? data.suggestions : [],
+      );
+    } catch {
+      // Options are optional; custom entry still works without them.
+    }
+  };
+  const matchPickerLevelFor = (name) =>
+    Number(matchPickerLevels[String(name || "").trim()] || 3);
+  const matchDemandKey = (name, level) =>
+    `${String(name || "")
+      .trim()
+      .toLocaleLowerCase()}::${Number(level)}`;
+  const matchSkillDemandKeys = matchSkillsInput.map((skill) =>
+    matchDemandKey(skill?.name, skill?.level),
+  );
+  const [skillMatchScope, setSkillMatchScope] = usePersistentState(
+    "skill-match-scope",
+    "all",
   );
   const [matchResults, setMatchResults] = usePersistentState(
     "match-results",
     [],
+  );
+  const [skillMatchMetadata, setSkillMatchMetadata] = usePersistentState(
+    "skill-match-metadata",
+    null,
   );
   const [matchingLoading, setMatchingLoading] = useState(false);
   const [skillMatchStatus, setSkillMatchStatus] = useState(() =>
@@ -496,9 +567,16 @@ const IntelligenceCenterView = ({ active = true }) => {
     message: "",
     completed: 0,
     total: 0,
+    matched: 0,
+    returned: 0,
   });
   const [activeMatchEmployeeId, setActiveMatchEmployeeId] = usePersistentState(
     "active-match-employee",
+    null,
+  );
+  // Skill-match run identity (mirrors the team assembly Generated/Scenario ID).
+  const [skillMatchRun, setSkillMatchRun] = usePersistentState(
+    "skill-match-run",
     null,
   );
 
@@ -513,22 +591,237 @@ const IntelligenceCenterView = ({ active = true }) => {
       { name: "AWS", level: 3 },
     ],
   );
+  const [teamInputsDirty, setTeamInputsDirty] = usePersistentState(
+    "team-inputs-dirty",
+    false,
+  );
+  const teamInputEditRef = useRef(teamInputsDirty);
+  const markTeamInputsDirty = () => {
+    teamInputEditRef.current = true;
+    setTeamInputsDirty(true);
+  };
+  useEffect(() => {
+    teamInputEditRef.current = teamInputsDirty;
+  }, [teamInputsDirty]);
   const [optimizedTeam, setOptimizedTeam] = usePersistentState(
     "optimized-team",
     null,
   );
+  const optimizedTeamRef = useRef(optimizedTeam);
+  useEffect(() => {
+    optimizedTeamRef.current = optimizedTeam;
+  }, [optimizedTeam]);
   const [optimizingLoading, setOptimizingLoading] = useState(false);
   const [teamOptimizeError, setTeamOptimizeError] = useState("");
-
-  // Team solver result state
-  const [, setAnnealingStep] = useState(0);
-  const [annealingHistory, setAnnealingHistory] = usePersistentState(
-    "team-search-history",
-    [],
+  const savedTeamInputs = optimizedTeam?.run_inputs;
+  const normalizeTeamTargets = (targets) =>
+    (Array.isArray(targets) ? targets : [])
+      .map((target) => ({
+        name: String(target?.name || "")
+          .trim()
+          .toLocaleLowerCase(),
+        level: Number(target?.level),
+      }))
+      .sort(
+        (left, right) =>
+          left.name.localeCompare(right.name) || left.level - right.level,
+      );
+  const teamInputsChanged = Boolean(
+    savedTeamInputs &&
+    (Number(savedTeamInputs.budget_cap) !== Number(teamBudget) ||
+      Number(savedTeamInputs.max_team_size) !== Number(teamSize) ||
+      JSON.stringify(normalizeTeamTargets(savedTeamInputs.target_skills)) !==
+        JSON.stringify(normalizeTeamTargets(teamSkillsInput))),
   );
+  const teamExactEvidenceAvailable =
+    optimizedTeam?.model_version === "team-milp-v4";
+  // Team solver result state
   const [annealingStatus, setAnnealingStatus] = useState(() =>
     optimizedTeam ? "complete" : "idle",
   ); // idle, running, complete
+  const teamSearchGenerationRef = useRef(0);
+  const teamOptimizationRunningRef = useRef(false);
+  // Feasibility + skill suggestion state (real tenant data, no fabricated ranges)
+  const [teamFeasibility, setTeamFeasibility] = useState(null);
+  const [teamFeasibilityError, setTeamFeasibilityError] = useState("");
+  const [teamSkillSuggestions, setTeamSkillSuggestions] = useState([]);
+  const [teamSkillQuery, setTeamSkillQuery] = useState("");
+  const fetchTeamFeasibility = async () => {
+    try {
+      const data = await apiCall("/team-optimize/feasibility");
+      setTeamFeasibility(data);
+      setTeamFeasibilityError("");
+    } catch (err) {
+      setTeamFeasibilityError(
+        err?.message || "Unable to load budget feasibility.",
+      );
+    }
+  };
+  const fetchTeamSkillSuggestions = async (query = "") => {
+    try {
+      const data = await apiCall(
+        `/team-optimize/skill-suggestions?q=${encodeURIComponent(query)}&limit=200`,
+      );
+      setTeamSkillSuggestions(
+        Array.isArray(data?.suggestions) ? data.suggestions : [],
+      );
+    } catch {
+      // Suggestions are optional; the form still works without them.
+    }
+  };
+  // Picker level per browsed skill (shared Add-level for custom entries).
+  const [teamPickerLevels, setTeamPickerLevels] = useState({});
+  const [teamCustomLevel, setTeamCustomLevel] = useState(3);
+  // Accordion sections for the Team Constraints column (persisted).
+  const [teamSections, setTeamSections] = usePersistentState(
+    "team-constraint-sections",
+    { budget: true, size: true, browser: true, demands: true },
+  );
+  const toggleTeamSection = (key) =>
+    setTeamSections((current) => ({ ...current, [key]: !current[key] }));
+  // Adjustable left-column width for the team builder (desktop, persisted).
+  const [teamLeftWidth, setTeamLeftWidth] = usePersistentState(
+    "team-left-width",
+    360,
+  );
+  const teamLeftWidthPx = Math.min(
+    560,
+    Math.max(300, Number(teamLeftWidth) || 360),
+  );
+  const teamResizeRef = useRef(null);
+  const startTeamResize = (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    event.preventDefault();
+    teamResizeRef.current = { startX: event.clientX, startW: teamLeftWidthPx };
+    const onMove = (moveEvent) => {
+      const drag = teamResizeRef.current;
+      if (!drag) return;
+      setTeamLeftWidth(
+        Math.min(
+          560,
+          Math.max(300, drag.startW + (moveEvent.clientX - drag.startX)),
+        ),
+      );
+    };
+    const onUp = () => {
+      teamResizeRef.current = null;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  const pickerLevelFor = (name) =>
+    Number(teamPickerLevels[String(name || "").trim()] || 3);
+  // Demand identity is (skill, level): Python L2 + Python L4 can coexist,
+  // but the exact same skill+level pair may only appear once.
+  const teamDemandKey = (name, level) =>
+    `${String(name || "")
+      .trim()
+      .toLocaleLowerCase()}::${Number(level)}`;
+  // Live duplicate/empty detection for the skill demand list (case-insensitive).
+  const teamSkillNameKeys = teamSkillsInput.map((skill) =>
+    String(skill?.name || "")
+      .trim()
+      .toLocaleLowerCase(),
+  );
+  const teamSkillDemandKeys = teamSkillsInput.map((skill) =>
+    teamDemandKey(skill?.name, skill?.level),
+  );
+  const teamEmptySkillCount = teamSkillNameKeys.filter((name) => !name).length;
+  const teamDuplicateDemands = (() => {
+    const seen = new Set();
+    const dupes = [];
+    teamSkillsInput.forEach((skill) => {
+      const key = teamDemandKey(skill?.name, skill?.level);
+      if (key.startsWith("::")) return;
+      if (seen.has(key)) {
+        const label = `${String(skill?.name || "").trim()} L${Number(skill?.level)}`;
+        if (!dupes.includes(label)) dupes.push(label);
+      } else {
+        seen.add(key);
+      }
+    });
+    return dupes;
+  })();
+  const teamDuplicateSkillNames = teamDuplicateDemands;
+  const addTeamSkill = (rawName, rawLevel = 3) => {
+    const value = String(rawName || "").trim();
+    const level = Number(rawLevel);
+    if (!value) {
+      setTeamOptimizeError("Skill names cannot be empty.");
+      return false;
+    }
+    if (!Number.isInteger(level) || level < 1 || level > 5) {
+      setTeamOptimizeError("Skill level must be a whole number from 1 to 5.");
+      return false;
+    }
+    if (
+      teamSkillsInput.some(
+        (skill) =>
+          teamDemandKey(skill?.name, skill?.level) ===
+          teamDemandKey(value, level),
+      )
+    ) {
+      setTeamOptimizeError(
+        `"${value}" at L${level} is already in your demands. The same skill can be added at different levels (e.g. Python L2 and L4), but the same skill+level pair may only appear once.`,
+      );
+      return false;
+    }
+    markTeamInputsDirty();
+    setTeamSkillsInput([...teamSkillsInput, { name: value, level }]);
+    setTeamOptimizeError("");
+    return true;
+  };
+  const removeDuplicateTeamSkills = () => {
+    const seen = new Set();
+    const deduped = [];
+    teamSkillsInput.forEach((skill) => {
+      const key = teamDemandKey(skill?.name, skill?.level);
+      if (key.startsWith("::") || seen.has(key)) return;
+      seen.add(key);
+      deduped.push(skill);
+    });
+    markTeamInputsDirty();
+    setTeamSkillsInput(deduped);
+    setTeamOptimizeError("");
+  };
+
+  // Collapsible accordion section for the Team Constraints column.
+  const renderTeamSection = (key, title, badge, alert, children) => {
+    const isOpen = teamSections[key] !== false;
+    return (
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
+        <button
+          type="button"
+          onClick={() => toggleTeamSection(key)}
+          aria-expanded={isOpen}
+          className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2.5 text-left transition hover:bg-white/[0.04]"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <ChevronDown
+              size={13}
+              className={`shrink-0 text-slate-400 transition-transform ${isOpen ? "" : "-rotate-90"}`}
+            />
+            <span className="truncate text-[10px] font-bold uppercase tracking-widest text-slate-300">
+              {title}
+            </span>
+            {alert && (
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+            )}
+          </span>
+          {badge && (
+            <span className="shrink-0 rounded-md border border-white/10 bg-slate-950/70 px-1.5 py-0.5 font-mono text-[9px] text-slate-300">
+              {badge}
+            </span>
+          )}
+        </button>
+        {isOpen && (
+          <div className="border-t border-white/5 px-3 py-3">{children}</div>
+        )}
+      </div>
+    );
+  };
 
   // 3. Attrition State
   const [attritionData, setAttritionData] = usePersistentState(
@@ -553,14 +846,19 @@ const IntelligenceCenterView = ({ active = true }) => {
   );
   const [attritionLoading, setAttritionLoading] = useState(false);
   const [attritionError, setAttritionError] = useState("");
+  // Attrition run identity (mirrors team assembly Generated/Scenario ID).
+  const [attritionRun, setAttritionRun] = usePersistentState(
+    "attrition-run",
+    null,
+  );
   const [attritionSearch, setAttritionSearch] = usePersistentState(
     "attrition-search",
     "",
   );
   const [attritionSort, setAttritionSort] = usePersistentState(
     "attrition-sort",
-    "hazard",
-  ); // hazard | name | tenure | percentile
+    "tenure",
+  ); // tenure | name | department | survival (observed records only)
   const [attritionSortDesc, setAttritionSortDesc] = usePersistentState(
     "attrition-sort-desc",
     true,
@@ -581,12 +879,17 @@ const IntelligenceCenterView = ({ active = true }) => {
   ); // skills count
   const [hoveredSurvMonth, setHoveredSurvMonth] = useState(null);
   const [hoveredHazMonth, setHoveredHazMonth] = useState(null);
-  const [hoveredAnnealIndex, setHoveredAnnealIndex] = useState(null);
+  // Cursor-following tooltip position for the cohort survival chart.
+  const [survHoverPos, setSurvHoverPos] = useState(null);
+  // Fullscreen toggle for the cohort survival chart only.
+  const [survGraphExpanded, setSurvGraphExpanded] = useState(false);
 
   // Legacy scenario calculations. These are never exposed as forecasts unless
-  // a validated, outcome-trained model is supplied by the server.
+  // a validated, outcome-trained model is supplied by the server. They run
+  // only for selections carrying model levers; descriptive roster records
+  // (no levers) always yield null instead of crashing.
   const attritionBaseline = useMemo(() => {
-    if (!selectedAttritionEmp || !populationStats) return null;
+    if (!selectedAttritionEmp?.levers || !populationStats) return null;
     return computeSurvival(
       buildCovariates(selectedAttritionEmp.levers),
       populationStats.means,
@@ -594,7 +897,7 @@ const IntelligenceCenterView = ({ active = true }) => {
   }, [selectedAttritionEmp, populationStats]);
 
   const attritionSim = useMemo(() => {
-    if (!selectedAttritionEmp || !populationStats) return null;
+    if (!selectedAttritionEmp?.levers || !populationStats) return null;
     const covs = buildCovariates(selectedAttritionEmp.levers, {
       morale: moraleSlider,
       salaryIncrease: salarySlider,
@@ -612,7 +915,7 @@ const IntelligenceCenterView = ({ active = true }) => {
   // Legacy scenario covariates. Forecasts remain hidden unless a validated
   // outcome-trained model is explicitly available from the server.
   const attritionCovs = useMemo(() => {
-    if (!selectedAttritionEmp) return null;
+    if (!selectedAttritionEmp?.levers) return null;
     return buildCovariates(selectedAttritionEmp.levers, {
       morale: moraleSlider,
       salaryIncrease: salarySlider,
@@ -642,31 +945,44 @@ const IntelligenceCenterView = ({ active = true }) => {
     selectedAttritionEmp,
   ]);
 
-  // Registry view: search + sort (never mutates server data)
+  // Registry view: observed descriptive records, never forecasts.
   const visibleAttrition = useMemo(() => {
     const q = attritionSearch.trim().toLowerCase();
     let list = attritionData;
     if (q) {
       list = attritionData.filter(
         (e) =>
-          e.full_name.toLowerCase().includes(q) ||
+          (e.full_name || "").toLowerCase().includes(q) ||
           (e.role || "").toLowerCase().includes(q) ||
           (e.department || "").toLowerCase().includes(q),
       );
     }
+    // Legacy formula sort keys fall back to observed tenure.
+    const sortKey = ["name", "tenure", "department", "survival"].includes(
+      attritionSort,
+    )
+      ? attritionSort
+      : "tenure";
     const sorted = [...list];
     const dir = attritionSortDesc ? -1 : 1;
     sorted.sort((a, b) => {
-      switch (attritionSort) {
+      switch (sortKey) {
         case "name":
-          return dir * a.full_name.localeCompare(b.full_name);
+          return dir * (a.full_name || "").localeCompare(b.full_name || "");
+        case "department":
+          return (
+            dir * (a.department || "").localeCompare(b.department || "") ||
+            dir * ((a.tenure_months || 0) - (b.tenure_months || 0))
+          );
+        case "survival":
+          return (
+            dir *
+            ((a.cohort_survival_at_tenure ?? 0) -
+              (b.cohort_survival_at_tenure ?? 0))
+          );
         case "tenure":
-          return dir * (a.tenure_months - b.tenure_months);
-        case "percentile":
-          return dir * (a.risk_percentile - b.risk_percentile);
-        case "hazard":
         default:
-          return dir * (a.hazard_ratio - b.hazard_ratio);
+          return dir * ((a.tenure_months || 0) - (b.tenure_months || 0));
       }
     });
     return sorted;
@@ -678,14 +994,13 @@ const IntelligenceCenterView = ({ active = true }) => {
   });
   const [onaLoading, setOnaLoading] = useState(false);
   const [onaError, setOnaError] = useState("");
+  const [onaWindowDays, setOnaWindowDays] = useState(90);
+  const [onaFocusSelected, setOnaFocusSelected] = useState(false);
+  const onaRequestRef = useRef(0);
   const [selectedOnaNode, setSelectedOnaNode] = usePersistentState(
     "selected-ona-node",
     null,
   );
-  const [onaColorMode, setOnaColorMode] = usePersistentState(
-    "ona-color-mode",
-    "department",
-  ); // "department" | "pagerank" | "betweenness" | "silo"
   const [onaDeptFilter, setOnaDeptFilter] = usePersistentState(
     "ona-department-filter",
     "all",
@@ -698,6 +1013,15 @@ const IntelligenceCenterView = ({ active = true }) => {
     "intelligence-readiness",
     null,
   );
+  const availableCompensationUnits = Object.keys(
+    intelligenceReadiness?.team_assembly?.compensation_units || {},
+  );
+  const teamBudgetUnitLabel =
+    availableCompensationUnits.length === 1
+      ? humanizeCompensationUnit(availableCompensationUnits[0])
+      : availableCompensationUnits.length > 1
+        ? "mixed units; normalize uploaded records"
+        : "recorded compensation amount";
 
   const topInfluencers = useMemo(() => {
     if (!onaData?.nodes?.length) return [];
@@ -728,6 +1052,9 @@ const IntelligenceCenterView = ({ active = true }) => {
             weight: l.record_count ?? l.weight,
             channel: l.channel,
             isCross: l.is_cross_dept,
+            eventTypes: l.event_types || [],
+            firstOccurredAt: l.first_occurred_at,
+            lastOccurredAt: l.last_occurred_at,
           });
       } else if (l.target === selectedOnaNode.id) {
         const sourceNode = onaData.nodes.find((n) => n.id === l.source);
@@ -737,6 +1064,9 @@ const IntelligenceCenterView = ({ active = true }) => {
             weight: l.record_count ?? l.weight,
             channel: l.channel,
             isCross: l.is_cross_dept,
+            eventTypes: l.event_types || [],
+            firstOccurredAt: l.first_occurred_at,
+            lastOccurredAt: l.last_occurred_at,
           });
       }
     });
@@ -749,6 +1079,25 @@ const IntelligenceCenterView = ({ active = true }) => {
       new Set(onaData.nodes.map((n) => n.department || "General")),
     );
   }, [onaData]);
+
+  const onaEmployeesWithoutEvents =
+    onaData?.metrics?.employees_without_qualifying_events;
+  const onaCrossDeptLinks =
+    onaData?.metrics?.cross_dept_links ??
+    (onaData?.links || []).filter((link) => link.is_cross_dept).length;
+  const onaDateRange = [
+    onaData?.metrics?.earliest_represented_record_at,
+    onaData?.metrics?.latest_represented_record_at,
+  ]
+    .filter(Boolean)
+    .map(formatOnaDate);
+  const onaEventTypeEntries = Object.entries(
+    onaData?.metrics?.event_type_breakdown || {},
+  ).sort((left, right) => right[1] - left[1]);
+  const maxOnaEventTypeCount = Math.max(
+    1,
+    ...onaEventTypeEntries.map(([, count]) => Number(count) || 0),
+  );
 
   // 5. Career Path State
   const [careerEmployees, setCareerEmployees] = usePersistentState(
@@ -775,6 +1124,9 @@ const IntelligenceCenterView = ({ active = true }) => {
     fetchAttrition();
     fetchOna();
     fetchCareerEmployees();
+    fetchTeamFeasibility();
+    fetchTeamSkillSuggestions("");
+    fetchMatchSkillOptions("");
     apiCall("/data-readiness")
       .then(setIntelligenceReadiness)
       .catch((err) =>
@@ -785,6 +1137,98 @@ const IntelligenceCenterView = ({ active = true }) => {
       );
     return undefined;
   }, [active]);
+
+  // Refresh feasibility + suggestions whenever the team builder tab is opened.
+  useEffect(() => {
+    if (!active || activeSubTab !== "team-builder") return undefined;
+    fetchTeamFeasibility();
+    fetchTeamSkillSuggestions(teamSkillQuery);
+    return undefined;
+  }, [active, activeSubTab]);
+
+  // Refresh skill options whenever the semantic search tab is opened.
+  useEffect(() => {
+    if (!active || activeSubTab !== "skill-match") return undefined;
+    fetchMatchSkillOptions(matchSkillQuery);
+    return undefined;
+  }, [active, activeSubTab]);
+
+  // Solver runs are persisted server-side as well as in the browser. Restore
+  // the latest tenant result when returning to this view so its chart survives
+  // navigation, tab switches, and browser reloads.
+  useEffect(() => {
+    if (
+      !active ||
+      activeSubTab !== "team-builder" ||
+      teamOptimizationRunningRef.current
+    ) {
+      return undefined;
+    }
+
+    const requestGeneration = teamSearchGenerationRef.current;
+    let cancelled = false;
+    apiCall("/team-optimize/latest")
+      .then((response) => {
+        if (
+          cancelled ||
+          requestGeneration !== teamSearchGenerationRef.current
+        ) {
+          return;
+        }
+        const savedResult = response?.result;
+        if (
+          !savedResult ||
+          !Array.isArray(savedResult.optimized_team) ||
+          !savedResult.metrics
+        ) {
+          return;
+        }
+        const restoredResult = {
+          ...savedResult,
+          run_inputs: savedResult.run_inputs || response?.inputs || null,
+        };
+        if (teamInputEditRef.current) {
+          if (!optimizedTeamRef.current) {
+            setOptimizedTeam(restoredResult);
+            setAnnealingStatus("complete");
+          }
+          return;
+        }
+
+        const savedInputs = restoredResult.run_inputs;
+        if (
+          savedInputs &&
+          Array.isArray(savedInputs.target_skills) &&
+          !teamInputEditRef.current
+        ) {
+          setTeamSkillsInput(savedInputs.target_skills);
+          if (Number.isFinite(Number(savedInputs.budget_cap))) {
+            setTeamBudget(Number(savedInputs.budget_cap));
+          }
+          if (Number.isFinite(Number(savedInputs.max_team_size))) {
+            setTeamSize(Number(savedInputs.max_team_size));
+          }
+        }
+
+        setOptimizedTeam(restoredResult);
+        setAnnealingStatus("complete");
+        setTeamOptimizeError("");
+      })
+      .catch((error) => {
+        if (
+          !cancelled &&
+          requestGeneration === teamSearchGenerationRef.current
+        ) {
+          setTeamOptimizeError(
+            error?.message || "Unable to restore the saved team result.",
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [active, activeSubTab]);
 
   // Sync sliders to the selected employee's recorded baseline values
   useEffect(() => {
@@ -811,12 +1255,14 @@ const IntelligenceCenterView = ({ active = true }) => {
       };
       // Never render employee risk values from an unvalidated/legacy API
       // response. A model must explicitly report holdout evaluation and
-      // acceptable calibration before the UI presents forecasts.
+      // acceptable calibration before the UI presents forecasts. The roster
+      // below is observed descriptive records only (tenure, status, cohort
+      // context) — never a forecast.
       const forecastsValidated =
         model.status === "validated" &&
         model.validation?.holdout_evaluated === true &&
         model.validation?.calibration_passed === true;
-      const employees = forecastsValidated ? data.employees || [] : [];
+      const employees = Array.isArray(data.employees) ? data.employees : [];
       const selectedEmployeeId =
         selectedAttritionEmp?.employee_id || selectedAttritionEmp?.id;
       const nextSelectedEmployee =
@@ -827,7 +1273,7 @@ const IntelligenceCenterView = ({ active = true }) => {
         employees[0] ||
         null;
       setAttritionData(employees);
-      setPopulationStats(forecastsValidated ? data.population || null : null);
+      setPopulationStats(data.population || null);
       setAttritionModel(
         forecastsValidated
           ? model
@@ -843,6 +1289,18 @@ const IntelligenceCenterView = ({ active = true }) => {
       );
       markResultUpdated("attrition");
       setSelectedAttritionEmp(nextSelectedEmployee);
+      const loadedAt = new Date().toISOString();
+      let runHash = 0;
+      const runSeed = `${loadedAt}:${model.status}:${data.survival_curve?.length || 0}`;
+      for (let i = 0; i < runSeed.length; i += 1) {
+        runHash = (runHash * 31 + runSeed.charCodeAt(i)) >>> 0;
+      }
+      setAttritionRun({
+        scenarioId: `AT-${loadedAt.slice(0, 10).replaceAll("-", "")}-${runHash.toString(16).padStart(8, "0").slice(0, 8)}`,
+        generatedAt: loadedAt,
+        modelStatus: model.status,
+        curvePoints: data.survival_curve?.length || 0,
+      });
     } catch (err) {
       setAttritionError(
         err?.message || "Unable to load attrition model status.",
@@ -852,50 +1310,38 @@ const IntelligenceCenterView = ({ active = true }) => {
     }
   }
 
-  async function fetchOna() {
+  async function fetchOna(windowDays = onaWindowDays) {
+    const requestId = ++onaRequestRef.current;
     try {
       setOnaLoading(true);
       setOnaError("");
-      const data = await apiCall("/ona?limit=120");
-      setOnaData(data);
+      const data = await apiCall(
+        `/ona?limit=500&window_days=${encodeURIComponent(windowDays)}`,
+      );
+      if (requestId !== onaRequestRef.current) return;
+      setOnaData({
+        ...data,
+        runIdentity: createLocalRunIdentity("ONA"),
+      });
       markResultUpdated("ona");
       if (data.nodes && data.nodes.length > 0) {
         const selectedNodeId = selectedOnaNode?.id;
         setSelectedOnaNode(
           data.nodes.find((node) => node.id === selectedNodeId) ||
+            data.nodes.find((node) => (node.degree || 0) > 0) ||
             data.nodes[0],
         );
+      } else {
+        setSelectedOnaNode(null);
+        setOnaFocusSelected(false);
       }
       setOnaLoading(false);
     } catch (err) {
+      if (requestId !== onaRequestRef.current) return;
       setOnaError(err?.message || "Unable to load the collaboration network.");
       setOnaLoading(false);
     }
   }
-
-  const getNodeColor = (node) => {
-    if (onaColorMode === "pagerank") {
-      const pr = node.influence_pagerank || 0;
-      if (pr > 0.75) return "#fbbf24";
-      if (pr > 0.45) return "#f59e0b";
-      if (pr > 0.25) return "#818cf8";
-      return "#6366f1";
-    }
-    if (onaColorMode === "betweenness") {
-      const bc = node.bridge_betweenness || 0;
-      if (bc > 0.6) return "#2dd4bf";
-      if (bc > 0.3) return "#06b6d4";
-      if (bc > 0.15) return "#0284c7";
-      return "#475569";
-    }
-    if (onaColorMode === "silo") {
-      const ei = node.ei_silo_index || 0;
-      if (ei > 0.3) return "#10b981"; // Strong cross-dept boundary spanner
-      if (ei >= -0.2) return "#38bdf8"; // Balanced
-      return "#f43f5e"; // Siloed in own dept
-    }
-    return node.department_color || "#10b981";
-  };
 
   async function fetchCareerEmployees() {
     try {
@@ -927,7 +1373,10 @@ const IntelligenceCenterView = ({ active = true }) => {
       setCareerPathData(null);
       const data = await apiCall(`/career-path/${empId}`);
       if (requestId !== careerRequestRef.current) return;
-      setCareerPathData(data);
+      setCareerPathData({
+        ...data,
+        runIdentity: createLocalRunIdentity("CP"),
+      });
       markResultUpdated("career");
     } catch (err) {
       if (requestId === careerRequestRef.current) {
@@ -941,13 +1390,35 @@ const IntelligenceCenterView = ({ active = true }) => {
   }
 
   // 1. Skill Match Actions
-  const addSkillMatchReq = () => {
-    if (!newSkillName.trim()) return;
-    setMatchSkillsInput([
-      ...matchSkillsInput,
-      { name: newSkillName.trim(), level: Number(newSkillLevel) },
-    ]);
+  // Demand identity is (skill, level): same skill may repeat at different
+  // levels, but the exact same skill+level pair is never stored twice.
+  const addSkillMatchReq = (rawName, rawLevel) => {
+    const value = String(rawName !== undefined ? rawName : newSkillName).trim();
+    const level = Number(rawLevel !== undefined ? rawLevel : newSkillLevel);
+    if (!value) {
+      setMatchInputError("Skill names cannot be empty.");
+      return false;
+    }
+    if (!Number.isInteger(level) || level < 1 || level > 5) {
+      setMatchInputError("Skill level must be a whole number from 1 to 5.");
+      return false;
+    }
+    if (
+      matchSkillsInput.some(
+        (skill) =>
+          matchDemandKey(skill?.name, skill?.level) ===
+          matchDemandKey(value, level),
+      )
+    ) {
+      setMatchInputError(
+        `"${value}" at L${level} is already in your requirements. The same skill can be added at different levels, but the same skill+level pair may only appear once.`,
+      );
+      return false;
+    }
+    setMatchSkillsInput([...matchSkillsInput, { name: value, level }]);
     setNewSkillName("");
+    setMatchInputError("");
+    return true;
   };
 
   const removeSkillMatchReq = (idx) => {
@@ -964,13 +1435,17 @@ const IntelligenceCenterView = ({ active = true }) => {
         message: "Connecting to the matching service…",
         completed: 0,
         total: 0,
+        matched: 0,
+        returned: 0,
       });
       setMatchResults([]);
+      setSkillMatchMetadata(null);
       setActiveMatchEmployeeId(null);
       setMobileActivePane("right");
+      let profilesEvaluated = null;
       const results = await apiCallWithProgress(
         "/skill-match/stream",
-        { target_skills: matchSkillsInput },
+        { target_skills: matchSkillsInput, scope: skillMatchScope, limit: 100 },
         (event) => {
           if (event.type === "progress" || event.type === "complete") {
             setSkillMatchProgress({
@@ -980,14 +1455,38 @@ const IntelligenceCenterView = ({ active = true }) => {
                 (event.type === "complete" ? "Results are ready." : ""),
               completed: event.completed || 0,
               total: event.total || 0,
+              matched: event.matched_profile_count || 0,
+              returned: event.returned || 0,
             });
+          }
+          if (event.type === "complete") {
+            setSkillMatchMetadata(event.semantic_search || null);
+            profilesEvaluated = event.profiles_evaluated ?? event.total ?? null;
           }
         },
       );
       setMatchResults(results);
       markResultUpdated("skill");
+      const completedAt = new Date().toISOString();
+      const runKeySeed = `${completedAt}:${JSON.stringify(matchSkillsInput)}:${skillMatchScope}:${results.length}`;
+      let runHash = 0;
+      for (let i = 0; i < runKeySeed.length; i += 1) {
+        runHash = (runHash * 31 + runKeySeed.charCodeAt(i)) >>> 0;
+      }
+      setSkillMatchRun({
+        scenarioId: `SM-${completedAt.slice(0, 10).replaceAll("-", "")}-${runHash.toString(16).padStart(8, "0").slice(0, 8)}`,
+        generatedAt: completedAt,
+        targetSkills: matchSkillsInput,
+        scope: skillMatchScope,
+        resultCount: results.length,
+        profilesEvaluated,
+      });
       if (results.length > 0) {
-        setActiveMatchEmployeeId(results[0].employee_id);
+        setActiveMatchEmployeeId(
+          results[0].profile_key ||
+            results[0].profile_id ||
+            results[0].employee_id,
+        );
       }
       setSkillMatchStatus("complete");
       setMatchingLoading(false);
@@ -1005,14 +1504,51 @@ const IntelligenceCenterView = ({ active = true }) => {
 
   // 2. Team Optimize Actions
   const triggerTeamOptimize = async () => {
-    if (teamSkillsInput.length === 0) return;
+    if (
+      !Number.isFinite(Number(teamBudget)) ||
+      Number(teamBudget) <= 0 ||
+      Number(teamBudget) > 1_000_000_000
+    ) {
+      setTeamOptimizeError(
+        "Enter a budget greater than 0 and no more than 1,000,000,000 in the uploaded compensation unit.",
+      );
+      return;
+    }
+    if (
+      !Number.isInteger(Number(teamSize)) ||
+      Number(teamSize) < 2 ||
+      Number(teamSize) > 10
+    ) {
+      setTeamOptimizeError("Team size must be a whole number from 2 to 10.");
+      return;
+    }
+    // Name the exact offenders so the user can fix them in one pass.
+    if (teamSkillsInput.length === 0) {
+      setTeamOptimizeError(
+        "Add at least one skill demand before optimizing (e.g. Python, AWS).",
+      );
+      return;
+    }
+    if (teamEmptySkillCount > 0) {
+      setTeamOptimizeError(
+        `${teamEmptySkillCount} skill demand${teamEmptySkillCount > 1 ? "s are" : " is"} empty. Remove or rename the blank row${teamEmptySkillCount > 1 ? "s" : ""} below, then re-optimize.`,
+      );
+      return;
+    }
+    if (teamDuplicateSkillNames.length > 0) {
+      const shown = teamDuplicateSkillNames.slice(0, 3).join('", "');
+      setTeamOptimizeError(
+        `Duplicate skill+level demand${teamDuplicateSkillNames.length > 1 ? "s" : ""}: "${shown}" appear${teamDuplicateSkillNames.length > 1 ? "" : "s"} more than once. The same skill may repeat at different levels (Python L2 + L4), but the same skill+level pair may only appear once. Use "Remove duplicates" below, then re-optimize.`,
+      );
+      return;
+    }
     try {
+      teamSearchGenerationRef.current += 1;
+      teamOptimizationRunningRef.current = true;
       setTeamOptimizeError("");
       setOptimizingLoading(true);
       setAnnealingStatus("running");
       setMobileActivePane("right");
-      setAnnealingStep(0);
-      setAnnealingHistory([]);
 
       const results = await apiCall("/team-optimize", "POST", {
         target_skills: teamSkillsInput,
@@ -1020,11 +1556,11 @@ const IntelligenceCenterView = ({ active = true }) => {
         max_team_size: teamSize,
       });
 
-      const history = results.optimization_history || [];
       setOptimizedTeam(results);
       markResultUpdated("team");
-      setAnnealingStep(results.total_search_nodes || 0);
-      setAnnealingHistory(history);
+      teamInputEditRef.current = false;
+      setTeamInputsDirty(false);
+      teamOptimizationRunningRef.current = false;
       setAnnealingStatus("complete");
       setOptimizingLoading(false);
     } catch (err) {
@@ -1039,32 +1575,214 @@ const IntelligenceCenterView = ({ active = true }) => {
         // Keep the original network or parsing error.
       }
       setTeamOptimizeError(message);
+      teamOptimizationRunningRef.current = false;
       setOptimizingLoading(false);
-      setAnnealingStatus("idle");
+      setAnnealingStatus(optimizedTeam ? "complete" : "idle");
     }
   };
 
   // Helper function to extract skill matching paths
   const getHighlightPathNodes = () => {
     const activeMatch = matchResults.find(
-      (r) => r.employee_id === activeMatchEmployeeId,
+      (r) =>
+        (r.profile_key || r.profile_id || r.employee_id) ===
+        activeMatchEmployeeId,
     );
     if (!activeMatch) return new Set();
 
     const nodesOnPath = new Set();
-    activeMatch.match_details.detailed_matches.forEach((det) => {
-      if (det.matched_by_skill) nodesOnPath.add(det.matched_by_skill);
-      if (det.target_skill) nodesOnPath.add(det.target_skill);
+    activeMatch.match_details.detailed_matches.forEach((detail) => {
+      (detail.graph_path || []).forEach((node) => nodesOnPath.add(node));
     });
     return nodesOnPath;
   };
 
+  const getHighlightPathEdges = () => {
+    const activeMatch = matchResults.find(
+      (r) =>
+        (r.profile_key || r.profile_id || r.employee_id) ===
+        activeMatchEmployeeId,
+    );
+    const edgesOnPath = new Set();
+    activeMatch?.match_details?.detailed_matches?.forEach((detail) => {
+      const path = detail.graph_path || [];
+      for (let index = 0; index < path.length - 1; index += 1) {
+        edgesOnPath.add([path[index], path[index + 1]].sort().join("::"));
+      }
+    });
+    return edgesOnPath;
+  };
+
   const highlightNodes = getHighlightPathNodes();
+  const highlightEdges = getHighlightPathEdges();
+
+  // Single permanent Explain dock at the bottom edge: one layout on every
+  // tab and every screen size. Each tab supplies its own props; the dock
+  // itself never reshapes.
+  // Explanation payloads stay small so small local models answer inside the
+  // server's first-text deadline: downsampled curve + capped rosters. Full
+  // data stays on screen; only the model-bound copy is trimmed.
+  const downsampleCurve = (curve, max = 48) => {
+    if (!Array.isArray(curve) || curve.length <= max) return curve;
+    const step = (curve.length - 1) / (max - 1);
+    const out = [];
+    for (let i = 0; i < max; i += 1) out.push(curve[Math.round(i * step)]);
+    return out;
+  };
+  const explainDock = (() => {
+    switch (activeSubTab) {
+      case "team-builder":
+        return {
+          subtab: "team-builder",
+          resultKey:
+            optimizedTeam?.scenario_id ||
+            `${optimizedTeam?.generated_at || "saved"}:${JSON.stringify(optimizedTeam?.run_inputs || {})}`,
+          context: {
+            runIdentity: optimizedTeam
+              ? {
+                  scenarioId: optimizedTeam.scenario_id,
+                  generatedAt: optimizedTeam.generated_at,
+                }
+              : null,
+            runInputs: optimizedTeam?.run_inputs || null,
+            optimizedTeam: optimizedTeam,
+            uploadedDataReadiness: intelligenceReadiness?.team_assembly,
+            stale: teamInputsChanged,
+            currentForm: {
+              budget_cap: teamBudget,
+              max_team_size: teamSize,
+              target_skills: teamSkillsInput,
+            },
+          },
+          buttonText:
+            teamInputsChanged && optimizedTeam && !optimizingLoading
+              ? "Explain Saved Run with AI"
+              : "Explain with AI",
+          disabled: !optimizedTeam || optimizingLoading,
+        };
+      case "attrition":
+        return {
+          subtab: "attrition",
+          // Selection is part of the key so the report always covers the
+          // person currently chosen, never a stale default.
+          resultKey: `${
+            attritionRun?.scenarioId ||
+            `attrition:${attritionModel?.status || "none"}:${survivalCurve.length}`
+          }:${selectedAttritionEmp?.employee_id || "none"}`,
+          context: {
+            model: attritionModel,
+            survivalCurve: downsampleCurve(survivalCurve),
+            survivalCurvePointCount: survivalCurve.length,
+            uploadedDataReadiness: intelligenceReadiness?.attrition,
+            runIdentity: attritionRun
+              ? {
+                  scenarioId: attritionRun.scenarioId,
+                  generatedAt: attritionRun.generatedAt,
+                  modelStatus: attritionRun.modelStatus,
+                }
+              : null,
+            rosterSize: attritionData.length,
+            selectedEmployee: selectedAttritionEmp,
+            population: populationStats,
+          },
+          buttonText: "Explain with AI",
+          disabled: !attritionModel || attritionLoading,
+        };
+      case "ona":
+        return {
+          subtab: "ona",
+          resultKey: `ona:${onaData?.runIdentity?.scenarioId || "unidentified"}:${selectedOnaNode?.id || "none"}`,
+          context: {
+            graphMetrics: onaData?.metrics || {},
+            runIdentity: onaData?.runIdentity || null,
+            windowDays: onaData?.metrics?.window_days || onaWindowDays,
+            uploadedDataReadiness: intelligenceReadiness?.ona,
+            nodeCount: onaData?.nodes?.length || 0,
+            linkCount: onaData?.links?.length || 0,
+            topInfluencers,
+            topBridgeBrokers,
+            selectedNode: selectedOnaNode,
+            selectedNodeNeighbors,
+          },
+          buttonText: "Explain with AI",
+          disabled: onaLoading || resultRevisions.ona === 0,
+        };
+      case "career-path":
+        return {
+          subtab: "career-path",
+          resultKey: `career:${careerPathData?.runIdentity?.scenarioId || selectedCareerEmpId || "none"}`,
+          context: {
+            selectedEmployeeId: selectedCareerEmpId,
+            careerPathData: careerPathData,
+            runIdentity: careerPathData?.runIdentity || null,
+            uploadedDataReadiness: intelligenceReadiness?.career_markov,
+          },
+          buttonText: "Explain with AI",
+          disabled: !careerPathData || careerLoading,
+        };
+      case "skill-match":
+      default: {
+        const allMatches = Array.isArray(matchResults) ? matchResults : [];
+        const activeKey = activeMatchEmployeeId || "none";
+        const activeRank =
+          allMatches.findIndex(
+            (r) =>
+              (r.profile_key || r.profile_id || r.employee_id) ===
+              activeMatchEmployeeId,
+          ) + 1;
+        const cappedMatches = allMatches.slice(0, 40);
+        if (
+          activeMatchEmployeeId &&
+          !cappedMatches.some(
+            (r) =>
+              (r.profile_key || r.profile_id || r.employee_id) ===
+              activeMatchEmployeeId,
+          )
+        ) {
+          const selected = allMatches.find(
+            (r) =>
+              (r.profile_key || r.profile_id || r.employee_id) ===
+              activeMatchEmployeeId,
+          );
+          if (selected) cappedMatches.push(selected);
+        }
+        return {
+          subtab: "skill-match",
+          // Selection is part of the key: switching people invalidates the
+          // old report so Explain always covers the person you chose.
+          resultKey: `${
+            skillMatchRun?.scenarioId ||
+            `${matchResults.length}:${JSON.stringify(matchSkillsInput)}:${skillMatchScope}`
+          }:${activeKey}`,
+          context: {
+            targetSkills: matchSkillsInput,
+            matchResults: cappedMatches,
+            matchResultCount: allMatches.length,
+            activeMatchRank: activeRank > 0 ? activeRank : null,
+            skillMatchMetadata,
+            activeMatchEmployeeId: activeMatchEmployeeId,
+            uploadedDataReadiness: intelligenceReadiness?.semantic_skill_graph,
+            runIdentity: skillMatchRun
+              ? {
+                  scenarioId: skillMatchRun.scenarioId,
+                  generatedAt: skillMatchRun.generatedAt,
+                  scope: skillMatchRun.scope,
+                  resultCount: skillMatchRun.resultCount,
+                  profilesEvaluated: skillMatchRun.profilesEvaluated,
+                }
+              : null,
+          },
+          buttonText: "Explain with AI",
+          disabled: skillMatchStatus !== "complete",
+        };
+      }
+    }
+  })();
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 lg:h-full space-y-3 md:space-y-4 max-w-full">
+    <div className="flex-1 flex flex-col min-h-0 h-full space-y-3 md:space-y-4 max-w-full min-w-0">
       {/* Top Header */}
-      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-1 border-b border-white/5 pb-3">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-1 border-b border-white/5 pb-3 shrink-0">
         <div className="flex-1 flex items-start justify-between">
           <div className="text-left">
             <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/5 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-indigo-400 mb-1.5">
@@ -1128,7 +1846,7 @@ const IntelligenceCenterView = ({ active = true }) => {
       </div>
 
       {intelligenceReadiness && (
-        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-slate-950/40 px-3 py-2 text-[9px] font-mono text-slate-400">
+        <div className="mb-2 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-slate-950/40 px-3 py-2 text-[9px] font-mono text-slate-400">
           <span className="font-bold uppercase tracking-wider text-slate-300">
             Uploaded data
           </span>
@@ -1150,16 +1868,30 @@ const IntelligenceCenterView = ({ active = true }) => {
             survival observations
           </span>
           <span>
-            Skill graph coverage:{" "}
-            {intelligenceReadiness.semantic_skill_graph?.coverage_ratio == null
-              ? "unavailable"
-              : `${Math.round(intelligenceReadiness.semantic_skill_graph.coverage_ratio * 100)}%`}
+            Skill index:{" "}
+            {intelligenceReadiness.semantic_skill_graph
+              ?.names_indexed_for_exact_matching ?? 0}{" "}
+            uploaded names searchable ·{" "}
+            {intelligenceReadiness.semantic_skill_graph
+              ?.names_mapped_to_graph_or_approved_alias ?? 0}{" "}
+            curated transfer nodes
+          </span>
+          <span>
+            Vector search:{" "}
+            {skillMatchMetadata?.embedding_status === "ready"
+              ? "enabled · exploratory"
+              : intelligenceReadiness.semantic_skill_graph
+                    ?.vector_search_status === "enabled_unvalidated"
+                ? "enabled · unvalidated"
+                : skillMatchMetadata?.embedding_status === "unavailable"
+                  ? "temporarily unavailable · exact/graph fallback"
+                  : "not configured · exact/graph search"}
           </span>
         </div>
       )}
 
       {/* TABS CONTAINER */}
-      <div className="relative flex-1 flex flex-col min-h-0 lg:overflow-hidden">
+      <div className="relative flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         <AnimatePresence mode="wait">
           {/* TAB 1: SKILL GRAPH DIJKSTRA MATCH */}
           {activeSubTab === "skill-match" && (
@@ -1168,7 +1900,7 @@ const IntelligenceCenterView = ({ active = true }) => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="min-h-0 lg:flex-1 lg:h-full w-full flex flex-col"
+              className="min-h-0 min-w-0 flex-1 h-full w-full flex flex-col"
             >
               <MobileSplitPane
                 activePane={mobileActivePane}
@@ -1179,9 +1911,9 @@ const IntelligenceCenterView = ({ active = true }) => {
                 rightIcon={<Brain size={14} />}
                 leftWidthClass="lg:w-[340px] xl:w-[360px]"
                 leftContent={
-                  <div className="space-y-4 flex flex-col h-auto lg:h-full min-h-0">
-                    <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)] h-auto lg:h-full flex flex-col justify-between">
-                      <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+                  <div className="flex min-h-0 min-w-0 flex-col h-full">
+                    <div className="premium-card flex min-h-0 flex-col h-full max-h-full overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)]">
+                      <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
                         <div>
                           <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">
                             <Briefcase size={13} /> Target definition
@@ -1190,8 +1922,8 @@ const IntelligenceCenterView = ({ active = true }) => {
                             Define target requirements
                           </h3>
                           <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                            Add the skills and minimum levels the graph solver
-                            must evaluate.
+                            Add the skills and minimum levels to search across
+                            uploaded employee and candidate profiles.
                           </p>
                         </div>
                         <span className="shrink-0 rounded-full border border-indigo-300/20 bg-indigo-300/10 px-2 py-1 text-[9px] font-semibold text-indigo-200">
@@ -1200,79 +1932,233 @@ const IntelligenceCenterView = ({ active = true }) => {
                         </span>
                       </div>
 
-                      {/* Top Form Inputs (Fixed) */}
-                      <div className="space-y-3.5 md:space-y-3 px-5 pt-4 pb-2 shrink-0">
-                        <div>
-                          <label className="text-[10px] md:text-[11px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                            Skill Node
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. PyTorch, React, FastAPI"
-                            value={newSkillName}
-                            onChange={(e) => setNewSkillName(e.target.value)}
-                            className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 md:py-2 text-xs md:text-sm text-white placeholder-slate-600 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10 min-h-[44px]"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] md:text-[11px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                            Min Proficiency
-                          </label>
-                          <PremiumSelect
-                            value={newSkillLevel}
-                            onChange={(e) =>
-                              setNewSkillLevel(Number(e.target.value))
-                            }
-                            className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 md:py-2 text-xs md:text-sm text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10 min-h-[44px]"
-                          >
-                            {[1, 2, 3, 4, 5].map((v) => (
-                              <option key={v} value={v}>
-                                Lvl {v}
-                              </option>
-                            ))}
-                          </PremiumSelect>
-                        </div>
-                        <button
-                          onClick={addSkillMatchReq}
-                          className="inline-flex h-10 md:h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-indigo-300/20 bg-indigo-500/90 text-xs md:text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(163,230,53,.18)] transition hover:bg-indigo-400 min-h-[44px]"
+                      <div className="px-5 pt-3 shrink-0">
+                        <label
+                          htmlFor="skill-match-scope"
+                          className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400"
                         >
-                          <Plus size={14} /> Add Skill requirement
-                        </button>
+                          Search profiles
+                        </label>
+                        <PremiumSelect
+                          id="skill-match-scope"
+                          value={skillMatchScope}
+                          onChange={(event) =>
+                            setSkillMatchScope(event.target.value)
+                          }
+                          className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none focus:border-cyan-400/50"
+                        >
+                          <option value="all">Employees and candidates</option>
+                          <option value="employees">Employees only</option>
+                          <option value="candidates">Candidates only</option>
+                        </PremiumSelect>
+                        <p className="mt-1 text-[9px] leading-relaxed text-slate-500">
+                          Uploaded skill names are searched directly. Transfer
+                          scores use exact or approved aliases and short paths
+                          in the curated graph; scores are ranking evidence, not
+                          probability or job-fit certification.
+                        </p>
                       </div>
 
-                      {/* Internal Scrollable Skill List Box */}
-                      <div className="flex-1 overflow-y-auto min-h-[120px] custom-scrollbar px-5 py-2 space-y-2">
-                        {matchSkillsInput.map((skill, idx) => (
-                          <div
-                            key={idx}
-                            className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 md:py-2 transition hover:border-indigo-300/30 hover:bg-indigo-300/[0.06] min-h-[44px]"
-                          >
-                            <div className="text-xs">
-                              <span className="font-bold text-white">
-                                {skill.name}
-                              </span>
-                              <span className="ml-2 rounded-full bg-indigo-300/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-200">
-                                L{skill.level}
-                              </span>
-                            </div>
-                            <button
-                              onClick={() => removeSkillMatchReq(idx)}
-                              aria-label={`Remove ${skill.name}`}
-                              className="rounded-md p-2 md:p-1.5 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                      {/* Scrollable middle: whole target form scrolls on desktop; page scrolls on mobile */}
+                      <div className="min-h-0 min-w-0 space-y-3 overflow-y-auto overscroll-contain custom-scrollbar px-5 py-4 flex-1">
+                        {/* Skill browser: auto-fetched from your database, per-row L1–L5 + Add */}
+                        <div className="space-y-3.5 md:space-y-3 pb-2">
+                          <div>
+                            <label
+                              htmlFor="match-skill-search"
+                              className="text-[10px] md:text-[11px] uppercase font-bold tracking-widest text-slate-400 mb-1 block"
                             >
-                              <Trash2 size={12} />
-                            </button>
+                              Browse Skills In Your Data
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                id="match-skill-search"
+                                type="text"
+                                placeholder="Search all skills in your data…"
+                                aria-label="Search skills in your data"
+                                value={matchSkillQuery}
+                                onChange={(e) => {
+                                  setMatchSkillQuery(e.target.value);
+                                  fetchMatchSkillOptions(e.target.value);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    if (
+                                      addSkillMatchReq(
+                                        e.target.value,
+                                        matchCustomLevel,
+                                      )
+                                    ) {
+                                      setMatchSkillQuery("");
+                                      e.target.value = "";
+                                    }
+                                  }
+                                }}
+                                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2.5 md:py-2 text-xs md:text-sm text-white placeholder-slate-600 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10 min-h-[44px]"
+                              />
+                              <PremiumSelect
+                                value={matchCustomLevel}
+                                onChange={(e) =>
+                                  setMatchCustomLevel(Number(e.target.value))
+                                }
+                                aria-label="Level for custom skill"
+                                className="h-11 md:h-9 shrink-0 rounded-xl border border-white/10 bg-slate-950 px-2 text-xs text-white focus:outline-none"
+                              >
+                                {[1, 2, 3, 4, 5].map((v) => (
+                                  <option key={v} value={v}>
+                                    L{v}
+                                  </option>
+                                ))}
+                              </PremiumSelect>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (
+                                    addSkillMatchReq(
+                                      matchSkillQuery,
+                                      matchCustomLevel,
+                                    )
+                                  ) {
+                                    setMatchSkillQuery("");
+                                  }
+                                }}
+                                className="h-11 md:h-9 shrink-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 text-xs text-slate-200 transition hover:border-indigo-300/40 hover:bg-indigo-300/10"
+                              >
+                                Add
+                              </button>
+                            </div>
+                            <p className="mt-1 text-[10px] text-slate-500">
+                              {matchSkillOptions.length} skills loaded from your
+                              database · same skill can repeat at different
+                              levels, never the same skill+level twice.
+                            </p>
                           </div>
-                        ))}
-                        {matchSkillsInput.length === 0 && (
-                          <div className="text-xs text-slate-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
-                            No skills requirements added yet.
+                          <div
+                            role="listbox"
+                            aria-label="Available skills from your data"
+                            className="max-h-56 space-y-1.5 overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-slate-950/60 p-2 custom-scrollbar"
+                          >
+                            {matchSkillOptions.length === 0 && (
+                              <p className="px-2 py-4 text-center text-[11px] text-slate-500">
+                                No skills match. Try another search, or type a
+                                custom name above and press Add.
+                              </p>
+                            )}
+                            {matchSkillOptions.map((suggestion) => {
+                              const pickedLevel = matchPickerLevelFor(
+                                suggestion.name,
+                              );
+                              const alreadyAdded =
+                                matchSkillDemandKeys.includes(
+                                  matchDemandKey(suggestion.name, pickedLevel),
+                                );
+                              return (
+                                <div
+                                  key={suggestion.name}
+                                  role="option"
+                                  aria-selected={alreadyAdded}
+                                  className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-2 py-1.5"
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div className="truncate text-[11px] font-bold text-white">
+                                      {suggestion.name}
+                                    </div>
+                                    <div className="text-[9px] text-slate-500">
+                                      {suggestion.employee_count} people · avg L
+                                      {Number(
+                                        suggestion.avg_level || 0,
+                                      ).toFixed(1)}
+                                    </div>
+                                  </div>
+                                  <PremiumSelect
+                                    value={pickedLevel}
+                                    onChange={(e) =>
+                                      setMatchPickerLevels((current) => ({
+                                        ...current,
+                                        [String(suggestion.name || "").trim()]:
+                                          Number(e.target.value),
+                                      }))
+                                    }
+                                    aria-label={`Level for ${suggestion.name}`}
+                                    className="shrink-0 rounded-lg border border-white/10 bg-slate-950 px-1 py-1 text-[10px] text-white focus:outline-none"
+                                  >
+                                    {[1, 2, 3, 4, 5].map((v) => (
+                                      <option key={v} value={v}>
+                                        L{v}
+                                      </option>
+                                    ))}
+                                  </PremiumSelect>
+                                  <button
+                                    type="button"
+                                    disabled={alreadyAdded}
+                                    onClick={() => {
+                                      addSkillMatchReq(
+                                        suggestion.name,
+                                        pickedLevel,
+                                      );
+                                    }}
+                                    className={`h-7 shrink-0 rounded-lg border px-2 text-[10px] font-semibold transition ${
+                                      alreadyAdded
+                                        ? "cursor-not-allowed border-white/5 bg-white/[0.02] text-slate-600"
+                                        : "border-indigo-300/30 bg-indigo-300/10 text-indigo-200 hover:bg-indigo-300/20"
+                                    }`}
+                                    title={
+                                      alreadyAdded
+                                        ? `${suggestion.name} L${pickedLevel} is already in your requirements`
+                                        : `Add ${suggestion.name} at L${pickedLevel}`
+                                    }
+                                  >
+                                    {alreadyAdded ? "✓" : "Add"}
+                                  </button>
+                                </div>
+                              );
+                            })}
                           </div>
-                        )}
+                          {matchInputError && (
+                            <p
+                              role="alert"
+                              className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-2.5 py-1.5 text-[10px] leading-relaxed text-rose-200"
+                            >
+                              {matchInputError}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Requirement list (scrolls with the form; capped on mobile so it never traps scroll) */}
+                        <div className="max-h-64 space-y-2 overflow-y-auto overscroll-contain py-2 custom-scrollbar lg:max-h-none lg:flex-1 lg:min-h-[120px]">
+                          {matchSkillsInput.map((skill, idx) => (
+                            <div
+                              key={idx}
+                              className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 md:py-2 transition hover:border-indigo-300/30 hover:bg-indigo-300/[0.06] min-h-[44px]"
+                            >
+                              <div className="text-xs">
+                                <span className="font-bold text-white">
+                                  {skill.name}
+                                </span>
+                                <span className="ml-2 rounded-full bg-indigo-300/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-200">
+                                  L{skill.level}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => removeSkillMatchReq(idx)}
+                                aria-label={`Remove ${skill.name}`}
+                                className="rounded-md p-2 md:p-1.5 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          ))}
+                          {matchSkillsInput.length === 0 && (
+                            <div className="text-xs text-slate-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
+                              No skills requirements added yet.
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* Fixed Footer */}
-                      <div className="border-t border-white/10 p-5 space-y-3 bg-slate-950/40 shrink-0">
+                      <div className="shrink-0 border-t border-white/10 p-5 space-y-3 bg-slate-950/40">
                         <button
                           onClick={() => {
                             setMobileActivePane("right");
@@ -1369,7 +2255,7 @@ const IntelligenceCenterView = ({ active = true }) => {
                                       {isScoring
                                         ? `Scored ${skillMatchProgress.completed.toLocaleString()} of ${skillMatchProgress.total.toLocaleString()} profiles`
                                         : isComplete
-                                          ? `Evaluated ${skillMatchProgress.total.toLocaleString()} profiles · ${matchResults.length} top matches shown`
+                                          ? `Scored ${skillMatchProgress.total.toLocaleString()} profiles · showing ${matchResults.length} of ${skillMatchProgress.matched.toLocaleString()} matches`
                                           : skillMatchStatus === "error"
                                             ? hasProfileCounts
                                               ? `Stopped after scoring ${skillMatchProgress.completed.toLocaleString()} of ${skillMatchProgress.total.toLocaleString()} profiles`
@@ -1392,62 +2278,263 @@ const IntelligenceCenterView = ({ active = true }) => {
                   </div>
                 }
                 rightContent={
-                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 h-auto lg:h-full flex flex-col overflow-visible lg:overflow-hidden">
+                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 min-h-0 h-full max-h-full flex flex-col overflow-hidden">
                     <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 shrink-0">
                       <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
                         Semantic Matching Matrix & Path Analysis
                       </h3>
                       <span className="text-[10px] text-slate-500">
-                        Shortest Path Dijkstra Weighting
+                        Exact catalog + curated graph paths
                       </span>
                     </div>
 
+                    {skillMatchRun && matchResults.length > 0 && (
+                      <div
+                        role="status"
+                        aria-live="polite"
+                        className="mb-4 shrink-0 rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-[10px] leading-relaxed text-slate-300"
+                      >
+                        <strong>Generated:</strong>{" "}
+                        <span className="font-mono">
+                          {new Date(skillMatchRun.generatedAt).toLocaleString()}
+                        </span>{" "}
+                        · <strong>Scenario ID:</strong>{" "}
+                        <span className="font-mono text-cyan-300">
+                          {skillMatchRun.scenarioId}
+                        </span>{" "}
+                        ·{" "}
+                        <span className="font-mono">
+                          {skillMatchRun.resultCount} profile
+                          {skillMatchRun.resultCount === 1 ? "" : "s"}
+                        </span>{" "}
+                        · scope{" "}
+                        <span className="font-mono">{skillMatchRun.scope}</span>
+                      </div>
+                    )}
+                    {matchResults.length > 0 && (
+                      <div className="mb-4 shrink-0 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] px-3 py-2.5">
+                        <div className="text-[9px] font-bold uppercase tracking-widest text-cyan-300">
+                          Analysis report — what was searched
+                        </div>
+                        <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] leading-relaxed text-slate-300 sm:grid-cols-4">
+                          <div>
+                            <span className="text-slate-500">Targets: </span>
+                            <span className="font-semibold text-white">
+                              {matchSkillsInput
+                                .map((t) => `${t.name} L${t.level}`)
+                                .join(" · ") || "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Scope: </span>
+                            <span className="font-mono">
+                              {skillMatchScope}
+                            </span>{" "}
+                            ·{" "}
+                            <span className="font-mono">
+                              {Number(
+                                skillMatchProgress.total || 0,
+                              ).toLocaleString()}{" "}
+                              evaluated
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Matched: </span>
+                            <span className="font-mono">
+                              {Number(
+                                skillMatchProgress.matched || 0,
+                              ).toLocaleString()}
+                            </span>{" "}
+                            · <span className="text-slate-500">returned: </span>
+                            <span className="font-mono">
+                              {matchResults.length}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Vector: </span>
+                            <span className="font-mono">
+                              {skillMatchMetadata?.embedding_status ||
+                                "not_configured"}
+                            </span>
+                            {intelligenceReadiness?.semantic_skill_graph && (
+                              <>
+                                {" "}
+                                ·{" "}
+                                <span className="font-mono">
+                                  {
+                                    intelligenceReadiness.semantic_skill_graph
+                                      .unique_uploaded_skill_names
+                                  }{" "}
+                                  skills indexed
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
+                          What this report is for: prove, from your uploaded
+                          records, who matches the targets and why — scores are
+                          ranking evidence, not job-fit certification.
+                        </p>
+                      </div>
+                    )}
                     {matchResults.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] xl:grid-cols-[250px_1fr] gap-4 md:gap-6 min-h-0 lg:flex-1 lg:h-full">
-                        {/* Left list of employees */}
+                      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] xl:grid-cols-[250px_1fr] gap-4 md:gap-6 min-h-0 min-w-0 flex-1 h-full max-lg:overflow-y-auto max-lg:overscroll-contain">
+                        {/* Ranked tenant employee and candidate profiles */}
                         <div className="space-y-2.5 border-r border-white/5 pr-3 md:pr-4 overflow-y-auto custom-scrollbar max-lg:pb-4">
-                          {matchResults.map((result) => (
-                            <button
-                              key={result.employee_id}
-                              onClick={() => {
-                                setActiveMatchEmployeeId(result.employee_id);
-                              }}
-                              className={`w-full text-left p-3 md:p-4 rounded-xl border transition-all relative overflow-hidden select-none cursor-pointer min-h-[52px] ${result.employee_id === activeMatchEmployeeId ? "border-primary bg-primary/5" : "border-white/5 bg-white/2 hover:border-white/10 hover:bg-white/[0.04]"}`}
-                            >
-                              <div className="font-bold text-white text-xs md:text-sm">
-                                {result.full_name}
-                              </div>
-                              <div className="text-[9px] md:text-[11px] text-slate-400 mt-1 uppercase tracking-wider">
-                                {result.role}
-                              </div>
-                              <div className="flex items-center justify-between mt-2 md:mt-3 border-t border-white/5 pt-2">
-                                <span className="text-[9px] md:text-[10px] uppercase font-semibold text-slate-500">
-                                  Compatibility
+                          <div className="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2">
+                            <div className="text-[9px] font-bold uppercase tracking-widest text-slate-300">
+                              Ranked profiles — why they are here
+                            </div>
+                            <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
+                              Ranked by skill-evidence score from your records.
+                              Each row shows who the person is (role,
+                              department) and why they surfaced (exact vs
+                              transfer evidence). Select a row for its
+                              per-target proof.
+                            </p>
+                          </div>
+                          {matchResults.map((result) => {
+                            const rowDetails =
+                              result.match_details?.detailed_matches || [];
+                            const exactHits = rowDetails.filter(
+                              (d) => d.status === "Perfect",
+                            ).length;
+                            return (
+                              <button
+                                key={
+                                  result.profile_key ||
+                                  result.profile_id ||
+                                  result.employee_id
+                                }
+                                onClick={() => {
+                                  setActiveMatchEmployeeId(
+                                    result.profile_key ||
+                                      result.profile_id ||
+                                      result.employee_id,
+                                  );
+                                }}
+                                className={`w-full text-left p-3 md:p-4 rounded-xl border transition-all relative overflow-hidden select-none cursor-pointer min-h-[52px] ${(result.profile_key || result.profile_id || result.employee_id) === activeMatchEmployeeId ? "border-primary bg-primary/5" : "border-white/5 bg-white/2 hover:border-white/10 hover:bg-white/[0.04]"}`}
+                              >
+                                <div className="font-bold text-white text-xs md:text-sm">
+                                  {result.full_name}
+                                </div>
+                                <span className="mt-1 inline-block rounded border border-cyan-300/15 bg-cyan-300/5 px-1.5 py-0.5 text-[8px] uppercase tracking-wider text-cyan-200">
+                                  {result.entity_type || "employee"}
                                 </span>
-                                <span className="text-xs md:text-sm font-black text-primary">
-                                  {(
-                                    result.match_details.overall_compatibility *
-                                    100
-                                  ).toFixed(0)}
-                                  %
-                                </span>
-                              </div>
-                            </button>
-                          ))}
+                                <div className="text-[9px] md:text-[11px] text-slate-400 mt-1 uppercase tracking-wider">
+                                  {result.role}
+                                  {result.department
+                                    ? ` · ${result.department}`
+                                    : ""}
+                                </div>
+                                <div className="mt-1 text-[9px] leading-relaxed text-slate-500">
+                                  Why here: {exactHits}/{rowDetails.length}{" "}
+                                  targets exact
+                                  {exactHits < rowDetails.length
+                                    ? " · rest via transfer or gap"
+                                    : " · all exact"}
+                                </div>
+                                <div className="flex items-center justify-between mt-2 md:mt-3 border-t border-white/5 pt-2">
+                                  <span className="text-[9px] md:text-[10px] uppercase font-semibold text-slate-500">
+                                    Skill evidence score
+                                  </span>
+                                  <span className="text-xs md:text-sm font-black text-primary">
+                                    {(
+                                      result.match_details
+                                        .overall_compatibility * 100
+                                    ).toFixed(0)}
+                                    %
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
 
                         {/* Right Dijkstra Path Details */}
                         <div className="space-y-5 md:space-y-6 overflow-y-auto custom-scrollbar flex-1 min-h-0 pr-1 max-lg:pb-4">
                           {(() => {
                             const activeMatch = matchResults.find(
-                              (r) => r.employee_id === activeMatchEmployeeId,
+                              (r) =>
+                                (r.profile_key ||
+                                  r.profile_id ||
+                                  r.employee_id) === activeMatchEmployeeId,
                             );
                             if (!activeMatch) return null;
+                            const activeDetails =
+                              activeMatch.match_details?.detailed_matches || [];
+                            const hasRouteEvidence = activeDetails.every(
+                              (detail) => Array.isArray(detail.graph_path),
+                            );
 
                             return (
                               <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-6">
                                 {/* Detailed path list */}
                                 <div className="space-y-4">
+                                  <div className="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2.5">
+                                    <div className="text-[9px] font-bold uppercase tracking-widest text-slate-300">
+                                      Target match breakdown — all returned
+                                      profiles
+                                    </div>
+                                    <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
+                                      Why: shows at a glance which requirements
+                                      are solid (exact) and which depend on
+                                      transfer evidence or have no cover.
+                                    </p>
+                                    <div className="mt-2 space-y-1">
+                                      {matchSkillsInput.map((target, tIdx) => {
+                                        const key = String(
+                                          target?.name || "",
+                                        ).toLocaleLowerCase();
+                                        let exact = 0;
+                                        let bridge = 0;
+                                        let missing = 0;
+                                        matchResults.forEach((r) => {
+                                          const row = (
+                                            r.match_details?.detailed_matches ||
+                                            []
+                                          ).find(
+                                            (d) =>
+                                              String(
+                                                d.target_skill || "",
+                                              ).toLocaleLowerCase() === key,
+                                          );
+                                          if (!row || !row.matched_by_skill)
+                                            missing += 1;
+                                          else if (row.status === "Perfect")
+                                            exact += 1;
+                                          else bridge += 1;
+                                        });
+                                        return (
+                                          <div
+                                            key={`${target.name}-${tIdx}`}
+                                            className="flex items-center justify-between gap-2 text-[10px]"
+                                          >
+                                            <span className="font-semibold text-slate-200">
+                                              {target.name}{" "}
+                                              <span className="font-mono text-slate-500">
+                                                L{target.level}
+                                              </span>
+                                            </span>
+                                            <span className="shrink-0 font-mono text-slate-400">
+                                              <span className="text-teal-300">
+                                                {exact} exact
+                                              </span>{" "}
+                                              ·{" "}
+                                              <span className="text-amber-300">
+                                                {bridge} transfer
+                                              </span>{" "}
+                                              ·{" "}
+                                              <span className="text-rose-300">
+                                                {missing} missing
+                                              </span>
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
                                   <div>
                                     <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-1">
                                       Target Match Breakdown for:
@@ -1455,6 +2542,14 @@ const IntelligenceCenterView = ({ active = true }) => {
                                     <h4 className="text-lg font-extrabold text-white">
                                       {activeMatch.full_name}
                                     </h4>
+                                    <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
+                                      How to read: each card is one requirement
+                                      measured against this person&apos;s
+                                      record. One recorded skill satisfies at
+                                      most one requirement. Status colors and
+                                      the evidence line state the proof; the
+                                      score is heuristic ranking evidence.
+                                    </p>
                                   </div>
 
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
@@ -1485,12 +2580,15 @@ const IntelligenceCenterView = ({ active = true }) => {
                                                 detail.status === "Perfect"
                                                   ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
                                                   : detail.status ===
-                                                      "Highly Transferable"
-                                                    ? "text-cyan-400 border-cyan-500/20 bg-cyan-500/5"
+                                                      "Potential Semantic Match"
+                                                    ? "text-amber-200 border-amber-300/30 bg-amber-300/10"
                                                     : detail.status ===
-                                                        "Trainable Gap"
-                                                      ? "text-amber-400 border-amber-500/20 bg-amber-500/5"
-                                                      : "text-rose-400 border-rose-500/20 bg-rose-500/5"
+                                                        "Highly Transferable"
+                                                      ? "text-cyan-400 border-cyan-500/20 bg-cyan-500/5"
+                                                      : detail.status ===
+                                                          "Trainable Gap"
+                                                        ? "text-amber-400 border-amber-500/20 bg-amber-500/5"
+                                                        : "text-rose-400 border-rose-500/20 bg-rose-500/5"
                                               }`}
                                             >
                                               {detail.status}
@@ -1499,37 +2597,58 @@ const IntelligenceCenterView = ({ active = true }) => {
 
                                           {/* Path rendering */}
                                           <div className="flex items-center flex-wrap gap-1.5 md:gap-2 text-xs md:text-sm">
-                                            {detail.matched_by_skill ? (
+                                            {detail.graph_path?.length ? (
+                                              detail.graph_path.map(
+                                                (skill, pathIndex) => (
+                                                  <React.Fragment
+                                                    key={`${skill}-${pathIndex}`}
+                                                  >
+                                                    {pathIndex > 0 && (
+                                                      <span
+                                                        className="text-indigo-300"
+                                                        aria-label="curated graph edge"
+                                                      >
+                                                        →
+                                                      </span>
+                                                    )}
+                                                    <span className="rounded border border-indigo-500/25 bg-indigo-950/70 px-2 py-1 text-indigo-100">
+                                                      {skill}
+                                                    </span>
+                                                  </React.Fragment>
+                                                ),
+                                              )
+                                            ) : detail.evidence_type ===
+                                              "embedding_semantic_candidate" ? (
                                               <>
-                                                <div className="bg-white/5 px-2 md:px-3 py-1 md:py-1.5 rounded border border-white/10 text-slate-200">
+                                                <span className="rounded border border-amber-300/20 bg-amber-300/5 px-2 py-1 text-slate-200">
                                                   {detail.matched_by_skill}
-                                                </div>
-                                                {detail.semantic_distance >
-                                                  0 && (
-                                                  <>
-                                                    <div className="text-slate-500 flex flex-col items-center">
-                                                      <span className="text-[8px] md:text-[9px] text-indigo-400 font-mono">
-                                                        Weight:{" "}
-                                                        {
-                                                          detail.semantic_distance
-                                                        }
-                                                      </span>
-                                                      <span className="text-indigo-400">
-                                                        ➔
-                                                      </span>
-                                                    </div>
-                                                    <div className="bg-indigo-950 px-2 md:px-3 py-1 md:py-1.5 rounded border border-indigo-500/30 text-indigo-300">
-                                                      {detail.target_skill}
-                                                    </div>
-                                                  </>
-                                                )}
+                                                </span>
+                                                <span className="text-[9px] text-amber-200">
+                                                  vector candidate ·{" "}
+                                                  {Math.round(
+                                                    (detail.semantic_similarity ||
+                                                      0) * 100,
+                                                  )}
+                                                  % similarity · no graph edge
+                                                </span>
                                               </>
+                                            ) : detail.matched_by_skill ? (
+                                              <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-slate-200">
+                                                {detail.matched_by_skill}
+                                              </span>
                                             ) : (
                                               <span className="min-w-0 break-words text-rose-300 text-[10px] md:text-[11px] leading-relaxed">
                                                 {detail.unmatched_reason ||
                                                   "No recorded employee skill connects to this target."}
                                               </span>
                                             )}
+                                          </div>
+                                          <div className="mt-2 break-words text-[9px] leading-relaxed text-slate-500">
+                                            Evidence:{" "}
+                                            {detail.evidence_type || "none"}
+                                            {detail.evidence_type ===
+                                              "embedding_semantic_candidate" &&
+                                              " · exploratory vector similarity; human review required"}
                                           </div>
                                         </div>
                                       ),
@@ -1546,12 +2665,31 @@ const IntelligenceCenterView = ({ active = true }) => {
                                     <div className="mb-2 flex items-start justify-between gap-3">
                                       <div>
                                         <div className="text-[9px] uppercase tracking-widest text-slate-300 font-bold">
-                                          Shortest path graph view
+                                          Search evidence graph
                                         </div>
                                         <div className="mt-1 text-[10px] text-slate-500 leading-relaxed">
-                                          Green nodes are present in the
-                                          candidate profile. Cyan paths show the
-                                          evaluated transitions.
+                                          Highlighted nodes and cyan edges come
+                                          from the selected search result’s
+                                          actual shortest paths. Exact catalog
+                                          matches have no transfer edge; vector
+                                          candidates are not ontology paths.
+                                          Routes using skills outside this
+                                          diagram remain visible in the path
+                                          details.
+                                        </div>
+                                        <div className="mt-2 rounded-lg border border-white/5 bg-white/[0.02] px-2 py-1.5 text-[9px] leading-relaxed text-slate-400">
+                                          <span className="font-bold uppercase tracking-widest text-slate-300">
+                                            How to read —{" "}
+                                          </span>
+                                          What it is: the curated skill ontology
+                                          drawn around this person&apos;s
+                                          evidence. What it does: proves each
+                                          transfer with its exact route. How: a
+                                          lone highlighted node = exact catalog
+                                          match (no edge needed); node → node
+                                          cyan path = the transfer route
+                                          actually used; dim nodes/edges =
+                                          unrelated context.
                                         </div>
                                       </div>
                                       <button
@@ -1583,54 +2721,59 @@ const IntelligenceCenterView = ({ active = true }) => {
                                   <div
                                     className={`${graphExpanded ? "min-h-0 flex-1" : "h-[380px] min-h-[380px]"} relative border border-white/5 rounded-lg overflow-hidden bg-slate-950/80`}
                                   >
+                                    {!hasRouteEvidence && (
+                                      <div className="absolute inset-x-3 top-3 z-10 rounded-lg border border-amber-300/20 bg-slate-950/95 px-3 py-2 text-[10px] leading-relaxed text-amber-100 shadow-lg">
+                                        This saved result predates route
+                                        evidence. Run the search again to show
+                                        its exact graph paths.
+                                      </div>
+                                    )}
                                     <svg
                                       className="absolute inset-0 h-full w-full pointer-events-none"
-                                      viewBox="80 70 840 400"
+                                      viewBox="80 50 900 470"
                                       preserveAspectRatio="xMidYMid meet"
                                     >
                                       {/* Links */}
-                                      {SKILL_GRAPH_LINKS.map((link, idx) => {
-                                        const src =
-                                          SKILL_GRAPH_COORDS[link.source];
-                                        const tgt =
-                                          SKILL_GRAPH_COORDS[link.target];
-                                        if (!src || !tgt) return null;
+                                      {SKILL_GRAPH_UNIQUE_LINKS.map(
+                                        (link, idx) => {
+                                          const src =
+                                            SKILL_GRAPH_COORDS[link.source];
+                                          const tgt =
+                                            SKILL_GRAPH_COORDS[link.target];
+                                          if (!src || !tgt) return null;
 
-                                        const isActivePath =
-                                          highlightNodes.has(link.source) &&
-                                          highlightNodes.has(link.target);
+                                          const edgeKey = [
+                                            link.source,
+                                            link.target,
+                                          ]
+                                            .sort()
+                                            .join("::");
+                                          const isActivePath =
+                                            highlightEdges.has(edgeKey);
 
-                                        return (
-                                          <g key={idx}>
-                                            <line
-                                              x1={src.x}
-                                              y1={src.y}
-                                              x2={tgt.x}
-                                              y2={tgt.y}
-                                              stroke={
-                                                isActivePath
-                                                  ? "#2dd4bf"
-                                                  : "#ffffff"
-                                              }
-                                              strokeOpacity={
-                                                isActivePath ? 0.9 : 0.05
-                                              }
-                                              strokeWidth={
-                                                isActivePath ? 3.5 : 1
-                                              }
-                                            />
-                                            {isActivePath && (
-                                              <circle r="4" fill="#2dd4bf">
-                                                <animateMotion
-                                                  path={`M ${src.x} ${src.y} L ${tgt.x} ${tgt.y}`}
-                                                  dur="2s"
-                                                  repeatCount="indefinite"
-                                                />
-                                              </circle>
-                                            )}
-                                          </g>
-                                        );
-                                      })}
+                                          return (
+                                            <g key={idx}>
+                                              <line
+                                                x1={src.x}
+                                                y1={src.y}
+                                                x2={tgt.x}
+                                                y2={tgt.y}
+                                                stroke={
+                                                  isActivePath
+                                                    ? "#2dd4bf"
+                                                    : "#ffffff"
+                                                }
+                                                strokeOpacity={
+                                                  isActivePath ? 0.9 : 0.05
+                                                }
+                                                strokeWidth={
+                                                  isActivePath ? 3.5 : 1
+                                                }
+                                              />
+                                            </g>
+                                          );
+                                        },
+                                      )}
 
                                       {/* Nodes */}
                                       {Object.entries(SKILL_GRAPH_COORDS).map(
@@ -1701,41 +2844,48 @@ const IntelligenceCenterView = ({ active = true }) => {
                           })()}
                         </div>
                       </div>
-                    ) : (
-                      <div className="flex-1 min-h-[420px] flex flex-col items-center justify-center py-10 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-auto">
-                        <div className="h-12 w-12 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 flex items-center justify-center text-indigo-300 mb-4 shadow-[0_0_20px_rgba(163,230,53,0.15)]">
-                          <Brain size={24} />
+                    ) : skillMatchStatus === "complete" ? (
+                      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar rounded-2xl border border-amber-300/15 bg-amber-300/[0.03] p-6">
+                        <div className="m-auto max-w-xl text-center">
+                          <div className="text-sm font-bold text-amber-200">
+                            No profiles matched the supplied evidence
+                          </div>
+                          <p className="mt-2 max-w-xl text-xs leading-relaxed text-slate-400">
+                            The search evaluated{" "}
+                            {skillMatchProgress.total.toLocaleString()}{" "}
+                            {skillMatchScope === "all"
+                              ? "employee and candidate"
+                              : skillMatchScope}{" "}
+                            profiles and returned no exact, approved-alias, or
+                            sufficiently close curated graph matches. Try a
+                            skill name from the uploaded catalog, or review the
+                            requested proficiency levels.
+                          </p>
                         </div>
-                        <h4 className="text-sm font-extrabold text-white tracking-wide uppercase mb-2">
-                          Graph Solver Standing By
-                        </h4>
-                        <p className="text-xs text-slate-400 leading-relaxed max-w-md">
-                          Enter target skill requirements on the left panel and
-                          click{" "}
-                          <span className="font-semibold text-cyan-300">
-                            Solve Adjacencies
-                          </span>{" "}
-                          to calculate graph shortest-path Dijkstra matching
-                          across the workforce.
-                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar rounded-2xl border border-dashed border-white/10 bg-white/[0.01] p-6">
+                        <div className="m-auto flex max-w-md flex-col items-center py-6 text-center">
+                          <div className="h-12 w-12 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 flex items-center justify-center text-indigo-300 mb-4 shadow-[0_0_20px_rgba(163,230,53,0.15)]">
+                            <Brain size={24} />
+                          </div>
+                          <h4 className="text-sm font-extrabold text-white tracking-wide uppercase mb-2">
+                            Graph Solver Standing By
+                          </h4>
+                          <p className="text-xs text-slate-400 leading-relaxed max-w-md">
+                            Enter target skill requirements on the left panel
+                            and click{" "}
+                            <span className="font-semibold text-cyan-300">
+                              Solve Adjacencies
+                            </span>{" "}
+                            to calculate graph shortest-path Dijkstra matching
+                            across the selected employee and candidate profiles.
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
                 }
-              />
-              <AIExplanationPanel
-                subtab="skill-match"
-                context={{
-                  targetSkills: matchSkillsInput,
-                  matchResults: matchResults,
-                  activeMatchEmployeeId: activeMatchEmployeeId,
-                  uploadedDataReadiness:
-                    intelligenceReadiness?.semantic_skill_graph,
-                }}
-                buttonText="Explain with AI"
-                autoRun
-                autoRunKey={`${resultRevisions.skill}:${activeMatchEmployeeId || "none"}`}
-                disabled={skillMatchStatus !== "complete"}
               />
             </motion.div>
           )}
@@ -1747,7 +2897,7 @@ const IntelligenceCenterView = ({ active = true }) => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="min-h-0 lg:flex-1 lg:h-full w-full flex flex-col"
+              className="min-h-0 min-w-0 flex-1 h-full w-full flex flex-col"
             >
               <MobileSplitPane
                 activePane={mobileActivePane}
@@ -1756,11 +2906,29 @@ const IntelligenceCenterView = ({ active = true }) => {
                 rightTitle="Optimization Results"
                 leftIcon={<Zap size={14} />}
                 rightIcon={<Sparkles size={14} />}
-                leftWidthClass="lg:w-[340px] xl:w-[360px]"
+                leftWidthClass="lg:shrink-0 lg:w-[var(--team-left-w)]"
+                leftStyle={{ "--team-left-w": `${teamLeftWidthPx}px` }}
+                leftHandle={
+                  <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label="Drag to resize the constraints column"
+                    title="Drag to resize"
+                    onPointerDown={startTeamResize}
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute top-8 bottom-8 -right-1.5 z-20 hidden w-3 cursor-ew-resize items-center justify-center rounded-full border border-white/10 bg-slate-900/90 opacity-0 transition group-hover:opacity-100 hover:opacity-100 lg:flex"
+                    style={{ touchAction: "none" }}
+                  >
+                    <span className="flex flex-col gap-0.5">
+                      <i className="h-3 w-px bg-slate-500" />
+                      <i className="h-3 w-px bg-slate-500" />
+                    </span>
+                  </div>
+                }
                 leftContent={
-                  <div className="space-y-4 flex flex-col h-auto lg:h-full min-h-0">
-                    <div className="premium-card overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)] h-auto lg:h-full flex flex-col justify-between">
-                      <div className="border-b border-white/10 px-5 py-4">
+                  <div className="flex min-h-0 min-w-0 flex-col h-full">
+                    <div className="premium-card flex min-h-0 flex-col h-full max-h-full overflow-hidden border border-white/10 bg-slate-950/35 backdrop-blur-xl shadow-[0_18px_55px_rgba(2,8,23,.22)]">
+                      <div className="shrink-0 border-b border-white/10 px-5 py-4">
                         <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">
                           <Zap size={13} /> Team constraints
                         </div>
@@ -1773,120 +2941,585 @@ const IntelligenceCenterView = ({ active = true }) => {
                         </p>
                       </div>
 
-                      {/* Top Form Inputs (Fixed) */}
-                      <div className="space-y-3 px-5 pt-4 pb-2 shrink-0">
-                        <div>
-                          <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                            Budget Cap (recorded compensation units)
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              value={teamBudget}
-                              onChange={(e) =>
-                                setTeamBudget(Number(e.target.value))
-                              }
-                              className="w-full rounded-xl border border-white/10 bg-slate-950/80 py-2 pl-3 pr-3 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
-                            Team Size (fixed)
-                          </label>
-                          <input
-                            type="number"
-                            min="2"
-                            max="6"
-                            value={teamSize}
-                            onChange={(e) =>
-                              setTeamSize(Number(e.target.value))
-                            }
-                            className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
-                          />
-                        </div>
-
-                        {/* Skills Add Bar (Fixed) */}
-                        <div>
-                          <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1.5 block">
-                            Skill Matrix Demands
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              id="team-skill-name"
-                              placeholder="e.g. AWS, Python, Docker"
-                              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const inputEl =
-                                  document.getElementById("team-skill-name");
-                                if (inputEl && inputEl.value.trim()) {
-                                  setTeamSkillsInput([
-                                    ...teamSkillsInput,
-                                    { name: inputEl.value.trim(), level: 3 },
-                                  ]);
-                                  inputEl.value = "";
-                                }
-                              }}
-                              className="h-9 shrink-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 text-xs text-slate-200 transition hover:border-indigo-300/40 hover:bg-indigo-300/10"
-                            >
-                              Add
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Internal Scrollable Skill List Box */}
-                      <div className="flex-1 overflow-y-auto min-h-[120px] custom-scrollbar px-5 py-2 space-y-2">
-                        {teamSkillsInput.map((skill, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2 text-xs"
-                          >
-                            <span className="text-white font-bold">
-                              {skill.name}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <PremiumSelect
-                                value={skill.level}
-                                onChange={(e) => {
-                                  const next = [...teamSkillsInput];
-                                  next[idx].level = Number(e.target.value);
-                                  setTeamSkillsInput(next);
-                                }}
-                                className="bg-slate-950 border border-white/5 rounded px-1.5 py-0.5 text-[10px] text-white focus:outline-none"
-                              >
-                                {[1, 2, 3, 4, 5].map((v) => (
-                                  <option key={v} value={v}>
-                                    L{v}
-                                  </option>
-                                ))}
-                              </PremiumSelect>
-                              <button
-                                onClick={() =>
-                                  setTeamSkillsInput(
-                                    teamSkillsInput.filter((_, i) => i !== idx),
-                                  )
-                                }
-                                className="text-rose-400 text-xs"
-                              >
-                                ×
-                              </button>
+                      {/* Scrollable middle: whole constraint form scrolls on desktop; page scrolls on mobile */}
+                      <div className="min-h-0 min-w-0 space-y-3 overflow-y-auto overscroll-contain custom-scrollbar px-5 py-4 flex-1">
+                        {renderTeamSection(
+                          "budget",
+                          "Budget Cap",
+                          `${Number(teamBudget || 0).toLocaleString()} ${teamBudgetUnitLabel}`,
+                          false,
+                          <>
+                            <div>
+                              <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
+                                Budget Cap ({teamBudgetUnitLabel})
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="1000000000"
+                                  step="1000"
+                                  aria-label={`Budget cap in ${teamBudgetUnitLabel}`}
+                                  value={teamBudget}
+                                  onChange={(e) => {
+                                    markTeamInputsDirty();
+                                    setTeamBudget(Number(e.target.value));
+                                  }}
+                                  className="w-full rounded-xl border border-white/10 bg-slate-950/80 py-2 pl-3 pr-3 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
+                                />
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                        {teamSkillsInput.length === 0 && (
-                          <div className="text-xs text-slate-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
-                            No skill demands added yet.
-                          </div>
+                          </>,
+                        )}
+                        {renderTeamSection(
+                          "size",
+                          "Team Size",
+                          `${Number(teamSize || 0)} people`,
+                          false,
+                          <>
+                            <div>
+                              <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">
+                                Team Size (2–10 employees)
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  aria-label="Decrease team size"
+                                  onClick={() => {
+                                    markTeamInputsDirty();
+                                    setTeamSize(
+                                      Math.max(2, Number(teamSize || 2) - 1),
+                                    );
+                                  }}
+                                  className="h-9 w-9 shrink-0 rounded-xl border border-white/10 bg-white/[0.06] text-sm text-slate-200 transition hover:border-indigo-300/40 hover:bg-indigo-300/10"
+                                >
+                                  −
+                                </button>
+                                <input
+                                  type="number"
+                                  min="2"
+                                  max="10"
+                                  step="1"
+                                  aria-label="Team size"
+                                  value={teamSize}
+                                  onChange={(e) => {
+                                    markTeamInputsDirty();
+                                    setTeamSize(Number(e.target.value));
+                                  }}
+                                  className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-center text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
+                                />
+                                <button
+                                  type="button"
+                                  aria-label="Increase team size"
+                                  onClick={() => {
+                                    markTeamInputsDirty();
+                                    setTeamSize(
+                                      Math.min(10, Number(teamSize || 2) + 1),
+                                    );
+                                  }}
+                                  className="h-9 w-9 shrink-0 rounded-xl border border-white/10 bg-white/[0.06] text-sm text-slate-200 transition hover:border-indigo-300/40 hover:bg-indigo-300/10"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <p className="mt-1 text-[10px] text-slate-500">
+                                Exact MILP team size. Larger teams cost more;
+                                the solver proves the optimum for the size you
+                                set.
+                              </p>
+                            </div>
+                          </>,
+                        )}
+                        {renderTeamSection(
+                          "feasibility",
+                          "Feasibility",
+                          (() => {
+                            const minForSize = Number(
+                              (teamFeasibility?.minimum_cost_by_team_size ||
+                                {})[String(Number(teamSize))] || 0,
+                            );
+                            if (!teamFeasibility || !minForSize) return "—";
+                            const gap = Number(teamBudget || 0) - minForSize;
+                            return gap >= 0
+                              ? `ok · +${gap.toLocaleString()}`
+                              : `short ${Math.abs(gap).toLocaleString()}`;
+                          })(),
+                          (() => {
+                            const minForSize = Number(
+                              (teamFeasibility?.minimum_cost_by_team_size ||
+                                {})[String(Number(teamSize))] || 0,
+                            );
+                            return Boolean(
+                              teamFeasibility &&
+                              minForSize &&
+                              Number(teamBudget || 0) < minForSize,
+                            );
+                          })(),
+                          <>
+                            {teamFeasibility && (
+                              <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/[0.05] px-3 py-2.5 text-[10px] leading-relaxed text-slate-300">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-semibold uppercase tracking-widest text-cyan-300 text-[9px]">
+                                    Budget feasibility · live from your data
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={fetchTeamFeasibility}
+                                    className="text-cyan-300/80 hover:text-cyan-200"
+                                  >
+                                    Refresh
+                                  </button>
+                                </div>
+                                {(() => {
+                                  const minMap =
+                                    teamFeasibility.minimum_cost_by_team_size ||
+                                    {};
+                                  const minForSize = Number(
+                                    minMap[String(Number(teamSize))] || 0,
+                                  );
+                                  const cap = Number(teamBudget || 0);
+                                  const unit = humanizeCompensationUnit(
+                                    teamFeasibility.compensation_unit,
+                                  );
+                                  if (!minForSize) {
+                                    return (
+                                      <p className="mt-1 text-slate-400">
+                                        {Number(
+                                          teamFeasibility.eligible_employee_count ||
+                                            0,
+                                        )}{" "}
+                                        eligible employees
+                                        {teamFeasibility.compensation_unit
+                                          ? ` · ${unit}`
+                                          : ""}
+                                        . Not enough eligible records for{" "}
+                                        {Number(teamSize)} people.
+                                      </p>
+                                    );
+                                  }
+                                  const shortfall = minForSize - cap;
+                                  return (
+                                    <>
+                                      <p className="mt-1">
+                                        Minimum for {Number(teamSize)} people:{" "}
+                                        <strong className="font-mono text-white">
+                                          {minForSize.toLocaleString()} {unit}
+                                        </strong>{" "}
+                                        · your cap:{" "}
+                                        <span className="font-mono">
+                                          {(Number.isFinite(cap)
+                                            ? cap
+                                            : 0
+                                          ).toLocaleString()}
+                                        </span>
+                                      </p>
+                                      {shortfall > 0 ? (
+                                        <p className="mt-1 text-amber-200">
+                                          Shortfall {shortfall.toLocaleString()}{" "}
+                                          {unit}. Raise the cap or reduce team
+                                          size — otherwise the solver correctly
+                                          returns infeasible.
+                                        </p>
+                                      ) : (
+                                        <p className="mt-1 text-emerald-300">
+                                          Feasible:{" "}
+                                          {(cap - minForSize).toLocaleString()}{" "}
+                                          {unit} of headroom above the cheapest
+                                          roster.
+                                        </p>
+                                      )}
+                                      <div className="mt-2 flex flex-wrap gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            markTeamInputsDirty();
+                                            setTeamBudget(
+                                              Math.ceil(minForSize),
+                                            );
+                                          }}
+                                          className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-300/20"
+                                        >
+                                          Set cap to minimum
+                                        </button>
+                                        {optimizedTeam?.metrics?.total_cost ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              markTeamInputsDirty();
+                                              setTeamBudget(
+                                                Math.ceil(
+                                                  Number(
+                                                    optimizedTeam.metrics
+                                                      .total_cost,
+                                                  ),
+                                                ),
+                                              );
+                                            }}
+                                            className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[10px] text-slate-300 hover:bg-white/10"
+                                          >
+                                            Reuse last cost (
+                                            {Number(
+                                              optimizedTeam.metrics.total_cost,
+                                            ).toLocaleString()}
+                                            )
+                                          </button>
+                                        ) : null}
+                                      </div>
+                                      <p className="mt-1.5 text-[9px] text-slate-500">
+                                        {Number(
+                                          teamFeasibility.eligible_employee_count ||
+                                            0,
+                                        )}{" "}
+                                        eligible ·{" "}
+                                        {Number(
+                                          teamFeasibility.excluded_departed_employee_count ||
+                                            0,
+                                        )}{" "}
+                                        departed excluded ·{" "}
+                                        {Number(
+                                          teamFeasibility.excluded_missing_compensation_count ||
+                                            0,
+                                        )}{" "}
+                                        missing salary excluded
+                                        {teamFeasibility.compensation_mixed
+                                          ? " · mixed units: normalize before optimizing"
+                                          : ""}
+                                      </p>
+                                    </>
+                                  );
+                                })()}
+                                {teamFeasibilityError && (
+                                  <p className="mt-1 text-rose-300">
+                                    {teamFeasibilityError}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </>,
+                        )}
+                        {renderTeamSection(
+                          "browser",
+                          "Skill Browser",
+                          `${teamSkillSuggestions.length} skills`,
+                          false,
+                          <>
+                            {/* Skill browser: auto-fetched from your database, searchable, per-row L1–L5 */}
+                            <div>
+                              <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1.5 block">
+                                Skill Matrix Demands ({teamSkillsInput.length}{" "}
+                                requirement
+                                {teamSkillsInput.length === 1 ? "" : "s"})
+                              </label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  id="team-skill-name"
+                                  placeholder="Search all skills in your data…"
+                                  aria-label="Search skills in your data"
+                                  value={teamSkillQuery}
+                                  onChange={(e) => {
+                                    setTeamSkillQuery(e.target.value);
+                                    fetchTeamSkillSuggestions(e.target.value);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      if (
+                                        addTeamSkill(
+                                          e.target.value,
+                                          teamCustomLevel,
+                                        )
+                                      ) {
+                                        setTeamSkillQuery("");
+                                        e.target.value = "";
+                                      }
+                                    }
+                                  }}
+                                  className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-400/10"
+                                />
+                                <PremiumSelect
+                                  value={teamCustomLevel}
+                                  onChange={(e) =>
+                                    setTeamCustomLevel(Number(e.target.value))
+                                  }
+                                  aria-label="Level for custom skill"
+                                  className="h-9 shrink-0 rounded-xl border border-white/10 bg-slate-950 px-2 text-xs text-white focus:outline-none"
+                                >
+                                  {[1, 2, 3, 4, 5].map((v) => (
+                                    <option key={v} value={v}>
+                                      L{v}
+                                    </option>
+                                  ))}
+                                </PremiumSelect>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const inputEl =
+                                      document.getElementById(
+                                        "team-skill-name",
+                                      );
+                                    if (inputEl && inputEl.value.trim()) {
+                                      if (
+                                        addTeamSkill(
+                                          inputEl.value,
+                                          teamCustomLevel,
+                                        )
+                                      ) {
+                                        inputEl.value = "";
+                                        setTeamSkillQuery("");
+                                      }
+                                    }
+                                  }}
+                                  className="h-9 shrink-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 text-xs text-slate-200 transition hover:border-indigo-300/40 hover:bg-indigo-300/10"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                              <p className="mt-1 text-[10px] text-slate-500">
+                                {teamSkillSuggestions.length} skills loaded from
+                                your database · same skill can repeat at
+                                different levels (Python L2 + L4), but the same
+                                skill+level pair is never added twice.
+                              </p>
+                              <div
+                                role="listbox"
+                                aria-label="Available skills from your data"
+                                className="mt-1.5 max-h-56 space-y-1.5 overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-slate-950/60 p-2 custom-scrollbar"
+                              >
+                                {teamSkillSuggestions.length === 0 && (
+                                  <p className="px-2 py-4 text-center text-[11px] text-slate-500">
+                                    No skills match. Try another search, or type
+                                    a custom name above and press Add.
+                                  </p>
+                                )}
+                                {teamSkillSuggestions.map((suggestion) => {
+                                  const pickedLevel = pickerLevelFor(
+                                    suggestion.name,
+                                  );
+                                  const alreadyAdded =
+                                    teamSkillDemandKeys.includes(
+                                      teamDemandKey(
+                                        suggestion.name,
+                                        pickedLevel,
+                                      ),
+                                    );
+                                  return (
+                                    <div
+                                      key={suggestion.name}
+                                      role="option"
+                                      aria-selected={alreadyAdded}
+                                      className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-2 py-1.5"
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <div className="truncate text-[11px] font-bold text-white">
+                                          {suggestion.name}
+                                        </div>
+                                        <div className="text-[9px] text-slate-500">
+                                          {suggestion.employee_count} people ·
+                                          avg L
+                                          {Number(
+                                            suggestion.avg_level || 0,
+                                          ).toFixed(1)}
+                                        </div>
+                                      </div>
+                                      <PremiumSelect
+                                        value={pickedLevel}
+                                        onChange={(e) =>
+                                          setTeamPickerLevels((current) => ({
+                                            ...current,
+                                            [String(
+                                              suggestion.name || "",
+                                            ).trim()]: Number(e.target.value),
+                                          }))
+                                        }
+                                        aria-label={`Level for ${suggestion.name}`}
+                                        className="shrink-0 rounded-lg border border-white/10 bg-slate-950 px-1 py-1 text-[10px] text-white focus:outline-none"
+                                      >
+                                        {[1, 2, 3, 4, 5].map((v) => (
+                                          <option key={v} value={v}>
+                                            L{v}
+                                          </option>
+                                        ))}
+                                      </PremiumSelect>
+                                      <button
+                                        type="button"
+                                        disabled={alreadyAdded}
+                                        onClick={() => {
+                                          addTeamSkill(
+                                            suggestion.name,
+                                            pickedLevel,
+                                          );
+                                        }}
+                                        className={`h-7 shrink-0 rounded-lg border px-2 text-[10px] font-semibold transition ${
+                                          alreadyAdded
+                                            ? "cursor-not-allowed border-white/5 bg-white/[0.02] text-slate-600"
+                                            : "border-indigo-300/30 bg-indigo-300/10 text-indigo-200 hover:bg-indigo-300/20"
+                                        }`}
+                                        title={
+                                          alreadyAdded
+                                            ? `${suggestion.name} L${pickedLevel} is already in your demands`
+                                            : `Add ${suggestion.name} at L${pickedLevel}`
+                                        }
+                                      >
+                                        {alreadyAdded ? "✓" : "Add"}
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {(teamDuplicateSkillNames.length > 0 ||
+                                teamEmptySkillCount > 0) && (
+                                <div className="mt-1.5 rounded-lg border border-amber-400/30 bg-amber-400/[0.06] px-2.5 py-1.5 text-[10px] leading-relaxed text-amber-200">
+                                  {teamDuplicateSkillNames.length > 0 && (
+                                    <p>
+                                      Duplicates:{" "}
+                                      {teamDuplicateSkillNames.join(", ")}.
+                                    </p>
+                                  )}
+                                  {teamEmptySkillCount > 0 && (
+                                    <p>
+                                      {teamEmptySkillCount} blank row
+                                      {teamEmptySkillCount > 1 ? "s" : ""}.
+                                    </p>
+                                  )}
+                                  <div className="mt-1 flex flex-wrap gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={removeDuplicateTeamSkills}
+                                      className="rounded-md border border-amber-300/30 bg-amber-300/10 px-2 py-0.5 font-semibold text-amber-100 hover:bg-amber-300/20"
+                                    >
+                                      Remove duplicates
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        markTeamInputsDirty();
+                                        setTeamSkillsInput([]);
+                                      }}
+                                      className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-0.5 text-slate-300 hover:bg-white/10"
+                                    >
+                                      Clear all
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                              <p className="mt-1 text-[10px] text-slate-500">
+                                Tip: the same skill can be demanded at several
+                                levels (Python L2 + L4); each level counts as
+                                its own requirement in the coverage score.
+                              </p>
+                            </div>
+                          </>,
+                        )}
+                        {renderTeamSection(
+                          "demands",
+                          "Added Demands",
+                          `${teamSkillsInput.length} requirement${teamSkillsInput.length === 1 ? "" : "s"}`,
+                          teamDuplicateSkillNames.length > 0 ||
+                            teamEmptySkillCount > 0,
+                          <>
+                            {/* Skill demands list (scrolls with the form; capped on mobile so it never traps scroll) */}
+                            <div className="max-h-64 space-y-2 overflow-y-auto overscroll-contain py-2 custom-scrollbar lg:max-h-none lg:flex-1 lg:min-h-[120px]">
+                              {teamSkillsInput.map((skill, idx) => {
+                                const isEmpty = !String(
+                                  skill?.name || "",
+                                ).trim();
+                                const demandKey = teamDemandKey(
+                                  skill?.name,
+                                  skill?.level,
+                                );
+                                const isDuplicate =
+                                  !isEmpty &&
+                                  teamSkillDemandKeys.indexOf(demandKey) !==
+                                    idx;
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={`flex items-center justify-between rounded-xl border px-3 py-2 text-xs ${
+                                      isDuplicate || isEmpty
+                                        ? "border-amber-400/50 bg-amber-400/[0.06]"
+                                        : "border-white/10 bg-white/[0.045]"
+                                    }`}
+                                  >
+                                    <span className="text-white font-bold">
+                                      {skill.name || (
+                                        <em className="text-amber-300">
+                                          (blank — rename or remove)
+                                        </em>
+                                      )}
+                                      {(isDuplicate || isEmpty) && (
+                                        <span className="ml-1.5 rounded bg-amber-400/20 px-1 text-[9px] font-semibold uppercase tracking-wide text-amber-200">
+                                          {isEmpty ? "empty" : "duplicate"}
+                                        </span>
+                                      )}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <PremiumSelect
+                                        value={skill.level}
+                                        onChange={(e) => {
+                                          const nextLevel = Number(
+                                            e.target.value,
+                                          );
+                                          const clash = teamSkillsInput.some(
+                                            (other, otherIdx) =>
+                                              otherIdx !== idx &&
+                                              teamDemandKey(
+                                                other?.name,
+                                                other?.level,
+                                              ) ===
+                                                teamDemandKey(
+                                                  skill?.name,
+                                                  nextLevel,
+                                                ),
+                                          );
+                                          if (clash) {
+                                            setTeamOptimizeError(
+                                              `"${String(skill?.name || "").trim()}" at L${nextLevel} is already demanded below. Pick another level or remove the other row first.`,
+                                            );
+                                            return;
+                                          }
+                                          markTeamInputsDirty();
+                                          const next = [...teamSkillsInput];
+                                          next[idx].level = nextLevel;
+                                          setTeamSkillsInput(next);
+                                        }}
+                                        className="bg-slate-950 border border-white/5 rounded px-1.5 py-0.5 text-[10px] text-white focus:outline-none"
+                                      >
+                                        {[1, 2, 3, 4, 5].map((v) => (
+                                          <option key={v} value={v}>
+                                            L{v}
+                                          </option>
+                                        ))}
+                                      </PremiumSelect>
+                                      <button
+                                        onClick={() => {
+                                          markTeamInputsDirty();
+                                          setTeamSkillsInput(
+                                            teamSkillsInput.filter(
+                                              (_, i) => i !== idx,
+                                            ),
+                                          );
+                                        }}
+                                        className="text-rose-400 text-xs"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {teamSkillsInput.length === 0 && (
+                                <div className="text-xs text-slate-500 text-center py-6 border border-dashed border-white/5 rounded-xl">
+                                  No skill demands added yet.
+                                </div>
+                              )}
+                            </div>
+                          </>,
                         )}
                       </div>
 
                       {/* Fixed Footer */}
-                      <div className="border-t border-white/10 p-5 bg-slate-950/40 shrink-0">
+                      <div className="shrink-0 border-t border-white/10 p-5 bg-slate-950/40">
                         <button
                           onClick={() => {
                             setMobileActivePane("right");
@@ -1900,14 +3533,16 @@ const IntelligenceCenterView = ({ active = true }) => {
                           <Play size={14} />{" "}
                           {optimizingLoading
                             ? "Proving the optimal team..."
-                            : "Optimize Team"}
+                            : optimizedTeam
+                              ? "Re-optimize Team"
+                              : "Optimize Team"}
                         </button>
                       </div>
                     </div>
                   </div>
                 }
                 rightContent={
-                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 h-auto lg:h-full flex flex-col overflow-visible lg:overflow-hidden">
+                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 min-h-0 h-full max-h-full flex flex-col overflow-hidden">
                     <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4 shrink-0">
                       <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
                         Optimization Assembly Results
@@ -1917,31 +3552,228 @@ const IntelligenceCenterView = ({ active = true }) => {
                       </span>
                     </div>
 
+                    {optimizedTeam && (
+                      <div
+                        role="status"
+                        aria-live="polite"
+                        className={`mb-4 shrink-0 rounded-lg border px-3 py-2 text-[10px] leading-relaxed ${
+                          !savedTeamInputs
+                            ? "border-amber-400/40 bg-amber-400/10 text-amber-100"
+                            : teamInputsChanged
+                              ? "border-amber-400/40 bg-amber-400/10 text-amber-100"
+                              : "border-white/10 bg-slate-950/35 text-slate-300"
+                        }`}
+                      >
+                        {(() => {
+                          const runInputs = optimizedTeam.run_inputs || {};
+                          const runBudget = Number(
+                            runInputs.budget_cap ?? optimizedTeam.budget_cap,
+                          );
+                          const runTeamSize = Number(
+                            runInputs.max_team_size ??
+                              optimizedTeam.optimized_team?.length ??
+                              0,
+                          );
+                          const runSkillCount = Array.isArray(
+                            runInputs.target_skills,
+                          )
+                            ? runInputs.target_skills.length
+                            : (optimizedTeam.metrics?.skills_coverage?.length ??
+                              0);
+                          const formatBudget = (value) =>
+                            Number.isFinite(value)
+                              ? `${value.toLocaleString()} ${teamBudgetUnitLabel}`
+                              : "not recorded";
+
+                          return !savedTeamInputs ? (
+                            <>
+                              <strong>Run inputs are unavailable.</strong> This
+                              saved result may not match the current form.
+                              Re-optimize the team to create a result with a
+                              verified input snapshot.
+                            </>
+                          ) : teamInputsChanged ? (
+                            <>
+                              <strong>
+                                Showing a previous proven run (kept visible
+                                below).
+                              </strong>{" "}
+                              It used a cap of {formatBudget(runBudget)}, a team
+                              size of {runTeamSize} employees, and{" "}
+                              {runSkillCount} skill requirements. Your current
+                              inputs are a cap of{" "}
+                              {formatBudget(Number(teamBudget))}, a team size of{" "}
+                              {teamSize}, and {teamSkillsInput.length}{" "}
+                              requirements. The charts below are that previous
+                              result for comparison; select{" "}
+                              <strong>Re-optimize Team</strong> to run the
+                              search against the current inputs.
+                            </>
+                          ) : (
+                            <>
+                              <strong>Result uses the current inputs:</strong>{" "}
+                              cap {formatBudget(runBudget)}, team size{" "}
+                              {runTeamSize} employees, {runSkillCount} skill
+                              requirements.
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+
                     <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar space-y-4">
-                      {annealingStatus === "complete" && optimizedTeam && (
-                        <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/5 px-3 py-2 text-[10px] leading-relaxed text-slate-300">
-                          {optimizedTeam.optimality_proven
-                            ? "Optimality proven for the recorded candidates and scoring rules."
-                            : "The solver did not prove optimality; no team is presented as optimal."}{" "}
-                          The selected team satisfies the hard budget cap. The
-                          chart shows the final measured team result.
-                          Compensation uses stored employee record units;
-                          currency and pay period are not defined in the data.{" "}
-                          {optimizedTeam.source_scope
-                            ?.excluded_missing_compensation_count > 0 &&
-                            String(
-                              optimizedTeam.source_scope
-                                .excluded_missing_compensation_count,
-                            ) +
-                              " employees without positive recorded compensation were excluded."}
-                        </div>
-                      )}
+                      {annealingStatus === "complete" &&
+                        optimizedTeam &&
+                        (teamInputsChanged ||
+                          !savedTeamInputs ||
+                          !teamExactEvidenceAvailable) && (
+                          <div className="rounded-xl border border-amber-400/30 bg-amber-400/[0.06] p-5">
+                            <p className="text-xs font-semibold text-amber-200">
+                              {teamInputsChanged
+                                ? "Results are out of date — previous charts kept below"
+                                : !savedTeamInputs
+                                  ? "This saved result has no input snapshot"
+                                  : "The scoring model has changed"}
+                            </p>
+                            <p className="mt-2 max-w-xl text-xs leading-5 text-slate-400">
+                              {teamInputsChanged
+                                ? "The current budget, team size, or skill requirements differ from this run. The previous proven charts stay visible below for comparison and are labelled with their original inputs."
+                                : !savedTeamInputs
+                                  ? "The original budget and skill requirements could not be verified, so this result cannot be compared with the current form."
+                                  : "This run used older skill-matching rules. Its result is hidden until you re-optimize using the current direct-skill objective."}
+                            </p>
+                            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-white/10 pt-3 text-xs sm:grid-cols-3">
+                              <div>
+                                <div className="text-[10px] text-slate-500">
+                                  Previous roster cost
+                                </div>
+                                <div className="mt-1 font-mono text-slate-200">
+                                  {Number(
+                                    optimizedTeam.metrics?.total_cost || 0,
+                                  ).toLocaleString()}{" "}
+                                  {humanizeCompensationUnit(
+                                    optimizedTeam.compensation_unit,
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] text-slate-500">
+                                  Previous cap
+                                </div>
+                                <div className="mt-1 font-mono text-slate-200">
+                                  {Number(
+                                    optimizedTeam.budget_cap || 0,
+                                  ).toLocaleString()}{" "}
+                                  {humanizeCompensationUnit(
+                                    optimizedTeam.compensation_unit,
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] text-slate-500">
+                                  Previous run
+                                </div>
+                                <div className="mt-1 text-slate-200">
+                                  {optimizedTeam.optimized_team?.length || 0}{" "}
+                                  people ·{" "}
+                                  {optimizedTeam.metrics?.skills_coverage
+                                    ?.length || 0}{" "}
+                                  requirements
+                                </div>
+                              </div>
+                            </div>
+                            <p className="mt-3 text-[10px] text-slate-500">
+                              Select{" "}
+                              <strong className="font-medium text-slate-300">
+                                Re-optimize team
+                              </strong>{" "}
+                              to calculate against the inputs currently shown.
+                            </p>
+                          </div>
+                        )}
+
+                      {annealingStatus === "complete" &&
+                        optimizedTeam &&
+                        savedTeamInputs &&
+                        teamExactEvidenceAvailable && (
+                          <div className="rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 text-[10px] leading-relaxed text-slate-300">
+                            {optimizedTeam.optimality_proven
+                              ? "Best feasible team proven for direct recorded skill coverage, then lowest cost among tied teams."
+                              : "The solver did not prove optimality; no team is presented as optimal."}{" "}
+                            Budget is a maximum; the solver does not try to
+                            spend the remainder. Compensation is shown as
+                            recorded employee values in{" "}
+                            {optimizedTeam.compensation_unit ||
+                              "the stored compensation unit"}
+                            ;{" "}
+                            {optimizedTeam.compensation_provenance ||
+                              "source provenance is unknown"}{" "}
+                            This result does not validate market accuracy or job
+                            proficiency.{" "}
+                            {optimizedTeam.source_scope
+                              ?.excluded_missing_compensation_count > 0 &&
+                              String(
+                                optimizedTeam.source_scope
+                                  .excluded_missing_compensation_count,
+                              ) +
+                                " employees without positive recorded compensation were excluded."}
+                          </div>
+                        )}
                       {teamOptimizeError && (
                         <div
                           role="alert"
-                          className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-200"
+                          className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2.5 text-xs leading-relaxed text-rose-200"
                         >
-                          {teamOptimizeError}
+                          <p>{teamOptimizeError}</p>
+                          {teamFeasibility?.minimum_cost_by_team_size?.[
+                            String(Number(teamSize))
+                          ] && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const minForSize = Number(
+                                    teamFeasibility.minimum_cost_by_team_size[
+                                      String(Number(teamSize))
+                                    ] || 0,
+                                  );
+                                  if (minForSize > 0) {
+                                    markTeamInputsDirty();
+                                    setTeamBudget(Math.ceil(minForSize));
+                                    setTeamOptimizeError("");
+                                  }
+                                }}
+                                className="rounded-lg border border-rose-300/30 bg-rose-300/10 px-2 py-1 text-[10px] font-semibold text-rose-100 hover:bg-rose-300/20"
+                              >
+                                Set cap to minimum (
+                                {Number(
+                                  teamFeasibility.minimum_cost_by_team_size[
+                                    String(Number(teamSize))
+                                  ] || 0,
+                                ).toLocaleString()}
+                                )
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  markTeamInputsDirty();
+                                  setTeamSize(
+                                    Math.max(2, Number(teamSize || 2) - 1),
+                                  );
+                                  setTeamOptimizeError("");
+                                }}
+                                className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[10px] text-slate-200 hover:bg-white/10"
+                              >
+                                Reduce team size to{" "}
+                                {Math.max(2, Number(teamSize || 2) - 1)}
+                              </button>
+                            </div>
+                          )}
+                          <p className="mt-1.5 text-[10px] text-rose-200/70">
+                            This is real feasibility from recorded compensation
+                            — not an estimate. The previous proven result (if
+                            any) stays visible below.
+                          </p>
                         </div>
                       )}
 
@@ -1950,10 +3782,14 @@ const IntelligenceCenterView = ({ active = true }) => {
                         <div className="py-12 flex flex-col items-center justify-center space-y-6">
                           <div className="text-center">
                             <div className="text-xs font-mono text-primary uppercase tracking-[0.2em] mb-2 animate-pulse">
-                              Searching this tenant until optimality is proven
+                              Solving exact MILP for {Number(teamSize)} people ·
+                              cap {Number(teamBudget || 0).toLocaleString()}{" "}
+                              {teamBudgetUnitLabel}
                             </div>
-                            <div className="text-3xl font-black text-white font-mono">
-                              Larger datasets can take longer to solve
+                            <div className="text-sm font-semibold text-white">
+                              Proving maximum direct skill coverage, then lowest
+                              cost. No fake progress — the result appears only
+                              when optimality is proven.
                             </div>
                           </div>
 
@@ -1963,782 +3799,460 @@ const IntelligenceCenterView = ({ active = true }) => {
                         </div>
                       )}
 
-                      {annealingStatus === "complete" && optimizedTeam && (
-                        <div>
-                          {(() => {
-                            const history =
-                              annealingHistory.length > 0
-                                ? annealingHistory
-                                : [];
+                      {annealingStatus === "complete" &&
+                        optimizedTeam &&
+                        savedTeamInputs &&
+                        teamExactEvidenceAvailable && (
+                          <div>
+                            {(() => {
+                              const metrics = optimizedTeam.metrics || {};
+                              const coverage = metrics.skills_coverage || [];
+                              const compensationUnit =
+                                optimizedTeam.compensation_unit ||
+                                "recorded amount";
+                              const compensationUnitLabel =
+                                humanizeCompensationUnit(compensationUnit);
+                              const formatAmount = (value) =>
+                                Number(value || 0).toLocaleString(undefined, {
+                                  maximumFractionDigits: 0,
+                                });
+                              const totalCost = Number(metrics.total_cost || 0);
+                              const budgetCap = Number(
+                                optimizedTeam.budget_cap || 0,
+                              );
+                              const budgetPercent =
+                                budgetCap > 0
+                                  ? Math.min(100, (totalCost / budgetCap) * 100)
+                                  : 0;
+                              const scorePercent = (value) =>
+                                Math.max(0, Math.min(100, Number(value || 0)));
 
-                            if (history.length === 0) {
                               return (
-                                <div className="h-44 rounded-xl border border-white/10 bg-slate-950/80 flex items-center justify-center px-4 text-center text-[10px] text-slate-500">
-                                  No optimization data yet — configure target
-                                  skills and run the solver.
-                                </div>
-                              );
-                            }
+                                <section
+                                  className="space-y-3"
+                                  aria-label="Team optimization result charts"
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3 text-[10px] leading-relaxed text-slate-400">
+                                    <span>
+                                      {optimizedTeam.optimality_proven
+                                        ? "Optimality proven for direct skill coverage, then cost."
+                                        : "Optimality was not proven."}{" "}
+                                      Skill records do not verify proficiency.
+                                    </span>
+                                    <span className="shrink-0 font-mono text-slate-500">
+                                      {optimizedTeam.solver || "Solver"} ·{" "}
+                                      {Number(
+                                        optimizedTeam.total_search_nodes || 0,
+                                      ).toLocaleString()}{" "}
+                                      search nodes
+                                    </span>
+                                  </div>
 
-                            const n = history.length;
-                            const steps = history.map(
-                              (h) => Number(h.step) || 0,
-                            );
-                            const energies = history.map(
-                              (h) => Number(h.energy) || 0,
-                            );
-                            const bestSoFar = history.map((h) => {
-                              const rawBest = h.best_energy;
-                              return rawBest === null || rawBest === undefined
-                                ? Number(h.energy) || 0
-                                : Number(rawBest) || 0;
-                            });
-                            const coverages = history.map(
-                              (h) => Number(h.coverage) || 0,
-                            );
-                            const hasTemperature = history.some((h) =>
-                              Number.isFinite(Number(h.temperature)),
-                            );
-                            const costs = history.map(
-                              (h) => Number(h.cost) || 0,
-                            );
+                                  <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(240px,1fr)] gap-4">
+                                    <div className="rounded-xl border border-white/10 bg-slate-950/80 p-4">
+                                      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-3">
+                                        <div>
+                                          <h4 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
+                                            Related-skill estimates
+                                          </h4>
+                                          <p className="mt-1 text-[9px] text-slate-500">
+                                            Reference only · not used to select
+                                            the team
+                                          </p>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-lg font-semibold text-slate-200">
+                                            {Number(
+                                              metrics.ontology_adjusted_coverage_percentage ??
+                                                metrics.coverage_percentage ??
+                                                0,
+                                            ).toFixed(1)}
+                                            %
+                                          </div>
+                                          <div className="text-[9px] text-slate-500">
+                                            graph-adjusted estimate
+                                          </div>
+                                        </div>
+                                      </div>
 
-                            const metrics = optimizedTeam.metrics || {};
-                            const lastCost = costs[costs.length - 1] || 0;
-                            const usagePct =
-                              Number(metrics.budget_usage_percentage) || 0;
-                            const budgetCap =
-                              Number(optimizedTeam.budget_cap) ||
-                              (usagePct > 0
-                                ? Math.round(lastCost / (usagePct / 100))
-                                : Math.max(...costs) || 1);
+                                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[9px] text-slate-400">
+                                        <span className="inline-flex items-center gap-1.5">
+                                          <i className="h-2 w-2 rounded-sm bg-teal-400" />
+                                          Exact skill evidence
+                                        </span>
+                                        <span className="inline-flex items-center gap-1.5">
+                                          <i className="h-2 w-2 rounded-sm bg-amber-400" />
+                                          Related-skill estimate
+                                        </span>
+                                        <span className="inline-flex items-center gap-1.5">
+                                          <i className="h-2 w-2 rounded-sm bg-slate-700" />
+                                          No matching evidence
+                                        </span>
+                                      </div>
 
-                            const minE = Math.min(...energies, ...bestSoFar);
-                            const maxE = Math.max(...energies, ...bestSoFar);
-                            const ePad = (maxE - minE) * 0.12 || 1;
-
-                            const niceTicks = (lo, hi, count = 5) => {
-                              if (!isFinite(lo) || !isFinite(hi) || hi <= lo)
-                                return [lo, hi];
-                              const stepRaw = (hi - lo) / count;
-                              const mag = Math.pow(
-                                10,
-                                Math.floor(Math.log10(stepRaw)),
-                              );
-                              const ratio = stepRaw / mag;
-                              const step =
-                                (ratio < 1.5
-                                  ? 1
-                                  : ratio < 3
-                                    ? 2
-                                    : ratio < 7
-                                      ? 5
-                                      : 10) * mag;
-                              const ticks = [];
-                              for (
-                                let v = Math.ceil(lo / step) * step;
-                                v <= hi + step * 1e-6;
-                                v += step
-                              ) {
-                                ticks.push(Number(v.toFixed(6)));
-                              }
-                              return ticks.length >= 2 ? ticks : [lo, hi];
-                            };
-
-                            const eTicks = niceTicks(
-                              minE - ePad,
-                              maxE + ePad,
-                              5,
-                            );
-                            const maxCost =
-                              Math.max(...costs, budgetCap) * 1.05 || 1;
-                            const costTicks = niceTicks(0, maxCost, 4);
-                            const covTicks = [0, 25, 50, 75, 100];
-                            const tmpTicks = [10, 5, 0];
-
-                            const xPos = (i) =>
-                              n === 1 ? 50 : (i / (n - 1)) * 100;
-                            const yScaler = (lo, hi) => (v) => {
-                              const r = hi - lo || 1;
-                              return (
-                                84 - Math.max(0, Math.min(1, (v - lo) / r)) * 66
-                              );
-                            };
-                            const yE = yScaler(
-                              eTicks[0],
-                              eTicks[eTicks.length - 1],
-                            );
-                            const yC = yScaler(0, 100);
-                            const yT = yScaler(0, 10);
-                            const yK = yScaler(0, Math.max(...costTicks));
-
-                            const ePts = energies.map((e, i) => ({
-                              x: xPos(i),
-                              y: yE(e),
-                            }));
-                            const bPts = bestSoFar.map((e, i) => ({
-                              x: xPos(i),
-                              y: yE(e),
-                            }));
-                            const cPts = coverages.map((c, i) => ({
-                              x: xPos(i),
-                              y: yC(c),
-                            }));
-                            const globalBest = Math.max(...energies);
-                            const bestIndex = energies.indexOf(globalBest);
-                            /* coverage area is rendered as a smooth closed path in JSX */
-                            const budgetY = yK(budgetCap);
-
-                            const fmtCompensation = (v) =>
-                              Number(v || 0).toLocaleString(undefined, {
-                                maximumFractionDigits: 0,
-                              });
-
-                            const stepAt = (frac) =>
-                              steps[Math.round((n - 1) * frac)] ?? steps[n - 1];
-                            const smoothPath = (pts) => {
-                              if (pts.length < 2) {
-                                return pts.length
-                                  ? `M ${pts[0].x},${pts[0].y}`
-                                  : "";
-                              }
-                              let d = `M ${pts[0].x},${pts[0].y}`;
-                              for (let i = 0; i < pts.length - 1; i++) {
-                                const p0 = pts[i - 1] || pts[i];
-                                const p1 = pts[i];
-                                const p2 = pts[i + 1];
-                                const p3 = pts[i + 2] || p2;
-                                const c1x = p1.x + (p2.x - p0.x) / 6;
-                                const c1y = p1.y + (p2.y - p0.y) / 6;
-                                const c2x = p2.x - (p3.x - p1.x) / 6;
-                                const c2y = p2.y - (p3.y - p1.y) / 6;
-                                d += ` C ${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}`;
-                              }
-                              return d;
-                            };
-                            const barW =
-                              n === 1 ? 4 : Math.max(0.85, (100 / n) * 0.8);
-                            const hovered = hoveredAnnealIndex;
-
-                            return (
-                              <>
-                                {/* Legend */}
-                                <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-slate-400 mb-3">
-                                  <span className="flex items-center gap-1">
-                                    <span className="h-0.5 w-3 rounded bg-teal-400" />
-                                    Final coverage score
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <span className="h-0.5 w-3 rounded border-t border-dashed border-emerald-400" />
-                                    Selected team score
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <span className="h-0.5 w-3 rounded bg-indigo-400" />
-                                    Coverage %
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <span className="h-0.5 w-3 rounded border-t border-dashed border-rose-400" />
-                                    Budget cap
-                                  </span>
-                                </div>
-                                <div className="relative mt-2">
-                                  {/* ===== MAIN CHART: Energy + Best-so-far (left) + Coverage (right) ===== */}
-                                  <div className="relative h-56 w-full rounded-lg border border-white/10 bg-slate-950/80 overflow-hidden">
-                                    {/* Y-axis energy tick labels */}
-                                    {eTicks.map((t) => (
-                                      <span
-                                        key={`et-${t}`}
-                                        className="absolute left-1 -translate-y-1/2 z-10 pointer-events-none text-[10px] font-mono text-slate-400 bg-slate-900/75 px-1 rounded"
-                                        style={{ top: `${yE(t)}%` }}
-                                      >
-                                        {t.toFixed(1)}
-                                      </span>
-                                    ))}
-                                    {/* Y-axis coverage tick labels (right) */}
-                                    {covTicks.map((t) => (
-                                      <span
-                                        key={`ct-${t}`}
-                                        className="absolute right-1 -translate-y-1/2 z-10 pointer-events-none text-[10px] font-mono text-indigo-300/80 bg-slate-900/75 px-1 rounded"
-                                        style={{ top: `${yC(t)}%` }}
-                                      >
-                                        {t}
-                                      </span>
-                                    ))}
-                                    <div className="ml-14 mr-11 h-full relative">
-                                      <svg
-                                        className="h-full w-full overflow-hidden"
-                                        viewBox="0 0 100 100"
-                                        preserveAspectRatio="none"
-                                        shapeRendering="geometricPrecision"
-                                      >
-                                        <defs>
-                                          <linearGradient
-                                            id="annealGradHigh"
-                                            x1="0"
-                                            y1="0"
-                                            x2="0"
-                                            y2="1"
-                                          >
-                                            <stop
-                                              offset="0%"
-                                              stopColor="#2dd4bf"
-                                              stopOpacity="0.22"
-                                            />
-                                            <stop
-                                              offset="100%"
-                                              stopColor="#2dd4bf"
-                                              stopOpacity="0.0"
-                                            />
-                                          </linearGradient>
-                                          <linearGradient
-                                            id="annealCovArea"
-                                            x1="0"
-                                            y1="0"
-                                            x2="0"
-                                            y2="1"
-                                          >
-                                            <stop
-                                              offset="0%"
-                                              stopColor="#fbbf24"
-                                              stopOpacity="0.18"
-                                            />
-                                            <stop
-                                              offset="100%"
-                                              stopColor="#fbbf24"
-                                              stopOpacity="0.0"
-                                            />
-                                          </linearGradient>
-                                          <filter
-                                            id="glowEmerald"
-                                            x="-30%"
-                                            y="-30%"
-                                            width="160%"
-                                            height="160%"
-                                          >
-                                            <feGaussianBlur
-                                              stdDeviation="1.5"
-                                              result="blur"
-                                            />
-                                            <feComposite
-                                              in="SourceGraphic"
-                                              in2="blur"
-                                              operator="over"
-                                            />
-                                          </filter>
-                                          <filter
-                                            id="glowTeal"
-                                            x="-30%"
-                                            y="-30%"
-                                            width="160%"
-                                            height="160%"
-                                          >
-                                            <feGaussianBlur
-                                              stdDeviation="1.5"
-                                              result="blur"
-                                            />
-                                            <feComposite
-                                              in="SourceGraphic"
-                                              in2="blur"
-                                              operator="over"
-                                            />
-                                          </filter>
-                                        </defs>
-
-                                        {/* Horizontal gridlines at every energy tick */}
-                                        {eTicks.map((t) => (
-                                          <line
-                                            key={`gl-${t}`}
-                                            x1="0"
-                                            y1={yE(t)}
-                                            x2="100"
-                                            y2={yE(t)}
-                                            stroke="rgba(255,255,255,0.07)"
-                                            strokeDasharray="3 3"
-                                            vectorEffect="non-scaling-stroke"
-                                          />
-                                        ))}
-
-                                        {/* Explicit Y & X axis lines */}
-                                        <line
-                                          x1="0"
-                                          y1="12"
-                                          x2="0"
-                                          y2="84"
-                                          stroke="rgba(255,255,255,0.2)"
-                                          strokeWidth="1"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-                                        <line
-                                          x1="0"
-                                          y1="84"
-                                          x2="100"
-                                          y2="84"
-                                          stroke="rgba(255,255,255,0.2)"
-                                          strokeWidth="1"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-
-                                        {/* Energy Area Fill Gradient */}
-                                        <path
-                                          d={`M 0,84 ${ePts[0].x},${ePts[0].y} ${smoothPath(ePts).slice(2)} L 100,84 Z`}
-                                          fill="url(#annealGradHigh)"
-                                        />
-
-                                        {/* Coverage area (smooth closed path) + line (right axis) */}
-                                        <path
-                                          d={`M 0,84 ${cPts[0].x},${cPts[0].y} ${smoothPath(cPts).slice(2)} L 100,84 Z`}
-                                          fill="url(#annealCovArea)"
-                                        />
-                                        <path
-                                          d={smoothPath(cPts)}
-                                          fill="none"
-                                          stroke="#fbbf24"
-                                          strokeWidth="4"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          opacity="0.18"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-                                        <path
-                                          d={smoothPath(cPts)}
-                                          fill="none"
-                                          stroke="#fbbf24"
-                                          strokeWidth="1.5"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-
-                                        {/* Best-so-far dashed line (smooth) */}
-                                        <path
-                                          d={smoothPath(bPts)}
-                                          fill="none"
-                                          stroke="#34d399"
-                                          strokeWidth="4.5"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          opacity="0.14"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-                                        <path
-                                          d={smoothPath(bPts)}
-                                          fill="none"
-                                          stroke="#34d399"
-                                          strokeWidth="1.6"
-                                          strokeDasharray="4 3"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-
-                                        {/* Energy line (smooth cubic bezier with soft ambient glow) */}
-                                        <path
-                                          d={smoothPath(ePts)}
-                                          fill="none"
-                                          stroke="#2dd4bf"
-                                          strokeWidth="6"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          opacity="0.18"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-                                        <path
-                                          d={smoothPath(ePts)}
-                                          fill="none"
-                                          stroke="#2dd4bf"
-                                          strokeWidth="2"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-
-                                        {/* Laser crosshair on hover */}
-                                        {hovered !== null && (
-                                          <line
-                                            x1={xPos(hovered)}
-                                            y1="12"
-                                            x2={xPos(hovered)}
-                                            y2="84"
-                                            stroke="#2dd4bf"
-                                            strokeWidth="1.5"
-                                            strokeDasharray="3 3"
-                                            vectorEffect="non-scaling-stroke"
-                                          />
-                                        )}
-                                      </svg>
-
-                                      {/* True 100% Round Circle Node Markers Overlay (Positioned Directly on SVG Curve Line) */}
-                                      <div className="absolute inset-0 pointer-events-none">
-                                        {ePts.map((p, idx) => {
-                                          const isBest = idx === bestIndex;
-                                          const isHov = idx === hovered;
-                                          if (
-                                            !isBest &&
-                                            !isHov &&
-                                            idx %
-                                              Math.max(1, Math.floor(n / 8)) !==
-                                              0
-                                          )
-                                            return null;
-
+                                      <div className="mt-2 space-y-1">
+                                        {coverage.map((detail, index) => {
+                                          const hasCoverageValue =
+                                            detail.coverage_percentage !=
+                                              null &&
+                                            Number.isFinite(
+                                              Number(
+                                                detail.coverage_percentage,
+                                              ),
+                                            );
+                                          const value = hasCoverageValue
+                                            ? scorePercent(
+                                                detail.coverage_percentage,
+                                              )
+                                            : null;
+                                          const hasMatchBasis = [
+                                            "exact_skill_name",
+                                            "ontology_bridge",
+                                            "no_evidence",
+                                          ].includes(detail.match_basis);
+                                          const isExact =
+                                            detail.match_basis ===
+                                            "exact_skill_name";
+                                          const hasEvidence =
+                                            hasMatchBasis &&
+                                            detail.match_basis !==
+                                              "no_evidence" &&
+                                            Boolean(
+                                              detail.contributed_by_skill,
+                                            );
+                                          const barColor = !hasMatchBasis
+                                            ? "bg-slate-600"
+                                            : isExact
+                                              ? "bg-teal-400"
+                                              : hasEvidence
+                                                ? "bg-amber-400"
+                                                : "bg-slate-700";
+                                          const exactTxt =
+                                            !teamExactEvidenceAvailable ||
+                                            detail.exact_match_coverage_percentage ==
+                                              null
+                                              ? "—"
+                                              : `${Number(detail.exact_match_coverage_percentage).toFixed(0)}%`;
                                           return (
                                             <div
-                                              key={idx}
-                                              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-150 ${
-                                                isBest
-                                                  ? "w-3.5 h-3.5 bg-emerald-400 border-2 border-white shadow-[0_0_10px_#34d399] z-20"
-                                                  : isHov
-                                                    ? "w-3 h-3 bg-white border-2 border-teal-400 shadow-[0_0_8px_#2dd4bf] z-20"
-                                                    : "w-2 h-2 bg-teal-400/90 border border-slate-900 shadow-[0_0_4px_#2dd4bf] z-10"
-                                              }`}
-                                              style={{
-                                                left: `${p.x}%`,
-                                                top: `${p.y}%`,
-                                              }}
-                                            />
+                                              key={`${detail.skill}-${index}`}
+                                              className="border-b border-white/5 py-2 last:border-0"
+                                            >
+                                              <div className="flex items-center gap-2.5">
+                                                <span className="w-28 min-w-0 shrink-0 truncate text-[10px] font-medium text-slate-200">
+                                                  {detail.skill}{" "}
+                                                  <span className="font-mono text-slate-500">
+                                                    L{detail.target_level}
+                                                  </span>
+                                                </span>
+                                                <div
+                                                  className="h-1.5 w-full max-w-[180px] flex-1 overflow-hidden rounded-full bg-slate-800"
+                                                  role="img"
+                                                  aria-label={
+                                                    value === null
+                                                      ? `${detail.skill}: per-skill coverage unavailable for this saved result`
+                                                      : `${detail.skill}: ${value.toFixed(1)} percent graph-adjusted estimate`
+                                                  }
+                                                >
+                                                  <div
+                                                    className={`h-full rounded-full ${barColor}`}
+                                                    style={{
+                                                      width: `${value ?? 0}%`,
+                                                    }}
+                                                  />
+                                                </div>
+                                                <span className="w-11 shrink-0 text-right font-mono text-[10px] text-slate-300">
+                                                  {value === null
+                                                    ? "—"
+                                                    : `${value.toFixed(0)}%`}
+                                                </span>
+                                                <span
+                                                  title="Exact skill evidence (the optimizer's selection objective)"
+                                                  className="w-14 shrink-0 rounded border border-teal-400/25 bg-teal-400/10 px-1 py-px text-right font-mono text-[9px] text-teal-300"
+                                                >
+                                                  E&nbsp;{exactTxt}
+                                                </span>
+                                              </div>
+                                              <div className="mt-1 flex flex-wrap justify-between gap-x-3 text-[9px] text-slate-500">
+                                                <span className="min-w-0 truncate">
+                                                  {hasEvidence
+                                                    ? `${isExact ? "Exact evidence" : "Ontology path"}: ${isExact ? detail.contributed_by_skill : (detail.ontology_path || []).join(" → ") || detail.contributed_by_skill}`
+                                                    : hasMatchBasis
+                                                      ? "No recorded matching skill"
+                                                      : "Match basis unavailable for this saved result"}
+                                                </span>
+                                                <span className="shrink-0 font-mono">
+                                                  {value === null
+                                                    ? "Re-run for saved coverage detail"
+                                                    : `${detail.achieved_effective_level ?? 0}/${detail.target_level} lvl`}
+                                                </span>
+                                              </div>
+                                            </div>
                                           );
                                         })}
                                       </div>
+
+                                      <div className="mt-4 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 text-[9px] leading-relaxed text-slate-500">
+                                        Average graph-adjusted estimate:{" "}
+                                        <strong className="text-slate-300">
+                                          {metrics.ontology_adjusted_coverage_percentage ==
+                                          null
+                                            ? "unavailable for this saved result"
+                                            : `${Number(metrics.ontology_adjusted_coverage_percentage).toFixed(1)}%`}
+                                        </strong>
+                                        . A related skill does not count toward
+                                        selection and is not proof of
+                                        proficiency. The exact evidence score
+                                        below is the optimizer's primary
+                                        objective.
+                                      </div>
                                     </div>
-                                  </div>
 
-                                  {/* ===== SUB CHART: Team Cost vs Budget Cap ===== */}
-                                  <div className="relative mt-3 h-32 w-full rounded-lg border border-white/10 bg-slate-950/80 overflow-hidden">
-                                    {/* Cost tick labels (left) */}
-                                    {costTicks.map((t) => (
-                                      <span
-                                        key={`kt-${t}`}
-                                        className="absolute left-1 -translate-y-1/2 z-10 pointer-events-none text-[10px] font-mono text-slate-400 bg-slate-900/75 px-1 rounded"
-                                        style={{ top: `${yK(t)}%` }}
-                                      >
-                                        {fmtCompensation(t)}
-                                      </span>
-                                    ))}
-                                    {/* Temperature tick labels (right) */}
-                                    {hasTemperature &&
-                                      tmpTicks.map((t) => (
-                                        <span
-                                          key={`tt-${t}`}
-                                          className="absolute right-1 -translate-y-1/2 z-10 pointer-events-none text-[10px] font-mono text-amber-300/80 bg-slate-950/75 px-1 rounded"
-                                          style={{ top: `${yT(t)}%` }}
-                                        >
-                                          T {t}
-                                        </span>
-                                      ))}
-                                    <div className="ml-14 mr-11 h-full relative">
-                                      <svg
-                                        className="h-full w-full overflow-hidden"
-                                        viewBox="0 0 100 100"
-                                        preserveAspectRatio="none"
-                                        shapeRendering="geometricPrecision"
-                                      >
-                                        <defs>
-                                          <linearGradient
-                                            id="annealBarGrad"
-                                            x1="0"
-                                            y1="0"
-                                            x2="0"
-                                            y2="1"
+                                    <div className="space-y-4">
+                                      <div className="rounded-xl border border-white/10 bg-slate-950/80 p-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div>
+                                            <h4 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
+                                              Budget
+                                            </h4>
+                                            <p className="mt-1 text-[9px] text-slate-500">
+                                              Maximum allowed cost; unused
+                                              budget is expected
+                                            </p>
+                                          </div>
+                                          <span
+                                            className={`rounded-md border px-2 py-1 text-[9px] font-semibold ${metrics.is_under_budget ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-rose-400/20 bg-rose-400/10 text-rose-300"}`}
                                           >
-                                            <stop
-                                              offset="0%"
-                                              stopColor="#6ee7b7"
-                                              stopOpacity="0.95"
-                                            />
-                                            <stop
-                                              offset="100%"
-                                              stopColor="#0d9488"
-                                              stopOpacity="0.9"
-                                            />
-                                          </linearGradient>
-                                          <filter
-                                            id="glowAmber"
-                                            x="-30%"
-                                            y="-30%"
-                                            width="160%"
-                                            height="160%"
-                                          >
-                                            <feGaussianBlur
-                                              in="SourceAlpha"
-                                              stdDeviation="0.35"
-                                              result="blur"
-                                            />
-                                            <feFlood
-                                              floodColor="#fbbf24"
-                                              floodOpacity="0.9"
-                                              result="c"
-                                            />
-                                            <feComposite
-                                              in="c"
-                                              in2="blur"
-                                              operator="in"
-                                              result="glow"
-                                            />
-                                            <feMerge>
-                                              <feMergeNode in="glow" />
-                                              <feMergeNode in="SourceGraphic" />
-                                            </feMerge>
-                                          </filter>
-                                        </defs>
-
-                                        {/* Cost gridlines */}
-                                        {costTicks.map((t) => (
-                                          <line
-                                            key={`kgl-${t}`}
-                                            x1="0"
-                                            y1={yK(t)}
-                                            x2="100"
-                                            y2={yK(t)}
-                                            stroke="rgba(255,255,255,0.07)"
-                                            strokeDasharray="3 3"
-                                            vectorEffect="non-scaling-stroke"
-                                          />
-                                        ))}
-                                        <line
-                                          x1="0"
-                                          y1="84"
-                                          x2="100"
-                                          y2="84"
-                                          stroke="rgba(255,255,255,0.2)"
-                                          strokeWidth="1"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-
-                                        {/* Budget cap line */}
-                                        <line
-                                          x1="0"
-                                          y1={budgetY}
-                                          x2="100"
-                                          y2={budgetY}
-                                          stroke="#fb7185"
-                                          strokeWidth="1.5"
-                                          strokeDasharray="5 4"
-                                          vectorEffect="non-scaling-stroke"
-                                        />
-
-                                        {/* Cost bars per step (rounded, gradient) */}
-                                        {costs.map((c, i) => (
-                                          <rect
-                                            key={`bar-${i}`}
-                                            x={xPos(i) - barW / 2}
-                                            y={yK(c)}
-                                            width={barW}
-                                            height={84 - yK(c)}
-                                            rx="1.6"
-                                            ry="1.6"
-                                            fill="url(#annealBarGrad)"
-                                            opacity={hovered === i ? 1 : 0.55}
-                                            stroke={
-                                              hovered === i ? "#ffffff" : "none"
-                                            }
-                                            strokeWidth="0.6"
-                                            vectorEffect="non-scaling-stroke"
-                                          />
-                                        ))}
-
-                                        {/* Crosshair on hover */}
-                                        {hovered !== null && (
-                                          <line
-                                            x1={xPos(hovered)}
-                                            y1="18"
-                                            x2={xPos(hovered)}
-                                            y2="84"
-                                            stroke="#2dd4bf"
-                                            strokeWidth="1.5"
-                                            strokeDasharray="3 3"
-                                            vectorEffect="non-scaling-stroke"
-                                          />
-                                        )}
-                                      </svg>
-                                    </div>
-                                  </div>
-                                  {/* Hover overlay spanning both charts */}
-                                  <div className="absolute inset-0 ml-14 mr-11 flex justify-between items-stretch pointer-events-auto">
-                                    {history.map((h, i) => (
-                                      <div
-                                        key={i}
-                                        onMouseEnter={() =>
-                                          setHoveredAnnealIndex(i)
-                                        }
-                                        onMouseLeave={() =>
-                                          setHoveredAnnealIndex(null)
-                                        }
-                                        className="flex-1 h-full cursor-pointer relative group"
-                                      />
-                                    ))}
-                                  </div>
-
-                                  {/* Smart Opposite-Corner Hover Tooltip Box (Zero Obscuration & Zero Extra Gap) */}
-                                  {hovered !== null &&
-                                    history[hovered] &&
-                                    (() => {
-                                      const hx = xPos(hovered);
-                                      const isRightHalf = hx > 50;
-                                      return (
-                                        <div
-                                          className={`absolute top-2 z-30 rounded-xl border border-teal-400/40 bg-slate-950/90 p-2.5 shadow-[0_10px_25px_rgba(0,0,0,0.8)] backdrop-blur-md text-[10.5px] space-y-1 pointer-events-none transition-all duration-150 ease-out min-w-[165px] ${
-                                            isRightHalf ? "left-16" : "right-14"
-                                          }`}
-                                        >
-                                          <div className="font-bold text-teal-300 flex items-center justify-between gap-1 border-b border-white/10 pb-1">
-                                            <span className="flex items-center gap-1">
-                                              Search nodes:
-                                              {history[hovered].step ?? hovered}
+                                            {metrics.is_under_budget
+                                              ? "Within cap"
+                                              : "Over cap"}
+                                          </span>
+                                        </div>
+                                        <div className="mt-5 flex items-end justify-between gap-3">
+                                          <div className="font-mono text-lg font-bold text-white">
+                                            {formatAmount(totalCost)}{" "}
+                                            <span className="text-[10px] font-normal text-slate-400">
+                                              {compensationUnitLabel}
                                             </span>
-                                            {hovered === bestIndex && (
-                                              <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30 font-semibold">
-                                                Best team
-                                              </span>
+                                          </div>
+                                          <div className="text-right text-[9px] text-slate-500">
+                                            Cap
+                                            <br />
+                                            <span className="font-mono text-slate-300">
+                                              {formatAmount(budgetCap)}{" "}
+                                              {compensationUnitLabel}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div
+                                          className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-800"
+                                          role="img"
+                                          aria-label={`Team cost uses ${Number(metrics.budget_usage_percentage || 0).toFixed(1)} percent of budget cap`}
+                                        >
+                                          <div
+                                            className={`h-full rounded-full ${metrics.is_under_budget ? "bg-teal-400" : "bg-rose-400"}`}
+                                            style={{
+                                              width: `${budgetPercent}%`,
+                                            }}
+                                          />
+                                        </div>
+                                        <div className="mt-2 flex justify-between text-[9px] text-slate-500">
+                                          <span>
+                                            {Number(
+                                              metrics.budget_usage_percentage ||
+                                                0,
+                                            ).toFixed(1)}
+                                            % used
+                                          </span>
+                                          <span>
+                                            {formatAmount(
+                                              Math.max(
+                                                0,
+                                                budgetCap - totalCost,
+                                              ),
+                                            )}{" "}
+                                            remaining
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      <div className="rounded-xl border border-white/10 bg-slate-950/80 p-4">
+                                        <h4 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
+                                          Search proof
+                                        </h4>
+                                        <dl className="mt-3 space-y-2 text-[10px]">
+                                          <div className="flex justify-between gap-3">
+                                            <dt className="text-slate-500">
+                                              Status
+                                            </dt>
+                                            <dd className="text-emerald-300">
+                                              {optimizedTeam.search_status ||
+                                                "Unknown"}
+                                            </dd>
+                                          </div>
+                                          <div className="flex justify-between gap-3">
+                                            <dt className="text-slate-500">
+                                              Optimality
+                                            </dt>
+                                            <dd className="text-slate-200">
+                                              {optimizedTeam.optimality_proven
+                                                ? "Proven for this model"
+                                                : "Not proven"}
+                                            </dd>
+                                          </div>
+                                          <div className="flex justify-between gap-3">
+                                            <dt className="text-slate-500">
+                                              Relative gap
+                                            </dt>
+                                            <dd className="font-mono text-slate-200">
+                                              {optimizedTeam.solver_relative_gap ??
+                                                "Unavailable"}
+                                            </dd>
+                                          </div>
+                                          <div className="flex justify-between gap-3">
+                                            <dt className="text-slate-500">
+                                              Eligible employees
+                                            </dt>
+                                            <dd className="font-mono text-slate-200">
+                                              {Number(
+                                                optimizedTeam.source_scope
+                                                  ?.eligible_employee_count ||
+                                                  0,
+                                              ).toLocaleString()}
+                                            </dd>
+                                          </div>
+                                        </dl>
+                                        <p className="mt-3 border-t border-white/5 pt-2 text-[9px] leading-relaxed text-slate-500">
+                                          Optimality applies only to the
+                                          eligible records and the configured
+                                          coverage/cost objective. It does not
+                                          establish real-world job fit.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </section>
+                              );
+                            })()}
+
+                            {/* Assembled Team Roster & Skill Coverage Grid */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                              {/* Assembled Team Roster */}
+                              <div className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between">
+                                <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
+                                  <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                                    Assembled Team Roster (
+                                    {
+                                      (optimizedTeam.optimized_team || [])
+                                        .length
+                                    }{" "}
+                                    members)
+                                  </div>
+                                  <div className="text-[10px] font-mono text-cyan-300 font-bold">
+                                    Total:{" "}
+                                    {Number(
+                                      optimizedTeam.metrics?.total_cost || 0,
+                                    ).toLocaleString()}{" "}
+                                    {humanizeCompensationUnit(
+                                      optimizedTeam.compensation_unit,
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                                  {(optimizedTeam.optimized_team || []).map(
+                                    (emp, idx) => (
+                                      <div
+                                        key={emp.id || idx}
+                                        className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-2.5 hover:border-indigo-400/30 transition-colors"
+                                      >
+                                        <div className="min-w-0 flex-1 mr-2">
+                                          <div className="text-xs font-bold text-white truncate">
+                                            {emp.full_name}
+                                          </div>
+                                          <div className="text-[10px] text-slate-400 truncate">
+                                            {emp.role} · {emp.department}
+                                          </div>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                          <div className="text-xs font-mono font-bold text-emerald-400">
+                                            {Number(
+                                              emp.estimated_cost || 0,
+                                            ).toLocaleString()}{" "}
+                                            {humanizeCompensationUnit(
+                                              optimizedTeam.compensation_unit,
                                             )}
                                           </div>
-                                          <div className="text-slate-300 flex justify-between gap-3">
-                                            <span>
-                                              Mean coverage objective:
-                                            </span>
-                                            <strong className="text-teal-300 font-mono">
-                                              {Number(
-                                                history[hovered].energy,
-                                              ).toFixed(4)}
-                                            </strong>
+                                          <div className="text-[8px] uppercase tracking-wider text-slate-500">
+                                            {emp.salary_source ===
+                                            "employee_record"
+                                              ? "Employee record"
+                                              : "Estimate"}
                                           </div>
-                                          <div className="text-slate-300 flex justify-between gap-3">
-                                            <span>Selected team score:</span>
-                                            <strong className="text-emerald-400 font-mono">
-                                              {Number(
-                                                history[hovered].best_energy ??
-                                                  history[hovered].energy,
-                                              ).toFixed(4)}
-                                            </strong>
-                                          </div>
-                                          <div className="text-slate-300 flex justify-between gap-3">
-                                            <span>Skill Coverage:</span>
-                                            <strong className="text-indigo-300 font-mono">
-                                              {Number(
-                                                history[hovered].coverage ?? 0,
-                                              ).toFixed(1)}
-                                              %
-                                            </strong>
-                                          </div>
-                                          <div className="text-slate-300 flex justify-between gap-3 border-t border-white/5 pt-1">
-                                            <span>Team Cost:</span>
-                                            <strong className="text-cyan-300 font-mono">
-                                              {fmtCompensation(
-                                                history[hovered].cost ?? 0,
-                                              )}
-                                            </strong>
-                                          </div>
-                                        </div>
-                                      );
-                                    })()}
-                                </div>
-
-                                {/* Final result is a single measured point, not an invented iteration trace. */}
-                                <div className="ml-14 mr-11 mt-2 flex justify-center items-center text-[10px] font-mono text-slate-400 border-t border-white/10 pt-2">
-                                  <span className="flex flex-col items-center">
-                                    <span className="text-emerald-300 font-bold">
-                                      Final result · {stepAt(1)} search nodes
-                                    </span>
-                                    <span className="text-[9px] text-slate-500">
-                                      {optimizedTeam.optimality_proven
-                                        ? "Optimality proven"
-                                        : "Proof unavailable"}
-                                    </span>
-                                  </span>
-                                </div>
-                              </>
-                            );
-                          })()}
-
-                          {/* Assembled Team Roster & Skill Coverage Grid */}
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-                            {/* Assembled Team Roster */}
-                            <div className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between">
-                              <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
-                                <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                                  Assembled Team Roster (
-                                  {(optimizedTeam.optimized_team || []).length}{" "}
-                                  members)
-                                </div>
-                                <div className="text-[10px] font-mono text-cyan-300 font-bold">
-                                  Total:{" "}
-                                  {Number(
-                                    optimizedTeam.metrics?.total_cost || 0,
-                                  ).toLocaleString()}{" "}
-                                  units
-                                </div>
-                              </div>
-                              <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-                                {(optimizedTeam.optimized_team || []).map(
-                                  (emp, idx) => (
-                                    <div
-                                      key={emp.id || idx}
-                                      className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-2.5 hover:border-indigo-400/30 transition-colors"
-                                    >
-                                      <div className="min-w-0 flex-1 mr-2">
-                                        <div className="text-xs font-bold text-white truncate">
-                                          {emp.full_name}
-                                        </div>
-                                        <div className="text-[10px] text-slate-400 truncate">
-                                          {emp.role} · {emp.department}
                                         </div>
                                       </div>
-                                      <div className="text-right shrink-0">
-                                        <div className="text-xs font-mono font-bold text-emerald-400">
-                                          {Number(
-                                            emp.estimated_cost || 0,
-                                          ).toLocaleString()}{" "}
-                                          units
-                                        </div>
-                                        <div className="text-[8px] uppercase tracking-wider text-slate-500">
-                                          {emp.salary_source ===
-                                          "employee_record"
-                                            ? "Recorded"
-                                            : "Estimated"}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ),
-                                )}
+                                    ),
+                                  )}
+                                </div>
                               </div>
-                            </div>
 
-                            {/* Skill Coverage details */}
-                            <div className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between">
-                              <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
-                                <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                                  Total Skill Coverage
-                                </div>
-                                <div className="text-xl font-extrabold text-indigo-400">
-                                  {optimizedTeam.metrics.coverage_percentage}%
-                                </div>
-                              </div>
-                              <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
-                                {(
-                                  optimizedTeam.metrics.skills_coverage || []
-                                ).map((detail, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="flex justify-between items-center text-[10px] border-b border-white/5 py-1.5"
-                                  >
-                                    <span className="text-slate-300 font-medium">
-                                      {detail.skill}{" "}
-                                      <span className="text-[9px] text-slate-500 font-mono">
-                                        (L{detail.target_level})
-                                      </span>
-                                    </span>
-                                    <span className="text-slate-200">
-                                      Bridge:{" "}
-                                      <strong className="text-cyan-400 font-semibold">
-                                        {detail.contributed_by_skill || "None"}
-                                      </strong>
-                                    </span>
+                              {/* Skill Coverage details */}
+                              <div className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between">
+                                <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
+                                  <div className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                                    Direct skill coverage · selection objective
                                   </div>
-                                ))}
+                                  <div className="text-xl font-semibold text-slate-100">
+                                    {!teamExactEvidenceAvailable ||
+                                    optimizedTeam.metrics
+                                      .optimization_coverage_percentage == null
+                                      ? "—"
+                                      : `${optimizedTeam.metrics.optimization_coverage_percentage}%`}
+                                  </div>
+                                </div>
+                                <p className="-mt-1 mb-2 text-[9px] text-slate-500">
+                                  The solver maximizes this score, then
+                                  minimizes cost among tied teams.
+                                </p>
+                                <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+                                  {(
+                                    optimizedTeam.metrics.skills_coverage || []
+                                  ).map((detail, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex justify-between items-center text-[10px] border-b border-white/5 py-1.5"
+                                    >
+                                      <span className="text-slate-300 font-medium">
+                                        {detail.skill}{" "}
+                                        <span className="text-[9px] text-slate-500 font-mono">
+                                          (L{detail.target_level})
+                                        </span>
+                                      </span>
+                                      <span className="text-slate-200">
+                                        Exact match:{" "}
+                                        <strong className="text-cyan-400 font-semibold">
+                                          {!teamExactEvidenceAvailable
+                                            ? "Re-optimize to refresh"
+                                            : detail.exact_match_skill ||
+                                              "None recorded"}
+                                        </strong>
+                                        <span className="ml-2 text-slate-500">
+                                          {!teamExactEvidenceAvailable ||
+                                          detail.exact_match_coverage_percentage ==
+                                            null
+                                            ? "—"
+                                            : Number(
+                                                detail.exact_match_coverage_percentage,
+                                              ).toFixed(1)}
+                                          %
+                                        </span>
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
                       {annealingStatus === "idle" && (
                         <div className="py-12 px-6 border border-dashed border-white/10 rounded-2xl bg-white/[0.01] text-center max-w-md mx-auto my-4 text-xs text-slate-400 leading-relaxed">
@@ -2753,20 +4267,6 @@ const IntelligenceCenterView = ({ active = true }) => {
                   </div>
                 }
               />
-              <AIExplanationPanel
-                subtab="team-builder"
-                context={{
-                  targetSkills: teamSkillsInput,
-                  budget: teamBudget,
-                  teamSize: teamSize,
-                  optimizedTeam: optimizedTeam,
-                  uploadedDataReadiness: intelligenceReadiness?.team_assembly,
-                }}
-                buttonText="Explain with AI"
-                autoRun
-                autoRunKey={resultRevisions.team}
-                disabled={!optimizedTeam || optimizingLoading}
-              />
             </motion.div>
           )}
 
@@ -2777,33 +4277,34 @@ const IntelligenceCenterView = ({ active = true }) => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="min-h-0 lg:flex-1 lg:h-full w-full flex flex-col"
+              className="min-h-0 min-w-0 flex-1 h-full w-full flex flex-col"
             >
               <MobileSplitPane
                 activePane={mobileActivePane}
                 setActivePane={setMobileActivePane}
-                leftTitle="Attrition Model Readiness"
-                rightTitle="Forecast Readiness"
+                leftTitle="Cohort Data"
+                rightTitle="Survival Curve & Details"
                 leftIcon={<Users size={14} />}
                 rightIcon={<TrendingUp size={14} />}
                 leftWidthClass="lg:w-[320px] xl:w-[340px]"
                 leftContent={
-                  <div className="premium-card h-auto lg:h-full p-4 md:p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col overflow-hidden">
+                  <div className="premium-card p-4 md:p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col min-h-0 h-full max-h-full overflow-hidden">
                     <div className="flex items-center justify-between shrink-0 border-b border-white/5 pb-2 mb-3">
                       <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
                         Attrition Model Readiness
                       </h3>
                       <span className="text-[9px] font-mono text-slate-500">
-                        {attritionModel?.status === "ready"
-                          ? `${attritionData.length} outcome-validated profiles`
+                        {attritionData.length > 0
+                          ? `${attritionData.length} observed records`
                           : attritionModel?.status === "cohort_descriptive"
                             ? `${attritionModel.eligible_observation_count} observed durations`
                             : "Outcome history required"}
                       </span>
                     </div>
 
-                    {/* Search + sort controls appear only when a validated model is available. */}
-                    {attritionModel?.status === "ready" && (
+                    {/* Search + sort the observed descriptive roster. */}
+                    {(attritionData.length > 0 ||
+                      attritionModel?.status === "cohort_descriptive") && (
                       <div className="shrink-0 space-y-2 mb-3">
                         <div className="relative">
                           <Search
@@ -2820,10 +4321,10 @@ const IntelligenceCenterView = ({ active = true }) => {
                         </div>
                         <div className="flex items-center gap-1.5">
                           {[
-                            { key: "hazard", label: "Risk" },
-                            { key: "name", label: "Name" },
                             { key: "tenure", label: "Tenure" },
-                            { key: "percentile", label: "Pct" },
+                            { key: "name", label: "Name" },
+                            { key: "department", label: "Dept" },
+                            { key: "survival", label: "Cohort S" },
                           ].map((opt) => (
                             <button
                               key={opt.key}
@@ -2851,7 +4352,7 @@ const IntelligenceCenterView = ({ active = true }) => {
                       </div>
                     )}
 
-                    <div className="space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                    <div className="space-y-2 flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar pr-1 max-h-96 lg:max-h-none">
                       {attritionLoading ? (
                         <div className="text-xs text-slate-500 text-center py-8">
                           Loading attrition model readiness...
@@ -2908,6 +4409,9 @@ const IntelligenceCenterView = ({ active = true }) => {
                           const isSel =
                             emp.employee_id ===
                             selectedAttritionEmp?.employee_id;
+                          const departed =
+                            emp.employment_status === "departed" ||
+                            emp.departure_observed === true;
                           return (
                             <button
                               key={emp.employee_id}
@@ -2926,26 +4430,33 @@ const IntelligenceCenterView = ({ active = true }) => {
                                     {emp.role} · {emp.department}
                                   </div>
                                   <div className="text-[9px] text-slate-500 mt-1 font-mono">
-                                    {emp.tenure_months} mo tenure ·{" "}
-                                    {emp.skills_count ?? 0} skills
+                                    {Number(emp.tenure_months || 0).toFixed(1)}{" "}
+                                    mo tenure · {emp.skills_count ?? 0} skills
                                   </div>
                                 </div>
                                 <div className="text-right shrink-0 flex flex-col items-end gap-1">
                                   <span
-                                    className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider"
-                                    style={{
-                                      color: tierColor(emp.risk_tier),
-                                      background: tierBg(emp.risk_tier),
-                                      border: `1px solid ${tierColor(emp.risk_tier)}33`,
-                                    }}
+                                    className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider border ${
+                                      departed
+                                        ? "text-slate-300 border-white/15 bg-white/5"
+                                        : "text-emerald-300 border-emerald-400/20 bg-emerald-400/10"
+                                    }`}
                                   >
-                                    {emp.risk_tier}
+                                    {departed ? "Departed" : "Active"}
                                   </span>
-                                  <div className="text-xs font-black text-rose-300 font-mono">
-                                    x{emp.hazard_ratio}
+                                  <div
+                                    className="text-xs font-black text-cyan-300 font-mono"
+                                    title="Share of the observed cohort still employed at this tenure (Kaplan–Meier, descriptive)"
+                                  >
+                                    {(
+                                      Number(
+                                        emp.cohort_survival_at_tenure ?? 1,
+                                      ) * 100
+                                    ).toFixed(0)}
+                                    %
                                   </div>
                                   <div className="text-[8px] text-slate-500 uppercase">
-                                    HR · P{emp.risk_percentile}
+                                    Cohort S(t)
                                   </div>
                                 </div>
                               </div>
@@ -2957,8 +4468,35 @@ const IntelligenceCenterView = ({ active = true }) => {
                   </div>
                 }
                 rightContent={
-                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 h-auto lg:h-full flex flex-col overflow-visible lg:overflow-hidden">
-                    {selectedAttritionEmp ? (
+                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 min-h-0 h-full max-h-full flex flex-col overflow-hidden">
+                    {attritionRun && attritionModel && (
+                      <div
+                        role="status"
+                        aria-live="polite"
+                        className="mb-4 shrink-0 rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-[10px] leading-relaxed text-slate-300"
+                      >
+                        <strong>Generated:</strong>{" "}
+                        <span className="font-mono">
+                          {new Date(attritionRun.generatedAt).toLocaleString()}
+                        </span>{" "}
+                        · <strong>Scenario ID:</strong>{" "}
+                        <span className="font-mono text-cyan-300">
+                          {attritionRun.scenarioId}
+                        </span>{" "}
+                        ·{" "}
+                        <span className="font-mono">
+                          {attritionRun.modelStatus}
+                        </span>{" "}
+                        ·{" "}
+                        <span className="font-mono">
+                          {attritionRun.curvePoints} curve points
+                        </span>
+                      </div>
+                    )}
+                    {/* Legacy formula detail renders only for validated selections
+                        carrying model levers. Descriptive roster selections fall
+                        through to the observed cohort view below. */}
+                    {selectedAttritionEmp?.levers ? (
                       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar space-y-6 pr-1">
                         <div className="flex items-center justify-between border-b border-white/5 pb-3 gap-3">
                           <div className="min-w-0">
@@ -4224,83 +5762,695 @@ const IntelligenceCenterView = ({ active = true }) => {
                         </div>
                       </div>
                     ) : attritionModel?.status === "cohort_descriptive" ? (
-                      <div className="mx-auto my-auto w-full max-w-3xl rounded-xl border border-cyan-400/20 bg-slate-950/50 p-5">
-                        <div className="text-sm font-bold text-cyan-200">
-                          Observed workforce survival
-                        </div>
-                        <p className="mt-1 text-xs leading-5 text-slate-300">
-                          Kaplan–Meier cohort estimate from uploaded employment
-                          dates. It describes this dataset and does not predict
-                          an individual employee’s outcome.
-                        </p>
-                        {survivalCurve.length > 1 && (
-                          <div className="mt-4 h-52 rounded-lg border border-white/10 bg-slate-950 p-3">
-                            <svg
-                              viewBox="0 0 100 100"
-                              preserveAspectRatio="none"
-                              className="h-full w-full"
-                              role="img"
-                              aria-label="Observed workforce survival curve"
-                            >
-                              {[0, 25, 50, 75, 100].map((v) => (
-                                <line
-                                  key={v}
-                                  x1="0"
-                                  x2="100"
-                                  y1={100 - v}
-                                  y2={100 - v}
-                                  stroke="rgba(255,255,255,.09)"
-                                  strokeDasharray="2 2"
-                                />
-                              ))}
-                              <path
-                                fill="none"
-                                stroke="#22d3ee"
-                                strokeWidth="1.5"
-                                vectorEffect="non-scaling-stroke"
-                                d={survivalCurve.reduce((path, point) => {
-                                  const maxMonth = Math.max(
-                                    1,
-                                    survivalCurve[survivalCurve.length - 1]
-                                      .tenure_month,
-                                  );
-                                  const x =
-                                    (point.tenure_month / maxMonth) * 100;
-                                  const y =
-                                    100 - point.survival_probability * 100;
-                                  return `${path} H ${x} V ${y}`;
-                                }, "M 0 0")}
-                              />
-                            </svg>
-                            <div className="mt-1 flex justify-between text-[9px] font-mono text-slate-500">
-                              <span>0 months</span>
-                              <span>
-                                {survivalCurve[
-                                  survivalCurve.length - 1
-                                ].tenure_month.toFixed(1)}{" "}
-                                months observed
-                              </span>
+                      <div className="my-2 w-full flex-1 min-h-0 rounded-xl border border-cyan-400/20 bg-slate-950/50 p-4 md:p-5 flex flex-col gap-4 overflow-y-auto overscroll-contain custom-scrollbar">
+                        {selectedAttritionEmp && (
+                          <div className="rounded-xl border border-indigo-400/25 bg-indigo-500/[0.06] px-4 py-3">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="text-[9px] font-bold uppercase tracking-widest text-indigo-300">
+                                  Selected record — observed facts, not a
+                                  forecast
+                                </div>
+                                <div className="mt-1 truncate text-base font-extrabold text-white">
+                                  {selectedAttritionEmp.full_name}
+                                </div>
+                                <div className="mt-0.5 truncate text-[10px] text-slate-400">
+                                  {selectedAttritionEmp.role} ·{" "}
+                                  {selectedAttritionEmp.department} ·{" "}
+                                  {Number(
+                                    selectedAttritionEmp.tenure_months || 0,
+                                  ).toFixed(1)}{" "}
+                                  months tenure ·{" "}
+                                  {selectedAttritionEmp.skills_count ?? 0}{" "}
+                                  recorded skills ·{" "}
+                                  {selectedAttritionEmp.employment_status ||
+                                    "active"}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedAttritionEmp(null)}
+                                className="shrink-0 rounded-lg border border-white/10 px-2 py-1 text-[10px] text-slate-300 hover:border-indigo-400/50 hover:text-white"
+                              >
+                                Clear selection
+                              </button>
                             </div>
+                            <div className="mt-2 grid grid-cols-1 gap-2 text-[10px] leading-relaxed sm:grid-cols-3">
+                              <div className="rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2">
+                                <div className="text-[9px] uppercase tracking-wider text-slate-500">
+                                  Cohort still employed at this tenure
+                                </div>
+                                <div className="mt-1 font-mono text-lg font-bold text-cyan-300">
+                                  {(
+                                    Number(
+                                      selectedAttritionEmp.cohort_survival_at_tenure ??
+                                        1,
+                                    ) * 100
+                                  ).toFixed(1)}
+                                  %
+                                </div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2">
+                                <div className="text-[9px] uppercase tracking-wider text-slate-500">
+                                  Tenure vs cohort median
+                                </div>
+                                <div className="mt-1 font-mono text-lg font-bold text-white">
+                                  {Number(
+                                    selectedAttritionEmp.tenure_months || 0,
+                                  ).toFixed(1)}{" "}
+                                  <span className="text-[10px] font-normal text-slate-500">
+                                    / median{" "}
+                                    {Number(
+                                      populationStats?.median_tenure_months ||
+                                        0,
+                                    ).toFixed(1)}{" "}
+                                    mo
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2">
+                                <div className="text-[9px] uppercase tracking-wider text-slate-500">
+                                  Tenure marked on curve
+                                </div>
+                                <div className="mt-1 text-[11px] text-slate-300">
+                                  Amber marker below shows this tenure on the
+                                  observed curve.
+                                </div>
+                              </div>
+                            </div>
+                            <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
+                              Context only: these numbers place one observed
+                              record against the cohort curve. They do not
+                              predict this person&apos;s departure.
+                            </p>
                           </div>
                         )}
-                        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-slate-400">
-                          <span>
-                            {attritionModel.eligible_observation_count} valid
-                            durations
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-bold text-cyan-200">
+                              Observed workforce survival
+                            </div>
+                            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-300">
+                              Kaplan–Meier estimate calculated from uploaded
+                              employee employment dates. This describes the
+                              observed cohort; it is not an individual risk
+                              forecast.
+                            </p>
+                          </div>
+                          <span className="rounded-md border border-cyan-300/20 bg-cyan-300/5 px-2 py-1 text-[9px] font-mono uppercase text-cyan-200">
+                            {attritionModel.estimator ||
+                              "Kaplan–Meier cohort estimate"}
                           </span>
-                          <span>
-                            {attritionModel.observed_departure_count} departures
-                          </span>
-                          <span>
-                            {attritionModel.right_censored_count} censored
-                            records
-                          </span>
-                          <span>
-                            {attritionModel.excluded_missing_start_count +
-                              attritionModel.excluded_missing_outcome_or_censor_count +
-                              attritionModel.excluded_invalid_date_order_count}{" "}
-                            excluded records
-                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                          {[
+                            [
+                              "Included records",
+                              attritionModel.eligible_observation_count,
+                            ],
+                            [
+                              "Recorded departures",
+                              attritionModel.observed_departure_count,
+                            ],
+                            [
+                              "Active / censored",
+                              attritionModel.right_censored_count,
+                            ],
+                            [
+                              "Excluded records",
+                              attritionModel.excluded_record_count ??
+                                attritionModel.excluded_missing_start_count +
+                                  attritionModel.excluded_missing_outcome_or_censor_count +
+                                  attritionModel.excluded_invalid_date_order_count,
+                            ],
+                          ].map(([label, value]) => (
+                            <div
+                              key={label}
+                              className="rounded-lg border border-white/10 bg-slate-950/80 px-3 py-2"
+                            >
+                              <div className="text-[9px] uppercase tracking-wider text-slate-500">
+                                {label}
+                              </div>
+                              <div className="mt-1 text-lg font-bold tabular-nums text-white">
+                                {Number(value || 0).toLocaleString()}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {survivalCurve.length > 0 ? (
+                          (() => {
+                            const maxMonth = Math.max(
+                              1,
+                              survivalCurve[survivalCurve.length - 1]
+                                .tenure_month,
+                            );
+                            // Fixed viewBox + margin convention: uniform scale,
+                            // so axis text stays crisp at any screen size.
+                            // Wide 32:15 frame fills the card without dead space.
+                            const CW = 640;
+                            const CH = 300;
+                            const ML = 52;
+                            const MR = 14;
+                            const MT = 14;
+                            const MB = 44;
+                            const PW = CW - ML - MR;
+                            const PH = CH - MT - MB;
+                            const xFor = (month) =>
+                              ML + (Math.max(0, month) / maxMonth) * PW;
+                            const yFor = (probability) =>
+                              MT +
+                              (1 - Math.min(1, Math.max(0, probability))) * PH;
+                            const tickSteps = [
+                              1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000,
+                            ];
+                            const tickStep =
+                              tickSteps.find((s) => maxMonth / s <= 6) || 1000;
+                            const xTicks = [];
+                            for (
+                              let t = 0;
+                              t <= maxMonth + 1e-9;
+                              t += tickStep
+                            ) {
+                              xTicks.push(Math.min(t, maxMonth));
+                            }
+                            if (xTicks[xTicks.length - 1] < maxMonth) {
+                              xTicks.push(maxMonth);
+                            }
+                            // Kaplan–Meier step function from (0, 100%).
+                            let stepPath = `M ${ML} ${MT}`;
+                            survivalCurve.forEach((point) => {
+                              stepPath += ` H ${xFor(point.tenure_month)} V ${yFor(point.survival_probability)}`;
+                            });
+                            stepPath += ` H ${ML + PW}`;
+                            const bandTop = survivalCurve
+                              .map(
+                                (p) =>
+                                  `${xFor(p.tenure_month)},${yFor(p.ci_95_high)}`,
+                              )
+                              .join(" ");
+                            const bandBottom = [...survivalCurve]
+                              .reverse()
+                              .map(
+                                (p) =>
+                                  `${xFor(p.tenure_month)},${yFor(p.ci_95_low)}`,
+                              )
+                              .join(" ");
+                            const empTenure =
+                              selectedAttritionEmp?.tenure_months != null
+                                ? Math.min(
+                                    Number(
+                                      selectedAttritionEmp.tenure_months,
+                                    ) || 0,
+                                    maxMonth,
+                                  )
+                                : null;
+                            const hoveredPoint =
+                              hoveredSurvMonth != null
+                                ? survivalCurve[hoveredSurvMonth]
+                                : null;
+                            const pickSurvPoint = (clientX, clientY, el) => {
+                              const rect = el.getBoundingClientRect();
+                              const px = clientX - rect.left;
+                              const py = clientY - rect.top;
+                              const month =
+                                (((px / rect.width) * CW - ML) / PW) * maxMonth;
+                              let best = 0;
+                              survivalCurve.forEach((p, i) => {
+                                if (
+                                  Math.abs(p.tenure_month - month) <
+                                  Math.abs(
+                                    survivalCurve[best].tenure_month - month,
+                                  )
+                                ) {
+                                  best = i;
+                                }
+                              });
+                              setHoveredSurvMonth(best);
+                              setSurvHoverPos({ x: px, y: py, w: rect.width });
+                            };
+                            return (
+                              <>
+                                {survGraphExpanded && (
+                                  <div
+                                    aria-hidden="true"
+                                    onClick={() => setSurvGraphExpanded(false)}
+                                    className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm"
+                                  />
+                                )}
+                                <div
+                                  className={`rounded-lg border border-white/10 bg-slate-950 p-3 ${
+                                    survGraphExpanded
+                                      ? "fixed inset-2 z-[90] flex flex-col overflow-y-auto overscroll-contain md:inset-4"
+                                      : "relative"
+                                  }`}
+                                >
+                                  <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] text-slate-400">
+                                    <span className="flex items-center gap-1.5">
+                                      <i className="h-0.5 w-4 bg-cyan-400" />
+                                      Estimated survival
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                      <i className="h-2 w-4 rounded-sm bg-cyan-400/20" />
+                                      95% confidence band
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                      <i className="h-2 w-2 rounded-full border-2 border-cyan-300 bg-slate-950" />
+                                      Departure event time
+                                    </span>
+                                    {empTenure != null && (
+                                      <span className="flex items-center gap-1.5">
+                                        <i className="h-2 w-2 rounded-full bg-amber-400" />
+                                        Selected tenure
+                                      </span>
+                                    )}
+                                    <span className="ml-auto flex items-center gap-2">
+                                      <span className="hidden sm:inline">
+                                        Hover any point for full details
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setSurvGraphExpanded((v) => !v)
+                                        }
+                                        title={
+                                          survGraphExpanded
+                                            ? "Back to normal size"
+                                            : "Expand graph to full screen"
+                                        }
+                                        aria-label={
+                                          survGraphExpanded
+                                            ? "Restore graph to normal size"
+                                            : "Expand graph to full screen"
+                                        }
+                                        className="rounded-lg border border-white/10 bg-white/[0.04] p-1.5 text-slate-300 transition hover:border-cyan-300/40 hover:text-cyan-200 cursor-pointer"
+                                      >
+                                        {survGraphExpanded ? (
+                                          <Minimize2 size={13} />
+                                        ) : (
+                                          <Maximize2 size={13} />
+                                        )}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const table = document.getElementById(
+                                            "survival-estimate-table",
+                                          );
+                                          // Scroll only the panel's own
+                                          // scroller — never the whole page.
+                                          const scroller =
+                                            table?.closest(".overflow-y-auto");
+                                          if (table && scroller) {
+                                            const top =
+                                              table.getBoundingClientRect()
+                                                .top -
+                                              scroller.getBoundingClientRect()
+                                                .top +
+                                              scroller.scrollTop -
+                                              8;
+                                            scroller.scrollTo({
+                                              top,
+                                              behavior: "smooth",
+                                            });
+                                          }
+                                        }}
+                                        title="Jump to the estimate table below the graph"
+                                        className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-slate-300 transition hover:bg-white/10 hover:text-white cursor-pointer"
+                                      >
+                                        Table ↓
+                                      </button>
+                                    </span>
+                                  </div>
+                                  <div
+                                    className="relative aspect-[32/15] w-full cursor-crosshair"
+                                    onMouseMove={(e) => {
+                                      pickSurvPoint(
+                                        e.clientX,
+                                        e.clientY,
+                                        e.currentTarget,
+                                      );
+                                    }}
+                                    onClick={(e) => {
+                                      pickSurvPoint(
+                                        e.clientX,
+                                        e.clientY,
+                                        e.currentTarget,
+                                      );
+                                    }}
+                                    onMouseLeave={() => {
+                                      setHoveredSurvMonth(null);
+                                      setSurvHoverPos(null);
+                                    }}
+                                  >
+                                    <svg
+                                      viewBox={`0 0 ${CW} ${CH}`}
+                                      className="h-full w-full"
+                                      role="img"
+                                      aria-label="Kaplan-Meier observed workforce survival curve with 95 percent confidence band. Hover any point for details."
+                                    >
+                                      {[
+                                        0, 10, 20, 30, 40, 50, 60, 70, 80, 90,
+                                        100,
+                                      ].map((v) => (
+                                        <line
+                                          key={v}
+                                          x1={ML}
+                                          x2={ML + PW}
+                                          y1={yFor(v / 100)}
+                                          y2={yFor(v / 100)}
+                                          stroke={
+                                            v % 20 === 0
+                                              ? "rgba(255,255,255,.16)"
+                                              : "rgba(255,255,255,.06)"
+                                          }
+                                          strokeWidth="1"
+                                        />
+                                      ))}
+                                      {[0, 20, 40, 60, 80, 100].map((v) => (
+                                        <text
+                                          key={v}
+                                          x={ML - 8}
+                                          y={yFor(v / 100) + 4}
+                                          textAnchor="end"
+                                          fill="#94a3b8"
+                                          fontSize="12"
+                                          fontFamily="ui-monospace, monospace"
+                                        >
+                                          {v}%
+                                        </text>
+                                      ))}
+                                      <text
+                                        x={14}
+                                        y={MT + PH / 2}
+                                        textAnchor="middle"
+                                        fill="#64748b"
+                                        fontSize="12"
+                                        transform={`rotate(-90 14 ${MT + PH / 2})`}
+                                      >
+                                        Survival probability
+                                      </text>
+                                      {xTicks.map((t) => (
+                                        <g key={t}>
+                                          <line
+                                            x1={xFor(t)}
+                                            x2={xFor(t)}
+                                            y1={MT + PH}
+                                            y2={MT + PH + 5}
+                                            stroke="rgba(255,255,255,.25)"
+                                            strokeWidth="1"
+                                          />
+                                          <text
+                                            x={xFor(t)}
+                                            y={MT + PH + 19}
+                                            textAnchor="middle"
+                                            fill="#94a3b8"
+                                            fontSize="12"
+                                            fontFamily="ui-monospace, monospace"
+                                          >
+                                            {Number(t.toFixed(1))}
+                                          </text>
+                                        </g>
+                                      ))}
+                                      <text
+                                        x={ML + PW / 2}
+                                        y={CH - 6}
+                                        textAnchor="middle"
+                                        fill="#64748b"
+                                        fontSize="12"
+                                      >
+                                        Observed tenure (months)
+                                      </text>
+                                      <polygon
+                                        points={`${bandTop} ${bandBottom}`}
+                                        fill="rgba(34,211,238,.10)"
+                                      />
+                                      <path
+                                        fill="none"
+                                        stroke="#22d3ee"
+                                        strokeWidth="2.5"
+                                        strokeLinejoin="round"
+                                        d={stepPath}
+                                      />
+                                      {empTenure != null && (
+                                        <g pointerEvents="none">
+                                          <line
+                                            x1={xFor(empTenure)}
+                                            x2={xFor(empTenure)}
+                                            y1={MT}
+                                            y2={MT + PH}
+                                            stroke="rgba(251,191,36,.6)"
+                                            strokeWidth="1.5"
+                                            strokeDasharray="5 4"
+                                          />
+                                          <circle
+                                            cx={xFor(empTenure)}
+                                            cy={yFor(
+                                              Number(
+                                                selectedAttritionEmp.cohort_survival_at_tenure ??
+                                                  1,
+                                              ),
+                                            )}
+                                            r="5"
+                                            fill="#fbbf24"
+                                            stroke="#020617"
+                                            strokeWidth="1.5"
+                                          />
+                                        </g>
+                                      )}
+                                      <g pointerEvents="none">
+                                        {survivalCurve.map((point, index) => (
+                                          <g
+                                            key={`${point.tenure_month}-${index}`}
+                                          >
+                                            {point.departures > 0 ? (
+                                              <circle
+                                                cx={xFor(point.tenure_month)}
+                                                cy={yFor(
+                                                  point.survival_probability,
+                                                )}
+                                                r={
+                                                  hoveredSurvMonth === index
+                                                    ? 6.5
+                                                    : 4.5
+                                                }
+                                                fill={
+                                                  hoveredSurvMonth === index
+                                                    ? "#22d3ee"
+                                                    : "#0b1220"
+                                                }
+                                                stroke="#22d3ee"
+                                                strokeWidth="2"
+                                              />
+                                            ) : (
+                                              <circle
+                                                cx={xFor(point.tenure_month)}
+                                                cy={yFor(
+                                                  point.survival_probability,
+                                                )}
+                                                r="2.2"
+                                                fill="#475569"
+                                              />
+                                            )}
+                                          </g>
+                                        ))}
+                                      </g>
+                                      {hoveredPoint && (
+                                        <line
+                                          x1={xFor(hoveredPoint.tenure_month)}
+                                          x2={xFor(hoveredPoint.tenure_month)}
+                                          y1={MT}
+                                          y2={MT + PH}
+                                          stroke="rgba(255,255,255,.35)"
+                                          strokeWidth="1"
+                                          strokeDasharray="3 3"
+                                          pointerEvents="none"
+                                        />
+                                      )}
+                                    </svg>
+                                    {hoveredPoint && survHoverPos && (
+                                      <div
+                                        aria-hidden="true"
+                                        className="pointer-events-none absolute z-20 w-52 rounded-xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-md"
+                                        style={(() => {
+                                          const frac =
+                                            survHoverPos.x /
+                                            Math.max(survHoverPos.w || 1, 1);
+                                          return {
+                                            top: Math.max(
+                                              survHoverPos.y - 8,
+                                              4,
+                                            ),
+                                            transform: "translateY(-100%)",
+                                            ...(frac <= 0.62
+                                              ? { left: survHoverPos.x + 14 }
+                                              : {
+                                                  right:
+                                                    (survHoverPos.w || 0) -
+                                                    survHoverPos.x +
+                                                    14,
+                                                }),
+                                          };
+                                        })()}
+                                      >
+                                        <div className="text-[9px] font-bold uppercase tracking-widest text-cyan-300">
+                                          {Number(
+                                            hoveredPoint.tenure_month,
+                                          ).toFixed(1)}{" "}
+                                          months tenure
+                                        </div>
+                                        <dl className="mt-1.5 space-y-1 text-[10px] tabular-nums">
+                                          <div className="flex justify-between gap-2">
+                                            <dt className="text-slate-500">
+                                              Survival
+                                            </dt>
+                                            <dd className="font-bold text-white">
+                                              {(
+                                                hoveredPoint.survival_probability *
+                                                100
+                                              ).toFixed(1)}
+                                              %
+                                            </dd>
+                                          </div>
+                                          <div className="flex justify-between gap-2">
+                                            <dt className="text-slate-500">
+                                              95% CI
+                                            </dt>
+                                            <dd className="font-mono text-slate-300">
+                                              {(
+                                                hoveredPoint.ci_95_low * 100
+                                              ).toFixed(1)}
+                                              –
+                                              {(
+                                                hoveredPoint.ci_95_high * 100
+                                              ).toFixed(1)}
+                                              %
+                                            </dd>
+                                          </div>
+                                          <div className="flex justify-between gap-2">
+                                            <dt className="text-slate-500">
+                                              At risk
+                                            </dt>
+                                            <dd className="font-mono text-slate-300">
+                                              {hoveredPoint.at_risk}
+                                            </dd>
+                                          </div>
+                                          <div className="flex justify-between gap-2">
+                                            <dt className="text-slate-500">
+                                              Departures
+                                            </dt>
+                                            <dd className="font-mono text-slate-300">
+                                              {hoveredPoint.departures}
+                                            </dd>
+                                          </div>
+                                          <div className="flex justify-between gap-2">
+                                            <dt className="text-slate-500">
+                                              Censored
+                                            </dt>
+                                            <dd className="font-mono text-slate-300">
+                                              {hoveredPoint.censored}
+                                            </dd>
+                                          </div>
+                                        </dl>
+                                        <p className="mt-1.5 border-t border-white/5 pt-1.5 text-[9px] leading-relaxed text-slate-500">
+                                          Observed cohort evidence — not a
+                                          forecast.
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div
+                                  id="survival-estimate-table"
+                                  className="min-h-0 scroll-mt-2 overflow-hidden rounded-lg border border-white/10"
+                                >
+                                  <div className="border-b border-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-300">
+                                    Survival estimate by observed event time (
+                                    {survivalCurve.length} rows)
+                                  </div>
+                                  <div className="max-h-64 overflow-auto custom-scrollbar">
+                                    <table className="w-full text-left text-[10px] tabular-nums">
+                                      <thead className="sticky top-0 bg-slate-900 text-[9px] uppercase tracking-wider text-slate-500">
+                                        <tr>
+                                          <th className="px-3 py-2">
+                                            Tenure (mo)
+                                          </th>
+                                          <th className="px-3 py-2">
+                                            Survival
+                                          </th>
+                                          <th className="px-3 py-2">95% CI</th>
+                                          <th className="px-3 py-2">At risk</th>
+                                          <th className="px-3 py-2">
+                                            Departures
+                                          </th>
+                                          <th className="px-3 py-2">
+                                            Censored
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-white/5 text-slate-300">
+                                        {survivalCurve.map((point, index) => (
+                                          <tr
+                                            key={`${point.tenure_month}-${index}`}
+                                          >
+                                            <td className="px-3 py-2">
+                                              {Number(
+                                                point.tenure_month,
+                                              ).toFixed(1)}
+                                            </td>
+                                            <td className="px-3 py-2 text-cyan-200">
+                                              {(
+                                                point.survival_probability * 100
+                                              ).toFixed(1)}
+                                              %
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              {(point.ci_95_low * 100).toFixed(
+                                                1,
+                                              )}
+                                              –
+                                              {(point.ci_95_high * 100).toFixed(
+                                                1,
+                                              )}
+                                              %
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              {point.at_risk}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              {point.departures}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              {point.censored}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </>
+                            );
+                          })()
+                        ) : (
+                          <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.04] p-4 text-xs text-amber-100">
+                            The API reports a cohort model but returned no
+                            survival time points. Check the uploaded employment
+                            outcome dates.
+                          </div>
+                        )}
+                        <div className="text-[10px] leading-4 text-slate-500">
+                          Source: {attritionModel.date_based_observation_count}{" "}
+                          date-based records;{" "}
+                          {attritionModel.duration_based_observation_count}{" "}
+                          duration-based records.{" "}
+                          {attritionModel.excluded_invalid_date_order_count}{" "}
+                          records were excluded because the recorded end/censor
+                          date did not follow the start date. Intervals are
+                          descriptive uncertainty bounds, not a validation
+                          score.
                         </div>
                       </div>
                     ) : (
@@ -4329,18 +6479,6 @@ const IntelligenceCenterView = ({ active = true }) => {
                   </div>
                 }
               />
-              <AIExplanationPanel
-                subtab="attrition"
-                context={{
-                  model: attritionModel,
-                  survivalCurve,
-                  uploadedDataReadiness: intelligenceReadiness?.attrition,
-                }}
-                buttonText="Explain with AI"
-                autoRun
-                autoRunKey={`${resultRevisions.attrition}:${selectedAttritionEmp?.employee_id || "population"}:${moraleSlider}:${salarySlider}:${workloadSlider}`}
-                disabled={!attritionModel || attritionLoading}
-              />
             </motion.div>
           )}
 
@@ -4351,18 +6489,57 @@ const IntelligenceCenterView = ({ active = true }) => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="min-h-0 lg:flex-1 lg:h-full w-full flex flex-col"
+              className="min-h-0 min-w-0 flex-1 h-full w-full flex flex-col"
             >
+              <div className="mb-3 grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+                {[
+                  ["Participants shown", onaData?.nodes?.length || 0],
+                  ["Observed ties", onaData?.links?.length || 0],
+                  [
+                    "Events represented",
+                    onaData?.metrics?.represented_record_count || 0,
+                  ],
+                  [
+                    "Cross-department",
+                    `${onaCrossDeptLinks} · ${onaData?.links?.length ? Math.round((onaCrossDeptLinks / onaData.links.length) * 100) : 0}%`,
+                  ],
+                  [
+                    "Employees without events",
+                    onaEmployeesWithoutEvents ?? "—",
+                  ],
+                  [
+                    "Evidence dates",
+                    onaDateRange.length
+                      ? `${onaDateRange[0]} – ${onaDateRange[onaDateRange.length - 1]}`
+                      : "No dated events",
+                  ],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="min-w-0 rounded-xl border border-white/10 bg-slate-950/55 px-3 py-2.5"
+                  >
+                    <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                      {label}
+                    </div>
+                    <div
+                      className="mt-1 truncate text-base font-semibold text-white"
+                      title={String(value)}
+                    >
+                      {value}
+                    </div>
+                  </div>
+                ))}
+              </div>
               <MobileSplitPane
                 activePane={mobileActivePane}
                 setActivePane={setMobileActivePane}
-                leftTitle="3D Collaboration Space"
+                leftTitle="2D Collaboration Map"
                 rightTitle="Network Intelligence"
                 leftIcon={<Share2 size={14} />}
                 rightIcon={<Activity size={14} />}
                 leftWidthClass="lg:w-[60%] xl:w-[63%]"
                 leftContent={
-                  <div className="premium-card p-4 md:p-5 border border-white/5 bg-slate-950/30 backdrop-blur-xl flex flex-col justify-between relative overflow-hidden h-auto lg:h-full">
+                  <div className="premium-card p-4 md:p-5 border border-white/5 bg-slate-950/30 backdrop-blur-xl flex flex-col justify-between relative h-full max-h-full min-h-0 overflow-y-auto overscroll-contain custom-scrollbar">
                     <div className="flex-1 flex flex-col min-h-0">
                       {/* Top Canvas Bar with Filter & Search Controls */}
                       <div className="flex flex-wrap items-center justify-between border-b border-white/5 pb-3 mb-3 gap-2 shrink-0">
@@ -4372,45 +6549,45 @@ const IntelligenceCenterView = ({ active = true }) => {
                               Observed Collaboration Network
                             </h3>
                             <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-[8.5px] font-mono font-bold text-cyan-300">
-                              {onaData?.nodes?.length || 0} Nodes ·{" "}
-                              {onaData?.links?.length || 0} Links
+                              {onaData?.nodes?.length || 0} People ·{" "}
+                              {onaData?.links?.length || 0} Ties
                             </span>
                           </div>
                           <p className="mt-0.5 text-[9.5px] text-slate-400">
-                            Uploaded collaboration events ·{" "}
-                            {onaData?.metrics?.window_days || 90}-day window ·
-                            relative centrality
+                            Employee event network ·{" "}
+                            {onaData?.metrics?.window_days || onaWindowDays}-day
+                            window · candidates excluded
                           </p>
                           <p className="mt-0.5 text-[8.5px] text-slate-500">
                             {onaData?.metrics?.employee_scope_truncated
-                              ? "Employee scope is capped; displayed centrality is relative to this subset. · "
-                              : ""}
-                            {onaData?.metrics?.latest_represented_record_at
-                              ? `Latest represented record: ${new Date(onaData.metrics.latest_represented_record_at).toLocaleDateString()}`
-                              : "No qualifying event in this window"}
+                              ? `${onaData.metrics.participant_count_before_display_limit} event participants found; showing the ${onaData.metrics.employee_limit || 500} most active. ${onaData.metrics.records_excluded_by_display_limit || 0} event records to people outside this map are excluded. Centrality is relative to this sample.`
+                              : onaDateRange.length
+                                ? `${onaData?.metrics?.represented_record_count || 0} represented records · Evidence dates: ${onaDateRange[0]} – ${onaDateRange[onaDateRange.length - 1]}`
+                                : "No qualifying collaboration events in this window"}
                           </p>
                         </div>
 
-                        {/* Search in 3D Canvas */}
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <div className="relative">
                             <Search
                               size={11}
                               className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
                             />
                             <input
+                              aria-label="Search network participants"
                               type="text"
                               value={onaSearchQuery}
                               onChange={(e) =>
                                 setOnaSearchQuery(e.target.value)
                               }
-                              placeholder="Find member in 3D space..."
+                              placeholder="Search people, roles, teams…"
                               className="rounded-lg border border-white/10 bg-slate-950/80 pl-7 pr-2 py-1 text-[9.5px] text-white placeholder:text-slate-600 outline-none focus:border-cyan-400/50 w-36 sm:w-44"
                             />
                           </div>
 
                           {/* Department Filter */}
                           <select
+                            aria-label="Filter by department"
                             value={onaDeptFilter}
                             onChange={(e) => setOnaDeptFilter(e.target.value)}
                             className="rounded-lg border border-white/10 bg-slate-950/80 px-2 py-1 text-[9.5px] font-bold text-slate-300 outline-none focus:border-cyan-400/50 cursor-pointer"
@@ -4422,11 +6599,84 @@ const IntelligenceCenterView = ({ active = true }) => {
                               </option>
                             ))}
                           </select>
+                          <select
+                            aria-label="Collaboration event date window"
+                            value={onaWindowDays}
+                            onChange={(event) => {
+                              const days = Number(event.target.value);
+                              setOnaWindowDays(days);
+                              fetchOna(days);
+                            }}
+                            className="rounded-lg border border-white/10 bg-slate-950/80 px-2 py-1 text-[9.5px] font-bold text-slate-300 outline-none focus:border-cyan-400/50 cursor-pointer"
+                          >
+                            {[30, 90, 180, 365].map((days) => (
+                              <option key={days} value={days}>
+                                Last {days} days
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            disabled={!selectedOnaNode}
+                            onClick={() => {
+                              const enteringFocus = !onaFocusSelected;
+                              if (enteringFocus) {
+                                setOnaDeptFilter("all");
+                                setOnaSearchQuery("");
+                              }
+                              setOnaFocusSelected(enteringFocus);
+                            }}
+                            className="rounded-lg border border-cyan-300/20 bg-cyan-300/5 px-2 py-1 text-[9.5px] font-semibold text-cyan-100 hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {onaFocusSelected
+                              ? "Show full network"
+                              : "Focus connections"}
+                          </button>
                         </div>
                       </div>
 
-                      {/* 3D Force Canvas Container */}
-                      <div className="relative flex-1 min-h-[420px] lg:min-h-0 w-full touch-none border border-white/10 bg-[#020408] backdrop-blur-2xl rounded-2xl overflow-hidden flex items-center justify-center select-none shadow-inner">
+                      {/* 2D observed collaboration map */}
+                      <div className="relative flex-1 min-h-[280px] lg:min-h-0 w-full touch-none border border-white/10 bg-[#020408] backdrop-blur-2xl rounded-2xl overflow-hidden flex items-center justify-center select-none shadow-inner">
+                        {(() => {
+                          const q = onaSearchQuery.trim().toLowerCase();
+                          const visibleCount = (onaData?.nodes || []).filter(
+                            (n) =>
+                              (onaDeptFilter === "all" ||
+                                n.department === onaDeptFilter) &&
+                              (!q ||
+                                (n.name || "").toLowerCase().includes(q) ||
+                                (n.role || "").toLowerCase().includes(q)),
+                          ).length;
+                          if (
+                            (onaData?.nodes?.length || 0) > 0 &&
+                            visibleCount === 0
+                          ) {
+                            return (
+                              <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-[#020408]/95 p-6 text-center">
+                                <div className="text-xs font-bold text-amber-200">
+                                  Filters hide all {onaData.nodes.length} nodes
+                                </div>
+                                <p className="max-w-xs text-[11px] leading-relaxed text-slate-400">
+                                  The department filter or search matches
+                                  nobody, so hover and click find nothing. Clear
+                                  them to restore the graph.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOnaDeptFilter("all");
+                                    setOnaSearchQuery("");
+                                    setOnaFocusSelected(false);
+                                  }}
+                                  className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-200 transition hover:bg-cyan-300/20 cursor-pointer"
+                                >
+                                  Clear filters
+                                </button>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                         {onaLoading ? (
                           <div className="text-slate-400 text-xs flex items-center gap-2">
                             <RefreshCw
@@ -4437,8 +6687,15 @@ const IntelligenceCenterView = ({ active = true }) => {
                             events...
                           </div>
                         ) : onaError ? (
-                          <div className="max-w-xl px-6 text-center text-xs text-rose-300 break-words">
-                            {onaError}
+                          <div className="flex max-w-xl flex-col items-center gap-3 px-6 text-center text-xs text-rose-300 break-words">
+                            <span>{onaError}</span>
+                            <button
+                              type="button"
+                              onClick={() => fetchOna(onaWindowDays)}
+                              className="rounded-lg border border-rose-300/25 px-3 py-1.5 font-semibold text-rose-100 hover:bg-rose-300/10"
+                            >
+                              Retry
+                            </button>
                           </div>
                         ) : !onaData?.nodes?.length ? (
                           <div className="text-slate-400 text-xs flex flex-col items-center gap-2 px-6 text-center">
@@ -4449,18 +6706,21 @@ const IntelligenceCenterView = ({ active = true }) => {
                             collaboration.
                           </div>
                         ) : (
-                          <OnaGraph3DCanvas
+                          <OnaNetworkMap2D
                             nodes={onaData.nodes}
                             links={onaData.links}
-                            colorMode={onaColorMode}
                             deptFilter={onaDeptFilter}
                             searchQuery={onaSearchQuery}
                             selectedId={selectedOnaNode?.id ?? null}
+                            focusId={
+                              onaFocusSelected
+                                ? (selectedOnaNode?.id ?? null)
+                                : null
+                            }
                             onSelect={(node) => {
                               setSelectedOnaNode(node);
                               setMobileActivePane("right");
                             }}
-                            onColorModeChange={setOnaColorMode}
                           />
                         )}
                       </div>
@@ -4468,21 +6728,22 @@ const IntelligenceCenterView = ({ active = true }) => {
                   </div>
                 }
                 rightContent={
-                  <div className="premium-card p-4 md:p-5 border border-white/5 bg-slate-950/40 backdrop-blur-xl flex flex-col justify-between h-auto lg:h-full w-full overflow-y-auto custom-scrollbar space-y-4">
+                  <div className="premium-card p-4 md:p-5 border border-white/5 bg-slate-950/40 backdrop-blur-xl flex flex-col justify-between h-full max-h-full min-h-0 w-full overflow-y-auto overscroll-contain custom-scrollbar space-y-4">
                     {selectedOnaNode ? (
                       <>
                         {/* Employee Node Header */}
                         <div className="border-b border-white/5 pb-3">
                           <div className="flex items-center justify-between">
                             <span className="text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                              Selected Node Centrality
+                              Observed Network Profile
                             </span>
                             <span
                               className="px-2 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider"
                               style={{
-                                color: getNodeColor(selectedOnaNode),
-                                background: `${getNodeColor(selectedOnaNode)}18`,
-                                border: `1px solid ${getNodeColor(selectedOnaNode)}44`,
+                                color:
+                                  selectedOnaNode.department_color || "#38bdf8",
+                                background: `${selectedOnaNode.department_color || "#38bdf8"}18`,
+                                border: `1px solid ${selectedOnaNode.department_color || "#38bdf8"}44`,
                               }}
                             >
                               {selectedOnaNode.department}
@@ -4502,7 +6763,7 @@ const IntelligenceCenterView = ({ active = true }) => {
                           {/* PageRank Centrality */}
                           <div className="rounded-xl border border-white/5 bg-slate-950/80 p-3">
                             <div className="text-[8.5px] uppercase tracking-widest text-slate-500 font-bold">
-                              PageRank (Relative)
+                              PageRank (Relative to Sample)
                             </div>
                             <div className="text-2xl font-black font-mono text-amber-300 mt-0.5">
                               {(
@@ -4523,7 +6784,7 @@ const IntelligenceCenterView = ({ active = true }) => {
                           {/* Betweenness Centrality */}
                           <div className="rounded-xl border border-white/5 bg-slate-950/80 p-3">
                             <div className="text-[8.5px] uppercase tracking-widest text-slate-500 font-bold">
-                              Betweenness (Relative)
+                              Betweenness (Relative to Sample)
                             </div>
                             <div className="text-2xl font-black font-mono text-cyan-300 mt-0.5">
                               {(
@@ -4544,7 +6805,7 @@ const IntelligenceCenterView = ({ active = true }) => {
                           {/* Closeness Centrality */}
                           <div className="rounded-xl border border-white/5 bg-slate-950/80 p-3">
                             <div className="text-[8.5px] uppercase tracking-widest text-slate-500 font-bold">
-                              Closeness (Relative)
+                              Closeness (Relative to Sample)
                             </div>
                             <div className="text-2xl font-black font-mono text-indigo-300 mt-0.5">
                               {(
@@ -4591,11 +6852,78 @@ const IntelligenceCenterView = ({ active = true }) => {
                           </div>
                         </div>
 
-                        {/* Direct 1st-Degree Collaborators (Ego Network) */}
+                        <div className="rounded-xl border border-white/10 bg-slate-950/70 p-3.5 space-y-3">
+                          <div>
+                            <div className="text-[9px] font-bold uppercase tracking-widest text-white">
+                              Network evidence summary
+                            </div>
+                            <div className="mt-1 text-[9px] leading-relaxed text-slate-400">
+                              {onaData?.metrics?.component_count || 0} connected
+                              components · largest contains{" "}
+                              {onaData?.metrics?.largest_component_size || 0}{" "}
+                              people · average{" "}
+                              {Number(
+                                onaData?.metrics?.average_degree || 0,
+                              ).toFixed(1)}{" "}
+                              ties per person · density{" "}
+                              {(
+                                Number(onaData?.metrics?.graph_density || 0) *
+                                100
+                              ).toFixed(2)}
+                              %.
+                            </div>
+                          </div>
+                          <div>
+                            <div className="mb-1.5 text-[8px] font-bold uppercase tracking-widest text-slate-500">
+                              Recorded event types · current window
+                            </div>
+                            {onaEventTypeEntries.length ? (
+                              <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
+                                {onaEventTypeEntries.map(([type, count]) => (
+                                  <div
+                                    key={type}
+                                    className="grid grid-cols-[minmax(0,1fr)_2fr_auto] items-center gap-2 text-[9px]"
+                                  >
+                                    <span
+                                      className="truncate text-slate-300"
+                                      title={type}
+                                    >
+                                      {type}
+                                    </span>
+                                    <span className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                                      <span
+                                        className="block h-full rounded-full bg-cyan-400"
+                                        style={{
+                                          width: `${(Number(count) / maxOnaEventTypeCount) * 100}%`,
+                                        }}
+                                      />
+                                    </span>
+                                    <span className="font-mono text-slate-400">
+                                      {count}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-[9px] text-slate-500">
+                                No event type evidence for this window.
+                              </div>
+                            )}
+                          </div>
+                          <p className="border-t border-white/5 pt-2 text-[8px] leading-relaxed text-slate-500">
+                            These measures describe imported, observed
+                            collaboration records in the selected window. They
+                            are not performance, potential, or employee-value
+                            ratings. No visible tie means no qualifying in-scope
+                            record was available for this map.
+                          </p>
+                        </div>
+
+                        {/* Direct observed collaborators for the selected person */}
                         <div className="rounded-xl border border-white/5 bg-slate-950/70 p-3.5 space-y-2">
                           <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
                             <span className="text-[9px] uppercase tracking-widest font-bold text-cyan-300">
-                              Recorded Co-Participants (
+                              Recorded Collaborators (
                               {selectedNodeNeighbors.length})
                             </span>
                             <span className="text-[8px] text-slate-500 font-mono">
@@ -4604,13 +6932,20 @@ const IntelligenceCenterView = ({ active = true }) => {
                           </div>
                           {selectedNodeNeighbors.length === 0 ? (
                             <div className="text-[10px] text-slate-500 py-2 text-center">
-                              No direct links detected
+                              No qualifying in-scope recorded ties.
                             </div>
                           ) : (
-                            <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
-                              {selectedNodeNeighbors
-                                .slice(0, 6)
-                                .map(({ node, weight, isCross }) => (
+                            <div className="space-y-1.5 max-h-[45vh] overflow-y-auto custom-scrollbar pr-1">
+                              {selectedNodeNeighbors.map(
+                                ({
+                                  node,
+                                  weight,
+                                  channel,
+                                  isCross,
+                                  eventTypes,
+                                  firstOccurredAt,
+                                  lastOccurredAt,
+                                }) => (
                                   <button
                                     key={node.id}
                                     onClick={() => setSelectedOnaNode(node)}
@@ -4623,6 +6958,20 @@ const IntelligenceCenterView = ({ active = true }) => {
                                       <div className="text-[8px] text-slate-400 truncate">
                                         {node.role} · {node.department}
                                       </div>
+                                      <div className="mt-0.5 text-[8px] text-slate-500">
+                                        {(eventTypes || []).length
+                                          ? eventTypes
+                                              .map(
+                                                ({ type, count }) =>
+                                                  `${type}: ${count}`,
+                                              )
+                                              .join(" · ")
+                                          : channel || "Imported collaboration"}
+                                      </div>
+                                      <div className="mt-0.5 text-[8px] text-slate-500">
+                                        {formatOnaDate(firstOccurredAt)} –{" "}
+                                        {formatOnaDate(lastOccurredAt)}
+                                      </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">
                                       {isCross && (
@@ -4632,11 +6981,12 @@ const IntelligenceCenterView = ({ active = true }) => {
                                       )}
                                       <span className="text-[9.5px] font-mono font-bold text-cyan-300">
                                         {weight}{" "}
-                                        {weight === 1 ? "record" : "records"}
+                                        {weight === 1 ? "event" : "events"}
                                       </span>
                                     </div>
                                   </button>
-                                ))}
+                                ),
+                              )}
                             </div>
                           )}
                         </div>
@@ -4646,7 +6996,7 @@ const IntelligenceCenterView = ({ active = true }) => {
                           {/* Influencers */}
                           <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3 space-y-1.5">
                             <span className="text-[8.5px] uppercase tracking-widest font-bold text-amber-300 block border-b border-white/5 pb-1">
-                              Highest PageRank (Relative)
+                              Highest PageRank (Within Shown Sample)
                             </span>
                             {topInfluencers.slice(0, 3).map((node) => (
                               <button
@@ -4670,7 +7020,7 @@ const IntelligenceCenterView = ({ active = true }) => {
                           {/* Bridge Brokers */}
                           <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3 space-y-1.5">
                             <span className="text-[8.5px] uppercase tracking-widest font-bold text-cyan-300 block border-b border-white/5 pb-1">
-                              Highest Betweenness (Relative)
+                              Highest Betweenness (Within Shown Sample)
                             </span>
                             {topBridgeBrokers.slice(0, 3).map((node) => (
                               <button
@@ -4717,23 +7067,6 @@ const IntelligenceCenterView = ({ active = true }) => {
                   </div>
                 }
               />
-              <AIExplanationPanel
-                subtab="ona"
-                context={{
-                  graphMetrics: onaData?.metrics || {},
-                  uploadedDataReadiness: intelligenceReadiness?.ona,
-                  nodeCount: onaData?.nodes?.length || 0,
-                  linkCount: onaData?.links?.length || 0,
-                  topInfluencers,
-                  topBridgeBrokers,
-                  selectedNode: selectedOnaNode,
-                  selectedNodeNeighbors,
-                }}
-                buttonText="Explain with AI"
-                autoRun
-                autoRunKey={`${resultRevisions.ona}:${selectedOnaNode?.id || "none"}`}
-                disabled={onaLoading || resultRevisions.ona === 0}
-              />
             </motion.div>
           )}
 
@@ -4744,7 +7077,7 @@ const IntelligenceCenterView = ({ active = true }) => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="min-h-0 lg:flex-1 lg:h-full w-full flex flex-col"
+              className="min-h-0 min-w-0 flex-1 h-full w-full flex flex-col"
             >
               <MobileSplitPane
                 activePane={mobileActivePane}
@@ -4755,7 +7088,7 @@ const IntelligenceCenterView = ({ active = true }) => {
                 rightIcon={<Sparkles size={14} />}
                 leftWidthClass="lg:w-[300px] xl:w-[320px]"
                 leftContent={
-                  <div className="premium-card p-4 md:p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col justify-between h-auto lg:h-full">
+                  <div className="premium-card p-4 md:p-5 border border-white/5 bg-slate-950/40 backdrop-blur-md flex flex-col justify-between h-full max-h-full min-h-0 overflow-y-auto overscroll-contain custom-scrollbar">
                     <div>
                       <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 mb-4 border-b border-white/5 pb-2">
                         Active Career Tracker
@@ -4813,16 +7146,22 @@ const IntelligenceCenterView = ({ active = true }) => {
                   </div>
                 }
                 rightContent={
-                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 h-auto lg:h-full lg:overflow-y-auto">
+                  <div className="premium-card p-4 md:p-6 border border-white/5 bg-slate-950/20 min-h-0 h-full max-h-full overflow-y-auto overscroll-contain custom-scrollbar">
                     <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
                       <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
-                        Observed Markov Role Changes
+                        Observed Role Transition Evidence
                       </h3>
                       <span className="text-[10px] text-slate-500">
-                        {careerPathData?.model_status ===
-                        "exploratory_observed_transitions"
-                          ? "Observed sample · not a validated forecast"
-                          : "Empirical history required"}
+                        {careerPathData?.career_history_provenance ===
+                        "synthetic_demo"
+                          ? "Synthetic demo data · workflow sample"
+                          : careerPathData?.career_history_provenance ===
+                              "mixed_uploaded_and_synthetic_demo"
+                            ? "Mixed uploaded and synthetic demo data"
+                            : careerPathData?.model_status ===
+                                "exploratory_observed_transitions"
+                              ? "Observed sample · not a validated forecast"
+                              : "Empirical history required"}
                       </span>
                     </div>
 
@@ -4833,12 +7172,38 @@ const IntelligenceCenterView = ({ active = true }) => {
                       </div>
                     ) : careerPathData ? (
                       <div className="space-y-5">
-                        <div className="rounded-lg border border-indigo-400/20 bg-indigo-950/20 p-3 text-[10px] text-slate-300">
+                        <div className="rounded-lg border border-indigo-400/20 bg-indigo-950/20 p-4 text-xs leading-relaxed text-slate-300">
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <span className="rounded-md border border-indigo-300/20 bg-indigo-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-200">
+                              Cohort evidence · exploratory
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                              Transition shares describe recorded histories for
+                              this role; they are not an individual career
+                              forecast.
+                            </span>
+                          </div>
                           <div>
                             {careerPathData.message ||
-                              `Empirical matrix: ${careerPathData.observed_transition_count} observed role changes across ${careerPathData.history_employee_count} people. Each step means the next recorded role change; no time-to-promotion estimate is available.`}
+                              `Observed matrix: ${careerPathData.observed_transition_count} role changes across ${careerPathData.history_employee_count} people with dated role histories. Each step means the next recorded role change; no time-to-promotion estimate is available.`}
                           </div>
-                          <div className="mt-1 text-slate-500">
+                          {careerPathData.career_history_provenance ===
+                            "synthetic_demo" && (
+                            <div className="mt-2 text-amber-300">
+                              These role histories are simulated demo records.
+                              Their transition shares demonstrate the workflow,
+                              not actual workforce or industry mobility.
+                            </div>
+                          )}
+                          {careerPathData.career_history_provenance ===
+                            "mixed_uploaded_and_synthetic_demo" && (
+                            <div className="mt-2 text-amber-300">
+                              This matrix combines uploaded histories with{" "}
+                              {careerPathData.synthetic_demo_role_record_count}{" "}
+                              simulated demo role records.
+                            </div>
+                          )}
+                          <div className="mt-2 border-t border-white/5 pt-2 text-[11px] text-slate-400">
                             Uploaded experience records:{" "}
                             {careerPathData.source_record_count} · dated roles:{" "}
                             {careerPathData.dated_role_record_count} · undated
@@ -4873,92 +7238,106 @@ const IntelligenceCenterView = ({ active = true }) => {
 
                         {careerPathData.model_status ===
                         "exploratory_observed_transitions" ? (
-                          <div className="space-y-8 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/5 z-0">
+                          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
                             {careerPathData.career_progression_markov.map(
                               (step, idx) => (
-                                <div key={idx} className="relative pl-10 z-10">
-                                  {/* Dot indicator */}
-                                  <div className="absolute left-2.5 top-1.5 h-3 w-3 rounded-full border border-indigo-400 bg-slate-950 z-20 flex items-center justify-center">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
-                                  </div>
-
-                                  <div className="mb-2">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
+                                <section
+                                  key={idx}
+                                  aria-labelledby={`career-step-${step.step_number}`}
+                                  className="min-w-0 rounded-xl border border-white/10 bg-slate-950/60 p-4"
+                                >
+                                  <div className="mb-4 min-h-12 border-b border-white/10 pb-3">
+                                    <h4
+                                      id={`career-step-${step.step_number}`}
+                                      className="text-sm font-semibold leading-snug text-indigo-200"
+                                    >
                                       {step.projected_time_horizon}
-                                    </span>
-                                    <span className="ml-2 text-[9px] text-slate-500">
-                                      Unmodeled mass:{" "}
+                                    </h4>
+                                    <div className="mt-1 text-[11px] text-slate-400">
+                                      {step.modeled_probability_mass > 0
+                                        ? `${(step.modeled_probability_mass * 100).toFixed(1)}% of path mass modeled`
+                                        : "No later transitions in the observed histories"}
+                                      <span className="px-1.5 text-slate-600">
+                                        ·
+                                      </span>
+                                      {"Unmodeled "}
                                       {(
                                         step.unmodeled_probability_mass * 100
                                       ).toFixed(1)}
                                       %
-                                    </span>
+                                    </div>
                                   </div>
 
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="grid grid-cols-1 gap-3">
                                     {step.possibilities.length === 0 && (
-                                      <div className="text-[10px] text-slate-500">
-                                        No further role changes can be estimated
-                                        from the observed history.
+                                      <div className="rounded-lg border border-dashed border-white/10 px-3 py-5 text-sm leading-relaxed text-slate-400">
+                                        No next role can be estimated from the
+                                        observed transition histories. The model
+                                        stops here rather than extrapolating
+                                        beyond its evidence.
                                       </div>
                                     )}
                                     {step.possibilities.map((pos, pIdx) => (
                                       <div
                                         key={pIdx}
-                                        className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col justify-between"
+                                        className="rounded-lg border border-white/10 bg-slate-900/70 p-3.5"
                                       >
-                                        <div className="flex justify-between items-start mb-3">
-                                          <div>
-                                            <div className="font-bold text-white text-sm">
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0">
+                                            <div className="break-words text-base font-semibold text-white">
                                               {pos.role}
                                             </div>
-                                            <div className="text-[9px] text-slate-500 mt-0.5 uppercase">
-                                              Target Transition State
+                                            <div className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                                              {step.step_number === 1
+                                                ? `${pos.observed_transition_count} of ${pos.observations_from_current_role} observed exits from ${careerPathData.current_role || "this role"}`
+                                                : "Share of paths represented by observed role transitions"}
                                             </div>
                                           </div>
-                                          <span className="text-[10px] font-black text-cyan-300 bg-cyan-400/5 border border-cyan-400/10 px-2 py-0.5 rounded">
+                                          <span className="shrink-0 rounded-md border border-cyan-300/20 bg-cyan-400/10 px-2 py-1 text-sm font-bold tabular-nums text-cyan-200">
                                             {(
                                               pos.transition_probability * 100
-                                            ).toFixed(0)}
-                                            {step.step_number === 1
-                                              ? "% of observed changes"
-                                              : "% modeled share"}
+                                            ).toFixed(1)}
+                                            %
                                           </span>
                                         </div>
-                                        {step.step_number === 1 && (
-                                          <div className="mb-2 text-[9px] text-slate-500">
-                                            Observed{" "}
-                                            {pos.observed_transition_count} of{" "}
-                                            {pos.observations_from_current_role}{" "}
-                                            changes from this role
-                                          </div>
-                                        )}
+                                        <div
+                                          className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-700/70"
+                                          role="img"
+                                          aria-label={`${(pos.transition_probability * 100).toFixed(1)} percent observed transition share`}
+                                        >
+                                          <div
+                                            className="h-full rounded-full bg-cyan-300"
+                                            style={{
+                                              width: `${Math.max(0, Math.min(100, pos.transition_probability * 100))}%`,
+                                            }}
+                                          />
+                                        </div>
 
                                         {/* Skill gaps */}
                                         {pos.skill_requirements_status ===
                                         "not_configured" ? (
-                                          <div className="border-t border-white/5 pt-2.5 text-[9px] text-slate-500">
+                                          <div className="mt-3 border-t border-white/10 pt-2.5 text-[11px] leading-relaxed text-slate-400">
                                             No configured skill checklist for
                                             this role; gap status is
                                             unavailable.
                                           </div>
                                         ) : pos.skill_gaps.length > 0 ? (
-                                          <div className="space-y-1.5 border-t border-white/5 pt-2.5">
-                                            <div className="text-[8px] uppercase tracking-wider text-slate-500 font-bold mb-1">
+                                          <div className="mt-3 space-y-1.5 border-t border-white/10 pt-2.5">
+                                            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
                                               Missing from recorded profile ·
                                               configured framework
                                             </div>
                                             {pos.skill_gaps.map((gap, gIdx) => (
                                               <div
                                                 key={`${pos.role}-${gap}-${gIdx}`}
-                                                className="text-[9px] text-slate-400 border-b border-white/5 pb-1"
+                                                className="text-xs text-slate-300 border-b border-white/5 pb-1"
                                               >
                                                 {gap}
                                               </div>
                                             ))}
                                           </div>
                                         ) : (
-                                          <div className="border-t border-white/5 pt-2.5 text-[9px] text-slate-400">
+                                          <div className="mt-3 border-t border-white/10 pt-2.5 text-[11px] leading-relaxed text-slate-400">
                                             No missing exact skill names in the
                                             configured framework; this framework
                                             is not tenant-validated.
@@ -4967,7 +7346,7 @@ const IntelligenceCenterView = ({ active = true }) => {
                                       </div>
                                     ))}
                                   </div>
-                                </div>
+                                </section>
                               ),
                             )}
                           </div>
@@ -4992,21 +7371,22 @@ const IntelligenceCenterView = ({ active = true }) => {
                   </div>
                 }
               />
-              <AIExplanationPanel
-                subtab="career-path"
-                context={{
-                  selectedEmployeeId: selectedCareerEmpId,
-                  careerPathData: careerPathData,
-                  uploadedDataReadiness: intelligenceReadiness?.career_markov,
-                }}
-                buttonText="Explain with AI"
-                autoRun
-                autoRunKey={`${resultRevisions.career}:${selectedCareerEmpId}`}
-                disabled={!careerPathData || careerLoading}
-              />
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Permanent Explain dock: fixed at the bottom edge on every tab and
+            every screen size. One layout — expand/collapse live here. */}
+        <div className="shrink-0 min-h-0 max-h-[72%] overflow-y-auto overscroll-contain custom-scrollbar border-t border-cyan-500/15 bg-slate-950/95 backdrop-blur-md">
+          <AIExplanationPanel
+            key={explainDock.subtab}
+            subtab={explainDock.subtab}
+            resultKey={explainDock.resultKey}
+            context={explainDock.context}
+            buttonText={explainDock.buttonText}
+            disabled={explainDock.disabled}
+          />
+        </div>
       </div>
     </div>
   );

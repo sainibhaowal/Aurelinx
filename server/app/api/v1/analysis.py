@@ -379,6 +379,12 @@ async def _call_openai_compatible_model(
         "google-gemini": "gemini",
     }.get(provider, provider)
 
+    from app.api.v1.chat import (
+        _OPENAI_COMPATIBLE_PROVIDER_URLS,
+        _openai_compatible_base,
+        _openai_compatible_default_model,
+    )
+
     if provider == "lmstudio":
         endpoint = (
             f"{normalize_local_provider_base(base_url).rstrip('/')}/chat/completions"
@@ -395,14 +401,43 @@ async def _call_openai_compatible_model(
         endpoint = "https://api.groq.com/openai/v1/chat/completions"
         selected_model = model or "llama-3.1-70b-versatile"
         auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    elif provider == "openrouter":
+        endpoint = f"{(base_url or 'https://openrouter.ai/api/v1').rstrip('/')}/chat/completions"
+        selected_model = model or "nvidia/nemotron-3.5-lightning:free"
+        auth_header = {
+            "Authorization": f"Bearer {api_key}" if api_key else "",
+            "HTTP-Referer": "https://aurelinx.local",
+            "X-Title": "Aurelinx Talent Scout",
+        }
+        auth_header = {key: value for key, value in auth_header.items() if value}
+    elif provider in _OPENAI_COMPATIBLE_PROVIDER_URLS:
+        endpoint = f"{_openai_compatible_base(provider, base_url)}/chat/completions"
+        selected_model = model or _openai_compatible_default_model(provider)
+        auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    elif provider == "claude":
+        endpoint = "https://api.anthropic.com/v1/messages"
+        selected_model = model or "claude-3-5-sonnet-20241022"
+        auth_header = {"anthropic-version": "2023-06-01"}
+        if api_key:
+            auth_header["x-api-key"] = api_key
+    elif provider == "gemini":
+        if not api_key:
+            raise ValueError("Gemini requires an API key")
+        selected_model = model or "gemini-2.0-flash"
+        endpoint = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{selected_model}:generateContent?key={api_key}"
+        )
+        auth_header = {}
     elif provider == "openai":
         endpoint = "https://api.openai.com/v1/chat/completions"
         selected_model = model or "gpt-4o-mini"
         auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     elif provider == "ollama":
-        endpoint = (
-            f"{(base_url or 'http://127.0.0.1:11434/v1').rstrip('/')}/chat/completions"
-        )
+        ollama_base = (base_url or "http://127.0.0.1:11434").rstrip("/")
+        if not ollama_base.endswith("/v1"):
+            ollama_base = f"{ollama_base}/v1"
+        endpoint = f"{ollama_base}/chat/completions"
         selected_model = model or "llama3"
         auth_header = {}
     elif provider == "custom":
@@ -432,14 +467,28 @@ async def _call_openai_compatible_model(
         "4) Final recommendation"
     )
 
-    payload = {
-        "model": selected_model,
-        "temperature": 0.2,
-        "messages": [
-            {"role": "system", "content": system_msg},
-            {"role": "user", "content": user_msg},
-        ],
-    }
+    if provider == "claude":
+        payload = {
+            "model": selected_model,
+            "max_tokens": 1800,
+            "temperature": 0.2,
+            "system": system_msg,
+            "messages": [{"role": "user", "content": user_msg}],
+        }
+    elif provider == "gemini":
+        payload = {
+            "contents": [{"parts": [{"text": f"{system_msg}\n\n{user_msg}"}]}],
+            "generationConfig": {"temperature": 0.2},
+        }
+    else:
+        payload = {
+            "model": selected_model,
+            "temperature": 0.2,
+            "messages": [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+        }
 
     headers = {"Content-Type": "application/json", **auth_header}
 
@@ -447,6 +496,21 @@ async def _call_openai_compatible_model(
         response = await client.post(endpoint, json=payload, headers=headers)
         response.raise_for_status()
         data = response.json()
+        if provider == "claude":
+            blocks = data.get("content", [])
+            return "\n".join(
+                block.get("text", "")
+                for block in blocks
+                if isinstance(block, dict) and block.get("text")
+            ).strip()
+        if provider == "gemini":
+            return (
+                data.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [{}])[0]
+                .get("text", "")
+                .strip()
+            )
         return data["choices"][0]["message"]["content"].strip()
 
 
@@ -581,6 +645,34 @@ async def analyze_talent(
     """
     start = time.perf_counter()
     logger.info(f"User {current_user.user_id} analyzing talent with {request.provider}")
+
+    from app.api.v1.chat import _resolve_api_key
+
+    provider_api_key = _resolve_api_key(request.provider, request.api_key)
+    keyed_providers = {
+        "openai",
+        "claude",
+        "groq",
+        "gemini",
+        "opencode",
+        "openrouter",
+        "moonshot",
+        "zai",
+        "nvidia",
+        "deepseek",
+        "mistral",
+        "cline",
+    }
+    if request.provider in keyed_providers and not provider_api_key:
+        raise HTTPException(
+            status_code=422,
+            detail=f"An API key is required for the selected {request.provider} provider. Configure it in Providers & Webhooks.",
+        )
+    if request.provider == "custom" and not request.base_url:
+        raise HTTPException(
+            status_code=422,
+            detail="A base URL is required for the OpenAI-compatible custom provider.",
+        )
 
     try:
         tenant_id = _tenant_key(current_user)
@@ -738,7 +830,7 @@ async def analyze_talent(
             provider=request.provider,
             prompt=request.prompt,
             ranked_profiles=top_profiles,
-            api_key=request.api_key,
+            api_key=provider_api_key,
             base_url=request.base_url,
             model=request.model,
         )

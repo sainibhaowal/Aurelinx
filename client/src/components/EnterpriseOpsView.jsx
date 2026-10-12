@@ -135,7 +135,7 @@ const PROVIDER_SETUP = {
   },
 };
 
-const EnterpriseOpsView = ({ active = true }) => {
+const EnterpriseOpsView = ({ active = true, isAdmin = false }) => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = usePersistentState(
     "dataops-active-tab",
@@ -5452,7 +5452,9 @@ const EnterpriseOpsView = ({ active = true }) => {
               </div>
             )}
 
-            {compSubTab === "privacy_controls" && <PrivacyGovernanceView />}
+            {compSubTab === "privacy_controls" && (
+              <PrivacyGovernanceView isAdmin={isAdmin} />
+            )}
           </div>
         )}
 

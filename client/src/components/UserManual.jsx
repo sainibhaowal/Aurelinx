@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import PremiumSelect from "./PremiumSelect";
 import { APP_VERSION } from "../config/version";
@@ -49,7 +49,36 @@ export const UserManualModal = ({
   const [expandedNodes, setExpandedNodes] = useState({
     dataops: true,
     risk_interventions: true,
+    intelligence: true,
   });
+
+  // Left-nav Intelligence Center children scroll to their subsection anchors.
+  const INTELLIGENCE_ANCHORS = {
+    intelligence_skills: "manual-task-1-skills",
+    intelligence_team: "manual-task-2-team",
+    intelligence_attrition: "manual-task-3-attrition",
+    intelligence_ona: "manual-task-4-ona",
+    intelligence_career: "manual-task-5-career",
+  };
+  const contentRef = useRef(null);
+
+  useEffect(() => {
+    const anchor = INTELLIGENCE_ANCHORS[activeTab];
+    if (!anchor) {
+      // Overview and non-task tabs always start at the top.
+      contentRef.current?.scrollTo?.({ top: 0 });
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      const target = document.getElementById(anchor);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        contentRef.current?.scrollTo?.({ top: 0 });
+      }
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [activeTab]);
 
   const toggleNode = (nodeId, e) => {
     if (e) e.stopPropagation();
@@ -72,7 +101,40 @@ export const UserManualModal = ({
       ],
     },
     { id: "directory", label: "Talent Directory", icon: Users },
-    { id: "intelligence", label: "Intelligence Center", icon: Network },
+    {
+      id: "intelligence",
+      label: "Intelligence Center",
+      icon: Network,
+      hasChildren: true,
+      children: [
+        { id: "intelligence", label: "Center Overview", icon: Network },
+        {
+          id: "intelligence_skills",
+          label: "Task 1 — Semantic Skills Graph",
+          icon: Brain,
+        },
+        {
+          id: "intelligence_team",
+          label: "Task 2 — Optimal Team Assembly",
+          icon: Zap,
+        },
+        {
+          id: "intelligence_attrition",
+          label: "Task 3 — Survival Attrition",
+          icon: TrendingUp,
+        },
+        {
+          id: "intelligence_ona",
+          label: "Task 4 — Network Analysis (ONA)",
+          icon: Activity,
+        },
+        {
+          id: "intelligence_career",
+          label: "Task 5 — Markov Career Path",
+          icon: BriefcaseBusiness,
+        },
+      ],
+    },
     {
       id: "dataops",
       label: "Data Ops & Enterprise",
@@ -135,6 +197,10 @@ export const UserManualModal = ({
   ];
 
   const renderContent = () => {
+    // Intelligence Center children render as separate pages: the overview
+    // shows everything, each task id shows only its own section.
+    const showIntelligenceTask = (taskId) =>
+      activeTab === "intelligence" || activeTab === taskId;
     switch (activeTab) {
       case "dashboard":
         return (
@@ -2644,6 +2710,11 @@ export const UserManualModal = ({
           </div>
         );
 
+      case "intelligence_skills":
+      case "intelligence_team":
+      case "intelligence_attrition":
+      case "intelligence_ona":
+      case "intelligence_career":
       case "intelligence":
         return (
           <div className="space-y-8">
@@ -2673,14 +2744,15 @@ export const UserManualModal = ({
             </div>
 
             {/* Architecture Flow Diagram */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                <Cpu className="h-4 w-4 text-indigo-400" /> Math-Engine
-                Architecture & Optimization Pipeline
-              </h3>
-              <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4">
-                <div className="font-mono text-[10px] text-cyan-200/90 leading-relaxed whitespace-pre overflow-x-auto p-4 bg-slate-900/50 rounded-lg border border-white/5">
-                  {`+---------------------------------------------------------------------------------+
+            {activeTab === "intelligence" && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Cpu className="h-4 w-4 text-indigo-400" /> Math-Engine
+                  Architecture & Optimization Pipeline
+                </h3>
+                <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4">
+                  <div className="font-mono text-[10px] text-cyan-200/90 leading-relaxed whitespace-pre overflow-x-auto p-4 bg-slate-900/50 rounded-lg border border-white/5">
+                    {`+---------------------------------------------------------------------------------+
 |                                USER INPUT STAGE                                 |
 |  [Define Skill Node] + [Proficiency Scale] + [Budget Limit] + [Max Team Size]   |
 +---------------------------------------------------------------------------------+
@@ -2712,763 +2784,1154 @@ export const UserManualModal = ({
 |                               OUTPUT RESULTS STAGE                              |
 |   * Data-backed calculations with coverage and interpretation limits            |
 +---------------------------------------------------------------------------------+`}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* The Three Computational Pillars */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-white">
-                The Three Computational Pillars
-              </h3>
+            {/* Intelligence Center tasks: one subsection per tab */}
+            {activeTab === "intelligence" && (
+              <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3 text-[11px] leading-relaxed text-slate-300">
+                <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                  In this section — one subsection per task
+                </strong>
+                <ul className="list-disc pl-4 space-y-1 mt-1">
+                  <li>
+                    <a
+                      href="#manual-task-1-skills"
+                      className="text-cyan-300 hover:text-cyan-200"
+                    >
+                      Task 1 — Semantic Skills Graph
+                    </a>{" "}
+                    (match people to skill demands)
+                  </li>
+                  <li>
+                    <a
+                      href="#manual-task-2-team"
+                      className="text-cyan-300 hover:text-cyan-200"
+                    >
+                      Task 2 — Optimal Team Assembly
+                    </a>{" "}
+                    (constrained MILP team builder)
+                  </li>
+                  <li>
+                    <a
+                      href="#manual-task-3-attrition"
+                      className="text-cyan-300 hover:text-cyan-200"
+                    >
+                      Task 3 — Survival Attrition
+                    </a>{" "}
+                    (cohort survival, readiness-gated)
+                  </li>
+                  <li>
+                    <a
+                      href="#manual-task-4-ona"
+                      className="text-cyan-300 hover:text-cyan-200"
+                    >
+                      Task 4 — Network Analysis (ONA)
+                    </a>{" "}
+                    (influence, bridges, silos)
+                  </li>
+                  <li>
+                    <a
+                      href="#manual-task-5-career"
+                      className="text-cyan-300 hover:text-cyan-200"
+                    >
+                      Task 5 — Markov Career Path
+                    </a>{" "}
+                    (observed role transitions)
+                  </li>
+                </ul>
+              </div>
+            )}
 
-              <div className="space-y-4">
-                {/* Pillar 1 */}
-                <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-2 text-left">
-                  <div className="flex items-center gap-2">
-                    <Brain className="text-indigo-400 h-4.5 w-4.5" />
-                    <h4 className="text-xs font-black uppercase tracking-wider text-indigo-300">
-                      1. Semantic Skills Graph (Dijkstra's Solver)
-                    </h4>
+            {/* TASK 1 — SEMANTIC SKILLS GRAPH */}
+            {showIntelligenceTask("intelligence_skills") && (
+              <div className="space-y-4" id="manual-task-1-skills">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Brain className="h-4 w-4 text-indigo-400" /> Task 1 —
+                  Semantic Skills Graph
+                </h3>
+
+                <div className="space-y-4">
+                  {/* Pillar 1 */}
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-2 text-left">
+                    <div className="flex items-center gap-2">
+                      <Brain className="text-indigo-400 h-4.5 w-4.5" />
+                      <h4 className="text-xs font-black uppercase tracking-wider text-indigo-300">
+                        1. Semantic Skills Graph (Dijkstra's Solver)
+                      </h4>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      **What is it**: A graph representation of competencies
+                      where skills are nodes and edges represent
+                      learning/transfer paths.
+                    </p>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Uploaded employee and candidate skill names are searched
+                      exactly after normalization. The curated graph adds
+                      reviewed transfer paths. Optional vector similarity can
+                      surface additional candidates, but those results are
+                      explicitly exploratory until HR reviewers validate them.
+                    </p>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      **What you get**: Each result shows the recorded skill,
+                      requested proficiency, evidence type, and graph distance
+                      or vector similarity when applicable. Vector matching is
+                      off by default and sends only skill labels to the
+                      configured embedding endpoint when explicitly enabled.
+                      Ranking scores are heuristic and are not job-fit
+                      probabilities.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    **What is it**: A graph representation of competencies where
-                    skills are nodes and edges represent learning/transfer
-                    paths.
-                  </p>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    **Why we need it**: Keywords block candidates. A search for
-                    a "React Developer" shouldn't ignore a "Vue.js Developer"
-                    with years of framework knowledge.
-                  </p>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    **What you get**: The graph solver computes adjacency path
-                    weights (e.g. `Vue.js &rarr; JavaScript &rarr; React`). If
-                    the total path cost is low, the engine flags them as a match
-                    and suggests a micro-training learning path.
-                  </p>
+
+                  <h4 className="text-xs font-black uppercase tracking-wider text-indigo-300/80 pt-2">
+                    Task 1 (continued) — Skills Graph Controls & Terms
+                  </h4>
+
+                  <div className="space-y-3.5 text-xs text-left">
+                    {/* Control 1 */}
+                    <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                      <strong className="text-white block text-xs">
+                        🎯 Target Requirements & Skill Node
+                      </strong>
+                      <p className="text-slate-300 leading-relaxed">
+                        The skill token (e.g. `TypeScript`, `Docker`) selected
+                        as a search requirement.
+                      </p>
+                    </div>
+
+                    {/* Control 2 */}
+                    <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                      <strong className="text-white block text-xs">
+                        📊 Minimum Proficiency
+                      </strong>
+                      <p className="text-slate-300 leading-relaxed">
+                        The capability target required for the match (L1:
+                        Foundational, L2: Operational, L3: Strategic).
+                      </p>
+                    </div>
+
+                    {/* Control 3 */}
+                    <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                      <strong className="text-white block text-xs">
+                        🔗 Solving Adjacencies (Graph Theory)
+                      </strong>
+                      <p className="text-slate-300 leading-relaxed font-semibold text-cyan-300">
+                        What is an Adjacency?
+                      </p>
+                      <p className="text-slate-300 leading-relaxed">
+                        Uploaded skill labels are first indexed from the current
+                        tenant&apos;s employee and candidate records. Exact
+                        normalized matches work for every uploaded label,
+                        including labels that do not have a transfer edge in the
+                        curated graph. Approved tenant aliases and short
+                        weighted graph paths add explicitly recorded equivalence
+                        or transfer evidence.
+                      </p>
+                      <p className="text-slate-300 leading-relaxed">
+                        The graph search uses Dijkstra shortest paths and
+                        ignores paths beyond its configured distance threshold.
+                        A path is ontology proximity evidence; it is not a claim
+                        that two skills are interchangeable or that a person is
+                        qualified.
+                      </p>
+                    </div>
+
+                    {/* Control 4 */}
+                    <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                      <strong className="text-white block text-xs">
+                        🧮 Semantic Matching Matrix
+                      </strong>
+                      <p className="text-slate-300 leading-relaxed">
+                        The ranking compares requested skills with recorded
+                        skills and proficiency levels. One recorded skill can
+                        satisfy at most one requested requirement. Profiles are
+                        ranked using exact/alias evidence and accepted graph
+                        distances; role similarity is not part of this score.
+                      </p>
+                    </div>
+
+                    {/* Control 5 */}
+                    <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                      <strong className="text-white block text-xs">
+                        🗺️ Path Analysis
+                      </strong>
+                      <p className="text-slate-300 leading-relaxed">
+                        The visual mapping highlights only nodes and edges in
+                        the selected profile&apos;s returned shortest paths.
+                        Path order comes from the same weighted Dijkstra route
+                        used by the backend matcher. Catalog-only exact matches
+                        have no transfer edge; vector candidates are labeled
+                        separately and are not drawn as ontology paths. Skills
+                        without a visual node remain listed in the path details.
+                      </p>
+                    </div>
+
+                    {/* Control 6 */}
+                    <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                      <strong className="text-white block text-xs">
+                        📊 Target Match Breakdown
+                      </strong>
+                      <p className="text-slate-300 leading-relaxed">
+                        The search evaluates all profiles in the selected tenant
+                        scope (employees, candidates, or both) and returns up to
+                        100 highest-ranked matches. The full evaluated count and
+                        total number of matched profiles are shown with results.
+                        Scores are heuristic ranking evidence, not calibrated
+                        probabilities, validated job fit, or hiring decisions.
+                        Individual skill rows distinguish exact or normalized
+                        names from curated graph paths and unmatched
+                        requirements.
+                      </p>
+                    </div>
+
+                    {/* Control 7 */}
+                    <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
+                      <strong className="text-white block text-xs">
+                        🕸️ Search Evidence Graph
+                      </strong>
+                      <p className="text-slate-300 leading-relaxed">
+                        The SVG displays the curated skill ontology as context
+                        and highlights only the exact route returned for each
+                        matched requirement. It is evidence visualization, not a
+                        validated measure of job fit.
+                      </p>
+                      <ul className="text-slate-300 list-disc pl-4 space-y-1 mt-1">
+                        <li>
+                          <strong className="text-emerald-400">
+                            Neon Green Nodes:
+                          </strong>{" "}
+                          Mark matched, intermediate, and target skill nodes in
+                          the selected result&apos;s actual routes.
+                        </li>
+                        <li>
+                          <strong className="text-cyan-400">
+                            Neon Cyan Edges:
+                          </strong>{" "}
+                          Mark the exact ontology edges traversed by the
+                          backend&apos;s shortest paths. Unrelated edges stay
+                          dim.
+                        </li>
+                        <li>
+                          <strong className="text-cyan-300">
+                            Route order:
+                          </strong>{" "}
+                          The evidence breakdown lists every node in path order;
+                          an exact name match is shown as a single node, with no
+                          invented transfer edge.
+                        </li>
+                      </ul>
+                      <p className="text-slate-300 leading-relaxed mt-1">
+                        Graph proximity is evidence for ranking only. It does
+                        not prove that two skills are interchangeable or that a
+                        person is qualified for a role.
+                      </p>
+                    </div>
+                  </div>
                 </div>
+              </div>
+            )}
 
-                {/* Pillar 2 */}
-                <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-3 text-left">
-                  <div className="flex items-center gap-2">
-                    <Zap className="text-pink-400 h-4.5 w-4.5" />
-                    <h4 className="text-xs font-black uppercase tracking-wider text-pink-300">
-                      2. Optimal Team Assembly (Constrained MILP)
-                    </h4>
+            {/* TASK 2 — OPTIMAL TEAM ASSEMBLY */}
+            {showIntelligenceTask("intelligence_team") && (
+              <div className="space-y-4" id="manual-task-2-team">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Zap className="h-4 w-4 text-pink-400" /> Task 2 — Optimal
+                  Team Assembly
+                </h3>
+
+                <div className="space-y-4">
+                  {/* Pillar 2 */}
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-3 text-left">
+                    <div className="flex items-center gap-2">
+                      <Zap className="text-pink-400 h-4.5 w-4.5" />
+                      <h4 className="text-xs font-black uppercase tracking-wider text-pink-300">
+                        2. Optimal Team Assembly (Constrained MILP)
+                      </h4>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      The solver assembles the requested number of employees
+                      (2–10) under a hard budget cap. It first maximizes mean
+                      direct skill coverage using exact skill-name matches only,
+                      then picks the cheapest roster among teams tied at that
+                      coverage. Related-skill (ontology) estimates are shown for
+                      context but never select the team. This is an exact
+                      mixed-integer (HiGHS MILP) optimization with a zero-gap
+                      optimality proof for the submitted data and objective; it
+                      does not prove that skill definitions or salaries
+                      represent real business value or job fit.
+                    </p>
+                    <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                      <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                        Team constraints panel (left)
+                      </strong>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                        <li>
+                          <strong>Budget cap:</strong> a ceiling in the uploaded
+                          compensation unit, never a spending target. The live
+                          feasibility box shows the real minimum roster cost for
+                          your team size (computed from recorded salaries), the
+                          shortfall or headroom, one-click{" "}
+                          <em>Set cap to minimum</em> / <em>Reuse last cost</em>
+                          , and eligibility counts (eligible, departed excluded,
+                          missing salary excluded).
+                        </li>
+                        <li>
+                          <strong>Team size 2–10:</strong> stepper plus direct
+                          input. Larger teams cost more; the solver proves the
+                          optimum for the exact size you set.
+                        </li>
+                        <li>
+                          <strong>Skill browser:</strong> auto-loads up to 200
+                          skills from your database (name, headcount, average
+                          level) with a search box — pick from real evidence
+                          instead of typing blind. Every row has its own L1–L5
+                          selector plus Add; the custom search row also has a
+                          level selector for unlisted skills.
+                        </li>
+                        <li>
+                          <strong>Duplicate rule (skill + level):</strong> the
+                          same skill may repeat at different levels (Python L2 +
+                          L4 count as two requirements), but the exact same
+                          skill+level pair is never stored twice — Add blocks
+                          it, rows show ✓, and level changes that would collide
+                          are rejected. Name matching is case-insensitive.{" "}
+                          <em>Remove duplicates</em> / <em>Clear all</em> repair
+                          a list in one click; offending rows are badged.
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                      <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                        Results panel (right) — how to read it
+                      </strong>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                        <li>
+                          <strong>Run banner:</strong> tells you whether the
+                          charts match the current form or are a previous proven
+                          run kept visible for comparison (with its original
+                          cap, size, and requirement count). Editing the form
+                          never deletes the last proven charts.
+                        </li>
+                        <li>
+                          <strong>Related-skill estimates:</strong> wide bar =
+                          graph-adjusted estimate per requirement (teal = exact
+                          evidence, amber = ontology bridge with the path shown,
+                          grey = no evidence); thin bar = exact-skill evidence
+                          only, which is the optimized objective. Text shows the
+                          supplying skill or path plus effective vs target
+                          level. Coverage caps at 100% per requirement.
+                        </li>
+                        <li>
+                          <strong>Budget card:</strong> total recorded cost vs
+                          cap, percent used, remainder, Within-cap badge.
+                        </li>
+                        <li>
+                          <strong>Search proof:</strong> solver status,
+                          optimality (proven only when gap is 0.0), search
+                          nodes, eligible employee count. History holds the
+                          single proven final measurement — there is no live
+                          iteration progress by design; the result appears only
+                          when proven.
+                        </li>
+                        <li>
+                          <strong>Roster + direct coverage:</strong> winning
+                          members with role, department, and recorded salary
+                          each, plus the maximized exact-coverage score and
+                          per-requirement exact-match detail.
+                        </li>
+                        <li>
+                          <strong>Errors guide you:</strong> an infeasible cap
+                          names the cheapest feasible cost and the shortfall
+                          with <em>Set cap to minimum</em> /{" "}
+                          <em>Reduce team size</em> buttons; duplicate demands
+                          name the exact skill+level pairs. The previous proven
+                          result stays visible underneath.
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                      <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                        Eligibility, persistence, and AI explanation
+                      </strong>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                        <li>
+                          Only active employees with a positive recorded salary
+                          plus explicit currency and pay period are eligible, in
+                          one consistent unit. Missing values are never
+                          estimated; mixed currencies or pay periods block the
+                          run until the upload is normalized.
+                        </li>
+                        <li>
+                          Runs persist server-side per tenant and restore on
+                          return; the newest valid result reloads with its input
+                          snapshot for auditability.
+                        </li>
+                        <li>
+                          <strong>Explain with AI</strong> stays clickable for
+                          any saved run (labelled <em>Explain Saved Run</em>{" "}
+                          when the form has moved on) and streams an
+                          executive-grade consultant report — verdict,
+                          what/why/how findings, skill table, financial review,
+                          HR read, limits, numbered next steps — generated live
+                          from your result by the configured provider. If the
+                          provider is unreachable the panel names it and tells
+                          you to check the connection.
+                        </li>
+                      </ul>
+                    </div>
+                    <p className="text-amber-200 text-[11px] leading-relaxed">
+                      If the solver cannot prove feasibility and optimality, it
+                      returns an error rather than presenting an unproven team.
+                      Larger datasets or harder inputs can take longer; the
+                      objective is defined by the configured data and
+                      constraints.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    The solver chooses the requested number of employees while
-                    respecting a hard budget cap. It first maximizes skill
-                    coverage under the configured skill graph, then minimizes
-                    compensation among teams with that maximum coverage. This is
-                    an exact mixed-integer optimization for the submitted data
-                    and objective; it does not prove that the skill definitions
-                    or salaries represent real business value.
+                </div>
+              </div>
+            )}
+
+            {/* TASK 3 — ATTRITION SURVIVAL PREDICTOR */}
+            {showIntelligenceTask("intelligence_attrition") && (
+              <div className="space-y-4" id="manual-task-3-attrition">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4 text-amber-300" /> Task 3 —
+                  Survival Attrition
+                </h3>
+
+                <div className="space-y-4">
+                  {/* Pillar 3 */}
+                  <div className="p-4 bg-white/5 rounded-xl border border-amber-400/20 space-y-3 text-left">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="text-amber-300 h-4.5 w-4.5" />
+                      <h4 className="text-xs font-black uppercase tracking-wider text-amber-200">
+                        3. Attrition Model Data Readiness
+                      </h4>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      The current survival endpoint describes a cohort when
+                      valid employment durations and departure/censor outcomes
+                      exist. It does not emit individual employee forecasts.
+                      Stored sentiment, retention scores, salary, and risk flags
+                      do not replace observed employment outcomes.
+                    </p>
+                    <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                      <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                        Required historical records
+                      </strong>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                        <li>
+                          Employment start date for each observed employment
+                          episode.
+                        </li>
+                        <li>
+                          Departure date for employees who left, or a censor
+                          date for employees still active.
+                        </li>
+                        <li>
+                          An explicit indicator distinguishing a departure from
+                          an active, censored observation.
+                        </li>
+                        <li>
+                          Tenant ownership and source provenance for every
+                          record.
+                        </li>
+                      </ul>
+                      <p className="leading-relaxed">
+                        The offline bundle includes synthetic dates and
+                        benchmark-linked outcomes so the cohort calculation can
+                        be demonstrated. The curve is descriptive; it is not an
+                        individually validated prediction. Check the reported
+                        eligible, excluded, departure, and censor counts.
+                      </p>
+                    </div>
+                    <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                      <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                        How to operate this task
+                      </strong>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                        <li>
+                          Read the model status and readiness counts first
+                          (usable durations, departures, censored). If outcomes
+                          are missing, no curve or registry is shown — upload
+                          employment start, departure/censor dates, and the
+                          departure indicator.
+                        </li>
+                        <li>
+                          The survival curve and population stats describe the
+                          cohort (Kaplan-Meier). The registry lists observed
+                          descriptive records (tenure, status, skills, cohort
+                          survival at tenure) with search and sort — it never
+                          shows risk scores or forecasts.
+                        </li>
+                        <li>
+                          Selecting a record shows its observed facts plus
+                          cohort context (survival at its tenure, tenure vs
+                          median) and marks the tenure on the curve with an
+                          amber marker. Context is description, not prediction.
+                        </li>
+                        <li>
+                          Morale, salary-increase, and workload sliders are
+                          legacy scenario levers for validated selections only;
+                          they are not predictions and stay dormant on
+                          descriptive data.
+                        </li>
+                        <li>
+                          Re-run after new outcome data arrives; never compare
+                          curves across different populations without
+                          documenting the change.
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                      <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                        What survival attrition is and how it works
+                      </strong>
+                      <p className="leading-relaxed">
+                        Survival attrition answers one question from recorded
+                        history: of the people who started, what share was still
+                        employed after 6, 12, 24… months? Each employee
+                        contributes one observed episode — a tenure length plus
+                        an outcome (departed = event, still active =
+                        right-censored, meaning “observed this long without
+                        leaving”). The Kaplan–Meier product-limit estimator
+                        combines all episodes into a survival curve S(t): it
+                        starts at 100% and steps down only at tenures where a
+                        departure was actually recorded. Censored records keep
+                        people in the at-risk pool up to their tenure without
+                        ever stepping the curve down.
+                      </p>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                        <li>
+                          <strong>What you get:</strong> the curve, its 95%
+                          Greenwood log-log confidence band, an event-time table
+                          (tenure, survival, CI, at-risk, departures, censored
+                          per row), cohort counts, and a descriptive registry
+                          placing each person against the curve.
+                        </li>
+                        <li>
+                          <strong>What it is for:</strong> retention planning
+                          from evidence — e.g. “only ~52% of the cohort is still
+                          employed at 432 months tenure” tells you where tenure
+                          risk concentrates, which cohorts to interview, and
+                          whether onboarding or mid-tenure programs deserve
+                          budget.
+                        </li>
+                        <li>
+                          <strong>Why you need it:</strong> gut feel and raw
+                          headcount cannot separate “many people left early”
+                          from normal tenure mix. The curve adjusts for
+                          censoring, so active employees count correctly instead
+                          of biasing the picture.
+                        </li>
+                        <li>
+                          <strong>What it is not:</strong> no individual
+                          departure prediction, no reasons for leaving, no
+                          causal claims about salary, morale, or managers.
+                          Per-employee risk appears only with a fitted,
+                          holdout-validated model — which this endpoint does not
+                          claim to be.
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                      <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                        Reading the graph: axes, legends, markers, tooltips
+                      </strong>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                        <li>
+                          <strong>X axis — Observed tenure (months):</strong>{" "}
+                          how long employees have been employed. Ticks are
+                          auto-spaced (≈6 across the longest observed tenure).
+                        </li>
+                        <li>
+                          <strong>Y axis — Survival probability:</strong> share
+                          of the starting cohort still employed, 0–100% in 20%
+                          steps with faint 10% gridlines.
+                        </li>
+                        <li>
+                          <strong>Estimated survival (cyan step line):</strong>{" "}
+                          the Kaplan–Meier curve. Flat = nobody left at those
+                          tenures; each downward step = recorded departures at
+                          that tenure.
+                        </li>
+                        <li>
+                          <strong>95% confidence band (shaded):</strong> the
+                          uncertainty range around the curve (Greenwood
+                          log-log). Wide band = few observations there — trust
+                          it less.
+                        </li>
+                        <li>
+                          <strong>
+                            Departure event time (ringed cyan nodes):
+                          </strong>{" "}
+                          tenures where at least one departure was recorded.
+                          Small grey dots are censored-only times.
+                        </li>
+                        <li>
+                          <strong>Selected tenure (amber marker):</strong> the
+                          dashed line + dot for the registry person you picked,
+                          plotted at their cohort survival value.
+                        </li>
+                        <li>
+                          <strong>Hover/tap any point:</strong> a tooltip
+                          follows your cursor with tenure, survival %, 95% CI,
+                          at-risk count, departures, and censored for that exact
+                          event time. The ⤢ button expands the graph full-screen
+                          (⤡ or backdrop restores it); Table ↓ jumps to the
+                          estimate table.
+                        </li>
+                        <li>
+                          <strong>Estimate table:</strong> one row per observed
+                          event time with the same six numbers, newest last; the
+                          header shows the row count. Source note below lists
+                          date-based vs duration-based records and excluded
+                          invalid orders.
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                      <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                        Reading a selected record and the counts
+                      </strong>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                        <li>
+                          <strong>Registry rows</strong> show role, department,
+                          tenure in months, recorded skill count, and
+                          Active/Departed status — all uploaded facts.
+                        </li>
+                        <li>
+                          <strong>Cohort S(t)</strong> on each row is the
+                          curve&apos;s survival value at that tenure — e.g.
+                          51.5% means just over half the observed cohort was
+                          still employed that long.
+                        </li>
+                        <li>
+                          <strong>Selected-record card:</strong> “Cohort still
+                          employed at this tenure” (same S(t) as a headline),
+                          “Tenure vs cohort median” (e.g. 432.0 vs median 60.0
+                          mo — far above typical tenure), and the amber-marker
+                          note. The “Context only” line is the contract: these
+                          place one record against the curve and never predict
+                          that person.
+                        </li>
+                        <li>
+                          <strong>Counts:</strong> Included records (usable
+                          episodes), Recorded departures (events), Active /
+                          censored (still observed), Excluded records (missing
+                          start/outcome or invalid date order — fixable in the
+                          upload). Generated timestamp + Scenario ID identify
+                          every data pull for audit.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Task 4: ONA explanation block */}
+            {showIntelligenceTask("intelligence_ona") && (
+              <div className="space-y-4" id="manual-task-4-ona">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Network className="text-pink-400 h-4 w-4" /> Task 4 — Network
+                  Analysis (ONA)
+                </h3>
+
+                <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4">
+                  <div className="text-xs text-slate-300 leading-relaxed">
+                    <strong>What is ONA?</strong> ONA stands for{" "}
+                    <strong>Organizational Network Analysis</strong>. While
+                    traditional organizational charts show only the formal
+                    reporting hierarchy, ONA models the informal network of
+                    communications, collaborations, and advice flows. This
+                    reveals the actual collaborative engine of the company,
+                    answering:{" "}
+                    <em>
+                      Who is the true node of influence? Who acts as the bridge
+                      between isolated departments?
+                    </em>
+                  </div>
+
+                  <div className="relative h-44 bg-slate-900/80 rounded-lg border border-white/5 overflow-hidden flex items-center justify-center">
+                    <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:14px_14px]" />
+
+                    <svg className="absolute inset-0 h-full w-full pointer-events-none">
+                      <line
+                        x1="20%"
+                        y1="50%"
+                        x2="40%"
+                        y2="25%"
+                        stroke="rgba(244,63,94,0.3)"
+                        strokeWidth="2"
+                        strokeDasharray="3 3"
+                      />
+                      <line
+                        x1="20%"
+                        y1="50%"
+                        x2="40%"
+                        y2="75%"
+                        stroke="rgba(244,63,94,0.3)"
+                        strokeWidth="2"
+                        strokeDasharray="3 3"
+                      />
+                      <line
+                        x1="40%"
+                        y1="25%"
+                        x2="60%"
+                        y2="50%"
+                        stroke="rgba(236,72,153,0.8)"
+                        strokeWidth="3"
+                      />
+                      <line
+                        x1="40%"
+                        y1="75%"
+                        x2="60%"
+                        y2="50%"
+                        stroke="rgba(236,72,153,0.8)"
+                        strokeWidth="3"
+                      />
+                      <line
+                        x1="60%"
+                        y1="50%"
+                        x2="80%"
+                        y2="30%"
+                        stroke="rgba(45,212,191,0.4)"
+                        strokeWidth="2"
+                      />
+                      <line
+                        x1="60%"
+                        y1="50%"
+                        x2="80%"
+                        y2="70%"
+                        stroke="rgba(45,212,191,0.4)"
+                        strokeWidth="2"
+                      />
+                    </svg>
+
+                    <div className="absolute left-[15%] top-[40%] flex flex-col items-center">
+                      <div className="h-6 w-6 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center text-[8px] text-slate-400 font-bold">
+                        A
+                      </div>
+                      <span className="text-[9px] text-slate-400 mt-1">
+                        Isolated
+                      </span>
+                    </div>
+
+                    <div className="absolute left-[36%] top-[15%] flex flex-col items-center">
+                      <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(45,212,191,0.4)]">
+                        B
+                      </div>
+                      <span className="text-[9px] text-cyan-300 mt-1">
+                        High PageRank
+                      </span>
+                    </div>
+
+                    <div className="absolute left-[36%] top-[65%] flex flex-col items-center">
+                      <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(45,212,191,0.4)]">
+                        C
+                      </div>
+                      <span className="text-[9px] text-cyan-300 mt-1">
+                        Team Hub
+                      </span>
+                    </div>
+
+                    <div className="absolute left-[56%] top-[40%] flex flex-col items-center">
+                      <div className="h-10 w-10 rounded-full bg-pink-500 border-2 border-pink-400 flex items-center justify-center text-[11px] text-slate-950 font-black shadow-[0_0_12px_rgba(236,72,153,0.6)]">
+                        D
+                      </div>
+                      <span className="text-[9px] text-pink-400 font-extrabold mt-1">
+                        Key Broker
+                      </span>
+                    </div>
+
+                    <div className="absolute left-[76%] top-[20%] flex flex-col items-center">
+                      <div className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-500 flex items-center justify-center text-[9px] text-slate-300 font-bold">
+                        E
+                      </div>
+                      <span className="text-[9px] text-slate-400 mt-1">
+                        Operational
+                      </span>
+                    </div>
+
+                    <div className="absolute left-[76%] top-[60%] flex flex-col items-center">
+                      <div className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-500 flex items-center justify-center text-[9px] text-slate-300 font-bold">
+                        F
+                      </div>
+                      <span className="text-[9px] text-slate-400 mt-1">
+                        Operational
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300 text-left">
+                    {/* Metric 1 */}
+                    <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
+                      <strong className="text-cyan-300 block flex items-center gap-1">
+                        <Activity className="h-3.5 w-3.5" /> PageRank Centrality
+                        (Influence)
+                      </strong>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        <strong>Measures:</strong> Overall connectivity and
+                        communication propagation strength. High PageRank nodes
+                        act as information multipliers.
+                      </p>
+                      <p className="text-[11px] text-slate-400 leading-relaxed font-mono bg-black/30 p-1.5 rounded">
+                        PR(u) = (1-d)/N + d &times; &sum; [PR(v) / L(v)]
+                      </p>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        *Logic*: Adopted from Google&apos;s web-ranking
+                        algorithm, it measures structural prestige. An employee
+                        receives high PageRank if they are connected to other
+                        highly connected employees, indicating key
+                        decision-makers who can broadcast communications
+                        effectively.
+                      </p>
+                    </div>
+
+                    {/* Metric 2 */}
+                    <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
+                      <strong className="text-pink-300 block flex items-center gap-1">
+                        <Network className="h-3.5 w-3.5" /> Betweenness
+                        Centrality (Bridges)
+                      </strong>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        <strong>Measures:</strong> Structural bridge strength
+                        across siloed departments. High betweenness employees
+                        prevent organizational communication bottlenecks.
+                      </p>
+                      <p className="text-[11px] text-slate-400 leading-relaxed font-mono bg-black/30 p-1.5 rounded">
+                        C_B(v) = &sum; [&sigma;_st(v) / &sigma;_st]
+                      </p>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        *Logic*: Calculated via Brandes&apos; algorithm, it
+                        represents the fraction of all shortest communication
+                        paths that pass through an employee. High-betweenness
+                        employees act as bridges (like Node <strong>D</strong>).
+                        If a bridge is at risk of resigning, communication silos
+                        will form.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-black/40 rounded-xl border border-white/5 space-y-2 text-left text-xs">
+                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-indigo-300">
+                      Collaboration evidence and graph scope
+                    </strong>
+                    <p className="text-slate-300 leading-relaxed">
+                      ONA builds ties from dated collaboration-event records
+                      that link two distinct employees in the tenant. It does
+                      not create a relationship just because employees share a
+                      department or skills. Repeated events increase the
+                      recorded tie count; centrality and bridge values describe
+                      the resulting graph structure, not job performance or
+                      influence outside the observed events.
+                    </p>
+                    <p className="text-amber-200 leading-relaxed">
+                      Demo event links are simulated. Jira reporter-to-assignee
+                      links can be used as an issue-based proxy when both emails
+                      match employee records; Jira issue assignment does not
+                      prove direct communication. Review event source, date
+                      coverage, exclusions, and duplicate handling before
+                      interpreting a graph.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Task 5: Markov Career Path Section */}
+            {showIntelligenceTask("intelligence_career") && (
+              <div className="space-y-4" id="manual-task-5-career">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <TrendingUp className="text-cyan-400 h-4 w-4" /> Task 5 —
+                  Markov Career Path
+                </h3>
+                <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4 text-left text-xs">
+                  <p className="text-slate-300 leading-relaxed">
+                    Career Markov reads dated role records linked to employees
+                    in the current tenant. Candidate history is excluded. The
+                    service orders an employee&apos;s non-overlapping role
+                    records by effective date and counts transitions between
+                    consecutive, distinct roles.
                   </p>
-                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
+                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300">
                     <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
-                      Required inputs and outputs
+                      Observed transition calculation
                     </strong>
-                    <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
-                      <li>
-                        Choose target skills, minimum levels, team size, and
-                        budget.
-                      </li>
-                      <li>
-                        Only employees with positive recorded salary, currency,
-                        and pay period matching the selected budget units are
-                        eligible. Missing units are not filled with an estimated
-                        salary.
-                      </li>
-                      <li>
-                        The budget is a hard constraint. If no team fits, the
-                        API returns a validation error instead of an over-budget
-                        roster.
-                      </li>
-                      <li>
-                        The result shows coverage, roster costs, compensation
-                        units, solver status, and reproducibility details. The
-                        chart history is returned after solving; it is not live
-                        solver progress.
-                      </li>
-                      <li>
-                        Solver optimality applies to the supplied skills, graph
-                        weights, salary records, team size, and budget. Demo
-                        salaries and skill coverage are synthetic and do not
-                        make the result a real staffing recommendation.
-                      </li>
-                    </ul>
-                  </div>
-                  <p className="text-amber-200 text-[11px] leading-relaxed">
-                    If the solver cannot prove feasibility and optimality, it
-                    returns an error rather than presenting an unproven team.
-                    Larger datasets or harder inputs can take longer; the
-                    objective is defined by the configured data and constraints.
-                  </p>
-                </div>
-
-                {/* Pillar 3 */}
-                <div className="p-4 bg-white/5 rounded-xl border border-amber-400/20 space-y-3 text-left">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="text-amber-300 h-4.5 w-4.5" />
-                    <h4 className="text-xs font-black uppercase tracking-wider text-amber-200">
-                      3. Attrition Model Data Readiness
-                    </h4>
-                  </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    The current survival endpoint describes a cohort when valid
-                    employment durations and departure/censor outcomes exist. It
-                    does not emit individual employee forecasts. Stored
-                    sentiment, retention scores, salary, and risk flags do not
-                    replace observed employment outcomes.
-                  </p>
-                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300 text-xs">
-                    <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
-                      Required historical records
-                    </strong>
-                    <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
-                      <li>
-                        Employment start date for each observed employment
-                        episode.
-                      </li>
-                      <li>
-                        Departure date for employees who left, or a censor date
-                        for employees still active.
-                      </li>
-                      <li>
-                        An explicit indicator distinguishing a departure from an
-                        active, censored observation.
-                      </li>
-                      <li>
-                        Tenant ownership and source provenance for every record.
-                      </li>
-                    </ul>
-                    <p className="leading-relaxed">
-                      The offline bundle includes synthetic dates and
-                      benchmark-linked outcomes so the cohort calculation can be
-                      demonstrated. The curve is descriptive; it is not an
-                      individually validated prediction. Check the reported
-                      eligible, excluded, departure, and censor counts.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* UI Controls Glossary */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-white">
-                UI Controls & Technical Terminology
-              </h3>
-
-              <div className="space-y-3.5 text-xs text-left">
-                {/* Control 1 */}
-                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
-                  <strong className="text-white block text-xs">
-                    🎯 Target Requirements & Skill Node
-                  </strong>
-                  <p className="text-slate-300 leading-relaxed">
-                    The skill token (e.g. `TypeScript`, `Docker`) selected as a
-                    search requirement.
-                  </p>
-                </div>
-
-                {/* Control 2 */}
-                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
-                  <strong className="text-white block text-xs">
-                    📊 Minimum Proficiency
-                  </strong>
-                  <p className="text-slate-300 leading-relaxed">
-                    The capability target required for the match (L1:
-                    Foundational, L2: Operational, L3: Strategic).
-                  </p>
-                </div>
-
-                {/* Control 3 */}
-                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
-                  <strong className="text-white block text-xs">
-                    🔗 Solving Adjacencies (Graph Theory)
-                  </strong>
-                  <p className="text-slate-300 leading-relaxed font-semibold text-cyan-300">
-                    What is an Adjacency?
-                  </p>
-                  <p className="text-slate-300 leading-relaxed">
-                    In graph theory, two nodes are &quot;adjacent&quot; if they
-                    are directly connected by an edge. In Aurelinx, a skill
-                    adjacency represents a direct transfer relationship between
-                    two competencies (e.g., Python is adjacent to FastAPI).
-                  </p>
-                  <p className="text-slate-300 leading-relaxed">
-                    **Solving Adjacencies** is the process of executing a
-                    shortest-path solver (such as Dijkstra&#39;s algorithm) to
-                    find indirect pathways (e.g. `Vue.js &rarr; JavaScript
-                    &rarr; React`) when no direct match exists. This exposes
-                    hidden talent by calculating the learning proximity between
-                    skills.
-                  </p>
-                </div>
-
-                {/* Control 4 */}
-                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
-                  <strong className="text-white block text-xs">
-                    🧮 Semantic Matching Matrix
-                  </strong>
-                  <p className="text-slate-300 leading-relaxed">
-                    The underlying grid computed by the Math-Engine that indexes
-                    target requirements against candidate resumes. It calculates
-                    the overlap score using semantic distances, role
-                    similarities, and direct/indirect skill matches.
-                  </p>
-                </div>
-
-                {/* Control 5 */}
-                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
-                  <strong className="text-white block text-xs">
-                    🗺️ Path Analysis
-                  </strong>
-                  <p className="text-slate-300 leading-relaxed">
-                    The visual mapping of skill distances (e.g., a Vue developer
-                    matching a React project with a path cost of `0.15`). Path
-                    Analysis shows you the exact sequence of competencies a
-                    candidate needs to bridge the gap.
-                  </p>
-                </div>
-
-                {/* Control 6 */}
-                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
-                  <strong className="text-white block text-xs">
-                    📊 Target Match Breakdown
-                  </strong>
-                  <p className="text-slate-300 leading-relaxed">
-                    An analytical panel detailing the transition options for a
-                    selected candidate. It evaluates target skills against
-                    candidate competencies and categorizes them (e.g.,{" "}
-                    <em>Perfect Match</em>, <em>Highly Transferable</em>, or{" "}
-                    <em>Trainable Gap</em>). It displays the exact transfer
-                    sequence and computed semantic distance (e.g., `Vue.js
-                    &rarr; JavaScript &rarr; React` with weight `0.15`). If no
-                    connection is found, it marks the distance as infinite.
-                  </p>
-                </div>
-
-                {/* Control 7 */}
-                <div className="p-3.5 bg-slate-900/40 rounded-lg border border-white/5 space-y-1">
-                  <strong className="text-white block text-xs">
-                    🕸️ Shortest Path Graph View (Dijkstra Visualizer)
-                  </strong>
-                  <p className="text-slate-300 leading-relaxed">
-                    An interactive, neon-colored SVG network showing skills as
-                    nodes and competency overlaps as links.
-                  </p>
-                  <ul className="text-slate-300 list-disc pl-4 space-y-1 mt-1">
-                    <li>
-                      <strong className="text-emerald-400">
-                        Neon Green Nodes:
-                      </strong>{" "}
-                      Represent skills currently present in the candidate&apos;s
-                      profile (their existing competency islands).
-                    </li>
-                    <li>
-                      <strong className="text-cyan-400">
-                        Neon Cyan Edges:
-                      </strong>{" "}
-                      Highlight the shortest mathematical transition path from
-                      the candidate&apos;s existing skills to the required
-                      target skills.
-                    </li>
-                    <li>
-                      <strong className="text-cyan-300">
-                        Traveling Light Particles:
-                      </strong>{" "}
-                      Flow dynamically along the active cyan paths, showing the
-                      direction and speed of the learning/transition pathway.
-                    </li>
-                  </ul>
-                  <p className="text-slate-300 leading-relaxed mt-1">
-                    This network changes the way managers look at human talent,
-                    moving from a static keyword-matching list to a dynamic
-                    network.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* ONA explanation block */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                <Network className="text-pink-400 h-4 w-4" /> ONA Network
-                Centrality Blueprint
-              </h3>
-
-              <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4">
-                <div className="text-xs text-slate-300 leading-relaxed">
-                  <strong>What is ONA?</strong> ONA stands for{" "}
-                  <strong>Organizational Network Analysis</strong>. While
-                  traditional organizational charts show only the formal
-                  reporting hierarchy, ONA models the informal network of
-                  communications, collaborations, and advice flows. This reveals
-                  the actual collaborative engine of the company, answering:{" "}
-                  <em>
-                    Who is the true node of influence? Who acts as the bridge
-                    between isolated departments?
-                  </em>
-                </div>
-
-                <div className="relative h-44 bg-slate-900/80 rounded-lg border border-white/5 overflow-hidden flex items-center justify-center">
-                  <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:14px_14px]" />
-
-                  <svg className="absolute inset-0 h-full w-full pointer-events-none">
-                    <line
-                      x1="20%"
-                      y1="50%"
-                      x2="40%"
-                      y2="25%"
-                      stroke="rgba(244,63,94,0.3)"
-                      strokeWidth="2"
-                      strokeDasharray="3 3"
-                    />
-                    <line
-                      x1="20%"
-                      y1="50%"
-                      x2="40%"
-                      y2="75%"
-                      stroke="rgba(244,63,94,0.3)"
-                      strokeWidth="2"
-                      strokeDasharray="3 3"
-                    />
-                    <line
-                      x1="40%"
-                      y1="25%"
-                      x2="60%"
-                      y2="50%"
-                      stroke="rgba(236,72,153,0.8)"
-                      strokeWidth="3"
-                    />
-                    <line
-                      x1="40%"
-                      y1="75%"
-                      x2="60%"
-                      y2="50%"
-                      stroke="rgba(236,72,153,0.8)"
-                      strokeWidth="3"
-                    />
-                    <line
-                      x1="60%"
-                      y1="50%"
-                      x2="80%"
-                      y2="30%"
-                      stroke="rgba(45,212,191,0.4)"
-                      strokeWidth="2"
-                    />
-                    <line
-                      x1="60%"
-                      y1="50%"
-                      x2="80%"
-                      y2="70%"
-                      stroke="rgba(45,212,191,0.4)"
-                      strokeWidth="2"
-                    />
-                  </svg>
-
-                  <div className="absolute left-[15%] top-[40%] flex flex-col items-center">
-                    <div className="h-6 w-6 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center text-[8px] text-slate-400 font-bold">
-                      A
+                    <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
+                      P(role A → role B) = observed A-to-B changes ÷ all
+                      observed changes from A
                     </div>
-                    <span className="text-[9px] text-slate-400 mt-1">
-                      Isolated
-                    </span>
-                  </div>
-
-                  <div className="absolute left-[36%] top-[15%] flex flex-col items-center">
-                    <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(45,212,191,0.4)]">
-                      B
-                    </div>
-                    <span className="text-[9px] text-cyan-300 mt-1">
-                      High PageRank
-                    </span>
-                  </div>
-
-                  <div className="absolute left-[36%] top-[65%] flex flex-col items-center">
-                    <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold shadow-[0_0_8px_rgba(45,212,191,0.4)]">
-                      C
-                    </div>
-                    <span className="text-[9px] text-cyan-300 mt-1">
-                      Team Hub
-                    </span>
-                  </div>
-
-                  <div className="absolute left-[56%] top-[40%] flex flex-col items-center">
-                    <div className="h-10 w-10 rounded-full bg-pink-500 border-2 border-pink-400 flex items-center justify-center text-[11px] text-slate-950 font-black shadow-[0_0_12px_rgba(236,72,153,0.6)]">
-                      D
-                    </div>
-                    <span className="text-[9px] text-pink-400 font-extrabold mt-1">
-                      Key Broker
-                    </span>
-                  </div>
-
-                  <div className="absolute left-[76%] top-[20%] flex flex-col items-center">
-                    <div className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-500 flex items-center justify-center text-[9px] text-slate-300 font-bold">
-                      E
-                    </div>
-                    <span className="text-[9px] text-slate-400 mt-1">
-                      Operational
-                    </span>
-                  </div>
-
-                  <div className="absolute left-[76%] top-[60%] flex flex-col items-center">
-                    <div className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-500 flex items-center justify-center text-[9px] text-slate-300 font-bold">
-                      F
-                    </div>
-                    <span className="text-[9px] text-slate-400 mt-1">
-                      Operational
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300 text-left">
-                  {/* Metric 1 */}
-                  <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
-                    <strong className="text-cyan-300 block flex items-center gap-1">
-                      <Activity className="h-3.5 w-3.5" /> PageRank Centrality
-                      (Influence)
-                    </strong>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
-                      <strong>Measures:</strong> Overall connectivity and
-                      communication propagation strength. High PageRank nodes
-                      act as information multipliers.
-                    </p>
-                    <p className="text-[11px] text-slate-400 leading-relaxed font-mono bg-black/30 p-1.5 rounded">
-                      PR(u) = (1-d)/N + d &times; &sum; [PR(v) / L(v)]
-                    </p>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
-                      *Logic*: Adopted from Google&apos;s web-ranking algorithm,
-                      it measures structural prestige. An employee receives high
-                      PageRank if they are connected to other highly connected
-                      employees, indicating key decision-makers who can
-                      broadcast communications effectively.
+                    <p>
+                      Later steps multiply the observed transition matrix. Each
+                      step means the next recorded role change, not a fixed time
+                      period. The calculation does not adjust probabilities from
+                      skill coverage, predict promotion, or estimate when a move
+                      will happen. When history has no observed exits from the
+                      selected role, the result reports insufficient
+                      transitions.
                     </p>
                   </div>
-
-                  {/* Metric 2 */}
-                  <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-1">
-                    <strong className="text-pink-300 block flex items-center gap-1">
-                      <Network className="h-3.5 w-3.5" /> Betweenness Centrality
-                      (Bridges)
-                    </strong>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
-                      <strong>Measures:</strong> Structural bridge strength
-                      across siloed departments. High betweenness employees
-                      prevent organizational communication bottlenecks.
-                    </p>
-                    <p className="text-[11px] text-slate-400 leading-relaxed font-mono bg-black/30 p-1.5 rounded">
-                      C_B(v) = &sum; [&sigma;_st(v) / &sigma;_st]
-                    </p>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
-                      *Logic*: Calculated via Brandes&apos; algorithm, it
-                      represents the fraction of all shortest communication
-                      paths that pass through an employee. High-betweenness
-                      employees act as bridges (like Node <strong>D</strong>).
-                      If a bridge is at risk of resigning, communication silos
-                      will form.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-black/40 rounded-xl border border-white/5 space-y-2 text-left text-xs">
-                  <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-indigo-300">
-                    Collaboration evidence and graph scope
-                  </strong>
-                  <p className="text-slate-300 leading-relaxed">
-                    ONA builds ties from dated collaboration-event records that
-                    link two distinct employees in the tenant. It does not
-                    create a relationship just because employees share a
-                    department or skills. Repeated events increase the recorded
-                    tie count; centrality and bridge values describe the
-                    resulting graph structure, not job performance or influence
-                    outside the observed events.
-                  </p>
                   <p className="text-amber-200 leading-relaxed">
-                    Demo event links are simulated. Jira reporter-to-assignee
-                    links can be used as an issue-based proxy when both emails
-                    match employee records; Jira issue assignment does not prove
-                    direct communication. Review event source, date coverage,
-                    exclusions, and duplicate handling before interpreting a
-                    graph.
+                    In the offline demo, role dates and sequences are generated
+                    synthetic data. The graph demonstrates how the calculation
+                    works; its transition rates do not describe a real employer
+                    and are not an individual career forecast. Review the data
+                    readiness counts and source records beside the result.
                   </p>
                 </div>
               </div>
-            </div>
-
-            {/* Markov Career Path Section */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                <TrendingUp className="text-cyan-400 h-4 w-4" /> Markov Career
-                Path: Evidence and Interpretation
-              </h3>
-              <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4 text-left text-xs">
-                <p className="text-slate-300 leading-relaxed">
-                  Career Markov reads dated role records linked to employees in
-                  the current tenant. Candidate history is excluded. The service
-                  orders an employee&apos;s non-overlapping role records by
-                  effective date and counts transitions between consecutive,
-                  distinct roles.
-                </p>
-                <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2 text-slate-300">
-                  <strong className="text-white block font-mono text-[10px] uppercase tracking-wider text-cyan-300">
-                    Observed transition calculation
-                  </strong>
-                  <div className="p-2 bg-slate-950 font-mono text-[11px] text-center text-pink-300 rounded border border-white/5">
-                    P(role A → role B) = observed A-to-B changes ÷ all observed
-                    changes from A
-                  </div>
-                  <p>
-                    Later steps multiply the observed transition matrix. Each
-                    step means the next recorded role change, not a fixed time
-                    period. The calculation does not adjust probabilities from
-                    skill coverage, predict promotion, or estimate when a move
-                    will happen. When history has no observed exits from the
-                    selected role, the result reports insufficient transitions.
-                  </p>
-                </div>
-                <p className="text-amber-200 leading-relaxed">
-                  In the offline demo, role dates and sequences are generated
-                  synthetic data. The graph demonstrates how the calculation
-                  works; its transition rates do not describe a real employer
-                  and are not an individual career forecast. Review the data
-                  readiness counts and source records beside the result.
-                </p>
-              </div>
-            </div>
+            )}
 
             {/* Intelligence Center operational reference */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                <BookOpen className="text-emerald-400 h-4 w-4" /> Intelligence
-                Center: End-to-End Operating Reference
-              </h3>
-              <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4 text-left text-xs text-slate-300 leading-relaxed">
-                <p>
-                  Use the five workbench tabs in this order when moving from a
-                  talent question to an accountable decision:{" "}
-                  <strong>Semantic Skills Graph</strong> for capability fit,{" "}
-                  <strong>Optimal Team Assembly</strong> for constrained
-                  staffing, <strong>Survival / Attrition</strong> for retention
-                  signals, <strong>Network Analysis (ONA)</strong> for
-                  collaboration structure, and
-                  <strong> Markov Career Path</strong> for role-transition
-                  scenarios. Results are decision support; they do not change
-                  employee records or automatically trigger HR actions.
-                </p>
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
-                    <strong className="text-emerald-300 block">
-                      Shared data contract
-                    </strong>
-                    <p>
-                      Employee profiles, roles, departments, compensation, join
-                      dates, skills, skill levels, experience records,
-                      sentiment, and explicit risk flags are read within the
-                      signed-in tenant scope. The engine filters invalid or
-                      synthetic records according to the server data-quality
-                      rules.
-                    </p>
-                    <p>
-                      Interactive calls are authenticated and use the
-                      Intelligence API:{" "}
-                      <code className="text-cyan-300">POST /skill-match</code>,{" "}
-                      <code className="text-cyan-300">POST /team-optimize</code>
-                      ,{" "}
-                      <code className="text-cyan-300">
-                        GET /attrition-hazard
-                      </code>
-                      ,{" "}
-                      <code className="text-cyan-300">GET /ona?limit=120</code>,
-                      and{" "}
-                      <code className="text-cyan-300">
-                        GET /career-path/&lt;employee_id&gt;
-                      </code>
-                      .
-                    </p>
-                  </div>
-                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
-                    <strong className="text-amber-300 block">
-                      Interpretation and safety
-                    </strong>
-                    <p>
-                      “Probability,” “risk,” “influence,” “bridge,” “coverage,”
-                      and “optimal” are model outputs, not facts or employment
-                      recommendations. Review the source records, sample size,
-                      model status, validation status, and confidence before
-                      acting.
-                    </p>
-                    <p>
-                      Team optimality applies to the mathematical objective and
-                      inputs, not to real-world job fit. Demo career transitions
-                      are generated and are not validated against an
-                      employer&apos;s actual history. Never use a demo score as
-                      the sole basis for hiring, promotion, compensation,
-                      discipline, or termination.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
-                  <strong className="text-indigo-300 block">
-                    Complete operator workflow
-                  </strong>
-                  <ol className="list-decimal pl-5 space-y-1 text-[11px]">
-                    <li>
-                      Confirm tenant, permissions, data freshness, and that the
-                      population is large and representative enough for the
-                      question.
-                    </li>
-                    <li>
-                      Define the question and inputs. Record target skill names
-                      and L1–L5 minimums, team budget and size, the employee
-                      profile, or the network scope.
-                    </li>
-                    <li>
-                      Run the relevant tab and inspect both the visual result
-                      and its underlying evidence: match details, cost sources,
-                      covariates, graph metrics, transition gaps, timestamps,
-                      and model metadata.
-                    </li>
-                    <li>
-                      Use the AI explanation panel only as a plain-language
-                      explanation of the displayed result; verify it against the
-                      source cards and formulas.
-                    </li>
-                    <li>
-                      Save or export the result through the authorized workflow,
-                      attach assumptions and a human owner, and route any
-                      high-impact action to the Reviews Queue and applicable
-                      policy gate.
-                    </li>
-                    <li>
-                      Monitor the decision outcome. Re-run after source data,
-                      integrations, skills, compensation, or model versions
-                      change; do not compare scores from different populations
-                      without documenting the change.
-                    </li>
-                  </ol>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
-                    <strong className="text-cyan-300 block">
-                      Tab-by-tab controls and outputs
-                    </strong>
-                    <ul className="list-disc pl-4 space-y-1 text-[11px]">
-                      <li>
-                        <strong>Skills:</strong> add/remove target nodes, choose
-                        L1–L5, run matching, select a person, inspect semantic
-                        paths, confidence, status, and training gaps.
-                      </li>
-                      <li>
-                        <strong>Team:</strong> add/remove required skills, set
-                        budget and maximum roster size, run the solver, inspect
-                        solver status, coverage, salary units, cost, budget
-                        feasibility, and selected roster. The displayed chart is
-                        returned after solving, not live iteration progress.
-                      </li>
-                      <li>
-                        <strong>Attrition:</strong> inspect the cohort survival
-                        curve, eligibility counts, departure count, and censor
-                        count. The endpoint does not return individual risk
-                        forecasts.
-                      </li>
-                      <li>
-                        <strong>ONA:</strong> search, filter by department,
-                        select a node, change coloring by
-                        department/PageRank/betweenness/silo, inspect neighbors
-                        and graph metrics, then explain the observed topology.
-                      </li>
-                      <li>
-                        <strong>Career:</strong> select an employee, inspect the
-                        next observed role-change probabilities and history
-                        counts, then review whether the dated employee history
-                        supports those transitions.
-                      </li>
-                    </ul>
-                  </div>
-                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
-                    <strong className="text-pink-300 block">
-                      Failure, empty-state, and recovery rules
-                    </strong>
-                    <ul className="list-disc pl-4 space-y-1 text-[11px]">
-                      <li>
-                        Loading means the request is still running; do not
-                        interpret a blank chart as zero risk or zero
-                        connectivity.
-                      </li>
-                      <li>
-                        Missing employee, skill, dated experience,
-                        collaboration, compensation, or outcome records produce
-                        an empty result or an unavailable/readiness status. Add
-                        valid source records and re-run.
-                      </li>
-                      <li>
-                        Skill-match and team optimization require at least one
-                        target skill; team optimization also requires enough
-                        employees for the requested roster size.
-                      </li>
-                      <li>
-                        Team Assembly excludes employees without positive
-                        recorded compensation and matching currency and pay
-                        period. It does not invent role-based salaries.
-                      </li>
-                      <li>
-                        Authentication, authorization, API, or network errors
-                        are operational failures. Retry only after checking
-                        access and connectivity; never substitute a stale result
-                        without labeling it.
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
-                  <strong className="text-rose-300 block">
-                    Audit, privacy, and governance checklist
-                  </strong>
+            {activeTab === "intelligence" && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <BookOpen className="text-emerald-400 h-4 w-4" /> Intelligence
+                  Center: End-to-End Operating Reference
+                </h3>
+                <div className="p-5 rounded-xl bg-slate-950/60 border border-white/10 space-y-4 text-left text-xs text-slate-300 leading-relaxed">
                   <p>
-                    For every consequential use, retain the question, tenant and
-                    population scope, source timestamp, filters, exact inputs,
-                    model version, seed where supplied, returned evidence,
-                    explanation, reviewer, decision, and outcome. Team scenarios
-                    return a deterministic tenant/input-derived seed when one is
-                    not supplied and are persisted as forecast scenarios. ONA
-                    uses up to the requested employee limit and successful Jira
-                    integration logs; it is not a complete communication census.
-                    Attrition and career paths expose model limitations so HR
-                    must combine them with documented human review.
+                    Use the five workbench tabs in this order when moving from a
+                    talent question to an accountable decision:{" "}
+                    <strong>Semantic Skills Graph</strong> for capability fit,{" "}
+                    <strong>Optimal Team Assembly</strong> for constrained
+                    staffing, <strong>Survival / Attrition</strong> for
+                    retention signals, <strong>Network Analysis (ONA)</strong>{" "}
+                    for collaboration structure, and
+                    <strong> Markov Career Path</strong> for role-transition
+                    scenarios. Results are decision support; they do not change
+                    employee records or automatically trigger HR actions.
                   </p>
-                  <p>
-                    Restrict access to least privilege, avoid exposing
-                    unnecessary names or compensation, honor retention/deletion
-                    policy, and use approved intervention, compliance, audit,
-                    and disaster-recovery procedures for any downstream action.
-                    The Intelligence Center is read/compute oriented; write
-                    actions belong in governed workflows.
-                  </p>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
+                      <strong className="text-emerald-300 block">
+                        Shared data contract
+                      </strong>
+                      <p>
+                        Employee profiles, roles, departments, compensation,
+                        join dates, skills, skill levels, experience records,
+                        sentiment, and explicit risk flags are read within the
+                        signed-in tenant scope. The engine filters invalid or
+                        synthetic records according to the server data-quality
+                        rules.
+                      </p>
+                      <p>
+                        Interactive calls are authenticated and use the
+                        Intelligence API:{" "}
+                        <code className="text-cyan-300">POST /skill-match</code>
+                        ,{" "}
+                        <code className="text-cyan-300">
+                          POST /team-optimize
+                        </code>
+                        ,{" "}
+                        <code className="text-cyan-300">
+                          GET /attrition-hazard
+                        </code>
+                        ,{" "}
+                        <code className="text-cyan-300">
+                          GET /ona?limit=120
+                        </code>
+                        , and{" "}
+                        <code className="text-cyan-300">
+                          GET /career-path/&lt;employee_id&gt;
+                        </code>
+                        .
+                      </p>
+                    </div>
+                    <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
+                      <strong className="text-amber-300 block">
+                        Interpretation and safety
+                      </strong>
+                      <p>
+                        “Probability,” “risk,” “influence,” “bridge,”
+                        “coverage,” and “optimal” are model outputs, not facts
+                        or employment recommendations. Review the source
+                        records, sample size, model status, validation status,
+                        and confidence before acting.
+                      </p>
+                      <p>
+                        Team optimality applies to the mathematical objective
+                        and inputs, not to real-world job fit. Demo career
+                        transitions are generated and are not validated against
+                        an employer&apos;s actual history. Never use a demo
+                        score as the sole basis for hiring, promotion,
+                        compensation, discipline, or termination.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
+                    <strong className="text-indigo-300 block">
+                      Complete operator workflow
+                    </strong>
+                    <ol className="list-decimal pl-5 space-y-1 text-[11px]">
+                      <li>
+                        Confirm tenant, permissions, data freshness, and that
+                        the population is large and representative enough for
+                        the question.
+                      </li>
+                      <li>
+                        Define the question and inputs. Record target skill
+                        names and L1–L5 minimums, team budget and size, the
+                        employee profile, or the network scope.
+                      </li>
+                      <li>
+                        Run the relevant tab and inspect both the visual result
+                        and its underlying evidence: match details, cost
+                        sources, covariates, graph metrics, transition gaps,
+                        timestamps, and model metadata.
+                      </li>
+                      <li>
+                        Use the AI explanation panel only as a plain-language
+                        explanation of the displayed result; verify it against
+                        the source cards and formulas.
+                      </li>
+                      <li>
+                        Save or export the result through the authorized
+                        workflow, attach assumptions and a human owner, and
+                        route any high-impact action to the Reviews Queue and
+                        applicable policy gate.
+                      </li>
+                      <li>
+                        Monitor the decision outcome. Re-run after source data,
+                        integrations, skills, compensation, or model versions
+                        change; do not compare scores from different populations
+                        without documenting the change.
+                      </li>
+                    </ol>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
+                      <strong className="text-cyan-300 block">
+                        Tab-by-tab controls and outputs
+                      </strong>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px]">
+                        <li>
+                          <strong>Skills:</strong> add/remove target nodes,
+                          choose L1–L5, run matching, select a person, inspect
+                          semantic paths, confidence, status, and training gaps.
+                        </li>
+                        <li>
+                          <strong>Team:</strong> browse/search database skills
+                          with per-row L1–L5 and Add (same skill allowed at
+                          different levels, never the same skill+level twice),
+                          set budget with live minimum/shortfall guidance and
+                          roster size 2–10, run the solver, inspect run currency
+                          vs saved-run state, solver proof, exact vs
+                          graph-adjusted coverage, salary units, cost, and
+                          roster. Charts are the proven final measurement kept
+                          visible across edits, not live iteration progress.
+                          Explain with AI streams a consultant-grade report of
+                          the displayed run.
+                        </li>
+                        <li>
+                          <strong>Attrition:</strong> inspect the cohort
+                          survival curve, eligibility counts, departure count,
+                          and censor count. The endpoint does not return
+                          individual risk forecasts.
+                        </li>
+                        <li>
+                          <strong>ONA:</strong> search, filter by department,
+                          select a node, change coloring by
+                          department/PageRank/betweenness/silo, inspect
+                          neighbors and graph metrics, then explain the observed
+                          topology.
+                        </li>
+                        <li>
+                          <strong>Career:</strong> select an employee, inspect
+                          the next observed role-change probabilities and
+                          history counts, then review whether the dated employee
+                          history supports those transitions.
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
+                      <strong className="text-pink-300 block">
+                        Failure, empty-state, and recovery rules
+                      </strong>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px]">
+                        <li>
+                          Loading means the request is still running; do not
+                          interpret a blank chart as zero risk or zero
+                          connectivity.
+                        </li>
+                        <li>
+                          Missing employee, skill, dated experience,
+                          collaboration, compensation, or outcome records
+                          produce an empty result or an unavailable/readiness
+                          status. Add valid source records and re-run.
+                        </li>
+                        <li>
+                          Skill-match and team optimization require at least one
+                          target skill; team optimization also requires enough
+                          employees for the requested roster size.
+                        </li>
+                        <li>
+                          Team Assembly excludes employees without positive
+                          recorded compensation and matching currency and pay
+                          period. It does not invent role-based salaries.
+                        </li>
+                        <li>
+                          Authentication, authorization, API, or network errors
+                          are operational failures. Retry only after checking
+                          access and connectivity; never substitute a stale
+                          result without labeling it.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
+                    <strong className="text-rose-300 block">
+                      Audit, privacy, and governance checklist
+                    </strong>
+                    <p>
+                      For every consequential use, retain the question, tenant
+                      and population scope, source timestamp, filters, exact
+                      inputs, model version, seed where supplied, returned
+                      evidence, explanation, reviewer, decision, and outcome.
+                      Team scenarios return a deterministic tenant/input-derived
+                      seed when one is not supplied and are persisted as
+                      forecast scenarios. ONA uses up to the requested employee
+                      limit and successful Jira integration logs; it is not a
+                      complete communication census. Attrition and career paths
+                      expose model limitations so HR must combine them with
+                      documented human review.
+                    </p>
+                    <p>
+                      Restrict access to least privilege, avoid exposing
+                      unnecessary names or compensation, honor
+                      retention/deletion policy, and use approved intervention,
+                      compliance, audit, and disaster-recovery procedures for
+                      any downstream action. The Intelligence Center is
+                      read/compute oriented; write actions belong in governed
+                      workflows.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Compliance approval gates */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white">
-                Compliance Approval Gates
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                High-impact interventions or structural updates (such as
-                releasing department reorganizations) trigger **Mandatory Policy
-                Pack Gates**. These gates require administrative override keys
-                to authorize releases.
-              </p>
-            </div>
+            {activeTab === "intelligence" && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-white">
+                  Compliance Approval Gates
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  High-impact interventions or structural updates (such as
+                  releasing department reorganizations) trigger **Mandatory
+                  Policy Pack Gates**. These gates require administrative
+                  override keys to authorize releases.
+                </p>
+              </div>
+            )}
           </div>
         );
 
@@ -4553,10 +5016,12 @@ export const UserManualModal = ({
                     </li>
                     <li>
                       Semantic matching checks uploaded names against the
-                      configured skill graph and approved aliases. The bundle
-                      report maps 25 of 170 distinct employee skill names; 145
-                      are unmapped and no aliases are supplied. Coverage can
-                      change with the app ontology.
+                      normalized tenant catalog, approved aliases, and
+                      configured skill graph. Optional embedding matching is
+                      disabled by default; if enabled, vector candidates are
+                      exploratory and need human validation. The bundle report
+                      maps 25 of 170 distinct names to curated graph relations;
+                      remaining names are still searchable exactly.
                     </li>
                   </ul>
                 </div>
@@ -5372,7 +5837,10 @@ export const UserManualModal = ({
               </div>
 
               {/* Main Content Area */}
-              <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-950/10">
+              <div
+                ref={contentRef}
+                className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-950/10"
+              >
                 {/* Mobile Tab Selector */}
                 <div className="md:hidden mb-6">
                   <PremiumSelect
@@ -5391,7 +5859,24 @@ export const UserManualModal = ({
                       <option value="sentiment">Sentiment Intelligence</option>
                     </optgroup>
                     <option value="directory">Talent Directory</option>
-                    <option value="intelligence">Intelligence Center</option>
+                    <optgroup label="Intelligence Center">
+                      <option value="intelligence">Center Overview</option>
+                      <option value="intelligence_skills">
+                        Task 1 — Semantic Skills Graph
+                      </option>
+                      <option value="intelligence_team">
+                        Task 2 — Optimal Team Assembly
+                      </option>
+                      <option value="intelligence_attrition">
+                        Task 3 — Survival Attrition
+                      </option>
+                      <option value="intelligence_ona">
+                        Task 4 — Network Analysis (ONA)
+                      </option>
+                      <option value="intelligence_career">
+                        Task 5 — Markov Career Path
+                      </option>
+                    </optgroup>
                     <optgroup label="Data Ops & Enterprise">
                       <option value="dataops_overview">
                         Enterprise Console Overview

@@ -79,20 +79,21 @@ export function baselineHazard(tenureMonths) {
  * `levers` from the backend response carries the recorded values.
  */
 export function buildCovariates(levers, overrides = {}) {
+  const source = levers || {};
   const base = {
-    morale: levers.morale ?? 0.5,
-    salary: levers.salary ?? null,
-    salary_log_ratio: levers.salary_log_ratio ?? 0.0,
-    dept_median_salary: levers.dept_median_salary ?? 0,
-    skills_count: levers.skills_count ?? 0,
-    skill_level_avg: levers.skill_level_avg ?? 2.0,
-    match_score: levers.match_score ?? 0.5,
-    experience_years: levers.experience_years ?? 0,
-    companies_count: levers.companies_count ?? 0,
-    risk_flag: levers.risk_flag ?? false,
-    tenure_months: levers.tenure_months ?? 12,
-    seniority_scale: levers.seniority_scale ?? 1.0,
-    dept_offset: levers.dept_offset ?? 0.0,
+    morale: source.morale ?? 0.5,
+    salary: source.salary ?? null,
+    salary_log_ratio: source.salary_log_ratio ?? 0.0,
+    dept_median_salary: source.dept_median_salary ?? 0,
+    skills_count: source.skills_count ?? 0,
+    skill_level_avg: source.skill_level_avg ?? 2.0,
+    match_score: source.match_score ?? 0.5,
+    experience_years: source.experience_years ?? 0,
+    companies_count: source.companies_count ?? 0,
+    risk_flag: source.risk_flag ?? false,
+    tenure_months: source.tenure_months ?? 12,
+    seniority_scale: source.seniority_scale ?? 1.0,
+    dept_offset: source.dept_offset ?? 0.0,
   };
   const out = { ...base };
 
@@ -119,45 +120,52 @@ export function buildCovariates(levers, overrides = {}) {
  * `means` is the population means block returned by the backend.
  */
 export function logHazardContributions(covs, means) {
+  // Population means may be absent on descriptive-only payloads; center on
+  // zero instead of crashing so formula math always stays numeric.
+  const baseline = means || {};
+  const meanOf = (key) => baseline[key] ?? 0;
   const centered = (value, mean) => value - mean;
   const overloaded = (count) => Math.max(0.0, count - HEALTHY_SKILL_BASELINE);
 
   const contribs = {
-    morale: COX_COEFFICIENTS.morale * centered(covs.morale, means.morale),
+    morale: COX_COEFFICIENTS.morale * centered(covs.morale, meanOf("morale")),
     salary:
       COX_COEFFICIENTS.salary *
-      centered(covs.salary_log_ratio, means.salary_log_ratio),
+      centered(covs.salary_log_ratio, meanOf("salary_log_ratio")),
     risk_flag:
       COX_COEFFICIENTS.risk_flag *
-      centered(Number(covs.risk_flag), means.risk_flag),
+      centered(Number(covs.risk_flag), meanOf("risk_flag")),
     skills:
       COX_COEFFICIENTS.skills *
-      centered(overloaded(covs.skills_count), overloaded(means.skills_count)),
+      centered(
+        overloaded(covs.skills_count),
+        overloaded(meanOf("skills_count")),
+      ),
     skill_level:
       COX_COEFFICIENTS.skill_level *
       centered(
         covs.skill_level_avg - SKILL_LEVEL_REFERENCE,
-        means.skill_level_avg - SKILL_LEVEL_REFERENCE,
+        meanOf("skill_level_avg") - SKILL_LEVEL_REFERENCE,
       ),
     match:
       COX_COEFFICIENTS.match *
       centered(
         covs.match_score - MATCH_REFERENCE,
-        means.match_score - MATCH_REFERENCE,
+        meanOf("match_score") - MATCH_REFERENCE,
       ),
     experience:
       COX_COEFFICIENTS.experience *
       centered(
         covs.experience_years - EXPERIENCE_INFLECTION_YEARS,
-        means.experience_years - EXPERIENCE_INFLECTION_YEARS,
+        meanOf("experience_years") - EXPERIENCE_INFLECTION_YEARS,
       ),
     companies:
       COX_COEFFICIENTS.companies *
       centered(
         covs.companies_count - COMPANIES_INFLECTION,
-        means.companies_count - COMPANIES_INFLECTION,
+        meanOf("companies_count") - COMPANIES_INFLECTION,
       ),
-    department: centered(covs.dept_offset, means.dept_offset),
+    department: centered(covs.dept_offset, meanOf("dept_offset")),
   };
 
   let total = Object.values(contribs).reduce((a, b) => a + b, 0);

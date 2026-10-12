@@ -17,6 +17,7 @@ Tests for tenant isolation, exact team optimization, hard budget constraints,
 compensation data quality, and the response consumed by the Intelligence Center.
 """
 
+import json
 import os
 from itertools import combinations
 from types import SimpleNamespace
@@ -150,6 +151,13 @@ def test_team_optimize_uses_recorded_salary_and_reports_solver_proof(client_db):
     assert data["search_status"] == "optimal"
     assert data["solver"] == "HiGHS MILP"
     assert data["solver_relative_gap"] == 0.0
+    assert data["run_inputs"] == {**payload, "seed": None}
+    assert data["compensation_unit"] == "USD per annual"
+    assert data["compensation_provenance"] == (
+        "Employee record values; source provenance is not stored per employee."
+    )
+    assert data["metrics"]["compensation_basis"] == "recorded_employee_values"
+    assert data["score_definition"]["qualification_validation"] is False
 
     # The chart reports one final measurement, not simulated solver iterations.
     history = data["optimization_history"]
@@ -183,6 +191,64 @@ def test_team_optimize_uses_recorded_salary_and_reports_solver_proof(client_db):
     ):
         assert field in metrics, f"metrics missing {field}"
     assert metrics["salary_record_ratio"] == 1.0
+
+
+def test_latest_team_result_restores_the_persisted_graph_data(client_db):
+    engine = client_db["engine"]
+    _seed_employees(engine, count=8)
+    payload = {
+        "target_skills": [
+            {"name": "React", "level": 4},
+            {"name": "Python", "level": 3},
+        ],
+        "budget_cap": 500000.0,
+        "max_team_size": 3,
+    }
+
+    optimized = client_db["client"].post(
+        "/api/v1/intelligence/team-optimize", json=payload
+    )
+    assert optimized.status_code == 200, optimized.text
+
+    restored = client_db["client"].get("/api/v1/intelligence/team-optimize/latest")
+    assert restored.status_code == 200, restored.text
+    data = restored.json()
+    assert data["saved_at"]
+    assert data["result"]["scenario_id"] == optimized.json()["scenario_id"]
+    assert data["result"]["optimized_team"] == optimized.json()["optimized_team"]
+    expected_inputs = {**payload, "seed": None}
+    assert data["inputs"] == expected_inputs
+    assert data["result"]["run_inputs"] == expected_inputs
+    assert (
+        data["result"]["optimization_history"]
+        == optimized.json()["optimization_history"]
+    )
+
+
+def test_latest_team_result_does_not_return_another_tenants_scenario(client_db):
+    from app.models.database import ForecastScenarioTable
+
+    engine = client_db["engine"]
+    with SQLSession(engine) as session:
+        session.add(
+            ForecastScenarioTable(
+                tenant_id="another-tenant",
+                scenario_name="Team optimization · other tenant",
+                input_payload="{}",
+                output_payload=json.dumps(
+                    {
+                        "optimized_team": [{"full_name": "Other tenant"}],
+                        "metrics": {},
+                        "optimization_history": [],
+                    }
+                ),
+            )
+        )
+        session.commit()
+
+    response = client_db["client"].get("/api/v1/intelligence/team-optimize/latest")
+    assert response.status_code == 200, response.text
+    assert response.json()["result"] is None
 
 
 def test_team_optimize_is_deterministic_for_same_inputs(client_db):
@@ -265,6 +331,163 @@ def test_team_optimize_enforces_budget_and_prefers_lower_cost_on_equal_coverage(
         "/api/v1/intelligence/team-optimize", json=payload
     )
     assert infeasible.status_code == 422
+    # Enriched infeasibility message must state the real minimum + shortfall.
+    assert "185,000" in infeasible.json()["detail"]
+    assert "shortfall" in infeasible.json()["detail"].casefold()
+
+
+def test_team_feasibility_reports_minimum_costs_and_scope(client_db):
+    engine = client_db["engine"]
+    _seed_employees(engine, count=5)
+    response = client_db["client"].get("/api/v1/intelligence/team-optimize/feasibility")
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["eligible_employee_count"] == 5
+    assert data["compensation_unit"] == "USD per annual"
+    # 90k + 95k = 185k cheapest pair; exposes sizes up to 10 when staff allows.
+    assert data["minimum_cost_by_team_size"]["2"] == 185000
+    assert data["supported_team_sizes"][-1] == 10
+
+
+def test_team_skill_suggestions_come_from_uploaded_records(client_db):
+    engine = client_db["engine"]
+    _seed_employees(engine, count=4)
+    response = client_db["client"].get(
+        "/api/v1/intelligence/team-optimize/skill-suggestions",
+        params={"q": "reac", "limit": 10},
+    )
+    assert response.status_code == 200, response.text
+    names = [row["name"] for row in response.json()["suggestions"]]
+    assert "React" in names
+
+
+def test_team_optimize_allows_same_skill_at_different_levels(client_db):
+    engine = client_db["engine"]
+    _seed_employees(engine, count=4)
+    # Same skill at L2 and L4 are distinct demands and must solve.
+    ok = client_db["client"].post(
+        "/api/v1/intelligence/team-optimize",
+        json={
+            "target_skills": [
+                {"name": "React", "level": 2},
+                {"name": "React", "level": 4},
+            ],
+            "budget_cap": 500000.0,
+            "max_team_size": 2,
+        },
+    )
+    assert ok.status_code == 200, ok.text
+    # Exact same skill+level twice is still rejected.
+    dupe = client_db["client"].post(
+        "/api/v1/intelligence/team-optimize",
+        json={
+            "target_skills": [
+                {"name": "React", "level": 4},
+                {"name": "react", "level": 4},
+            ],
+            "budget_cap": 500000.0,
+            "max_team_size": 2,
+        },
+    )
+    assert dupe.status_code == 422
+    assert "level combination" in dupe.json()["detail"]
+
+
+def test_team_optimize_accepts_team_size_up_to_ten(client_db):
+    engine = client_db["engine"]
+    _seed_employees(engine, count=11)
+    payload = {
+        "target_skills": [{"name": "React", "level": 4}],
+        "budget_cap": 2_000_000.0,
+        "max_team_size": 10,
+    }
+    response = client_db["client"].post(
+        "/api/v1/intelligence/team-optimize", json=payload
+    )
+    assert response.status_code == 200, response.text
+    assert len(response.json()["optimized_team"]) == 10
+
+    oversized = client_db["client"].post(
+        "/api/v1/intelligence/team-optimize",
+        json={**payload, "max_team_size": 11},
+    )
+    assert oversized.status_code == 422
+
+
+def test_team_coverage_separates_exact_skill_matches_from_graph_bridges(client_db):
+    from sqlalchemy import delete
+
+    from app.api.v1.intelligence import dijkstra_distance
+
+    engine = client_db["engine"]
+    employee_ids = _seed_employees(engine, count=2)
+    bridge_distance = dijkstra_distance("Data Analysis", "Python")
+    assert bridge_distance < 99
+
+    with SQLSession(engine) as session:
+        session.exec(delete(SkillTable))
+        session.add_all(
+            [
+                SkillTable(
+                    tenant_id="test-tenant",
+                    employee_id=employee_ids[0],
+                    name="React",
+                    level=4,
+                ),
+                SkillTable(
+                    tenant_id="test-tenant",
+                    employee_id=employee_ids[1],
+                    name="Data Analysis",
+                    level=3,
+                ),
+            ]
+        )
+        session.commit()
+
+    response = client_db["client"].post(
+        "/api/v1/intelligence/team-optimize",
+        json={
+            "target_skills": [
+                {"name": "React", "level": 4},
+                {"name": "Python", "level": 3},
+            ],
+            "budget_cap": 500000,
+            "max_team_size": 2,
+        },
+    )
+    assert response.status_code == 200, response.text
+    metrics = response.json()["metrics"]
+    assert metrics["coverage_percentage"] == 90
+    assert metrics["ontology_adjusted_coverage_percentage"] == 90
+    assert metrics["exact_skill_coverage_percentage"] == 50
+    by_target = {row["skill"]: row for row in metrics["skills_coverage"]}
+    assert by_target["React"]["match_basis"] == "exact_skill_name"
+    assert by_target["React"]["exact_match_coverage_percentage"] == 100
+    assert by_target["Python"]["match_basis"] == "ontology_bridge"
+    assert by_target["Python"]["coverage_percentage"] == 80
+    assert by_target["Python"]["exact_match_coverage_percentage"] == 0
+    assert by_target["Python"]["ontology_path"] == [
+        "Data Analysis",
+        "Data Science",
+        "Python",
+    ]
+    assert by_target["Python"]["ontology_distance"] == round(bridge_distance, 3)
+
+    with SQLSession(engine) as session:
+        session.exec(delete(SkillTable).where(SkillTable.name == "React"))
+        session.commit()
+    distant_bridge = client_db["client"].post(
+        "/api/v1/intelligence/team-optimize",
+        json={
+            "target_skills": [{"name": "Frontend", "level": 3}],
+            "budget_cap": 500000,
+            "max_team_size": 2,
+        },
+    )
+    assert distant_bridge.status_code == 200, distant_bridge.text
+    distant_detail = distant_bridge.json()["metrics"]["skills_coverage"][0]
+    assert distant_detail["match_basis"] == "no_evidence"
+    assert distant_detail["contributed_by_skill"] == ""
 
 
 def test_team_optimize_ignores_untrusted_tenant_header(client_db):

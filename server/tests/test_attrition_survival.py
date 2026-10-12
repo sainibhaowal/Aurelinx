@@ -29,6 +29,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session as SQLSession
+from sqlmodel import select
 
 from app.core.security import TokenData, get_current_user
 from app.main import app
@@ -151,8 +152,207 @@ def test_attrition_returns_descriptive_kaplan_meier_for_uploaded_events(client_d
     assert data["model"]["eligible_observation_count"] == 2
     assert data["model"]["observed_departure_count"] == 1
     assert data["model"]["right_censored_count"] == 1
+    assert data["model"]["excluded_record_count"] == 0
+    assert data["model"]["date_based_observation_count"] == 2
     assert data["model"]["individual_forecasts_available"] is False
     assert data["survival_curve"][-1]["survival_probability"] == 0.5
+
+
+def test_attrition_roster_reports_observed_records_without_forecasts(client_db):
+    from app.models.database import SkillTable
+
+    start = datetime.utcnow() - timedelta(days=900)
+    with SQLSession(client_db["engine"]) as session:
+        session.add_all(
+            [
+                EmployeeTable(
+                    tenant_id="tenant-a",
+                    full_name="Departed",
+                    email="departed-r@tenant-a.example.invalid",
+                    department="Engineering",
+                    role="Engineer",
+                    employment_start_date=start,
+                    employment_end_date=start + timedelta(days=400),
+                    departure_event=True,
+                ),
+                EmployeeTable(
+                    tenant_id="tenant-a",
+                    full_name="Active",
+                    email="active-r@tenant-a.example.invalid",
+                    department="Sales",
+                    role="Associate",
+                    employment_start_date=start,
+                    employment_censor_date=datetime.utcnow(),
+                    departure_event=False,
+                ),
+                EmployeeTable(
+                    tenant_id="tenant-b",
+                    full_name="Other Tenant",
+                    email="other@tenant-b.example.invalid",
+                    department="Sales",
+                    role="Associate",
+                    employment_start_date=start,
+                    employment_censor_date=datetime.utcnow(),
+                    departure_event=False,
+                ),
+            ]
+        )
+        session.commit()
+    with SQLSession(client_db["engine"]) as session:
+        people = session.exec(select(EmployeeTable)).all()
+        by_email = {person.email: person for person in people}
+        session.add(
+            SkillTable(
+                tenant_id="tenant-a",
+                employee_id=by_email["active-r@tenant-a.example.invalid"].id,
+                name="Python",
+                level=3,
+            )
+        )
+        session.commit()
+
+    response = client_db["client"].get("/api/v1/intelligence/attrition-hazard")
+    assert response.status_code == 200, response.text
+    data = response.json()
+
+    # Descriptive roster only, strictly tenant-scoped.
+    assert {row["full_name"] for row in data["employees"]} == {"Departed", "Active"}
+    by_name = {row["full_name"]: row for row in data["employees"]}
+    assert by_name["Departed"]["employment_status"] == "departed"
+    assert by_name["Departed"]["departure_observed"] is True
+    assert by_name["Active"]["employment_status"] == "active"
+    assert by_name["Active"]["skills_count"] == 1
+    assert by_name["Departed"]["skills_count"] == 0
+    assert by_name["Active"]["tenure_months"] > by_name["Departed"]["tenure_months"]
+    for row in data["employees"]:
+        assert 0.0 <= row["cohort_survival_at_tenure"] <= 1.0
+        # Honesty lock: no forecast fields may ever appear on roster rows.
+        for forbidden in (
+            "hazard_ratio",
+            "risk_tier",
+            "risk_percentile",
+            "risk_score",
+            "forecast",
+            "probability",
+        ):
+            assert forbidden not in row
+
+    population = data["population"]
+    assert population["count"] == 2
+    assert population["departments"] == {"Engineering": 1, "Sales": 1}
+    assert population["median_tenure_months"] > 0
+    assert data["model"]["individual_forecasts_available"] is False
+    assert "forecast" in data["model"]["roster_basis"]
+    assert "no risk scores" in data["model"]["roster_basis"]
+
+
+def test_attrition_roster_counts_skills_per_employee(client_db):
+    """Per-employee skill counts require GROUP BY (Postgres rejects bare aggregates)."""
+    from app.models.database import SkillTable
+
+    start = datetime.utcnow() - timedelta(days=900)
+    with SQLSession(client_db["engine"]) as session:
+        session.add_all(
+            [
+                EmployeeTable(
+                    tenant_id="tenant-a",
+                    full_name="First",
+                    email="first@tenant-a.example.invalid",
+                    department="Engineering",
+                    role="Engineer",
+                    employment_start_date=start,
+                    employment_censor_date=datetime.utcnow(),
+                    departure_event=False,
+                ),
+                EmployeeTable(
+                    tenant_id="tenant-a",
+                    full_name="Second",
+                    email="second@tenant-a.example.invalid",
+                    department="Engineering",
+                    role="Engineer",
+                    employment_start_date=start,
+                    employment_end_date=start + timedelta(days=400),
+                    departure_event=True,
+                ),
+            ]
+        )
+        session.commit()
+        people = session.exec(select(EmployeeTable)).all()
+        by_email = {person.email: person for person in people}
+        session.add_all(
+            [
+                SkillTable(
+                    tenant_id="tenant-a",
+                    employee_id=by_email["first@tenant-a.example.invalid"].id,
+                    name="Python",
+                    level=3,
+                ),
+                SkillTable(
+                    tenant_id="tenant-a",
+                    employee_id=by_email["second@tenant-a.example.invalid"].id,
+                    name="React",
+                    level=4,
+                ),
+            ]
+        )
+        session.commit()
+
+    response = client_db["client"].get("/api/v1/intelligence/attrition-hazard")
+    assert response.status_code == 200, response.text
+    by_name = {row["full_name"]: row for row in response.json()["employees"]}
+    assert by_name["First"]["skills_count"] == 1
+    assert by_name["Second"]["skills_count"] == 1
+
+
+def test_attrition_survives_mixed_and_malformed_date_records(client_db):
+    """Mixed date/datetime values and bad durations degrade, never 500."""
+    from datetime import date as date_cls
+
+    start = datetime.utcnow() - timedelta(days=900)
+    with SQLSession(client_db["engine"]) as session:
+        session.add_all(
+            [
+                EmployeeTable(
+                    tenant_id="tenant-a",
+                    full_name="Mixed Types",
+                    email="mixed@tenant-a.example.invalid",
+                    department="Engineering",
+                    role="Engineer",
+                    employment_start_date=date_cls(2022, 1, 15),
+                    employment_censor_date=datetime.utcnow(),
+                    departure_event=False,
+                ),
+                EmployeeTable(
+                    tenant_id="tenant-a",
+                    full_name="Negative Duration",
+                    email="negative@tenant-a.example.invalid",
+                    department="Sales",
+                    role="Associate",
+                    employment_duration_years=-3.0,
+                    departure_event=False,
+                ),
+                EmployeeTable(
+                    tenant_id="tenant-a",
+                    full_name="Anchor Departed",
+                    email="anchor@tenant-a.example.invalid",
+                    department="Engineering",
+                    role="Engineer",
+                    employment_start_date=start,
+                    employment_end_date=start + timedelta(days=400),
+                    departure_event=True,
+                ),
+            ]
+        )
+        session.commit()
+
+    response = client_db["client"].get("/api/v1/intelligence/attrition-hazard")
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["model"]["status"] == "cohort_descriptive"
+    names = {row["full_name"] for row in data["employees"]}
+    assert "Mixed Types" in names
+    assert "Anchor Departed" in names
+    assert "Negative Duration" not in names
 
 
 def test_legacy_attrition_routes_never_return_unvalidated_cross_tenant_scores(

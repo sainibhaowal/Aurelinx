@@ -334,8 +334,8 @@ We follow [SemVer](https://semver.org/): `MAJOR.MINOR.PATCH`
 
 - **Questions**: [GitHub Discussions](https://github.com/ravindersingh/Aurelinx/discussions)
 - **GitHub Issues**: [github.com/sainibhaowal/Aurelinx/issues](https://github.com/sainibhaowal/Aurelinx/issues)
-- **Email**: `redacted@example.invalid`
-- **Security**: `redacted@example.invalid` (see [SECURITY.md](SECURITY.md))
+- **Maintainer contact**: [GitHub Discussions](https://github.com/sainibhaowal/Aurelinx/discussions)
+- **Security**: [GitHub Security Advisories](https://github.com/sainibhaowal/Aurelinx/security/advisories/new) (see [SECURITY.md](SECURITY.md))
 
 ---
 

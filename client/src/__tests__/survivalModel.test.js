@@ -24,6 +24,17 @@ import {
 } from "../utils/survivalModel.js";
 
 describe("Survival Model — Client Math Engine", () => {
+  it("never crashes on missing levers or means (descriptive records)", () => {
+    const covs = buildCovariates(undefined);
+    expect(covs.morale).toBe(0.5);
+    expect(covs.tenure_months).toBe(12);
+    const { total } = logHazardContributions(covs, undefined);
+    expect(Number.isFinite(total)).toBe(true);
+    const out = computeSurvival(covs, undefined);
+    expect(Number.isFinite(out.hazardRatio)).toBe(true);
+    expect(out.forecast.length).toBeGreaterThan(0);
+  });
+
   const sampleMeans = {
     morale: 0.7,
     salary_log_ratio: 0.0,

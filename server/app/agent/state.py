@@ -1,6 +1,7 @@
 # Copyright 2026 Ravinder Singh
 # Licensed under the Apache License, Version 2.0 (the "License");
 """Fixed execution state: single-count evidence, verification, safe trace."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

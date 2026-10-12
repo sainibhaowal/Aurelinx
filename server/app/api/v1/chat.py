@@ -9089,6 +9089,13 @@ class ProviderPingRequest(BaseModel):
 
 @router.post("/providers/ping")
 async def ping_provider(req: ProviderPingRequest):
+    """Verify a provider by getting a tiny real completion back from the model.
+
+    The ping sends "Reply with the single word: ok" with a small token cap and
+    only reports healthy when the model actually returns text. An HTTP 200 with
+    no text is reported as degraded; 401/403 is translated into an
+    authentication message naming the provider instead of raw JSON.
+    """
     import httpx
 
     started_at = time.perf_counter()
@@ -9105,6 +9112,32 @@ async def ping_provider(req: ProviderPingRequest):
     base_url = req.base_url or ""
     model = req.model or ""
 
+    if (
+        provider
+        in {
+            "openai",
+            "groq",
+            "openrouter",
+            "claude",
+            "gemini",
+            "opencode",
+            "moonshot",
+            "zai",
+            "nvidia",
+            "deepseek",
+            "mistral",
+            "cline",
+        }
+        and not api_key
+    ):
+        return {
+            "status": "error",
+            "message": (
+                f"{provider} requires an API key. Paste a valid key (or configure one "
+                "server-side) before testing — without it the provider answers 401."
+            ),
+        }
+
     try:
         if provider == "lmstudio":
             candidate_bases = build_local_provider_base_candidates(base_url)
@@ -9112,8 +9145,10 @@ async def ping_provider(req: ProviderPingRequest):
             headers = {"Content-Type": "application/json"}
             payload = {
                 "model": model_name,
-                "max_tokens": 1,
-                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 10,
+                "messages": [
+                    {"role": "user", "content": "Reply with the single word: ok"}
+                ],
             }
         elif provider == "opencode":
             opencode_mode = _opencode_api_mode(model or "gpt-5.5")
@@ -9129,22 +9164,38 @@ async def ping_provider(req: ProviderPingRequest):
                 mode=opencode_mode,
             )
             payload = (
-                _opencode_google_payload(model_name, "", [], "ping", 0)
+                _opencode_google_payload(
+                    model_name, "", [], "Reply with the single word: ok", 10
+                )
                 if opencode_mode == "google"
                 else (
-                    {"model": model_name, "input": "ping", "max_output_tokens": 1}
+                    {
+                        "model": model_name,
+                        "input": "Reply with the single word: ok",
+                        "max_output_tokens": 10,
+                    }
                     if opencode_mode == "responses"
                     else (
                         {
                             "model": model_name,
-                            "max_tokens": 16,
-                            "messages": [{"role": "user", "content": "ping"}],
+                            "max_tokens": 10,
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": "Reply with the single word: ok",
+                                }
+                            ],
                         }
                         if opencode_mode == "messages"
                         else {
                             "model": model_name,
-                            "max_tokens": 1,
-                            "messages": [{"role": "user", "content": "ping"}],
+                            "max_tokens": 10,
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": "Reply with the single word: ok",
+                                }
+                            ],
                         }
                     )
                 )
@@ -9157,8 +9208,10 @@ async def ping_provider(req: ProviderPingRequest):
                 headers["Authorization"] = f"Bearer {api_key}"
             payload = {
                 "model": model_name,
-                "max_tokens": 1,
-                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 10,
+                "messages": [
+                    {"role": "user", "content": "Reply with the single word: ok"}
+                ],
             }
         elif provider == "groq":
             endpoint = "https://api.groq.com/openai/v1/chat/completions"
@@ -9177,8 +9230,10 @@ async def ping_provider(req: ProviderPingRequest):
                 headers["Authorization"] = f"Bearer {api_key}"
             payload = {
                 "model": model_name,
-                "max_tokens": 1,
-                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 10,
+                "messages": [
+                    {"role": "user", "content": "Reply with the single word: ok"}
+                ],
             }
         elif provider == "openrouter":
             endpoint = "https://openrouter.ai/api/v1/chat/completions"
@@ -9192,8 +9247,10 @@ async def ping_provider(req: ProviderPingRequest):
                 headers["Authorization"] = f"Bearer {api_key}"
             payload = {
                 "model": model_name,
-                "max_tokens": 1,
-                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 10,
+                "messages": [
+                    {"role": "user", "content": "Reply with the single word: ok"}
+                ],
             }
         elif provider == "claude":
             endpoint = "https://api.anthropic.com/v1/messages"
@@ -9206,8 +9263,10 @@ async def ping_provider(req: ProviderPingRequest):
                 headers["x-api-key"] = api_key
             payload = {
                 "model": model_name,
-                "max_tokens": 1,
-                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 10,
+                "messages": [
+                    {"role": "user", "content": "Reply with the single word: ok"}
+                ],
             }
         elif provider == "gemini":
             model_name = model or "gemini-3.6-flash"
@@ -9216,8 +9275,8 @@ async def ping_provider(req: ProviderPingRequest):
             endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
             headers = {"Content-Type": "application/json"}
             payload = {
-                "contents": [{"parts": [{"text": "ping"}]}],
-                "generationConfig": {"maxOutputTokens": 1},
+                "contents": [{"parts": [{"text": "Reply with the single word: ok"}]}],
+                "generationConfig": {"maxOutputTokens": 10},
             }
         elif provider == "ollama":
             endpoint = (
@@ -9229,8 +9288,10 @@ async def ping_provider(req: ProviderPingRequest):
             headers = {"Content-Type": "application/json"}
             payload = {
                 "model": model_name,
-                "max_tokens": 1,
-                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 10,
+                "messages": [
+                    {"role": "user", "content": "Reply with the single word: ok"}
+                ],
             }
         elif provider == "custom":
             if not base_url:
@@ -9245,8 +9306,10 @@ async def ping_provider(req: ProviderPingRequest):
                 headers["Authorization"] = f"Bearer {api_key}"
             payload = {
                 "model": model_name,
-                "max_tokens": 1,
-                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 10,
+                "messages": [
+                    {"role": "user", "content": "Reply with the single word: ok"}
+                ],
             }
         elif provider in _OPENAI_COMPATIBLE_PROVIDER_URLS:
             endpoint = f"{_openai_compatible_base(provider, base_url)}/chat/completions"
@@ -9270,8 +9333,10 @@ async def ping_provider(req: ProviderPingRequest):
                 )
             payload = {
                 "model": model_name,
-                "max_tokens": 1,
-                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 10,
+                "messages": [
+                    {"role": "user", "content": "Reply with the single word: ok"}
+                ],
             }
         else:
             return {
@@ -9279,7 +9344,27 @@ async def ping_provider(req: ProviderPingRequest):
                 "message": f"Unsupported provider: {provider}",
             }
 
-        async with httpx.AsyncClient(timeout=8.0) as client:
+        def healthy_response(reply: str) -> dict:
+            return {
+                "status": "healthy",
+                "message": (
+                    "Connection healthy! Model responded. " f"Reply: {reply[:60]!r}."
+                ),
+                "reply": reply[:60],
+                "latency_ms": round((time.perf_counter() - started_at) * 1000),
+            }
+
+        def degraded_response() -> dict:
+            return {
+                "status": "degraded",
+                "message": (
+                    "Connected, but the model returned no text. Check the selected "
+                    "model name and retry."
+                ),
+                "latency_ms": round((time.perf_counter() - started_at) * 1000),
+            }
+
+        async with httpx.AsyncClient(timeout=12.0) as client:
             if provider == "lmstudio":
                 last_error = None
                 for endpoint in [
@@ -9291,11 +9376,15 @@ async def ping_provider(req: ProviderPingRequest):
                             endpoint, json=payload, headers=headers
                         )
                         if resp.status_code == 200:
-                            return {
-                                "status": "healthy",
-                                "message": "Connection healthy! Model is fully responsive.",
-                            }
-                        last_error = f"Server returned error code {resp.status_code}: {resp.text[:200]}"
+                            try:
+                                reply = _extract_ping_reply(provider, resp.json())
+                            except Exception:
+                                reply = ""
+                            if reply:
+                                return healthy_response(reply)
+                            last_error = "model returned no text"
+                        else:
+                            last_error = f"Server returned error code {resp.status_code}: {resp.text[:200]}"
                     except Exception as exc:
                         last_error = str(exc)
                 return {
@@ -9304,12 +9393,19 @@ async def ping_provider(req: ProviderPingRequest):
                 }
 
             resp = await client.post(endpoint, json=payload, headers=headers)
-            if resp.status_code == 200:
+            if resp.status_code in (401, 403):
                 return {
-                    "status": "healthy",
-                    "message": "Connection healthy! Model is fully responsive.",
-                    "latency_ms": round((time.perf_counter() - started_at) * 1000),
+                    "status": "error",
+                    "message": _ping_auth_error(provider, resp.status_code, resp.text),
                 }
+            if resp.status_code == 200:
+                try:
+                    reply = _extract_ping_reply(provider, resp.json())
+                except Exception:
+                    reply = ""
+                if reply:
+                    return healthy_response(reply)
+                return degraded_response()
             error_msg = (
                 _provider_error_detail(resp.text)
                 if (
@@ -9324,6 +9420,65 @@ async def ping_provider(req: ProviderPingRequest):
             }
     except Exception as e:
         return {"status": "offline", "message": f"Ping connection failed: {e!s}"}
+
+
+def _extract_ping_reply(provider: str, data: Any) -> str:
+    """Pull the model's ping reply text from any supported provider shape."""
+    if not isinstance(data, dict):
+        return ""
+    try:
+        if provider == "claude":
+            blocks = data.get("content") or []
+            return "".join(
+                block.get("text", "") for block in blocks if isinstance(block, dict)
+            ).strip()
+        if provider == "gemini" or (
+            isinstance(data.get("candidates"), list) and "choices" not in data
+        ):
+            parts = (data.get("candidates") or [{}])[0].get("content", {}).get(
+                "parts"
+            ) or []
+            return "".join(
+                part.get("text", "") for part in parts if isinstance(part, dict)
+            ).strip()
+        # Responses-style (opencode responses mode).
+        if isinstance(data.get("output"), list):
+            chunks: list[str] = []
+            for item in data["output"]:
+                if not isinstance(item, dict):
+                    continue
+                for block in item.get("content") or []:
+                    if isinstance(block, dict) and block.get("text"):
+                        chunks.append(str(block["text"]))
+            if chunks:
+                return "".join(chunks).strip()
+        if isinstance(data.get("output_text"), str) and data["output_text"].strip():
+            return data["output_text"].strip()
+        # OpenAI-style chat completions (covers most providers + opencode modes).
+        choices = data.get("choices") or []
+        if choices and isinstance(choices[0], dict):
+            message = choices[0].get("message") or {}
+            content = message.get("content", "")
+            if isinstance(content, list):
+                content = "".join(
+                    part.get("text", "") for part in content if isinstance(part, dict)
+                )
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+            if isinstance(choices[0].get("text"), str):
+                return choices[0]["text"].strip()
+    except Exception:
+        return ""
+    return ""
+
+
+def _ping_auth_error(provider: str, status_code: int, raw: str) -> str:
+    return (
+        f"Authentication failed for {provider} (HTTP {status_code}). The API key is "
+        "missing, invalid, or revoked — the model was never reached. Paste a valid key "
+        "and retry. "
+        f"Provider said: {raw[:160]}"
+    )
 
 
 class ProviderDiscoverRequest(BaseModel):

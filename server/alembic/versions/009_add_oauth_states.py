@@ -16,13 +16,17 @@ def upgrade() -> None:
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column("nonce", sa.String(128), nullable=False),
         sa.Column("user_id", sa.String(128), nullable=False),
-        sa.Column("tenant_id", sa.String(128), nullable=False, server_default="default"),
+        sa.Column(
+            "tenant_id", sa.String(128), nullable=False, server_default="default"
+        ),
         sa.Column("provider", sa.String(80), nullable=False),
         sa.Column("redirect_uri", sa.Text(), nullable=False),
         sa.Column("code_verifier", sa.Text(), nullable=False),
         sa.Column("expires_at", sa.DateTime(), nullable=False),
         sa.Column("consumed_at", sa.DateTime(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
+        ),
         sa.UniqueConstraint("nonce", name="uq_oauth_states_nonce"),
     )
     op.create_index("ix_oauth_states_tenant_id", "oauth_states", ["tenant_id"])

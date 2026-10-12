@@ -2,7 +2,7 @@
 
 > **Project**: Aurelinx HR Intelligence Platform  
 > **Version**: 1.2.0  
-> **Contact**: `redacted@example.invalid`  
+> **Contact**: [GitHub Security Advisories](https://github.com/sainibhaowal/Aurelinx/security/advisories/new)
 
 ---
 
@@ -20,7 +20,7 @@
 ### Do not create public GitHub issues for security vulnerabilities.
 
 ### Report Privately To:
-**`redacted@example.invalid`**
+[GitHub Security Advisories](https://github.com/sainibhaowal/Aurelinx/security/advisories/new)
 
 Include:
 1. **Description** — What is the vulnerability?

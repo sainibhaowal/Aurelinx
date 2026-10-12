@@ -70,15 +70,35 @@ def upgrade() -> None:
                 server_default=sa.text("false"),
             ),
             sa.Column("expires_at", sa.DateTime(), nullable=False),
-            sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                server_default=sa.func.now(),
+                nullable=False,
+            ),
         )
-        op.create_index("ix_email_verifications_user_id", "email_verifications", ["user_id"])
-        op.create_index("ix_email_verifications_email", "email_verifications", ["email"])
+        op.create_index(
+            "ix_email_verifications_user_id", "email_verifications", ["user_id"]
+        )
+        op.create_index(
+            "ix_email_verifications_email", "email_verifications", ["email"]
+        )
         op.create_index("ix_email_verifications_code", "email_verifications", ["code"])
-        op.create_index("ix_email_verifications_token", "email_verifications", ["token"], unique=True)
-        op.create_index("ix_email_verifications_purpose", "email_verifications", ["purpose"])
-        op.create_index("ix_email_verifications_is_used", "email_verifications", ["is_used"])
-        op.create_index("ix_email_verifications_expires_at", "email_verifications", ["expires_at"])
+        op.create_index(
+            "ix_email_verifications_token",
+            "email_verifications",
+            ["token"],
+            unique=True,
+        )
+        op.create_index(
+            "ix_email_verifications_purpose", "email_verifications", ["purpose"]
+        )
+        op.create_index(
+            "ix_email_verifications_is_used", "email_verifications", ["is_used"]
+        )
+        op.create_index(
+            "ix_email_verifications_expires_at", "email_verifications", ["expires_at"]
+        )
 
 
 def downgrade() -> None:

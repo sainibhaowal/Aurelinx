@@ -2,8 +2,15 @@
 # infra/docker-compose.local.yml   (commit this)
 # -------------------------------------------------
 
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
+    logging: *default-logging
     image: postgres:16-alpine
     restart: unless-stopped
     env_file: ./.env.local
@@ -19,6 +26,7 @@ services:
       retries: 10
 
   redis:
+    logging: *default-logging
     image: redis:7-alpine
     restart: unless-stopped
     env_file: ./.env.local
@@ -34,6 +42,7 @@ services:
       retries: 10
 
   qdrant:
+    logging: *default-logging
     image: qdrant/qdrant:v1.13.6
     restart: unless-stopped
     ports:
@@ -48,9 +57,10 @@ services:
       retries: 10
 
   # -------------------------------------------------
-  #  APP SERVICES – **build locally**, hot‑reload
+  #  APP SERVICES – build locally, stable runtime
   # -------------------------------------------------
   api:
+    logging: *default-logging
     build:
       context: ../server
       dockerfile: ../infra/backend.Dockerfile
@@ -83,6 +93,7 @@ services:
       retries: 5
 
   worker:
+    logging: *default-logging
     build:
       context: ../server
       dockerfile: ../infra/backend.Dockerfile
@@ -103,6 +114,7 @@ services:
       - ../server:/app
 
   scheduler:
+    logging: *default-logging
     build:
       context: ../server
       dockerfile: ../infra/backend.Dockerfile
@@ -124,24 +136,27 @@ services:
       - ../server:/app
 
   web:
+    logging: *default-logging
     build:
       context: ../client
       dockerfile: ../infra/frontend.Dockerfile
-      target: builder             # the *builder* stage (has node_modules, runs `next dev`)
+      target: runner
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5100}
+        INTERNAL_API_URL: http://api:5000
     restart: unless-stopped
     env_file: ./.env.local
     environment:
       HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      INTERNAL_API_URL: http://api:5000
     depends_on:
       api:
         condition: service_healthy
     ports:
       - "${WEB_PORT}:3000"
     volumes:
-      - ../client:/app
-      - /app/node_modules          # keep container‑local node_modules
-      - /app/.next
-    command: ["npm","run","dev"]   # Next.js dev server with hot‑reload
+      - web_static_assets:/app/.next/static
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 10s
@@ -149,6 +164,7 @@ services:
       retries: 5
 
   caddy:
+    logging: *default-logging
     image: caddy:2-alpine
     restart: unless-stopped
     ports:
@@ -173,3 +189,4 @@ volumes:
   chat_uploads:
   caddy_data:
   caddy_config:
+  web_static_assets:

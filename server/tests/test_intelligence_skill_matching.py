@@ -10,13 +10,20 @@ from app.api.v1 import intelligence
 from app.api.v1.intelligence import (
     FULL_SKILL_GRAPH,
     SkillMatchRequest,
+    _shortest_skill_path,
+    _skill_match_events,
     calculate_skill_match,
     dijkstra_distance,
     match_skills,
 )
 from app.core.security import TokenData, get_current_user
 from app.main import app
-from app.models.database import EmployeeTable, SkillAliasTable, SkillTable
+from app.models.database import (
+    CandidateTable,
+    EmployeeTable,
+    SkillAliasTable,
+    SkillTable,
+)
 
 
 def test_skill_matching_resolves_case_and_common_python_transposition():
@@ -39,6 +46,36 @@ def test_sales_skills_are_connected_in_the_transfer_map():
 def test_seed_catalog_skills_have_transfer_paths():
     assert dijkstra_distance("Data Analysis", "Python") < 99
     assert dijkstra_distance("CI/CD", "AWS") < 99
+
+
+def test_match_result_contains_the_actual_deterministic_ontology_path():
+    detail = calculate_skill_match(
+        candidate_skills=[{"name": "FastAPI", "level": 3}],
+        target_skills=[{"name": "Python", "level": 3}],
+    )["detailed_matches"][0]
+
+    assert detail["graph_path"] == list(_shortest_skill_path("FastAPI", "Python"))
+    assert detail["graph_path"] == ["FastAPI", "Python"]
+    assert detail["graph_path_type"] == "ontology_path"
+    path_cost = sum(
+        weight
+        for source, target in zip(
+            detail["graph_path"], detail["graph_path"][1:], strict=False
+        )
+        for neighbor, weight in FULL_SKILL_GRAPH[source]
+        if neighbor == target
+    )
+    assert round(path_cost, 3) == detail["semantic_distance"]
+
+
+def test_exact_skill_result_does_not_invent_a_graph_edge():
+    detail = calculate_skill_match(
+        candidate_skills=[{"name": "Workday Payroll", "level": 2}],
+        target_skills=[{"name": "workday payroll", "level": 2}],
+    )["detailed_matches"][0]
+
+    assert detail["graph_path"] == ["Workday Payroll"]
+    assert detail["graph_path_type"] == "exact_or_alias"
 
 
 def test_graph_adjacency_is_deduplicated():
@@ -65,6 +102,54 @@ def test_unmapped_skill_still_allows_exact_matches_and_explains_no_match():
     assert "not in the transfer map" in missing["unmatched_reason"]
 
 
+def test_tenant_catalog_supports_exact_skills_outside_transfer_graph():
+    result = calculate_skill_match(
+        candidate_skills=[{"name": "Research Methods", "level": 3}],
+        target_skills=[{"name": "research methods", "level": 3}],
+        skill_catalog={"researchmethods": "Research Methods"},
+    )["detailed_matches"][0]
+    assert result["target_skill_mapped"] is True
+    assert result["target_skill_in_uploaded_catalog"] is True
+    assert result["target_skill_in_transfer_graph"] is False
+    assert result["match_confidence"] == 1
+    assert result["evidence_type"] == "exact_or_alias"
+
+
+def test_unvalidated_vector_evidence_is_separately_labeled():
+    result = calculate_skill_match(
+        candidate_skills=[{"name": "Statistical Modeling", "level": 3}],
+        target_skills=[{"name": "Regression Modeling", "level": 3}],
+        semantic_similarities={("regression modeling", "statistical modeling"): 0.9},
+        semantic_min_similarity=0.82,
+    )["detailed_matches"][0]
+    assert result["evidence_type"] == "embedding_semantic_candidate"
+    assert result["status"] == "Potential Semantic Match"
+    assert result["semantic_similarity"] == 0.9
+
+
+def test_vector_similarity_below_review_threshold_does_not_create_match():
+    result = calculate_skill_match(
+        candidate_skills=[{"name": "Different Skill", "level": 5}],
+        target_skills=[{"name": "Regression Modeling", "level": 3}],
+        semantic_similarities={("regression modeling", "different skill"): 0.81},
+        semantic_min_similarity=0.82,
+    )["detailed_matches"][0]
+    assert result["evidence_type"] == "none"
+    assert result["matched_by_skill"] is None
+
+
+def test_a_recorded_skill_cannot_fulfill_multiple_requirements():
+    result = calculate_skill_match(
+        candidate_skills=[{"name": "Python", "level": 5}],
+        target_skills=[
+            {"name": "Python", "level": 5},
+            {"name": "Backend", "level": 5},
+        ],
+    )
+    assert result["matched_requirement_count"] == 1
+    assert result["requirement_coverage_ratio"] == 0.5
+
+
 def test_tenant_approved_alias_maps_uploaded_skill_to_graph_node():
     detail = calculate_skill_match(
         candidate_skills=[{"name": "golang", "level": 3}],
@@ -87,6 +172,7 @@ def test_skill_match_queries_only_the_authenticated_tenant():
         engine,
         tables=[
             EmployeeTable.__table__,
+            CandidateTable.__table__,
             SkillTable.__table__,
             SkillAliasTable.__table__,
         ],
@@ -107,7 +193,23 @@ def test_skill_match_queries_only_the_authenticated_tenant():
             role="Engineer",
             tenant_id="tenant-b",
         )
-        session.add_all([tenant_employee, other_employee])
+        tenant_candidate = CandidateTable(
+            full_name="Candidate A",
+            email="candidate-a@example.test",
+            department="Sales",
+            role="Sales Candidate",
+            tenant_id="tenant-a",
+        )
+        other_candidate = CandidateTable(
+            full_name="Candidate B Secret",
+            email="candidate-b@example.test",
+            department="Engineering",
+            role="Engineer Candidate",
+            tenant_id="tenant-b",
+        )
+        session.add_all(
+            [tenant_employee, other_employee, tenant_candidate, other_candidate]
+        )
         session.commit()
         session.add_all(
             [
@@ -123,6 +225,18 @@ def test_skill_match_queries_only_the_authenticated_tenant():
                     name="Sales",
                     level=5,
                 ),
+                SkillTable(
+                    candidate_id=tenant_candidate.id,
+                    tenant_id="tenant-a",
+                    name="Sales",
+                    level=4,
+                ),
+                SkillTable(
+                    candidate_id=other_candidate.id,
+                    tenant_id="tenant-b",
+                    name="Sales",
+                    level=5,
+                ),
             ]
         )
         session.commit()
@@ -132,6 +246,15 @@ def test_skill_match_queries_only_the_authenticated_tenant():
             session,
             SimpleNamespace(tenant_id="tenant-a"),
         )
+        all_scope_events = list(
+            _skill_match_events(
+                [{"name": "Sales", "level": 3}],
+                "tenant-a",
+                session,
+                scope="all",
+                limit=100,
+            )
+        )
 
     assert len(results) == 1
     assert results[0]["full_name"] == "Tenant A"
@@ -139,10 +262,25 @@ def test_skill_match_queries_only_the_authenticated_tenant():
         results[0]["match_details"]["detailed_matches"][0]["matched_by_skill"]
         == "Negotiation"
     )
+    assert results[0]["match_details"]["detailed_matches"][0]["graph_path"] == [
+        "Negotiation",
+        "Sales",
+    ]
+    all_scope_result = all_scope_events[-1]
+    assert all_scope_result["profiles_evaluated"] == 2
+    assert all_scope_result["matched_profile_count"] == 2
+    assert {row["entity_type"] for row in all_scope_result["results"]} == {
+        "employee",
+        "candidate",
+    }
+    assert "Candidate B Secret" not in {
+        row["full_name"] for row in all_scope_result["results"]
+    }
     engine.dispose()
 
 
 def test_stream_reports_server_confirmed_matching_progress(monkeypatch):
+    monkeypatch.setattr(intelligence, "semantic_embeddings_configured", lambda: False)
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -213,3 +351,14 @@ def test_stream_reports_server_confirmed_matching_progress(monkeypatch):
         (1, 1),
     ]
     assert events[-1]["results"][0]["full_name"] == "Streamed Match"
+    assert events[-1]["results"][0]["match_details"]["detailed_matches"][0][
+        "graph_path"
+    ] == ["Negotiation", "Sales"]
+    assert events[-1]["semantic_search"] == {
+        "mode": "exact_and_curated_graph",
+        "embedding_status": "not_configured",
+        "embedding_model": None,
+        "catalog_skills_embedded": 0,
+        "semantic_min_cosine_similarity": None,
+        "vector_matches_validated": False,
+    }

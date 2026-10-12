@@ -24,6 +24,18 @@ const MONO =
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+const traceHexagon = (ctx, x, y, radius) => {
+  ctx.beginPath();
+  for (let corner = 0; corner < 6; corner++) {
+    const angle = (Math.PI / 3) * corner - Math.PI / 6;
+    const px = x + Math.cos(angle) * radius;
+    const py = y + Math.sin(angle) * radius;
+    if (corner === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+};
+
 const buildLayout = (nodes) => {
   const depts = Array.from(
     new Set(nodes.map((n) => n.department || "General")),
@@ -139,9 +151,9 @@ const physicsStep = (nodes, links, idToIndex, draggedIdx) => {
     const dy = b.y - a.y;
     const dz = (b.z || 0) - (a.z || 0);
     const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy + dz * dz));
-    const rest = 92 - (l.weight || 0.5) * 48;
+    const rest = 110 - (l.weight || 0.5) * 42;
     const force = clamp(
-      (dist - rest) * (0.016 + (l.weight || 0.5) * 0.026),
+      (dist - rest) * (0.04 + (l.weight || 0.5) * 0.045),
       -0.85,
       0.85,
     );
@@ -165,13 +177,13 @@ const physicsStep = (nodes, links, idToIndex, draggedIdx) => {
     const nd = nodes[i];
     if (i === draggedIdx) continue;
     if (nd.cx !== undefined) {
-      nd.vx += (nd.cx - nd.x) * 0.0022;
-      nd.vy += (nd.cy - nd.y) * 0.0022;
-      nd.vz += ((nd.cz || 0) - (nd.z || 0)) * 0.0022;
+      nd.vx += (nd.cx - nd.x) * 0.00065;
+      nd.vy += (nd.cy - nd.y) * 0.00065;
+      nd.vz += ((nd.cz || 0) - (nd.z || 0)) * 0.00065;
     }
-    nd.vx += (WORLD_CENTER - nd.x) * 0.0007;
-    nd.vy += (WORLD_CENTER - nd.y) * 0.0007;
-    nd.vz += -(nd.z || 0) * 0.0007;
+    nd.vx += (WORLD_CENTER - nd.x) * 0.0003;
+    nd.vy += (WORLD_CENTER - nd.y) * 0.0003;
+    nd.vz += -(nd.z || 0) * 0.0003;
 
     nd.vx *= 0.885;
     nd.vy *= 0.885;
@@ -273,6 +285,22 @@ const OnaGraph3DCanvas = ({
   }, [links, selectedId]);
   neighborRef.current = neighborIds;
 
+  // Top hubs always labelled so values sit beside key nodes.
+  const topIds = useMemo(() => {
+    const ranked = [...nodes]
+      .filter((n) => (n.degree || 0) > 0)
+      .sort((a, b) => (b.influence_pagerank || 0) - (a.influence_pagerank || 0))
+      .slice(0, 8);
+    return new Set(ranked.map((n) => n.id));
+  }, [nodes]);
+  const topRef = useRef(new Set());
+  topRef.current = topIds;
+
+  // Cursor position for the cursor-following tooltip.
+  const cursorRef = useRef({ x: 0, y: 0, inside: false });
+  // Neighbors of the hovered node (cursor focus), alongside selection focus.
+  const hoverNbrRef = useRef(new Set());
+
   const [mode, setMode] = useState("orbit");
   const [frozen, setFrozen] = useState(false);
   const modeRef = useRef("orbit");
@@ -288,6 +316,17 @@ const OnaGraph3DCanvas = ({
   const hoverIdxRef = useRef(-1);
   const hoverSwitchRef = useRef(0);
   const hoverScreenRef = useRef({ sx: 0, sy: 0, visible: false });
+  useEffect(() => {
+    const set = new Set();
+    const hid = hovered?.id;
+    if (hid) {
+      for (const l of linksRef.current) {
+        if (l.source === hid) set.add(l.target);
+        if (l.target === hid) set.add(l.source);
+      }
+    }
+    hoverNbrRef.current = set;
+  }, [hovered]);
 
   const nodeDragRef = useRef(null);
   const camDragRef = useRef(null);
@@ -444,42 +483,53 @@ const OnaGraph3DCanvas = ({
       edgeOrder.sort((a, b) => b.avgDepth - a.avgDepth);
 
       for (const { l, pa, pb } of edgeOrder) {
+        const hovId =
+          hoverIdxRef.current >= 0 ? layout[hoverIdxRef.current]?.id : null;
         const connected =
-          filters.selectedId &&
-          (l.source === filters.selectedId || l.target === filters.selectedId);
-        const dimmed = filters.selectedId && !connected;
-        // edge color: very subtle
+          (filters.selectedId &&
+            (l.source === filters.selectedId ||
+              l.target === filters.selectedId)) ||
+          (hovId && (l.source === hovId || l.target === hovId));
+        const dimmed = (filters.selectedId || hovId) && !connected;
+        // edge color: clearly visible base, glowing when in focus
         let r, g, b;
         if (connected) {
           r = 34;
           g = 211;
           b = 238;
         } else if (l.is_cross_dept) {
-          r = 91;
-          g = 91;
-          b = 122;
+          r = 148;
+          g = 163;
+          b = 184;
         } else {
-          r = 51;
-          g = 65;
-          b = 85;
+          r = 100;
+          g = 116;
+          b = 139;
         }
         const width =
-          (0.35 + (l.weight || 0.5) * 0.5) *
+          (1.1 + (l.weight || 0.5) * 1.1) *
+          (connected ? 1.9 : 1) *
           clamp((pa.persp + pb.persp) / 2, 0.6, 1.4);
         const baseAlpha = dimmed
-          ? 0.08
+          ? 0.3
           : connected
-            ? 0.9
+            ? 0.95
             : l.is_cross_dept
-              ? 0.28
-              : 0.22;
+              ? 0.78
+              : 0.66;
         ctx.beginPath();
         ctx.moveTo(pa.sx, pa.sy);
         ctx.lineTo(pb.sx, pb.sy);
         ctx.strokeStyle = `rgba(${r},${g},${b},${baseAlpha * intro})`;
         ctx.lineWidth = width;
+        ctx.lineCap = "round";
+        if (connected) {
+          ctx.shadowColor = "rgba(34,211,238,0.85)";
+          ctx.shadowBlur = 8;
+        }
         if (l.is_cross_dept && !connected) ctx.setLineDash([3, 3]);
         ctx.stroke();
+        ctx.shadowBlur = 0;
         ctx.setLineDash([]);
       }
 
@@ -489,25 +539,36 @@ const OnaGraph3DCanvas = ({
       order.sort((a, b) => proj[b].depth - proj[a].depth);
 
       let hoverVisible = false;
+      const hovFocusId =
+        hoverIdxRef.current >= 0 ? layout[hoverIdxRef.current]?.id : null;
+      const focusActive = Boolean(filters.selectedId || hovFocusId);
       for (const i of order) {
         const nd = layout[i];
         const p = proj[i];
         const isSelected = filters.selectedId === nd.id;
-        const isNeighbor = neighborRef.current.has(nd.id);
         const isHover = hoverIdxRef.current === i;
+        const isNeighbor =
+          neighborRef.current.has(nd.id) || hoverNbrRef.current.has(nd.id);
         const dim =
-          !vis[i] || (filters.selectedId && !isSelected && !isNeighbor);
+          !vis[i] || (focusActive && !isSelected && !isHover && !isNeighbor);
 
-        // sphere radius in world units scaled by PageRank
+        // Keep people legible at the fitted overview scale; PageRank adds a
+        // modest size cue without reducing low-centrality people to pinpoints.
         const baseRadius =
-          (2.2 + (nd.influence_pagerank || 0) * 3.5) * (isSelected ? 1.55 : 1);
-        const radius = baseRadius * clamp(0.48 + 0.52 * p.persp, 0.4, 1.4);
-        if (radius < 1.2) continue;
+          (7 + (nd.influence_pagerank || 0) * 6) * (isSelected ? 1.3 : 1);
+        const radius = baseRadius * clamp(0.72 + 0.28 * p.persp, 0.65, 1.3);
 
-        const depthFade = clamp(1.1 - Math.max(0, p.depth) * 0.0008, 0.45, 1);
-        const alpha = (dim ? 0.18 : 0.55 + 0.45 * depthFade) * intro;
+        const depthFade = clamp(1.1 - Math.max(0, p.depth) * 0.0008, 0.6, 1);
+        const alpha = (dim ? 0.42 : 0.7 + 0.3 * depthFade) * intro;
 
         const color = getNodeColor(nd, filters.colorMode);
+        // Visibility floor so hues survive the dark theme.
+        const visFloor = (c) => Math.max(c, 70);
+        const base = {
+          r: visFloor(color.r),
+          g: visFloor(color.g),
+          b: visFloor(color.b),
+        };
         const lightDir = { x: -0.3, y: -0.5, z: -0.8 };
         const lightLen = Math.sqrt(
           lightDir.x ** 2 + lightDir.y ** 2 + lightDir.z ** 2,
@@ -516,7 +577,8 @@ const OnaGraph3DCanvas = ({
         lightDir.y /= lightLen;
         lightDir.z /= lightLen;
 
-        // create radial gradient for 3D sphere lighting
+        // A restrained highlight gives the hexagon depth while retaining a
+        // crisp, recognizable network-node shape.
         const grad = ctx.createRadialGradient(
           p.sx - radius * 0.3,
           p.sy - radius * 0.3,
@@ -525,23 +587,26 @@ const OnaGraph3DCanvas = ({
           p.sy,
           radius,
         );
-        const highlight = `rgba(${Math.min(255, color.r + 60)},${Math.min(255, color.g + 60)},${Math.min(255, color.b + 60)},${alpha})`;
-        const mid = `rgba(${color.r},${color.g},${color.b},${alpha})`;
-        const shadow = `rgba(${Math.max(0, color.r - 80)},${Math.max(0, color.g - 80)},${Math.max(0, color.b - 80)},${alpha * 0.6})`;
+        const highlight = `rgba(${Math.min(255, base.r + 60)},${Math.min(255, base.g + 60)},${Math.min(255, base.b + 60)},${alpha})`;
+        const mid = `rgba(${base.r},${base.g},${base.b},${alpha})`;
+        const shadow = `rgba(${Math.max(0, base.r - 80)},${Math.max(0, base.g - 80)},${Math.max(0, base.b - 80)},${alpha * 0.6})`;
         grad.addColorStop(0, highlight);
         grad.addColorStop(0.45, mid);
         grad.addColorStop(1, shadow);
 
         ctx.globalAlpha = 1;
-        ctx.beginPath();
-        ctx.arc(p.sx, p.sy, radius, 0, Math.PI * 2);
+        traceHexagon(ctx, p.sx, p.sy, radius);
         ctx.fillStyle = grad;
         ctx.fill();
+        traceHexagon(ctx, p.sx, p.sy, radius);
+        ctx.strokeStyle = `rgba(226,232,240,${(isHover || isSelected ? 0.9 : 0.52) * alpha})`;
+        ctx.lineWidth = isHover || isSelected ? 1.5 : 0.9;
+        ctx.stroke();
 
         // selected ring
         if (isSelected) {
           ctx.beginPath();
-          ctx.arc(p.sx, p.sy, radius + 2.5, 0, Math.PI * 2);
+          traceHexagon(ctx, p.sx, p.sy, radius + 3.5);
           ctx.strokeStyle = `rgba(34,211,238,${0.7 * intro})`;
           ctx.lineWidth = 1;
           ctx.stroke();
@@ -559,18 +624,23 @@ const OnaGraph3DCanvas = ({
         screenRef.current[i] = {
           sx: p.sx,
           sy: p.sy,
-          size: Math.max(4, radius),
+          size: Math.max(8, radius),
           depth: p.depth,
           visible: vis[i],
         };
 
-        if (i === hoverIdxRef.current && !dim) {
+        if (i === hoverIdxRef.current) {
           hoverScreenRef.current = { sx: p.sx, sy: p.sy, visible: true };
           hoverVisible = true;
         }
 
-        // label - clean mono beside sphere
-        if ((isSelected || isHover) && !dim && nd.name) {
+        // label - clean mono beside sphere: selected, hovered, neighbors,
+        // and top hubs always carry their values
+        if (
+          (isSelected || isHover || isNeighbor || topRef.current.has(nd.id)) &&
+          !dim &&
+          nd.name
+        ) {
           const label = nd.name.toUpperCase();
           ctx.font = `500 8px ${MONO}`;
           const tw = ctx.measureText(label).width;
@@ -589,12 +659,22 @@ const OnaGraph3DCanvas = ({
       }
       if (!hoverVisible) hoverScreenRef.current.visible = false;
 
-      // tooltip
+      // tooltip follows the cursor with full node details
       const tt = tooltipRef.current;
       if (tt) {
         if (hoverVisible) {
+          const { w, h } = sizeRef.current;
+          const cx = cursorRef.current.inside
+            ? cursorRef.current.x
+            : hoverScreenRef.current.sx;
+          const cy = cursorRef.current.inside
+            ? cursorRef.current.y
+            : hoverScreenRef.current.sy;
+          const flip = cx > w - 286;
+          const tx = flip ? cx - 274 : cx + 16;
+          const ty = Math.min(Math.max(cy - 18, 8), Math.max(8, h - 126));
           tt.style.opacity = "1";
-          tt.style.transform = `translate(${hoverScreenRef.current.sx}px, ${hoverScreenRef.current.sy}px) translate(-50%, -125%)`;
+          tt.style.transform = `translate(${tx}px, ${ty}px)`;
         } else {
           tt.style.opacity = "0";
         }
@@ -615,7 +695,7 @@ const OnaGraph3DCanvas = ({
 
       canvas.style.cursor =
         hoverIdxRef.current >= 0
-          ? "crosshair"
+          ? "pointer"
           : nodeDragRef.current || camDragRef.current
             ? "grabbing"
             : "crosshair";
@@ -657,7 +737,7 @@ const OnaGraph3DCanvas = ({
     for (let i = 0; i < s.length; i++) {
       const e = s[i];
       if (!e || !e.visible) continue;
-      const r = Math.max(6, e.size / 2 + 4);
+      const r = Math.max(13, e.size + 7);
       const dx = e.sx - x;
       const dy = e.sy - y;
       if (dx * dx + dy * dy <= r * r && e.depth < bestDepth) {
@@ -707,6 +787,7 @@ const OnaGraph3DCanvas = ({
 
   const handlePointerMove = (e) => {
     const { x, y } = localPoint(e);
+    cursorRef.current = { x, y, inside: true };
     if (nodeDragRef.current) {
       const d = nodeDragRef.current;
       d.moved += Math.abs(x - d.lastX) + Math.abs(y - d.lastY);
@@ -804,28 +885,50 @@ const OnaGraph3DCanvas = ({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        onPointerLeave={() => updateHover(-1)}
+        onDoubleClick={resetCamera}
+        onPointerLeave={() => {
+          cursorRef.current.inside = false;
+          updateHover(-1);
+        }}
         onContextMenu={(e) => e.preventDefault()}
         className="absolute inset-0 h-full w-full"
       />
 
       <div
         ref={tooltipRef}
-        className="pointer-events-none absolute left-0 top-0 z-40 transition-opacity duration-80"
-        style={{ opacity: 0, transform: "translate(0px, 0px)" }}
+        className="pointer-events-none absolute left-0 top-0 z-40"
+        style={{
+          opacity: 0,
+          transform: "translate(0px, 0px)",
+          transition: "opacity 100ms ease",
+        }}
       >
         {hovered && (
-          <div className="flex flex-col bg-[#020408]/98 text-white px-2 py-1.5 rounded border border-white/5 shadow-xl">
-            <span className="text-[9px] font-bold text-white tracking-wide">
+          <div className="flex flex-col bg-[#020408]/[0.98] text-white px-3 py-2.5 rounded-xl border border-cyan-300/35 shadow-[0_12px_36px_rgba(0,0,0,0.65)] w-64 backdrop-blur-xl">
+            <span className="text-[11px] font-bold text-white tracking-wide truncate">
               {hovered.name}
             </span>
-            <span className="text-[7.5px] text-slate-500 uppercase tracking-[0.18em] mt-0.5">
-              {hovered.role} {hovered.department}
+            <span className="text-[9px] text-slate-300 uppercase tracking-[0.12em] mt-0.5 truncate">
+              {hovered.role} · {hovered.department || "General"}
             </span>
-            <span className="text-[7.5px] font-mono text-cyan-300 mt-1 border-t border-white/5 pt-1">
-              PR {(hovered.influence_pagerank || 0).toFixed(4)} BC{" "}
-              {(hovered.bridge_betweenness || 0).toFixed(4)} DEG{" "}
-              {hovered.degree || 0}
+            <span className="text-[9px] font-mono text-cyan-200 mt-1.5 border-t border-white/10 pt-1.5 tabular-nums">
+              PR {(hovered.influence_pagerank || 0).toFixed(3)} · BC{" "}
+              {(hovered.bridge_betweenness || 0).toFixed(3)}
+            </span>
+            <span className="text-[9px] font-mono text-slate-300 tabular-nums">
+              Close{" "}
+              {hovered.closeness == null && hovered.closeness_centrality == null
+                ? "—"
+                : Number(
+                    hovered.closeness ?? hovered.closeness_centrality ?? 0,
+                  ).toFixed(3)}{" "}
+              · Ties {hovered.degree || 0} · Silo{" "}
+              {hovered.ei_silo_index == null
+                ? "—"
+                : Number(hovered.ei_silo_index).toFixed(2)}
+            </span>
+            <span className="text-[8px] text-slate-400 mt-1.5">
+              Click node to inspect · drag to move
             </span>
           </div>
         )}
@@ -836,6 +939,37 @@ const OnaGraph3DCanvas = ({
         className="pointer-events-none absolute top-2 left-2 z-30 font-mono text-[8px] tracking-[0.1em] text-slate-500 uppercase"
       >
         NODES 0 LINKS 0 DENSITY 0.0000 MODE ORBIT PHYSICS ACTIVE
+      </div>
+
+      {/* In-canvas legend: node colors per mode + edge language */}
+      <div className="pointer-events-none absolute top-8 left-2 z-30 max-w-[210px] rounded-lg border border-white/10 bg-[#020408]/90 p-2 backdrop-blur-xl">
+        <div className="text-[7.5px] font-bold uppercase tracking-[0.16em] text-slate-400 mb-1">
+          {colorMode === "department"
+            ? "Node = department color"
+            : colorMode === "pagerank"
+              ? "Node = influence (gold high → indigo low)"
+              : colorMode === "betweenness"
+                ? "Node = bridge strength (teal high → slate low)"
+                : "Node = silo span (green bridge · blue balanced · rose siloed)"}
+        </div>
+        <div className="space-y-0.5 text-[7.5px] text-slate-500">
+          <div className="flex items-center gap-1.5">
+            <i className="h-0 w-4 border-t-2 border-slate-400" />
+            Recorded tie · thickness = strength
+          </div>
+          <div className="flex items-center gap-1.5">
+            <i className="h-0 w-4 border-t border-dashed border-slate-400" />
+            Cross-department tie
+          </div>
+          <div className="flex items-center gap-1.5">
+            <i className="h-0 w-4 border-t-2 border-cyan-300 shadow-[0_0_6px_rgba(34,211,238,.9)]" />
+            Selected / hovered path
+          </div>
+          <div className="flex items-center gap-1.5">
+            <i className="h-2.5 w-2.5 border border-cyan-300 [clip-path:polygon(25%_0,75%_0,100%_50%,75%_100%,25%_100%,0_50%)]" />
+            Hexagon = person · outline = selected
+          </div>
+        </div>
       </div>
 
       <div className="absolute bottom-2 left-2 right-2 sm:right-auto flex justify-center sm:justify-start z-30">

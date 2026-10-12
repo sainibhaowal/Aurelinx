@@ -5,6 +5,7 @@
 TOOL_SCHEMAS, AGENT_TOOL_CATALOG, labels, roles and dispatch all derive
 from REGISTRY. Adding a tool = one entry here.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

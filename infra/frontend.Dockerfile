@@ -3,7 +3,9 @@ FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 ARG NEXT_PUBLIC_API_URL=http://localhost:5100
+ARG INTERNAL_API_URL=http://api:5000
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
+    INTERNAL_API_URL=${INTERNAL_API_URL} \
     NEXT_TELEMETRY_DISABLED=1 \
     npm_config_fund=false \
     npm_config_audit=false
@@ -27,9 +29,24 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/.next/static /app/static-assets
 COPY --from=builder /app/public ./public
+
+# Keep the runtime static directory on a persistent volume across deployments.
+# Copy new build assets into it at startup so chunks requested by already-open
+# tabs remain available after the application image is replaced.
+RUN cat > /app/start-frontend.sh <<'EOF'
+#!/bin/sh
+set -eu
+mkdir -p /app/.next/static
+cp -a /app/static-assets/. /app/.next/static/
+# Hashed assets are immutable. Retain old build chunks for 30 days so stale
+# tabs can finish loading while naturally bounding persistent-volume growth.
+find /app/.next/static -type f -mtime +30 -delete
+exec node /app/server.js
+EOF
+RUN chmod +x /app/start-frontend.sh
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["/app/start-frontend.sh"]

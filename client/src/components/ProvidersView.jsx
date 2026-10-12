@@ -332,7 +332,7 @@ const ProvidersView = () => {
   const [availableModels, setAvailableModels] = useState([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [pinging, setPinging] = useState(false);
-  const [pingStatus, setPingStatus] = useState(null); // 'connected' | 'error' | 'offline'
+  const [pingStatus, setPingStatus] = useState(null); // 'connected' | 'degraded' | 'error' | 'offline'
   const [pingMessage, setPingMessage] = useState("");
   const [toast, setToast] = useState({
     visible: false,
@@ -834,9 +834,15 @@ const ProvidersView = () => {
       if (data.status === "healthy") {
         setPingStatus("connected");
         setPingMessage(
-          `Connection healthy! Latency ${Number.isFinite(data.latency_ms) ? data.latency_ms : "—"}ms.`,
+          `Model responded${data.reply ? ` (“${data.reply}”)` : ""}! Latency ${Number.isFinite(data.latency_ms) ? data.latency_ms : "—"}ms.`,
         );
-        showToast("Ping succeeded!", "success");
+        showToast("Ping succeeded — model responded!", "success");
+      } else if (data.status === "degraded") {
+        setPingStatus("degraded");
+        setPingMessage(
+          `Ping inconclusive: ${data.message || "model returned no text."} Latency ${Number.isFinite(data.latency_ms) ? data.latency_ms : "—"}ms.`,
+        );
+        showToast("Model gave no text back", "warning");
       } else {
         const message = data.message || "Provider rejected the test request.";
         setPingStatus("error");
@@ -2549,10 +2555,12 @@ console.log("Ingestion Status:", result);`}
                             className={`rounded-xl border p-3.5 ${
                               pingStatus === "connected"
                                 ? "border-emerald-500/20 bg-emerald-500/5"
-                                : pingStatus === "error" ||
-                                    pingStatus === "offline"
-                                  ? "border-rose-500/20 bg-rose-500/5"
-                                  : "border-white/5 bg-white/5"
+                                : pingStatus === "degraded"
+                                  ? "border-amber-500/20 bg-amber-500/5"
+                                  : pingStatus === "error" ||
+                                      pingStatus === "offline"
+                                    ? "border-rose-500/20 bg-rose-500/5"
+                                    : "border-white/5 bg-white/5"
                             }`}
                           >
                             <div className="text-[8px] uppercase tracking-widest text-slate-400 mb-1 font-bold font-mono">
@@ -2562,18 +2570,22 @@ console.log("Ingestion Status:", result);`}
                               className={`text-xs font-bold truncate ${
                                 pingStatus === "connected"
                                   ? "text-emerald-300"
-                                  : pingStatus === "error" ||
-                                      pingStatus === "offline"
-                                    ? "text-rose-300"
-                                    : "text-slate-300"
+                                  : pingStatus === "degraded"
+                                    ? "text-amber-300"
+                                    : pingStatus === "error" ||
+                                        pingStatus === "offline"
+                                      ? "text-rose-300"
+                                      : "text-slate-300"
                               }`}
                             >
                               {pingStatus === "connected"
                                 ? "Connected"
-                                : pingStatus === "error" ||
-                                    pingStatus === "offline"
-                                  ? "Offline"
-                                  : "Not connected"}
+                                : pingStatus === "degraded"
+                                  ? "Inconclusive"
+                                  : pingStatus === "error" ||
+                                      pingStatus === "offline"
+                                    ? "Offline"
+                                    : "Not connected"}
                             </div>
                             <div className="text-[9px] text-slate-400 mt-0.5 truncate">
                               {pingMessage || "No runtime check yet."}

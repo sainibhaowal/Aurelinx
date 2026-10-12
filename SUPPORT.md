@@ -13,7 +13,6 @@
 - **Stack Overflow**: Tag `aurelinx`
 
 ### Direct Contact
-- **Email**: redacted@example.invalid
 - **GitHub Discussions & Issues**: https://github.com/sainibhaowal/Aurelinx/issues
 
 ## Issue Triage
@@ -77,4 +76,4 @@ For enterprise customers:
 - On-premise deployment assistance
 - Security audit assistance
 
-Contact: redacted@example.invalid
+Contact: https://github.com/sainibhaowal/Aurelinx/discussions
