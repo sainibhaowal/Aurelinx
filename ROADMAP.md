@@ -7,41 +7,40 @@ to make data-driven people decisions with privacy, ethics, and transparency at t
 
 ---
 
-## Version 1.0 — Foundation (Q3 2026)
+## Version 0.2.x - Foundation (Current)
 
-**Status: In Progress**
+**Status: Active (`v0.2.9`)**
 
 ### Core Platform
 - [x] FastAPI backend with async architecture
-- [x] PostgreSQL + Redis + Elasticsearch
-- [x] Authentication (JWT, OAuth2, SSO)
-- [x] Role-based access control
+- [x] PostgreSQL + Redis + Qdrant vector database
+- [x] Authentication (Argon2, JWT, refresh sessions, OAuth2)
+- [x] Role-based access control (`is_admin`, `tenant_id` isolation)
 - [x] Audit logging framework
-- [x] Database migrations (Alembic)
+- [x] Database migrations (Alembic `001`–`018`)
 
 ### Intelligence Engine
-- [x] Candidate screening & scoring
-- [x] Team composition optimization
-- [x] Attrition risk prediction
+- [x] Candidate screening & semantic scoring
+- [x] Team composition optimization (budget-capped MILP)
+- [x] Cohort survival analysis (Kaplan-Meier + Greenwood 95% CI)
 - [x] Sentiment analysis pipeline
-- [ ] Skills gap analysis
-- [ ] Career pathing recommendations
+- [x] Semantic skills graph & Dijkstra matching
+- [x] Markov career path transition modeling
+- [x] Organizational Network Analysis (ONA)
 
 ### Integrations
-- [x] Greenhouse ATS connector
-- [x] Workday HRIS connector
-- [ ] Lever ATS connector
-- [ ] BambooHR connector
-- [ ] Generic webhook framework
-- [ ] Custom connector SDK
+- [x] Greenhouse, Lever, Slack, Teams, BambooHR, HiBob, SuccessFactors adapters
+- [x] Local Dataset Hub (`CSV / ZIP` bulk import/export)
+- [x] Webhook ingestion with HMAC `X-Signature` and `Idempotency-Key`
+- [ ] Live production credential verification per external provider sandbox
 
 ### Frontend
-- [x] Next.js 14 dashboard
+- [x] Next.js 15 + React 19 dashboard
 - [x] Real-time analytics views
 - [x] Candidate review workflow
 - [x] Team intelligence center
-- [ ] Mobile-responsive design
-- [ ] Dark mode
+- [x] Dark mode executive UI
+- [ ] Mobile-responsive optimization pass
 
 ### Desktop App
 - [x] Tauri shell

@@ -186,20 +186,20 @@ desktop/
 # Base interface (server/app/services/connectors/base.py)
 class BaseConnector(ABC):
     """Abstract base for all HR system connectors."""
-    
+
     @property
     @abstractmethod
     def connector_type(self) -> ConnectorType: ...
-    
+
     @abstractmethod
     async def test_connection(self, config: ConnectorConfig) -> ConnectionResult: ...
-    
+
     @abstractmethod
     async def sync_candidates(self, config: ConnectorConfig, since: datetime) -> SyncResult: ...
-    
+
     @abstractmethod
     async def sync_employees(self, config: ConnectorConfig, since: datetime) -> SyncResult: ...
-    
+
     @abstractmethod
     async def handle_webhook(self, payload: dict, headers: dict) -> WebhookResult: ...
 
@@ -236,7 +236,7 @@ tools/
 
 **Execution Flow**:
 ```
-User Message → ManagerAgent → Tool Selection (LLM) → Permission Check → 
+User Message → ManagerAgent → Tool Selection (LLM) → Permission Check →
 Tool Execution → Result Validation → Response Assembly → User
                     ↓
             Approval Required? → WorkflowApproval (30min TTL) → Admin Approve → Execute
@@ -360,7 +360,7 @@ Namespace: aurelinx-prod
 ### Environment Configuration
 | Environment | Config Source | Secrets |
 |-------------|---------------|---------|
-| Local | `.env.local` + `docker-compose.dev.yml` | `.env.local` (gitignored) |
+| Local | `.env.local` + `infra/docker-compose.local.yml` | `infra/.env.local` (gitignored) |
 | Staging | GitHub Environments + Doppler | Doppler / Vault |
 | Production | GitHub Environments + Vault | Vault (dynamic secrets) |
 
@@ -520,7 +520,7 @@ Role → Permission Set:
 | 2026-08-23 | Celery over RQ/Arq | Maturity, scheduling, monitoring | ADR-005 |
 | 2026-08-23 | Apache 2.0 license | Enterprise adoption, patent grant | ADR-006 |
 
-*Full ADRs in `docs/adr/`*
+*Full engineering and architecture docs in `docs/Worked/04_engineering_deep_dive/`*
 
 ---
 

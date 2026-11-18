@@ -35,7 +35,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 
 from app.core.data_policy import is_active_employee
 from app.core.security import (
@@ -338,23 +338,33 @@ async def get_data_summary(
 ):
     tenant_id = str(current_user.tenant_id or "default")
     return {
-        "employees": len(
+        "employees": int(
             db.exec(
-                select(EmployeeTable).where(EmployeeTable.tenant_id == tenant_id)
-            ).all()
+                select(func.count())
+                .select_from(EmployeeTable)
+                .where(EmployeeTable.tenant_id == tenant_id)
+            ).one()
         ),
-        "candidates": len(
+        "candidates": int(
             db.exec(
-                select(CandidateTable).where(CandidateTable.tenant_id == tenant_id)
-            ).all()
+                select(func.count())
+                .select_from(CandidateTable)
+                .where(CandidateTable.tenant_id == tenant_id)
+            ).one()
         ),
-        "skills": len(
-            db.exec(select(SkillTable).where(SkillTable.tenant_id == tenant_id)).all()
-        ),
-        "experience": len(
+        "skills": int(
             db.exec(
-                select(ExperienceTable).where(ExperienceTable.tenant_id == tenant_id)
-            ).all()
+                select(func.count())
+                .select_from(SkillTable)
+                .where(SkillTable.tenant_id == tenant_id)
+            ).one()
+        ),
+        "experience": int(
+            db.exec(
+                select(func.count())
+                .select_from(ExperienceTable)
+                .where(ExperienceTable.tenant_id == tenant_id)
+            ).one()
         ),
     }
 
@@ -1501,8 +1511,9 @@ def _import_rows_for_kind(
                 .strip()
                 .casefold()
             )
-            person_a, person_b = employee_by_email.get(email_a), employee_by_email.get(
-                email_b
+            person_a, person_b = (
+                employee_by_email.get(email_a),
+                employee_by_email.get(email_b),
             )
             if not person_a or not person_b or person_a.id == person_b.id:
                 continue
@@ -1604,141 +1615,196 @@ def _import_rows_for_kind(
 
 def _export_dataset_bundle_bytes(db: Session, tenant_id: str) -> bytes:
     employees = db.exec(
-        select(EmployeeTable)
+        select(
+            EmployeeTable.id,
+            EmployeeTable.full_name,
+            EmployeeTable.email,
+            EmployeeTable.department,
+            EmployeeTable.role,
+            EmployeeTable.sentiment_score,
+            EmployeeTable.is_at_risk,
+            EmployeeTable.retention_prob,
+            EmployeeTable.salary,
+            EmployeeTable.salary_currency,
+            EmployeeTable.salary_period,
+            EmployeeTable.join_date,
+            EmployeeTable.employment_start_date,
+            EmployeeTable.employment_end_date,
+            EmployeeTable.employment_censor_date,
+            EmployeeTable.employment_duration_years,
+            EmployeeTable.departure_event,
+            EmployeeTable.employment_status,
+            EmployeeTable.created_at,
+            EmployeeTable.updated_at,
+        )
         .where(EmployeeTable.tenant_id == tenant_id)
         .order_by(EmployeeTable.created_at.asc())
     ).all()
     candidates = db.exec(
-        select(CandidateTable)
+        select(
+            CandidateTable.id,
+            CandidateTable.full_name,
+            CandidateTable.email,
+            CandidateTable.department,
+            CandidateTable.role,
+            CandidateTable.sentiment_score,
+            CandidateTable.match_score,
+            CandidateTable.application_date,
+            CandidateTable.created_at,
+            CandidateTable.updated_at,
+        )
         .where(CandidateTable.tenant_id == tenant_id)
         .order_by(CandidateTable.created_at.asc())
     ).all()
     skills = db.exec(
-        select(SkillTable)
+        select(
+            SkillTable.employee_id,
+            SkillTable.candidate_id,
+            SkillTable.name,
+            SkillTable.level,
+        )
         .where(SkillTable.tenant_id == tenant_id)
         .order_by(SkillTable.created_at.asc())
     ).all()
     experiences = db.exec(
-        select(ExperienceTable)
+        select(
+            ExperienceTable.employee_id,
+            ExperienceTable.candidate_id,
+            ExperienceTable.company,
+            ExperienceTable.position,
+            ExperienceTable.duration_years,
+            ExperienceTable.description,
+            ExperienceTable.effective_start,
+            ExperienceTable.effective_end,
+            ExperienceTable.is_current,
+            ExperienceTable.source_record_key,
+        )
         .where(ExperienceTable.tenant_id == tenant_id)
         .order_by(ExperienceTable.created_at.asc())
     ).all()
     collaboration_events = db.exec(
-        select(CollaborationEventTable).where(
-            CollaborationEventTable.tenant_id == tenant_id
-        )
+        select(
+            CollaborationEventTable.external_event_id,
+            CollaborationEventTable.employee_a_id,
+            CollaborationEventTable.employee_b_id,
+            CollaborationEventTable.event_type,
+            CollaborationEventTable.occurred_at,
+        ).where(CollaborationEventTable.tenant_id == tenant_id)
     ).all()
     skill_aliases = db.exec(
-        select(SkillAliasTable).where(SkillAliasTable.tenant_id == tenant_id)
+        select(
+            SkillAliasTable.alias,
+            SkillAliasTable.canonical_skill,
+            SkillAliasTable.approved,
+        ).where(SkillAliasTable.tenant_id == tenant_id)
     ).all()
 
-    employee_email_by_id = {row.id: row.email for row in employees}
-    candidate_email_by_id = {row.id: row.email for row in candidates}
+    employee_email_by_id = {row[0]: row[2] for row in employees}
+    candidate_email_by_id = {row[0]: row[2] for row in candidates}
 
     employee_rows = [
         {
-            "id": row.id,
-            "full_name": row.full_name,
-            "email": row.email,
-            "department": row.department,
-            "role": row.role,
-            "sentiment_score": row.sentiment_score,
-            "is_at_risk": row.is_at_risk,
-            "retention_prob": row.retention_prob,
-            "salary": row.salary,
-            "salary_currency": row.salary_currency,
-            "salary_period": row.salary_period,
-            "join_date": row.join_date,
-            "employment_start_date": row.employment_start_date,
-            "employment_end_date": row.employment_end_date,
-            "employment_censor_date": row.employment_censor_date,
-            "employment_duration_years": row.employment_duration_years,
-            "departure_event": row.departure_event,
-            "employment_status": row.employment_status,
-            "created_at": row.created_at,
-            "updated_at": row.updated_at,
+            "id": row[0],
+            "full_name": row[1],
+            "email": row[2],
+            "department": row[3],
+            "role": row[4],
+            "sentiment_score": row[5],
+            "is_at_risk": row[6],
+            "retention_prob": row[7],
+            "salary": row[8],
+            "salary_currency": row[9],
+            "salary_period": row[10],
+            "join_date": row[11],
+            "employment_start_date": row[12],
+            "employment_end_date": row[13],
+            "employment_censor_date": row[14],
+            "employment_duration_years": row[15],
+            "departure_event": row[16],
+            "employment_status": row[17],
+            "created_at": row[18],
+            "updated_at": row[19],
         }
         for row in employees
     ]
     candidate_rows = [
         {
-            "id": row.id,
-            "full_name": row.full_name,
-            "email": row.email,
-            "department": row.department,
-            "role": row.role,
-            "sentiment_score": row.sentiment_score,
-            "match_score": row.match_score,
-            "application_date": row.application_date,
-            "created_at": row.created_at,
-            "updated_at": row.updated_at,
+            "id": row[0],
+            "full_name": row[1],
+            "email": row[2],
+            "department": row[3],
+            "role": row[4],
+            "sentiment_score": row[5],
+            "match_score": row[6],
+            "application_date": row[7],
+            "created_at": row[8],
+            "updated_at": row[9],
         }
         for row in candidates
     ]
     employee_skill_rows = [
         {
-            "employee_email": employee_email_by_id.get(row.employee_id, ""),
-            "skill_name": row.name,
-            "level": row.level,
+            "employee_email": employee_email_by_id.get(row[0], ""),
+            "skill_name": row[2],
+            "level": row[3],
         }
         for row in skills
-        if row.employee_id is not None
+        if row[0] is not None
     ]
     candidate_skill_rows = [
         {
-            "candidate_email": candidate_email_by_id.get(row.candidate_id, ""),
-            "skill_name": row.name,
-            "level": row.level,
+            "candidate_email": candidate_email_by_id.get(row[1], ""),
+            "skill_name": row[2],
+            "level": row[3],
         }
         for row in skills
-        if row.candidate_id is not None
+        if row[1] is not None
     ]
     employee_experience_rows = [
         {
-            "employee_email": employee_email_by_id.get(row.employee_id, ""),
-            "company": row.company,
-            "position": row.position,
-            "duration_years": row.duration_years,
-            "description": row.description,
-            "effective_start": row.effective_start,
-            "effective_end": row.effective_end,
-            "is_current": row.is_current,
-            "external_record_id": row.source_record_key,
+            "employee_email": employee_email_by_id.get(row[0], ""),
+            "company": row[2],
+            "position": row[3],
+            "duration_years": row[4],
+            "description": row[5],
+            "effective_start": row[6],
+            "effective_end": row[7],
+            "is_current": row[8],
+            "external_record_id": row[9],
         }
         for row in experiences
-        if row.employee_id is not None
+        if row[0] is not None
     ]
     candidate_experience_rows = [
         {
-            "candidate_email": candidate_email_by_id.get(row.candidate_id, ""),
-            "company": row.company,
-            "position": row.position,
-            "duration_years": row.duration_years,
-            "description": row.description,
-            "effective_start": row.effective_start,
-            "effective_end": row.effective_end,
-            "is_current": row.is_current,
+            "candidate_email": candidate_email_by_id.get(row[1], ""),
+            "company": row[2],
+            "position": row[3],
+            "duration_years": row[4],
+            "description": row[5],
+            "effective_start": row[6],
+            "effective_end": row[7],
+            "is_current": row[8],
         }
         for row in experiences
-        if row.candidate_id is not None
+        if row[1] is not None
     ]
     collaboration_rows = [
         {
-            "external_event_id": row.external_event_id,
-            "employee_a_email": employee_email_by_id.get(row.employee_a_id, ""),
-            "employee_b_email": employee_email_by_id.get(row.employee_b_id, ""),
-            "event_type": row.event_type,
-            "occurred_at": row.occurred_at,
+            "external_event_id": row[0],
+            "employee_a_email": employee_email_by_id.get(row[1], ""),
+            "employee_b_email": employee_email_by_id.get(row[2], ""),
+            "event_type": row[3],
+            "occurred_at": row[4],
         }
         for row in collaboration_events
-        if row.employee_a_id in employee_email_by_id
-        and row.employee_b_id in employee_email_by_id
+        if row[1] in employee_email_by_id and row[2] in employee_email_by_id
     ]
     skill_alias_rows = [
         {
-            "alias": row.alias,
-            "canonical_skill": row.canonical_skill,
-            "approved": row.approved,
+            "alias": row[0],
+            "canonical_skill": row[1],
+            "approved": row[2],
         }
         for row in skill_aliases
     ]

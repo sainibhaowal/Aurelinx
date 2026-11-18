@@ -18,7 +18,7 @@ The repository is structured as a production-oriented monorepo:
 - `client/` delivers the modern workspace UI
 - `server/` powers the FastAPI backend, database, migrations, and workers
 - `infra/` contains the Docker and deployment stack
-- `Docs/` stores planning, architecture, and implementation records
+- `docs/` stores engineering, architecture, and operational documentation
 
 ## Contents
 
@@ -94,7 +94,7 @@ Aurelinx/
 ├── client/      # Next.js workspace and public-facing UI
 ├── server/      # FastAPI application, models, services, tests, migrations
 ├── infra/       # Docker, compose, and environment files
-├── Docs/        # Architecture, planning, and delivery documentation
+├── docs/        # Architecture, engineering, and operational documentation
 └── package.json # Root orchestration scripts
 ```
 
@@ -222,6 +222,14 @@ That combination gives Aurelinx a credible enterprise footprint and a strong fou
 - `client/src/components/` for the UI modules
 - `server/app/api/v1/` for the backend surface area
 - `infra/docker-compose.prod.yml` for the deployment topology
+
+## Engineering & System Documentation
+
+- [Implemented System & Runbooks](docs/Worked/README.md): Verified capabilities, local Docker stack, migrations, and end-to-end verification (`191 passed`).
+- [Engineering Deep Dive (10 Volumes)](docs/Worked/04_engineering_deep_dive/README.md): Technical specifications, Mermaid diagrams, and exact mathematical formulas across all backend services, Intelligence Center engines, Data Ops, MLOps, and Privacy controls.
+- [Complete User Manual Reference](docs/Worked/05_user_manual_reference/README.md): All 19 operational guides covering every workspace view, threshold, and workflow.
+- [Planned Architecture & Roadmap](docs/Planned_Architecture/README.md): Target architecture blueprints, Data Ops lakehouse design, and honest project scope boundaries.
+- [Administration & Access Control](docs/AdminWork/README.md): Authentication, JWT/refresh sessions, RBAC (`is_admin`), and server-side `tenant_id` isolation.
 
 ## Brand Asset
 

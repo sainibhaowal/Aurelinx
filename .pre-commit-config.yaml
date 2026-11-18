@@ -1,0 +1,161 @@
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+
+default_stages:
+  - pre-commit
+
+repos:
+  # ---------------------------------------------------------------------------
+  # 1. File Hygiene, Syntax & Secret Guards (pre-commit)
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=2048"]
+      - id: detect-private-key
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-yaml
+        args: ["--unsafe"]
+      - id: check-json
+        exclude: ^(\.vscode/|client/tsconfig\.json$)
+      - id: check-toml
+      - id: end-of-file-fixer
+        exclude: ^docs/Worked/05_user_manual_reference/
+      - id: trailing-whitespace
+        args: ["--markdown-linebreak-ext=md"]
+
+  # ---------------------------------------------------------------------------
+  # 2. Python Lint & Format (Ruff on server/)
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.10
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+        files: ^server/
+      - id: ruff-format
+        files: ^server/
+
+  # ---------------------------------------------------------------------------
+  # 3. Local Security & Pre-Push Verification Gates
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: block-secret-files
+        name: Block live .env and auth secret files
+        entry: >-
+          bash -c 'for f in "$@"; do
+            case "$f" in
+              *.env.local|*.env.production|*opencode_auth.json|*.pem|*.key)
+                echo "ERROR: Refusing to commit secret file: $f" >&2
+                exit 1 ;;
+            esac
+          done' --
+        language: system
+        pass_filenames: true
+
+      - id: block-cache-and-temp-files
+        name: Block cache, bytecode, and temp files
+        entry: >-
+          bash -c 'for f in "$@"; do
+            case "$f" in
+              *__pycache__*|*.pyc|*.pyo|*.pyd|*.pytest_cache*|*.ruff_cache*|*.mypy_cache*|*.next/*|*.tmp|*.temp|*.bak|*.log|tmp/*)
+                echo "ERROR: Refusing to commit cache/temp file: $f" >&2
+                exit 1 ;;
+            esac
+          done' --
+        language: system
+        pass_filenames: true
+
+      - id: backend-syntax-check
+        name: Python syntax check (server/app, no bytecode)
+        entry: python3 -c "import ast, pathlib; [ast.parse(p.read_text(encoding='utf-8'), str(p)) for p in pathlib.Path('server/app').rglob('*.py')]"
+        language: system
+        pass_filenames: false
+        files: ^server/app/
+
+      - id: frontend-eslint
+        name: Frontend ESLint (client/)
+        entry: pnpm -C client run lint
+        language: system
+        pass_filenames: false
+        files: ^client/.*\.(js|jsx|ts|tsx)$
+
+      - id: frontend-vitest
+        name: Frontend Vitest suite (client/)
+        entry: pnpm -C client run test
+        language: system
+        pass_filenames: false
+        files: ^client/
+
+      - id: pre-push-clean-caches
+        name: Clean local __pycache__, test, and build caches (pre-push)
+        stages: [pre-push]
+        entry: >-
+          bash -c '
+          find server -type d \( -name "__pycache__" -o -name ".pytest_cache" -o -name ".ruff_cache" -o -name ".mypy_cache" \) -exec rm -rf {} + 2>/dev/null || true
+          rm -rf server/.coverage server/htmlcov client/.next 2>/dev/null || true
+          '
+        language: system
+        pass_filenames: false
+
+      - id: pre-push-docker-compose-validate
+        name: Validate Docker Compose config (pre-push)
+        stages: [pre-push]
+        entry: >-
+          bash -c 'if [ -f infra/.env.local ]; then
+            docker compose -f infra/docker-compose.local.yml --env-file infra/.env.local config -q
+          fi'
+        language: system
+        pass_filenames: false
+
+      - id: pre-push-frontend-lint
+        name: Frontend ESLint before push (pre-push)
+        stages: [pre-push]
+        entry: pnpm -C client run lint
+        language: system
+        pass_filenames: false
+
+      - id: pre-push-frontend-tests
+        name: Frontend Vitest suite before push (pre-push)
+        stages: [pre-push]
+        entry: pnpm -C client run test
+        language: system
+        pass_filenames: false
+
+      - id: pre-push-frontend-build
+        name: Frontend Next.js production build before push (pre-push)
+        stages: [pre-push]
+        entry: pnpm -C client run build
+        language: system
+        pass_filenames: false
+
+      - id: pre-push-backend-tests
+        name: Run backend pytest suite before push (pre-push)
+        stages: [pre-push]
+        entry: |
+          bash -c '
+          set -e
+          if docker ps --format "{{.Names}}" 2>/dev/null | grep -qx "infra-api-1"; then
+            docker exec -e PYTHONDONTWRITEBYTECODE=1 infra-api-1 python -c "
+          import os, subprocess, sqlalchemy
+          url = os.environ[\"DATABASE_URL\"].replace(\"search_path%3Dapp\", \"search_path%3Dtest\").replace(\"search_path=app\", \"search_path=test\")
+          eng = sqlalchemy.create_engine(url)
+          with eng.begin() as c:
+              c.exec_driver_sql(\"CREATE SCHEMA IF NOT EXISTS test AUTHORIZATION aurelinx\")
+          eng.dispose()
+          env = os.environ.copy()
+          env[\"TEST_DATABASE_URL\"] = url
+          env[\"DATABASE_URL\"] = url
+          raise SystemExit(subprocess.run([\"pytest\", \"-q\"], env=env).returncode)
+          "
+          else
+            echo "ERROR: infra-api-1 is not running; start Docker stack or activate server venv to run pytest." >&2
+            exit 1
+          fi
+          '
+        language: system
+        pass_filenames: false
