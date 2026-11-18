@@ -174,15 +174,19 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuth = async () => {
       if (token) {
-        const cachedUser = readCachedUser();
-        const initialUser = cachedUser || readTokenUser(token);
-        if (initialUser) {
-          setUser(initialUser);
-          if (!cachedUser) {
-            localStorage.setItem(
-              AUTH_USER_CACHE_KEY,
-              JSON.stringify(initialUser),
-            );
+        const expiresAt = readTokenExpiry(token);
+        const isTokenExpired = Boolean(expiresAt && expiresAt <= Date.now());
+        if (!isTokenExpired) {
+          const cachedUser = readCachedUser();
+          const initialUser = cachedUser || readTokenUser(token);
+          if (initialUser) {
+            setUser(initialUser);
+            if (!cachedUser) {
+              localStorage.setItem(
+                AUTH_USER_CACHE_KEY,
+                JSON.stringify(initialUser),
+              );
+            }
           }
         }
         try {
@@ -191,9 +195,18 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(userData));
           setError(null);
         } catch (err) {
-          // Keep the saved session and cached user during outages or
-          // authorization failures. A terminal refresh failure emits
-          // auth:expired and clears credentials in one place.
+          if (
+            err?.status === 401 ||
+            err?.status === 403 ||
+            err?.code === "SESSION_EXPIRED" ||
+            err?.code === "UNAUTHORIZED"
+          ) {
+            localStorage.removeItem("auth_token");
+            localStorage.removeItem("auth_refresh_token");
+            localStorage.removeItem(AUTH_USER_CACHE_KEY);
+            setToken(null);
+            setUser(null);
+          }
           setError(err);
         }
       }
