@@ -3,8 +3,16 @@ name: Semantic Release, Container & Desktop Build
 on:
   workflow_dispatch:
     inputs:
+      action:
+        description: 'Step to run manually'
+        required: true
+        default: 'prepare-release-branch'
+        type: choice
+        options:
+          - prepare-release-branch
+          - publish-release
       release_type:
-        description: 'Release type (auto, patch, minor, major)'
+        description: 'Release type for prepare-release-branch (auto, patch, minor, major)'
         required: true
         default: 'auto'
         type: choice
@@ -14,23 +22,14 @@ on:
           - minor
           - major
       build_desktop:
-        description: 'Build desktop installers (slow; leave off for web/API releases)'
+        description: 'Build desktop installers during publish-release (slow; leave off for web/API releases)'
         required: true
         default: false
         type: boolean
-  push:
-    branches:
-      - main
-    paths:
-      - 'package.json'
-    tags:
-      - 'v*'
 
 permissions:
   contents: write
   packages: write
-  pull-requests: write
-  actions: write
 
 # One release operation may calculate and publish a version for a branch at a
 # time. This prevents two manual runs from selecting the same next tag.
@@ -39,10 +38,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepare-release-pr:
-    name: Prepare Semantic Release PR
+  prepare-release-branch:
+    name: Prepare Semantic Release Branch
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'prepare-release-branch'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -78,9 +77,7 @@ jobs:
       - name: Verify Current Release Metadata
         run: npm run verify:release
 
-      - name: Bump Version & Open Release PR
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Bump Version & Push Release Branch
         run: |
           if [ "${{ github.event.inputs.release_type }}" = "auto" ]; then
             npx standard-version --skip.tag
@@ -99,57 +96,23 @@ jobs:
           git checkout -B "${RELEASE_BRANCH}"
           git push --force origin "${RELEASE_BRANCH}"
 
-          gh workflow run ci.yml --ref "${RELEASE_BRANCH}" || true
-
-          PR_TITLE="chore(release): ${NEW_TAG}"
-          if [ "${{ github.event.inputs.build_desktop }}" = "true" ]; then
-            PR_TITLE="chore(release): ${NEW_TAG} [build-desktop]"
-          fi
-          PR_BODY="Automated semantic release PR for \`${NEW_TAG}\`. Merging this PR into \`${{ github.ref_name }}\` will automatically tag \`${NEW_TAG}\`, publish container images, and create the GitHub Release."
           COMPARE_URL="https://github.com/${{ github.repository }}/compare/${{ github.ref_name }}...${RELEASE_BRANCH}?expand=1"
+          echo "Release branch '${RELEASE_BRANCH}' pushed."
+          echo "Open and merge PR manually: ${COMPARE_URL}"
+          {
+            echo "### Release Branch Ready: \`${RELEASE_BRANCH}\`"
+            echo ""
+            echo "1. Open & merge the PR into \`${{ github.ref_name }}\`: [Create Release PR (${NEW_TAG})](${COMPARE_URL})"
+            echo "2. After merging, run this workflow manually on \`${{ github.ref_name }}\` with \`action = publish-release\`."
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          EXISTING_PR=$(gh pr list --head "${RELEASE_BRANCH}" --state open --json number --jq '.[0].number // empty')
-          if [ -z "${EXISTING_PR}" ]; then
-            set +e
-            PR_OUT=$(gh pr create \
-              --base "${{ github.ref_name }}" \
-              --head "${RELEASE_BRANCH}" \
-              --title "${PR_TITLE}" \
-              --body "${PR_BODY}" 2>&1)
-            PR_RC=$?
-            set -e
-            if [ "${PR_RC}" -eq 0 ]; then
-              echo "Created Release PR: ${PR_OUT}"
-              echo "Created Release PR for \`${NEW_TAG}\`: ${PR_OUT}" >> "$GITHUB_STEP_SUMMARY"
-            elif echo "${PR_OUT}" | grep -qi "not permitted to create or approve pull requests"; then
-              echo "Branch '${RELEASE_BRANCH}' pushed and CI triggered."
-              echo "GitHub repository policy blocks GITHUB_TOKEN from auto-creating PRs."
-              echo "Open PR manually: ${COMPARE_URL}"
-              {
-                echo "### Release Branch Ready: \`${RELEASE_BRANCH}\`"
-                echo ""
-                echo "- CI has been dispatched on \`${RELEASE_BRANCH}\`."
-                echo "- Auto-PR creation is disabled in **Settings -> Actions -> General -> Workflow permissions**."
-                echo "- [Create & merge Release PR (${NEW_TAG})](${COMPARE_URL})"
-              } >> "$GITHUB_STEP_SUMMARY"
-            else
-              echo "${PR_OUT}" >&2
-              exit "${PR_RC}"
-            fi
-          else
-            gh pr edit "${EXISTING_PR}" --title "${PR_TITLE}" --body "${PR_BODY}"
-            echo "Updated Release PR #${EXISTING_PR} for \`${NEW_TAG}\`." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-  tag-on-merge:
-    name: Tag Merged Release on Main
+  tag-on-main:
+    name: Verify & Tag Release on Main
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'publish-release'
     outputs:
-      should_publish: ${{ steps.tag.outputs.should_publish }}
       tag: ${{ steps.tag.outputs.tag }}
       clean_version: ${{ steps.tag.outputs.clean_version }}
-      build_desktop: ${{ steps.tag.outputs.build_desktop }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -170,31 +133,22 @@ jobs:
           TAG="v${VERSION}"
 
           if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "Tag ${TAG} already exists on origin; skipping release."
-            echo "should_publish=false" >> $GITHUB_OUTPUT
-            exit 0
+            echo "Tag ${TAG} already exists on origin. Run prepare-release-branch and merge the Release PR first." >&2
+            exit 1
           fi
 
           npm run verify:release
           git tag -a "${TAG}" -m "chore(release): ${VERSION}"
           git push origin "${TAG}"
 
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          if echo "${COMMIT_MSG}" | grep -q '\[build-desktop\]'; then
-            echo "build_desktop=true" >> $GITHUB_OUTPUT
-          else
-            echo "build_desktop=false" >> $GITHUB_OUTPUT
-          fi
-
-          echo "should_publish=true" >> $GITHUB_OUTPUT
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "clean_version=${VERSION}" >> $GITHUB_OUTPUT
 
   build-and-publish:
     name: Build, Smoke-Test & Publish Images
     runs-on: ubuntu-latest
-    needs: [tag-on-merge]
-    if: always() && (github.ref_type == 'tag' || (github.ref == 'refs/heads/main' && needs.tag-on-merge.result == 'success' && needs.tag-on-merge.outputs.should_publish == 'true'))
+    needs: [tag-on-main]
+    if: needs.tag-on-main.result == 'success'
     outputs:
       tag: ${{ steps.vars.outputs.TAG }}
       version: ${{ steps.vars.outputs.VERSION }}
@@ -208,16 +162,12 @@ jobs:
         with:
           fetch-depth: 0
           # Keep desktop artifacts aligned with the released container images.
-          ref: ${{ github.ref_type == 'tag' && github.ref || needs.tag-on-merge.outputs.tag }}
+          ref: ${{ needs.tag-on-main.outputs.tag }}
 
       - name: Determine Target Version
         id: vars
         run: |
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-          else
-            TAG="${{ needs.tag-on-merge.outputs.tag }}"
-          fi
+          TAG="${{ needs.tag-on-main.outputs.tag }}"
           CLEAN_VERSION="${TAG#v}"
           echo "TAG=${TAG}" >> $GITHUB_OUTPUT
           echo "VERSION=${CLEAN_VERSION}" >> $GITHUB_OUTPUT
@@ -310,10 +260,10 @@ jobs:
   build-desktop-binaries:
     name: Build & Attach Desktop Binaries
     runs-on: ${{ matrix.os }}
-    needs: [tag-on-merge, build-and-publish]
+    needs: [build-and-publish]
     # Rust/Tauri packaging is deliberately opt-in. Normal releases serve the
     # web application and deploy containers without waiting for desktop builds.
-    if: needs.build-and-publish.result == 'success' && needs.tag-on-merge.outputs.build_desktop == 'true'
+    if: needs.build-and-publish.result == 'success' && inputs.build_desktop
     strategy:
       fail-fast: false
       matrix:
