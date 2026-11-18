@@ -202,11 +202,11 @@ Any confirmed or suspected:
 
 | Standard | Status | Notes |
 |----------|--------|-------|
-| **OWASP Top 10** | ✅ Addressed | See `docs/security/owasp-mapping.md` |
+| **OWASP Top 10** | ✅ Addressed | See `docs/AdminWork/01_authentication_and_access/02_rbac_and_tenant_isolation.md` |
 | **OWASP API Security Top 10** | ✅ Addressed | Rate limiting, auth, validation, logging |
-| **GDPR** | 🟡 Design-ready | Data export/delete endpoints planned, DPIA template in `docs/compliance/` |
+| **GDPR** | 🟡 Implemented (Beta) | Consent, retention, sensitive-field, and export APIs in `server/app/api/v1/privacy.py` |
 | **CCPA** | 🟡 Design-ready | Same as GDPR |
-| **SOC 2 Type II** | 🔄 Roadmap v1.2 | Controls documented, audit prep in `docs/compliance/soc2/` |
+| **SOC 2 Type II** | 🔄 Planned | Controls documented in `docs/Worked/04_engineering_deep_dive/09_compliance_privacy_and_sre/` |
 | **ISO 27001** | 🔄 Roadmap v2.0 | ISMS framework planned |
 
 ---

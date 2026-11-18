@@ -5,7 +5,7 @@
   "main": "start-all.js",
   "scripts": {
     "dev": "node start-all.js",
-    "dev:down": "docker compose -f docker-compose.dev.yml down",
+    "dev:down": "docker compose -f infra/docker-compose.local.yml --env-file infra/.env.local down",
     "release": "node scripts/reconcile-release-version.js && standard-version && npm run verify:release && git push --follow-tags",
     "verify:release": "node scripts/verify-release-metadata.js",
     "typecheck": "pnpm -C client exec tsc --noEmit",
@@ -22,7 +22,7 @@
     "intelligence",
     "agentic-ai",
     "fastapi",
-    "vite"
+    "nextjs"
   ],
   "author": "Ravinder Singh (https://github.com/sainibhaowal)",
   "license": "Apache-2.0",

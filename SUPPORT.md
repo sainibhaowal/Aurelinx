@@ -3,14 +3,13 @@
 ## Getting Help
 
 ### Documentation
-- **README**: Quick start and overview
-- **Wiki**: Detailed guides and tutorials
-- **API Docs**: `/docs` endpoint when running locally
+- **README**: Quick start and overview (`README.md`)
+- **Engineering & User Docs**: Full documentation in `docs/Worked/README.md`
+- **API Docs**: `/api/v1/docs` endpoint when running locally
 
 ### Community Support
-- **GitHub Discussions**: Questions, ideas, general help
-- **Discord**: Real-time chat (link in repo description)
-- **Stack Overflow**: Tag `aurelinx`
+- **GitHub Discussions**: Questions, ideas, and general help (`https://github.com/sainibhaowal/Aurelinx/discussions`)
+- **GitHub Issues**: Bug reports and feature requests (`https://github.com/sainibhaowal/Aurelinx/issues`)
 
 ### Direct Contact
 - **GitHub Discussions & Issues**: https://github.com/sainibhaowal/Aurelinx/issues
@@ -56,8 +55,8 @@ Use the feature request template. Explain:
 
 ### Debugging Tips
 - Enable debug logging: `LOG_LEVEL=DEBUG`
-- Check service health: `curl localhost:8000/health`
-- View logs: `docker compose logs -f [service]`
+- Check service health: `curl http://localhost:5100/health`
+- View logs: `docker compose -f infra/docker-compose.local.yml --env-file infra/.env.local logs -f [service]`
 
 ## Contributing to Support
 
