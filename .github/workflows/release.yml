@@ -19,12 +19,18 @@ on:
         default: false
         type: boolean
   push:
+    branches:
+      - main
+    paths:
+      - 'package.json'
     tags:
       - 'v*'
 
 permissions:
   contents: write
   packages: write
+  pull-requests: write
+  actions: write
 
 # One release operation may calculate and publish a version for a branch at a
 # time. This prevents two manual runs from selecting the same next tag.
@@ -33,19 +39,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  version-and-tag:
-    name: Generate Semantic Version & Tag
+  prepare-release-pr:
+    name: Prepare Semantic Release PR
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
-    outputs:
-      new_tag: ${{ steps.bump.outputs.tag }}
-      clean_version: ${{ steps.bump.outputs.clean_version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@v3
@@ -75,30 +78,100 @@ jobs:
       - name: Verify Current Release Metadata
         run: npm run verify:release
 
-      - name: Bump Version
-        id: bump
+      - name: Bump Version & Open Release PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ github.event.inputs.release_type }}" = "auto" ]; then
-            npx standard-version
+            npx standard-version --skip.tag
           else
-            npx standard-version --release-as ${{ github.event.inputs.release_type }}
+            npx standard-version --skip.tag --release-as ${{ github.event.inputs.release_type }}
           fi
-          NEW_TAG=$(git describe --tags --abbrev=0)
+          NEW_VER=$(node -p "require('./package.json').version")
+          NEW_TAG="v${NEW_VER}"
           if git ls-remote --exit-code --tags origin "refs/tags/${NEW_TAG}" >/dev/null 2>&1; then
             echo "Refusing to overwrite existing remote release tag: ${NEW_TAG}" >&2
             exit 1
           fi
           npm run verify:release
-          CLEAN_VER="${NEW_TAG#v}"
-          echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
-          echo "clean_version=${CLEAN_VER}" >> $GITHUB_OUTPUT
-          git push --follow-tags origin ${{ github.ref_name }}
+
+          RELEASE_BRANCH="release/${NEW_TAG}"
+          git checkout -B "${RELEASE_BRANCH}"
+          git push --force origin "${RELEASE_BRANCH}"
+
+          PR_TITLE="chore(release): ${NEW_TAG}"
+          if [ "${{ github.event.inputs.build_desktop }}" = "true" ]; then
+            PR_TITLE="chore(release): ${NEW_TAG} [build-desktop]"
+          fi
+          PR_BODY="Automated semantic release PR for \`${NEW_TAG}\`.\n\nMerging this PR into \`${{ github.ref_name }}\` will automatically tag \`${NEW_TAG}\`, publish container images, and create the GitHub Release."
+
+          EXISTING_PR=$(gh pr list --head "${RELEASE_BRANCH}" --state open --json number --jq '.[0].number // empty')
+          if [ -z "${EXISTING_PR}" ]; then
+            gh pr create \
+              --base "${{ github.ref_name }}" \
+              --head "${RELEASE_BRANCH}" \
+              --title "${PR_TITLE}" \
+              --body "${PR_BODY}"
+          else
+            gh pr edit "${EXISTING_PR}" --title "${PR_TITLE}" --body "${PR_BODY}"
+          fi
+
+          gh workflow run ci.yml --ref "${RELEASE_BRANCH}"
+
+  tag-on-merge:
+    name: Tag Merged Release on Main
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      should_publish: ${{ steps.tag.outputs.should_publish }}
+      tag: ${{ steps.tag.outputs.tag }}
+      clean_version: ${{ steps.tag.outputs.clean_version }}
+      build_desktop: ${{ steps.tag.outputs.build_desktop }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git User
+        run: |
+          git config --global user.name "Ravinder Singh"
+          git config --global user.email "251900306+sainibhaowal@users.noreply.github.com"
+
+      - name: Verify & Tag Release
+        id: tag
+        run: |
+          git fetch --force --tags origin
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists on origin; skipping release."
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          npm run verify:release
+          git tag -a "${TAG}" -m "chore(release): ${VERSION}"
+          git push origin "${TAG}"
+
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if echo "${COMMIT_MSG}" | grep -q '\[build-desktop\]'; then
+            echo "build_desktop=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_desktop=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "should_publish=true" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "clean_version=${VERSION}" >> $GITHUB_OUTPUT
 
   build-and-publish:
     name: Build, Smoke-Test & Publish Images
     runs-on: ubuntu-latest
-    needs: [version-and-tag]
-    if: always() && (github.event_name == 'push' || needs.version-and-tag.result == 'success')
+    needs: [tag-on-merge]
+    if: always() && (github.ref_type == 'tag' || (github.ref == 'refs/heads/main' && needs.tag-on-merge.result == 'success' && needs.tag-on-merge.outputs.should_publish == 'true'))
     outputs:
       tag: ${{ steps.vars.outputs.TAG }}
       version: ${{ steps.vars.outputs.VERSION }}
@@ -112,15 +185,15 @@ jobs:
         with:
           fetch-depth: 0
           # Keep desktop artifacts aligned with the released container images.
-          ref: ${{ github.event_name == 'workflow_dispatch' && needs.version-and-tag.outputs.new_tag || github.ref }}
+          ref: ${{ github.ref_type == 'tag' && github.ref || needs.tag-on-merge.outputs.tag }}
 
       - name: Determine Target Version
         id: vars
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ needs.version-and-tag.outputs.new_tag }}"
-          else
+          if [ "${{ github.ref_type }}" = "tag" ]; then
             TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="${{ needs.tag-on-merge.outputs.tag }}"
           fi
           CLEAN_VERSION="${TAG#v}"
           echo "TAG=${TAG}" >> $GITHUB_OUTPUT
@@ -214,10 +287,10 @@ jobs:
   build-desktop-binaries:
     name: Build & Attach Desktop Binaries
     runs-on: ${{ matrix.os }}
-    needs: [build-and-publish]
+    needs: [tag-on-merge, build-and-publish]
     # Rust/Tauri packaging is deliberately opt-in. Normal releases serve the
     # web application and deploy containers without waiting for desktop builds.
-    if: github.event_name == 'workflow_dispatch' && inputs.build_desktop
+    if: needs.build-and-publish.result == 'success' && needs.tag-on-merge.outputs.build_desktop == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -233,7 +306,7 @@ jobs:
         with:
           fetch-depth: 0
           # Attach installers built from the exact semantic-release tag.
-          ref: ${{ github.event_name == 'workflow_dispatch' && needs.version-and-tag.outputs.new_tag || github.ref }}
+          ref: ${{ needs.build-and-publish.outputs.tag }}
 
       - name: Install Node.js
         uses: actions/setup-node@v4
