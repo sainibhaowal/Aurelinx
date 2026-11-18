@@ -99,24 +99,47 @@ jobs:
           git checkout -B "${RELEASE_BRANCH}"
           git push --force origin "${RELEASE_BRANCH}"
 
+          gh workflow run ci.yml --ref "${RELEASE_BRANCH}" || true
+
           PR_TITLE="chore(release): ${NEW_TAG}"
           if [ "${{ github.event.inputs.build_desktop }}" = "true" ]; then
             PR_TITLE="chore(release): ${NEW_TAG} [build-desktop]"
           fi
-          PR_BODY="Automated semantic release PR for \`${NEW_TAG}\`.\n\nMerging this PR into \`${{ github.ref_name }}\` will automatically tag \`${NEW_TAG}\`, publish container images, and create the GitHub Release."
+          PR_BODY="Automated semantic release PR for \`${NEW_TAG}\`. Merging this PR into \`${{ github.ref_name }}\` will automatically tag \`${NEW_TAG}\`, publish container images, and create the GitHub Release."
+          COMPARE_URL="https://github.com/${{ github.repository }}/compare/${{ github.ref_name }}...${RELEASE_BRANCH}?expand=1"
 
           EXISTING_PR=$(gh pr list --head "${RELEASE_BRANCH}" --state open --json number --jq '.[0].number // empty')
           if [ -z "${EXISTING_PR}" ]; then
-            gh pr create \
+            set +e
+            PR_OUT=$(gh pr create \
               --base "${{ github.ref_name }}" \
               --head "${RELEASE_BRANCH}" \
               --title "${PR_TITLE}" \
-              --body "${PR_BODY}"
+              --body "${PR_BODY}" 2>&1)
+            PR_RC=$?
+            set -e
+            if [ "${PR_RC}" -eq 0 ]; then
+              echo "Created Release PR: ${PR_OUT}"
+              echo "Created Release PR for \`${NEW_TAG}\`: ${PR_OUT}" >> "$GITHUB_STEP_SUMMARY"
+            elif echo "${PR_OUT}" | grep -qi "not permitted to create or approve pull requests"; then
+              echo "Branch '${RELEASE_BRANCH}' pushed and CI triggered."
+              echo "GitHub repository policy blocks GITHUB_TOKEN from auto-creating PRs."
+              echo "Open PR manually: ${COMPARE_URL}"
+              {
+                echo "### Release Branch Ready: \`${RELEASE_BRANCH}\`"
+                echo ""
+                echo "- CI has been dispatched on \`${RELEASE_BRANCH}\`."
+                echo "- Auto-PR creation is disabled in **Settings -> Actions -> General -> Workflow permissions**."
+                echo "- [Create & merge Release PR (${NEW_TAG})](${COMPARE_URL})"
+              } >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "${PR_OUT}" >&2
+              exit "${PR_RC}"
+            fi
           else
             gh pr edit "${EXISTING_PR}" --title "${PR_TITLE}" --body "${PR_BODY}"
+            echo "Updated Release PR #${EXISTING_PR} for \`${NEW_TAG}\`." >> "$GITHUB_STEP_SUMMARY"
           fi
-
-          gh workflow run ci.yml --ref "${RELEASE_BRANCH}"
 
   tag-on-merge:
     name: Tag Merged Release on Main
