@@ -51,18 +51,31 @@ jobs:
           echo "### Building desktop installers for \`${TARGET_TAG}\`" >> "$GITHUB_STEP_SUMMARY"
 
   build-desktop-binaries:
-    name: Build & Attach Desktop Binaries
+    name: ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
     needs: [resolve-tag]
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            target_name: nsis
-          - os: ubuntu-22.04
-            target_name: deb
-            ubuntu_codename: jammy
+          - label: linux-x64
+            os: ubuntu-22.04
+            rust_target: x86_64-unknown-linux-gnu
+          - label: linux-arm64
+            os: ubuntu-22.04-arm
+            rust_target: aarch64-unknown-linux-gnu
+          - label: windows-x64
+            os: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+          - label: windows-arm64
+            os: windows-latest
+            rust_target: aarch64-pc-windows-msvc
+          - label: macos-x64
+            os: macos-14
+            rust_target: x86_64-apple-darwin
+          - label: macos-arm64
+            os: macos-14
+            rust_target: aarch64-apple-darwin
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -86,6 +99,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
 
       - name: Restore desktop build cache
         uses: actions/cache@v4
@@ -94,16 +109,16 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             desktop/src-tauri/target
-          key: ${{ runner.os }}-desktop-tauri-${{ hashFiles('desktop/package-lock.json', 'desktop/src-tauri/Cargo.lock') }}
+          key: ${{ matrix.label }}-desktop-tauri-${{ hashFiles('desktop/package-lock.json', 'desktop/src-tauri/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-desktop-tauri-
+            ${{ matrix.label }}-desktop-tauri-
 
       - name: Restore Linux package cache
         if: runner.os == 'Linux'
         uses: actions/cache@v4
         with:
           path: /var/cache/apt/archives
-          key: ${{ runner.os }}-desktop-apt-v1
+          key: ${{ matrix.label }}-desktop-apt-v1
 
       - name: Install Linux desktop dependencies
         if: runner.os == 'Linux'
@@ -123,7 +138,8 @@ jobs:
             libsoup-3.0-dev \
             libdbus-1-dev \
             pkg-config \
-            patchelf
+            patchelf \
+            rpm
 
       - name: Install desktop dependencies
         working-directory: desktop
@@ -134,7 +150,7 @@ jobs:
         shell: bash
         run: |
           APP_URL="${{ vars.AURELINX || vars.AURELINX_URL_APP || vars.AURELINX_APP_URL || vars.AURELIUS || vars.AURELIUS_URL_APP || vars.AURELIUS_APP_URL || 'https://aurelinx.averqel.com/app' }}"
-          echo "APP_URL=${APP_URL}" >> $GITHUB_OUTPUT
+          echo "APP_URL=${APP_URL}" >> "$GITHUB_OUTPUT"
 
       - name: Prepare desktop config
         working-directory: desktop
@@ -142,20 +158,54 @@ jobs:
           AURELINX_APP_URL: ${{ steps.app_url.outputs.APP_URL }}
         run: npm run prepare:config
 
-      - name: Build desktop package
+      - name: Build desktop package (${{ matrix.label }})
         working-directory: desktop
         env:
           AURELINX_APP_URL: ${{ steps.app_url.outputs.APP_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build
+        run: npm run build -- --target ${{ matrix.rust_target }}
+
+      - name: Upload Desktop Installer Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-installers-${{ matrix.label }}
+          path: |
+            desktop/src-tauri/target/${{ matrix.rust_target }}/release/bundle/nsis/*.exe
+            desktop/src-tauri/target/${{ matrix.rust_target }}/release/bundle/msi/*.msi
+            desktop/src-tauri/target/${{ matrix.rust_target }}/release/bundle/deb/*.deb
+            desktop/src-tauri/target/${{ matrix.rust_target }}/release/bundle/rpm/*.rpm
+            desktop/src-tauri/target/${{ matrix.rust_target }}/release/bundle/appimage/*.AppImage
+            desktop/src-tauri/target/${{ matrix.rust_target }}/release/bundle/dmg/*.dmg
+          if-no-files-found: warn
+
+  attach-to-release:
+    name: Attach Installers to GitHub Release
+    runs-on: ubuntu-latest
+    needs: [resolve-tag, build-desktop-binaries]
+    if: ${{ always() && needs.resolve-tag.result == 'success' && (needs.build-desktop-binaries.result == 'success' || needs.build-desktop-binaries.result == 'failure') }}
+    steps:
+      - name: Download Built Desktop Installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-installers-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: List Collected Installers
+        run: |
+          find release-assets -type f | sort || true
 
       - name: Attach Installers to Existing GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.resolve-tag.outputs.tag }}
+          fail_on_unmatched_files: false
           files: |
-            desktop/src-tauri/target/release/bundle/nsis/*.exe
-            desktop/src-tauri/target/release/bundle/deb/*.deb
-            desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            release-assets/**/*.exe
+            release-assets/**/*.msi
+            release-assets/**/*.deb
+            release-assets/**/*.rpm
+            release-assets/**/*.AppImage
+            release-assets/**/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
