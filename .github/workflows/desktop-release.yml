@@ -182,7 +182,7 @@ jobs:
     name: Attach Installers to GitHub Release
     runs-on: ubuntu-latest
     needs: [resolve-tag, build-desktop-binaries]
-    if: ${{ always() && needs.resolve-tag.result == 'success' && (needs.build-desktop-binaries.result == 'success' || needs.build-desktop-binaries.result == 'failure') }}
+    if: ${{ always() && needs.resolve-tag.result == 'success' && needs.build-desktop-binaries.result != 'skipped' }}
     steps:
       - name: Download Built Desktop Installers
         uses: actions/download-artifact@v4
