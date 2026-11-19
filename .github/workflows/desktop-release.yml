@@ -71,10 +71,10 @@ jobs:
             os: windows-latest
             rust_target: aarch64-pc-windows-msvc
           - label: macos-x64
-            os: macos-14
+            os: macos-latest
             rust_target: x86_64-apple-darwin
           - label: macos-arm64
-            os: macos-14
+            os: macos-latest
             rust_target: aarch64-apple-darwin
     steps:
       - name: Checkout repository

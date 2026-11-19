@@ -28,81 +28,147 @@ import {
   APP_VERSION,
   getReleaseDownloadUrls,
   detectUserPlatform,
-  GITHUB_LATEST_RELEASE_URL,
+  detectUserArchitecture,
+  fetchLatestGithubRelease,
+  formatAssetSize,
 } from "../config/version";
 
 export const DownloadModal = ({ isOpen, onClose }) => {
+  const [detectedOS, setDetectedOS] = useState("linux");
   const [selectedOS, setSelectedOS] = useState("linux");
+  const [detectedArch, setDetectedArch] = useState("x64");
+  const [selectedArch, setSelectedArch] = useState("x64");
+  const [release, setRelease] = useState(() =>
+    getReleaseDownloadUrls(APP_VERSION),
+  );
   const [copiedCmd, setCopiedCmd] = useState(false);
-  const release = getReleaseDownloadUrls(APP_VERSION);
 
   useEffect(() => {
-    if (isOpen) {
-      const platform = detectUserPlatform();
-      setSelectedOS(platform);
-    }
+    if (!isOpen) return;
+    let active = true;
+
+    const platform = detectUserPlatform();
+    setDetectedOS(platform);
+    setSelectedOS(platform);
+
+    detectUserArchitecture().then((arch) => {
+      if (!active) return;
+      setDetectedArch(arch);
+      setSelectedArch(arch);
+    });
+
+    fetchLatestGithubRelease(APP_VERSION).then((latest) => {
+      if (!active) return;
+      setRelease(latest);
+    });
+
+    return () => {
+      active = false;
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const isArm64 = selectedArch === "arm64";
+  const linuxDebAsset = isArm64 ? release.linuxDebArm64 : release.linuxDeb;
+  const linuxRpmAsset = isArm64 ? release.linuxRpmArm64 : release.linuxRpm;
+  const linuxAppImageAsset = isArm64
+    ? release.linuxAppImageArm64
+    : release.linuxAppImage;
+  const windowsExeAsset = isArm64 ? release.windowsArm64 : release.windows;
+  const windowsMsiAsset = isArm64
+    ? release.windowsMsiArm64
+    : release.windowsMsi;
+  const macosAsset = isArm64 ? release.macosArm64 : release.macos;
 
   const platforms = [
     {
       id: "linux",
       name: "Linux",
       icon: Terminal,
-      badge: "Ubuntu / Debian / Arch",
-      recommended: selectedOS === "linux",
+      badge: "Ubuntu / Debian / Fedora",
+      recommended: detectedOS === "linux",
       downloads: [
         {
           title: "Debian / Ubuntu Package",
-          file: release.linuxDeb.fileName,
-          url: release.linuxDeb.url,
-          format: ".deb (amd64)",
-          desc: "Recommended for Ubuntu, Debian, Pop!_OS, Mint",
+          file: linuxDebAsset.fileName,
+          url: linuxDebAsset.url,
+          format: `.deb (${linuxDebAsset.arch})`,
+          size: formatAssetSize(linuxDebAsset.sizeBytes),
+          available: linuxDebAsset.available,
+          desc: "Recommended for Ubuntu, Debian, Pop!_OS, Linux Mint",
+        },
+        {
+          title: "Fedora / RHEL / openSUSE",
+          file: linuxRpmAsset.fileName,
+          url: linuxRpmAsset.url,
+          format: `.rpm (${linuxRpmAsset.arch})`,
+          size: formatAssetSize(linuxRpmAsset.sizeBytes),
+          available: linuxRpmAsset.available,
+          desc: "Native RPM package for Fedora, RHEL, Rocky, openSUSE",
         },
         {
           title: "Universal Standalone AppImage",
-          file: release.linuxAppImage.fileName,
-          url: release.linuxAppImage.url,
-          format: ".AppImage",
-          desc: "Runs directly on Fedora, Arch, openSUSE, RHEL",
+          file: linuxAppImageAsset.fileName,
+          url: linuxAppImageAsset.url,
+          format: `.AppImage (${linuxAppImageAsset.arch})`,
+          size: formatAssetSize(linuxAppImageAsset.sizeBytes),
+          available: linuxAppImageAsset.available,
+          desc: "Portable binary for Arch, Fedora, Ubuntu, openSUSE",
         },
       ],
-      installCmd: `sudo dpkg -i ${release.linuxDeb.fileName}`,
+      installCmd: `sudo dpkg -i ${linuxDebAsset.fileName}  # or: sudo dnf install ./${linuxRpmAsset.fileName}`,
     },
     {
       id: "windows",
       name: "Windows",
       icon: Monitor,
-      badge: "Windows 10 / 11 (64-bit)",
-      recommended: selectedOS === "windows",
+      badge: "Windows 10 / 11 (x64 & ARM64)",
+      recommended: detectedOS === "windows",
       downloads: [
         {
           title: "Windows Setup Installer",
-          file: release.windows.fileName,
-          url: release.windows.url,
-          format: ".exe (x64)",
-          desc: "Native desktop setup with automatic updates and system tray",
+          file: windowsExeAsset.fileName,
+          url: windowsExeAsset.url,
+          format: `.exe (${windowsExeAsset.arch})`,
+          size: formatAssetSize(windowsExeAsset.sizeBytes),
+          available: windowsExeAsset.available,
+          desc: "Standard desktop setup wizard with system tray integration",
+        },
+        {
+          title: "Windows Enterprise Installer",
+          file: windowsMsiAsset.fileName,
+          url: windowsMsiAsset.url,
+          format: `.msi (${windowsMsiAsset.arch})`,
+          size: formatAssetSize(windowsMsiAsset.sizeBytes),
+          available: windowsMsiAsset.available,
+          desc: "Microsoft Installer package for managed/GPO deployments",
         },
       ],
-      installCmd: `${release.windows.fileName}`,
+      installCmd: `${windowsExeAsset.fileName}`,
     },
     {
       id: "macos",
       name: "macOS",
       icon: Cpu,
       badge: "Apple Silicon & Intel",
-      recommended: selectedOS === "macos",
+      recommended: detectedOS === "macos",
       downloads: [
         {
-          title: "macOS Universal Disk Image",
-          file: release.macos.fileName,
-          url: release.macos.url,
-          format: ".dmg (Universal)",
-          desc: "Native M1/M2/M3/M4 & Intel architecture support",
+          title: isArm64
+            ? "macOS Apple Silicon Disk Image"
+            : "macOS Intel Disk Image",
+          file: macosAsset.fileName,
+          url: macosAsset.url,
+          format: `.dmg (${macosAsset.arch})`,
+          size: formatAssetSize(macosAsset.sizeBytes),
+          available: macosAsset.available,
+          desc: isArm64
+            ? "Native M1 / M2 / M3 / M4 Apple Silicon build"
+            : "Native x86_64 Intel Mac build",
         },
       ],
-      installCmd: `open ${release.macos.fileName}`,
+      installCmd: `open ${macosAsset.fileName}`,
     },
   ];
 
@@ -151,7 +217,7 @@ export const DownloadModal = ({ isOpen, onClose }) => {
                     Download Aurelinx Desktop
                   </h3>
                   <span className="rounded-md border border-emerald-400/30 bg-emerald-950/50 px-2 py-0.5 font-mono text-xs font-bold text-emerald-300">
-                    v{APP_VERSION}
+                    {release.version}
                   </span>
                 </div>
                 <p className="text-xs text-slate-400">
@@ -207,8 +273,39 @@ export const DownloadModal = ({ isOpen, onClose }) => {
             })}
           </div>
 
+          {/* CPU Architecture Selector */}
+          <div className="mt-3 flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2">
+            <span className="text-[11px] font-medium text-slate-400">
+              CPU Architecture
+            </span>
+            <div className="flex items-center gap-1.5">
+              {[
+                { id: "x64", label: "x64 (Intel / AMD)" },
+                { id: "arm64", label: "ARM64 (aarch64 / Apple Silicon)" },
+              ].map((arch) => {
+                const active = selectedArch === arch.id;
+                const isDetected = detectedArch === arch.id;
+                return (
+                  <button
+                    key={arch.id}
+                    type="button"
+                    onClick={() => setSelectedArch(arch.id)}
+                    className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                      active
+                        ? "border border-emerald-400/40 bg-emerald-950/50 text-emerald-300"
+                        : "border border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                    }`}
+                  >
+                    {arch.label}
+                    {isDetected ? " · Detected" : ""}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Download Options for Selected OS */}
-          <div className="mt-5 space-y-3">
+          <div className="mt-4 space-y-2.5">
             {currentPlatform.downloads.map((item, idx) => (
               <div
                 key={idx}
@@ -217,13 +314,18 @@ export const DownloadModal = ({ isOpen, onClose }) => {
                 <div className="flex items-start gap-3">
                   <Package className="mt-0.5 h-5 w-5 text-emerald-400" />
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-bold text-white">
                         {item.title}
                       </span>
                       <span className="rounded border border-white/10 bg-slate-900 px-1.5 py-0.5 font-mono text-[10px] text-cyan-300">
                         {item.format}
                       </span>
+                      {item.size && (
+                        <span className="font-mono text-[10px] text-slate-400">
+                          {item.size}
+                        </span>
+                      )}
                     </div>
                     <p className="mt-0.5 text-xs text-slate-400">{item.desc}</p>
                     <span className="font-mono text-[11px] text-slate-500">
@@ -232,13 +334,19 @@ export const DownloadModal = ({ isOpen, onClose }) => {
                   </div>
                 </div>
 
-                <a
-                  href={item.url}
-                  download={item.file}
-                  className="flex shrink-0 items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-400 px-4 py-2.5 text-xs font-bold text-slate-950 transition-all hover:opacity-90 active:scale-95 shadow-md shadow-emerald-500/20"
-                >
-                  <Download className="h-4 w-4" /> Download
-                </a>
+                {item.available ? (
+                  <a
+                    href={item.url}
+                    download={item.file}
+                    className="flex shrink-0 items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-400 px-4 py-2.5 text-xs font-bold text-slate-950 transition-all hover:opacity-90 active:scale-95 shadow-md shadow-emerald-500/20"
+                  >
+                    <Download className="h-4 w-4" /> Download
+                  </a>
+                ) : (
+                  <span className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-400">
+                    Not Attached
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -259,7 +367,7 @@ export const DownloadModal = ({ isOpen, onClose }) => {
                   {copiedCmd ? "Copied!" : "Copy"}
                 </button>
               </div>
-              <code className="mt-1 block font-mono text-xs text-emerald-300">
+              <code className="mt-1 block overflow-x-auto font-mono text-xs text-emerald-300">
                 {currentPlatform.installCmd}
               </code>
             </div>
@@ -273,7 +381,7 @@ export const DownloadModal = ({ isOpen, onClose }) => {
             </div>
 
             <a
-              href={GITHUB_LATEST_RELEASE_URL}
+              href={release.releasePage}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 hover:underline"
